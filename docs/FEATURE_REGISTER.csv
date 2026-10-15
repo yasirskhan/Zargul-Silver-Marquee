@@ -4,7 +4,7 @@ PLAT-002,Master specification and AI handoff,0,In progress,Documents committed a
 PLAT-003,Automated tests and hosted CI,0,Initial backend CI verified,Run 38805803519 SUCCESS at 78d9629a6e9ad407b223133f9a9306c1893bd03d; PHP 8.3 Laravel Filament PostgreSQL and 11 backend tests pass; browser and production security suites pending
 WEB-001,Premium responsive customer website,6,Prototype only,index.html and CSS committed; responsive browser E2E and authentic venue assets pending
 WEB-002,Customer availability enquiry to staff inbox,6,Partial prototype,Sample enquiry preview only; persistence and secure customer intake pending
-AUTH-001,Owner/Admin MFA and all staff roles,1,Partial backend foundation,Filament panel and staff user/membership models added; MFA and all production authentication flows pending
+AUTH-001,Owner/Admin MFA and all staff roles,1,Partial backend foundation,Filament panel and staff user/membership models exist; app MFA and verified email are next; no production auth acceptance yet
 TEN-001,Company and hall access isolation,1,Initial backend test verified,PostgreSQL composite FKs and owner manager access checks PASS in run 38805803519; complete policy coverage pending
 AUD-001,Append-only searchable audit,1,Schema and immutability tests verified,Audit events table and PostgreSQL update/delete trigger tested; audit writer export and reporting not implemented
 HALL-001,Capacity and included seating plus priced additions,2,Prototype only,Backend pricing and capacity enforcement
@@ -26,7 +26,7 @@ PILOT-001,Supervised pilot and full restoration tests,8,Not started,Operator acc
 CMS-001,Typed page and column schema plus reordering and snapshot tests,0.5,Server validator verified,PHP typed schema security tests pass at 52b52ef6d9d2c58800f634ca8bba83eb09188684 run 38807658607; CMS persistence and browser acceptance still pending
 CMS-002,Owner branding theme logo and media management,0.5,Local browser preview only,Text theme color and temporary logo input in demo; production upload and permission rules pending
 CMS-003,Drag and drop visual sections and responsive columns,0.5,Interactive prototype CI verified,website-editor.html linked from owner demo; needs real browser E2E and persisted backend
-CMS-004,Website drafts review publish version and rollback,0.5,Transactional backend service verified,Authenticated draft save and atomic published snapshot audit and rollback-failure tests pass at cf2bc68be8a1d40dc6434b8bb98183e4dad325ba run 38808404906; no UI API or restore-previous-version yet
+CMS-004,Website drafts review publish version and rollback,0.5,Scoped models and transactional service verified,Backend Page and Revision models plus publish service pass 0d9ea64b8ab02c05940d44541fb873c44e945851 run 38808747998; no UI API or restore-previous-version yet
 CMS-005,Website menus headers footers SEO and domains,6,Not started,Public page verified with dynamic tenant content
 CMS-006,Media optimization validation and accessibility,6,Not started,Safe upload sizes formats alt and optimized responsive pictures
 CMS-007,Website enquiry forms and linked hall catalog blocks,6,Not started,Controlled form intake live hall service access and no private data leakage
