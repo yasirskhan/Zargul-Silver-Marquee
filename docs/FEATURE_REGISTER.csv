@@ -23,3 +23,12 @@ APR-003,Emergency approval delegation limits and expiry,5,Prototype only,Self-ap
 SRCH-001,Role-scoped universal search,3,Partial prototype,Browser sample search and visual role filters only; actual server-side authorization pending
 OPS-001,Event setup tasks and closeout,7,Not started,Complete event-day E2E
 PILOT-001,Supervised pilot and full restoration tests,8,Not started,Operator acceptance and every-day cash reconciliation
+CMS-001,Typed page and column schema plus reordering and snapshot tests,0.5,Implementation pending hosted CI,Validate typed blocks and draft/revision functions; production service still pending
+CMS-002,Owner branding theme logo and media management,0.5,Not started,Tenant scoped media store and audited branding edits
+CMS-003,Drag and drop visual sections and responsive columns,0.5,Not started,Preview resize reorder mobile and desktop in browser E2E
+CMS-004,Website drafts review publish version and rollback,0.5,Not started,Authorized publish immutable snapshots optimistic concurrency and rollback
+CMS-005,Website menus headers footers SEO and domains,6,Not started,Public page verified with dynamic tenant content
+CMS-006,Media optimization validation and accessibility,6,Not started,Safe upload sizes formats alt and optimized responsive pictures
+CMS-007,Website enquiry forms and linked hall catalog blocks,6,Not started,Controlled form intake live hall service access and no private data leakage
+CMS-008,Website content role permissions and complete audit,1,Not started,Owner and delegated site editor checks tenant boundaries history
+PLAT-004,Safe multi-session commit and overwrite avoidance protocol,0,Documented,Verify revision lease and exact SHA before each update
