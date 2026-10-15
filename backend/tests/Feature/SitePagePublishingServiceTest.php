@@ -24,6 +24,7 @@ class SitePagePublishingServiceTest extends TestCase
         $owner = User::create([
             'name' => 'Owner', 'email' => $slug.'-owner@example.test', 'password' => 'test-only-not-production',
         ]);
+        $owner->markEmailAsVerified();
         CompanyMembership::create([
             'company_id' => $company->id, 'user_id' => $owner->id, 'role' => 'owner',
         ]);
@@ -75,6 +76,7 @@ class SitePagePublishingServiceTest extends TestCase
         $second = User::create([
             'name' => 'Editor', 'email' => 'editor@example.test', 'password' => 'test-only-not-production',
         ]);
+        $second->markEmailAsVerified();
         CompanyMembership::create([
             'company_id' => $company->id, 'user_id' => $second->id,
             'role' => 'manager', 'can_edit_site' => true,
@@ -92,6 +94,7 @@ class SitePagePublishingServiceTest extends TestCase
         $editor = User::create([
             'name' => 'Editor', 'email' => 'only-editor@example.test', 'password' => 'test-only-not-production',
         ]);
+        $editor->markEmailAsVerified();
         CompanyMembership::create([
             'company_id' => $company->id, 'user_id' => $editor->id,
             'role' => 'manager', 'can_edit_site' => true,
@@ -202,5 +205,14 @@ SQL);
     {
         DB::statement('DROP TRIGGER IF EXISTS fail_test_audit_insert_trigger ON audit_events');
         DB::statement('DROP FUNCTION IF EXISTS fail_test_audit_insert()');
+    }
+
+    public function test_unverified_owner_cannot_write_content(): void
+    {
+        [$company, $owner, $pageId] = $this->setupWebsite('unverified');
+        $owner->forceFill(['email_verified_at' => null])->save();
+        $this->be($owner);
+        $this->expectException(AuthorizationException::class);
+        $this->service()->saveDraft($owner, $company->id, $pageId, $this->content('Unverified'), 0, 'Not allowed');
     }
 }

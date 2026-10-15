@@ -157,7 +157,8 @@ final class SitePagePublishingService
 
     private function authorize(User $actor, string $companyId, bool $publish): void
     {
-        if (! Auth::check() || (int) Auth::id() !== (int) $actor->getKey()
+        if (! Auth::check() || ! $actor->hasVerifiedEmail()
+            || (int) Auth::id() !== (int) $actor->getKey()
             || ! ($publish
                 ? $this->access->canPublishWebsite($actor, $companyId)
                 : $this->access->canEditWebsite($actor, $companyId))) {
