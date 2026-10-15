@@ -13,6 +13,8 @@ class User extends Authenticatable implements FilamentUser
 {
     use Notifiable;
 
+    protected $attributes = ['is_active' => true];
+
     protected $fillable = ['name', 'email', 'password', 'is_active'];
 
     protected $hidden = ['password', 'remember_token'];
