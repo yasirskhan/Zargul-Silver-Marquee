@@ -292,6 +292,51 @@ final class WebsiteWorkspace extends Page
         Notification::make()->title('Approved branding snapshot updated')->success()->send();
     }
 
+    /** Only published versions from this exact website are eligible for owner rollback. */
+    public function brandingPublishedHistory(): array
+    {
+        $actor = Filament::auth()->user();
+        $page = $this->currentPage();
+        if (! $actor instanceof User || ! $page
+            || $this->loadedBrandingCompanyId !== $page->company_id
+            || $this->loadedBrandingWebsiteId !== $page->website_id
+            || ! Gate::forUser($actor)->allows('publish', $page)) {
+            return [];
+        }
+
+        return DB::table('site_branding_publishing_events')
+            ->join('site_branding_revisions', function ($join): void {
+                $join->on('site_branding_publishing_events.website_id', '=', 'site_branding_revisions.website_id')
+                    ->on('site_branding_publishing_events.revision_id', '=', 'site_branding_revisions.id');
+            })
+            ->where('site_branding_publishing_events.company_id', $page->company_id)
+            ->where('site_branding_publishing_events.website_id', $page->website_id)
+            ->select('site_branding_revisions.id', 'site_branding_revisions.revision_number')
+            ->distinct()
+            ->orderByDesc('site_branding_revisions.revision_number')
+            ->limit(50)
+            ->get()
+            ->all();
+    }
+
+    public function restoreBranding(string $targetRevisionId): void
+    {
+        [$actor, $page] = $this->authorizeBranding('publish');
+        $this->validate(['brandingReason' => ['required', 'string', 'min:3', 'max:500']]);
+        if (! $this->loadedBrandingPublishedRevisionId) {
+            throw new ConflictHttpException('No approved branding snapshot exists to restore.');
+        }
+
+        $this->loadedBrandingPublishedRevisionId = app(SiteBrandingService::class)
+            ->restorePublishedBranding(
+                $actor, $page->company_id, $page->website_id,
+                $targetRevisionId, $this->loadedBrandingPublishedRevisionId,
+                $this->brandingReason
+            );
+        $this->brandingReason = '';
+        Notification::make()->title('Previously approved branding restored; latest draft preserved')->success()->send();
+    }
+
     /** Tenant-scoped media list with no object keys or raw file endpoints. */
     public function mediaForCurrentCompany(): array
     {

@@ -101,6 +101,21 @@
                             class="rounded border px-3 py-2 font-semibold">Publish branding</button>
                     @endif
                 </div>
+                @if ($this->canPublishCurrentPage())
+                    <div class="space-y-2" aria-label="Published branding versions">
+                        <h3 class="font-semibold">Previously approved branding</h3>
+                        <p class="text-xs">Restoring an older approved version changes only the published pointer. Your latest draft remains unchanged. Enter a reason above first.</p>
+                        <div class="flex flex-wrap gap-2">
+                            @forelse ($this->brandingPublishedHistory() as $approved)
+                                <button type="button" wire:click="restoreBranding('{{ $approved->id }}')"
+                                    wire:confirm="Restore this previously approved branding snapshot? Current draft edits will be preserved."
+                                    class="rounded border px-2 py-1 text-sm">Restore branding revision {{ $approved->revision_number }}</button>
+                            @empty
+                                <p class="text-sm">No approved branding history yet.</p>
+                            @endforelse
+                        </div>
+                    </div>
+                @endif
             </section>
 
             <section class="space-y-4 rounded-xl border p-4" aria-label="Website media library">

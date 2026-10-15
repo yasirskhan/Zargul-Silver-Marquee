@@ -97,4 +97,35 @@ class WebsiteWorkspaceBrandingTest extends TestCase
         $this->assertSame(1, (int) DB::table('websites')->where('id', $site)->value('branding_draft_revision'));
         $this->assertNull(DB::table('websites')->where('id', $site)->value('branding_published_revision_id'));
     }
+    public function test_owner_restores_an_earlier_approved_brand_without_discarding_latest_draft(): void
+    {
+        [, , $site] = $this->fixture();
+        $editor = Livewire::test(WebsiteWorkspace::class)
+            ->set('branding.siteName', 'Original Silver')
+            ->set('brandingReason', 'Initial approved branding')
+            ->call('saveBrandingDraft')->assertHasNoErrors()
+            ->set('brandingReason', 'Owner publishes original')
+            ->call('publishBranding')->assertHasNoErrors();
+        $first = DB::table('websites')->where('id', $site)->value('branding_published_revision_id');
+
+        $editor->set('branding.siteName', 'Second Silver')
+            ->set('brandingReason', 'Second approved branding')
+            ->call('saveBrandingDraft')->assertHasNoErrors()
+            ->set('brandingReason', 'Publish second version')
+            ->call('publishBranding')->assertHasNoErrors();
+        $editor->set('branding.siteName', 'Latest unsent draft')
+            ->set('brandingReason', 'Work in progress')
+            ->call('saveBrandingDraft')->assertHasNoErrors()
+            ->assertSee('Restore branding revision 1')
+            ->set('brandingReason', 'Restore approved original branding')
+            ->call('restoreBranding', $first)->assertHasNoErrors();
+
+        $this->assertSame($first, DB::table('websites')->where('id', $site)->value('branding_published_revision_id'));
+        $this->assertSame(3, (int) DB::table('websites')->where('id', $site)->value('branding_draft_revision'));
+        $this->assertSame(3, DB::table('site_branding_revisions')->count());
+        $this->assertSame(1, DB::table('site_branding_publishing_events')->where('action', 'restore')->count());
+        $this->assertSame(1, DB::table('audit_events')->where('action', 'website.branding_restored')->count());
+        $editor->assertSet('branding.siteName', 'Latest unsent draft');
+    }
+
 }
