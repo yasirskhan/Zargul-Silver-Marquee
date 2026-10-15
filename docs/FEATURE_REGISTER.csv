@@ -26,7 +26,7 @@ PILOT-001,Supervised pilot and full restoration tests,8,Not started,Operator acc
 CMS-001,Typed page and column schema plus reordering and snapshot tests,0.5,Server validator verified,PHP typed schema security tests pass at 52b52ef6d9d2c58800f634ca8bba83eb09188684 run 38807658607; CMS persistence and browser acceptance still pending
 CMS-002,Owner branding theme logo and media management,0.5,Local browser preview only,Text theme color and temporary logo input in demo; production upload and permission rules pending
 CMS-003,Drag and drop visual sections and responsive columns,0.5,Interactive prototype CI verified,website-editor.html linked from owner demo; needs real browser E2E and persisted backend
-CMS-004,Website drafts review publish version and rollback,0.5,Backend and Filament draft publish verified,Scoped audited draft save and publish UI passes 44 backend tests 162 assertions SHA 9ec24696e9ff16e322336a1878d37b3e2df3d460 CI 38812979688; restore UI and production browser E2E pending
+CMS-004,Website drafts review publish version and rollback,0.5,Filament save publish restore verified,Scoped audited draft save publish and published-snapshot history restore UI passes 45 backend tests 174 assertions SHA ba216cc188c034dbc1c961358fd00c3a259c2750 CI 38813371132; production browser E2E pending
 CMS-005,Website menus headers footers SEO and domains,6,Not started,Public page verified with dynamic tenant content
 CMS-006,Media optimization validation and accessibility,6,Not started,Safe upload sizes formats alt and optimized responsive pictures
 CMS-007,Website enquiry forms and linked hall catalog blocks,6,Not started,Controlled form intake live hall service access and no private data leakage
