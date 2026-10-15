@@ -102,3 +102,14 @@ jobs:
         run: php artisan migrate --force --no-interaction
       - name: Run tenant-isolation backend tests
         run: php artisan test --no-ansi
+      - name: Verify CMS migration rollback and replay
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: '5432'
+          DB_DATABASE: venue_test
+          DB_USERNAME: venue
+          DB_PASSWORD: venue
+        run: |
+          php artisan migrate:rollback --step=1 --force --no-interaction
+          php artisan migrate --force --no-interaction
