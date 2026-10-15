@@ -113,6 +113,75 @@ final class SitePagePublishingService
         }, 3);
     }
 
+
+    /**
+     * Restore an earlier immutable snapshot by creating a NEW publishing event.
+     * Does not mutate or discard the latest draft; checked CAS avoids stale rolls.
+     */
+    public function restorePublishedRevision(
+        User $actor,
+        string $companyId,
+        string $pageId,
+        string $targetRevisionId,
+        string $expectedPublishedRevisionId,
+        string $reason,
+    ): string {
+        $this->authorize($actor, $companyId, true);
+        $this->reason($reason);
+
+        return DB::transaction(function () use ($actor, $companyId, $pageId, $targetRevisionId, $expectedPublishedRevisionId, $reason): string {
+            $page = $this->pageForUpdate($companyId, $pageId);
+            if (! $page->published_revision_id || $page->published_revision_id !== $expectedPublishedRevisionId) {
+                throw new ConflictHttpException('Published snapshot changed; reload before restoring.');
+            }
+
+            $revision = DB::table('site_page_revisions')
+                ->where('company_id', $companyId)
+                ->where('page_id', $pageId)
+                ->where('id', $targetRevisionId)
+                ->first();
+            if (! $revision) {
+                throw new InvalidArgumentException('The selected published snapshot is unavailable for this page.');
+            }
+            // A restore may use only content that was previously published,
+            // not any arbitrary draft revision created since publication.
+            if (! DB::table('site_publishing_events')
+                ->where('company_id', $companyId)
+                ->where('page_id', $pageId)
+                ->where('revision_id', $targetRevisionId)
+                ->exists()) {
+                throw new InvalidArgumentException('Only previously published snapshots can be restored.');
+            }
+
+            $content = json_decode($revision->content, true, 512, JSON_THROW_ON_ERROR);
+            $this->validator->validate($content);
+            $this->assertCompanyMedia($companyId, $content, true);
+
+            if ($targetRevisionId === $page->published_revision_id) {
+                return $targetRevisionId; // Retry without duplicate history.
+            }
+
+            DB::table('site_pages')->where('id', $pageId)->where('company_id', $companyId)->update([
+                'published_revision_id' => $targetRevisionId,
+                'updated_at' => now(),
+            ]);
+            DB::table('site_publishing_events')->insert([
+                'id' => (string) Str::uuid(),
+                'company_id' => $companyId,
+                'page_id' => $pageId,
+                'revision_id' => $targetRevisionId,
+                'previous_revision_id' => $page->published_revision_id,
+                'action' => 'restore',
+                'actor_id' => $actor->getKey(),
+            ]);
+            $this->audit($companyId, $actor, 'website.restored', $pageId,
+                ['published_revision_id' => $page->published_revision_id],
+                ['published_revision_id' => $targetRevisionId, 'draft_revision' => (int) $page->draft_revision], $reason);
+
+            return $targetRevisionId;
+        }, 3);
+    }
+
     /** Only published snapshots are eligible for public rendering, never drafts. */
     public function publishedContent(string $companyId, string $pageId): ?array
     {

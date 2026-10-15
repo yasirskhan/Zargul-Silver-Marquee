@@ -188,6 +188,79 @@ class SitePagePublishingServiceTest extends TestCase
         $this->assertSame(1, DB::table('audit_events')->count());
     }
 
+
+    public function test_restore_published_version_records_new_event_and_preserves_newer_draft(): void
+    {
+        [$company, $owner, $pageId] = $this->setupWebsite('restore-page');
+        $this->be($owner);
+        $this->service()->saveDraft($owner, $company->id, $pageId, $this->content('Original'), 0, 'First draft');
+        $first = $this->service()->publish($owner, $company->id, $pageId, 1, 'First publish');
+        $this->service()->saveDraft($owner, $company->id, $pageId, $this->content('Replacement'), 1, 'Update');
+        $second = $this->service()->publish($owner, $company->id, $pageId, 2, 'Second publish');
+
+        $restored = $this->service()->restorePublishedRevision(
+            $owner, $company->id, $pageId, $first, $second, 'Restore approved headline'
+        );
+        $this->assertSame($first, $restored);
+        $this->assertEquals($this->content('Original'), $this->service()->publishedContent($company->id, $pageId));
+        $this->assertSame(2, DB::table('site_pages')->where('id', $pageId)->value('draft_revision'));
+        $this->assertSame(2, DB::table('site_page_revisions')->count());
+        $this->assertSame(3, DB::table('site_publishing_events')->count());
+        $this->assertSame(1, DB::table('site_publishing_events')->where('action', 'restore')->count());
+        $this->assertSame(5, DB::table('audit_events')->count());
+
+        $this->assertSame($first, $this->service()->restorePublishedRevision(
+            $owner, $company->id, $pageId, $first, $first, 'Idempotent retry'
+        ));
+        $this->assertSame(3, DB::table('site_publishing_events')->count());
+    }
+
+    public function test_restore_rejects_stale_pointer_and_draft_never_published(): void
+    {
+        [$company, $owner, $pageId] = $this->setupWebsite('restore-safety');
+        $this->be($owner);
+        $this->service()->saveDraft($owner, $company->id, $pageId, $this->content('First'), 0, 'First');
+        $first = $this->service()->publish($owner, $company->id, $pageId, 1, 'Publish');
+        $this->service()->saveDraft($owner, $company->id, $pageId, $this->content('Unpublished'), 1, 'Second');
+        $unpublished = DB::table('site_page_revisions')->where('page_id', $pageId)
+            ->where('revision_number', 2)->value('id');
+        try {
+            $this->service()->restorePublishedRevision(
+                $owner, $company->id, $pageId, $first, (string) Str::uuid(), 'Stale pointer'
+            );
+            $this->fail('Stale expected pointer was accepted');
+        } catch (ConflictHttpException) {
+            $this->assertSame($first, DB::table('site_pages')->where('id', $pageId)->value('published_revision_id'));
+        }
+        $this->expectException(InvalidArgumentException::class);
+        $this->service()->restorePublishedRevision(
+            $owner, $company->id, $pageId, $unpublished, $first, 'Never published'
+        );
+    }
+
+    public function test_restore_audit_failure_rolls_back_published_pointer_and_event(): void
+    {
+        [$company, $owner, $pageId] = $this->setupWebsite('restore-rollback');
+        $this->be($owner);
+        $this->service()->saveDraft($owner, $company->id, $pageId, $this->content('First'), 0, 'First');
+        $first = $this->service()->publish($owner, $company->id, $pageId, 1, 'Approved');
+        $this->service()->saveDraft($owner, $company->id, $pageId, $this->content('Second'), 1, 'Second');
+        $second = $this->service()->publish($owner, $company->id, $pageId, 2, 'Approved');
+        $this->rejectAuditWrites();
+        try {
+            $this->service()->restorePublishedRevision(
+                $owner, $company->id, $pageId, $first, $second, 'Rollback failure'
+            );
+            $this->fail('Restore should fail if audit write fails');
+        } catch (\Illuminate\Database\QueryException) {
+            $this->assertTrue(true);
+        } finally {
+            $this->allowAuditWrites();
+        }
+        $this->assertSame($second, DB::table('site_pages')->where('id', $pageId)->value('published_revision_id'));
+        $this->assertSame(2, DB::table('site_publishing_events')->count());
+    }
+
     private function rejectAuditWrites(): void
     {
         DB::unprepared(<<<'SQL'
