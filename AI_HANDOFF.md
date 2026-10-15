@@ -11,9 +11,9 @@ GitHub connector: repository read and write successful.
 Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; docs/ROADMAP.md; docs/WEBSITE_CMS_DESIGN.md; docs/DEVELOPMENT_PROTOCOL.md; docs/decisions/ADR-0001-platform-and-cms.md. Then read relevant source and tests. Verify LIVE development branch HEAD + exact SHA CI/jobs before writing. Actual repo/CI takes precedence over old handoff state.
 
 ## Last fully VERIFIED PRODUCT checkpoint
-- **Source commit:** `d2af406687d1d95c91ad3b62636865a01425eeca`
-- **Hosted CI:** `38818982835`, SUCCESS.
-- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38818982835
+- **Source commit:** `e0a60159e119522613e0e898db4e9c92aeb2c1d3`
+- **Hosted CI:** `38819195503`, SUCCESS.
+- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38819195503
 - All three jobs SUCCESS: `prototype-checks`, `laravel-postgres`.
 - PHP 8.3 clean Composer package resolution of Laravel 13 + Filament 5 succeeded.
 - PostgreSQL 16 migrations succeeded, including versioned website and tenant identity tables.
@@ -174,3 +174,9 @@ If current doc-only commit is verified, record that exact SHA and CI run only af
 - Locked loaded company/website IDs and current page Gate checks protect every action; service independently rechecks authenticated verified actor, membership, tenant and approved intact media. Unsaved Livewire form edits cannot be published. Switching website context clears previous company's form. Draft edits do not mutate the published pointer. Livewire tests cover owner approval, editor draft-only role, unsaved publish denial.
 - Browser E2E here still covers static prototype, not authenticated Filament. Branding is not wired into public serving; no owner go-live claim. Site media remains private until separately validated publication.
 - **NEXT BOUNDED TASK:** add audited rollback/restore for previously published BRANDING snapshots (not unpublished drafts), with expected published-pointer concurrency guard, untouched latest draft, immutable publishing events, and owner-only Livewire history/restore controls and PostgreSQL tests. Then responsive theme preview and safe public media projection (separate release gate).
+
+## 2026-10-15 audited branding snapshot restore backend VERIFIED
+- Product `e0a60159e119522613e0e898db4e9c92aeb2c1d3`, hosted CI `38819195503` SUCCESS (all three jobs at exact SHA).
+- Added `SiteBrandingService::restorePublishedBranding`: verified authorized publisher, live company-scoped website row lock, expected published-pointer CAS, required prior publication event, typed branding/media revalidation, immutable new restore event and append-only audit. It leaves current draft revision and older history unchanged, and idempotent restores do not duplicate events.
+- PostgreSQL tests cover first/second published versions followed by unpublished third draft, restoration, stale pointer denial and never-published draft denial. Source/migrations/rollback/prototype checks all passed.
+- **NEXT:** add publisher-only branding version history and restore button to MFA Filament WebsiteWorkspace with reason and stale-pointer protection; Livewire PostgreSQL tests. Then run authenticated Filament browser acceptance, safe media publication, and owner theme preview. Public website and customer booking remain incomplete.
