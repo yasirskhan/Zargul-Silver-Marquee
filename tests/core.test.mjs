@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {HALLS,SLOTS,availability,calculateQuote,calculateOvertime,canApprove} from '../assets/core.mjs';
+test('two halls and three daily sessions configured',()=>{assert.equal(Object.keys(HALLS).length,2);assert.deepEqual(SLOTS.map(s=>s.id),['morning','noon','evening'])});
+test('confirmed booking is unavailable',()=>assert.equal(availability('2026-10-22','grand','evening'),'booked'));
+test('different hall remains available in same time slot',()=>assert.equal(availability('2026-10-22','garden','evening'),'open'));
+test('temporary hold is visually distinguished',()=>assert.equal(availability('2026-10-24','grand','morning'),'hold'));
+test('seating and priced add-ons are itemized',()=>{const q=calculateQuote({guests:340,extraTables:4,extraChairs:40,addons:['music','lighting','entry']});assert.equal(q.total,821000);assert.equal(q.seatsValid,true);assert.equal(q.lines.length,7)});
+test('extra chairs cannot override physical capacity',()=>assert.equal(calculateQuote({guests:501,extraChairs:300,extraTables:100}).seatsValid,false));
+test('grace is free and overtime uses started billing blocks',()=>{assert.equal(calculateOvertime(15).amount,0);assert.equal(calculateOvertime(16).amount,10000);assert.equal(calculateOvertime(46).amount,20000)});
+test('delegated approval is scoped by amount and category',()=>{const d={adminId:'admin-1',startsAt:'2026-10-14T00:00:00Z',endsAt:'2026-10-17T23:59:59Z',categories:{discount:50000,refund:100000}}; const p={requesterId:'manager-1',approverId:'admin-1',approverRole:'admin',category:'discount',amount:50000,delegation:d};assert.equal(canApprove(p),true);assert.equal(canApprove({...p,amount:50001}),false);assert.equal(canApprove({...p,category:'expenses'}),false);assert.equal(canApprove({...p,requesterId:'admin-1'}),false);assert.equal(canApprove({...p,at:'2026-10-20T10:00:00Z'}),false);assert.equal(canApprove({...p,delegation:{...d,revoked:true}}),false)});
+test('invalid financial inputs and time rules fail',()=>{assert.throws(()=>calculateQuote({hall:'unknown'}));assert.throws(()=>calculateOvertime(30,{billingBlockMinutes:0}))});
