@@ -1,9 +1,9 @@
 ID,Feature,Phase,Status,Acceptance gate
 PLAT-001,Dedicated repo and protected development workflow,0,In progress,Read and write verified plus branch and hosted CI
 PLAT-002,Master specification and AI handoff,0,In progress,Documents committed and reconciled with live SHA
-PLAT-003,Automated tests and hosted CI,0,In progress,Node test workflow succeeds for exact SHA
-WEB-001,Premium responsive customer website,6,Not started,Mobile and desktop browser E2E with real approved assets
-WEB-002,Customer availability enquiry to staff inbox,6,Not started,Secure end-to-end persistence and no data exposure
+PLAT-003,Automated tests and hosted CI,0,Prototype CI verified,Run 38801706148 SUCCESS on SHA 03e5191f165f8a8769be871ac0a986d580cfdeaa; full backend CI not yet implemented
+WEB-001,Premium responsive customer website,6,Prototype only,index.html and CSS committed; responsive browser E2E and authentic venue assets pending
+WEB-002,Customer availability enquiry to staff inbox,6,Partial prototype,Sample enquiry preview only; persistence and secure customer intake pending
 AUTH-001,Owner/Admin MFA and all staff roles,1,Not started,Session and policy tests
 TEN-001,Company and hall access isolation,1,Not started,Cross-tenant and cross-hall tests
 AUD-001,Append-only searchable audit,1,Not started,Every important action traced with before/after
@@ -11,7 +11,7 @@ HALL-001,Capacity and included seating plus priced additions,2,Prototype only,Ba
 SLOT-001,Three owner-configurable programs daily,2,Prototype only,Persistent per-hall slot schedules
 SLOT-002,Grace/overtime/turnover/hard stop,2,Prototype only,Policy and operations integration tests
 ADD-001,Music/lighting/bridal entry and configurable addons,2,Prototype only,Admin catalog and itemized pricing
-BOOK-001,Availability calendar day/week/month/mobile,3,Prototype only,Actual database availability and browser tests
+BOOK-001,Availability calendar day/week/month/mobile,3,Partial prototype,Daily slot preview only; week/month views and DB protection pending
 BOOK-002,Database prevention of concurrent double booking,3,Not started,Parallel reservation and hold tests
 BOOK-003,Customers and booking history,3,Not started,CRM and access policy tests
 FIN-001,Versioned quotes and invoice/receipt PDF,4,Not started,PDF rendered and frozen invoice tests
@@ -20,6 +20,6 @@ FIN-003,Cash closeout and reconciliation,4,Not started,Daily cash balances prove
 APR-001,Discount/refund/waiver/free-service/expense approval,5,Prototype only,Authenticated approval state-machine tests
 APR-002,Private Telegram owner alerts and login popup,5,Not started,Recipient verification and deduplication tests
 APR-003,Emergency approval delegation limits and expiry,5,Prototype only,Self-approval expiry and revocation tests
-SRCH-001,Role-scoped universal search,3,Not started,Server-side search authorization
+SRCH-001,Role-scoped universal search,3,Partial prototype,Browser sample search and visual role filters only; actual server-side authorization pending
 OPS-001,Event setup tasks and closeout,7,Not started,Complete event-day E2E
 PILOT-001,Supervised pilot and full restoration tests,8,Not started,Operator acceptance and every-day cash reconciliation
