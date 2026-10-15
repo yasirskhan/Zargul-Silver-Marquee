@@ -1,0 +1,13 @@
+{
+  "name": "zargul-silver-marquee",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Zargul Silver Marquee and VenueDesk Phase 0 tested foundation",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
