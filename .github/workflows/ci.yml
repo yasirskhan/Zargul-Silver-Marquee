@@ -29,8 +29,13 @@ jobs:
           test -s assets/styles.css
           test -s assets/site.mjs
           test -s assets/admin.mjs
+          test -s assets/cms-schema.mjs
+          test -s tests/cms-schema.test.mjs
+          test -s docs/WEBSITE_CMS_DESIGN.md
+          test -s docs/DEVELOPMENT_PROTOCOL.md
       - name: Check JS syntax
         run: |
           node --check assets/core.mjs
           node --check assets/site.mjs
           node --check assets/admin.mjs
+          node --check assets/cms-schema.mjs
