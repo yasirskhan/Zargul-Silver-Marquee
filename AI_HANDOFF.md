@@ -11,9 +11,9 @@ GitHub connector: repository read and write successful.
 Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; docs/ROADMAP.md; docs/WEBSITE_CMS_DESIGN.md; docs/DEVELOPMENT_PROTOCOL.md; docs/decisions/ADR-0001-platform-and-cms.md. Then read relevant source and tests. Verify LIVE development branch HEAD + exact SHA CI/jobs before writing. Actual repo/CI takes precedence over old handoff state.
 
 ## Last fully VERIFIED PRODUCT checkpoint
-- **Source commit:** `e0a60159e119522613e0e898db4e9c92aeb2c1d3`
-- **Hosted CI:** `38819195503`, SUCCESS.
-- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38819195503
+- **Source commit:** `078046de7028f1060cfd0651b8da83d26a571a73`
+- **Hosted CI:** `38819428701`, SUCCESS.
+- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38819428701
 - All three jobs SUCCESS: `prototype-checks`, `laravel-postgres`.
 - PHP 8.3 clean Composer package resolution of Laravel 13 + Filament 5 succeeded.
 - PostgreSQL 16 migrations succeeded, including versioned website and tenant identity tables.
@@ -180,3 +180,10 @@ If current doc-only commit is verified, record that exact SHA and CI run only af
 - Added `SiteBrandingService::restorePublishedBranding`: verified authorized publisher, live company-scoped website row lock, expected published-pointer CAS, required prior publication event, typed branding/media revalidation, immutable new restore event and append-only audit. It leaves current draft revision and older history unchanged, and idempotent restores do not duplicate events.
 - PostgreSQL tests cover first/second published versions followed by unpublished third draft, restoration, stale pointer denial and never-published draft denial. Source/migrations/rollback/prototype checks all passed.
 - **NEXT:** add publisher-only branding version history and restore button to MFA Filament WebsiteWorkspace with reason and stale-pointer protection; Livewire PostgreSQL tests. Then run authenticated Filament browser acceptance, safe media publication, and owner theme preview. Public website and customer booking remain incomplete.
+
+## 2026-10-15 owner branding history restore UI VERIFIED
+- SOURCE `078046de7028f1060cfd0651b8da83d26a571a73`, hosted CI `38819428701` SUCCESS: all three jobs exact SHA, PHP syntax, PostgreSQL tests, schema rollback/replay, prototype Playwright browser checks.
+- Added company/page-scoped publisher-only approved branding version list and restore buttons in Filament WebsiteWorkspace. Each restore rechecks live tenant/page Gate, loaded company/website IDs, reason and expected published pointer before audited immutable service call. Restoring published branding does NOT mutate current draft.
+- PostgreSQL Livewire acceptance covers publishing versions one and two, saving separate third draft, restoring version one while preserving draft three, and single immutable audit/restore event. Delegated editor has no publisher controls.
+- No authenticated Playwright against Filament yet; browser suite remains static prototype. No production website public rendering, branding asset release, domain setup or booking persistence.
+- **NEXT BOUNDED TASK:** accessible responsive preview of whitelist-driven owner branding presets and draft, with escaped content and NO raw staged image file URLs; regression tests. Then service-side secure published snapshot renderer/variant projection and authenticated Filament browser acceptance. Broader Phase 2 venue configuration then Phase 3 booking follow roadmap.
