@@ -1,58 +1,69 @@
-# AI Handoff — Zargul Silver Marquee / VenueDesk
+# AI HANDOFF — Zargul Silver Marquee / VenueDesk
 
-Last updated: 2026-10-15 (UTC)
+Last verified at: 2026-10-15 UTC
 Repository: yasirskhan/Zargul-Silver-Marquee
-Working branch: chatgpt/phase0-foundation
-Default branch: main
-Related project: yasirskhan/property-platform — STRICTLY OFF LIMITS
+ONLY working branch: `chatgpt/phase0-foundation`
+Default `main`: untouched since README initialization at `83ee684f8b08e65bd673231e71f7d6ad6e817080`
+STRICTLY OUT OF SCOPE: yasirskhan/property-platform and all other repositories.
+GitHub connector: repository read and write successful.
 
-## Confirmed GitHub access
-- Repository read and write are functioning. Initial README commit on main: 83ee684f8b08e65bd673231e71f7d6ad6e817080.
-- Development branch was created from that commit. Project files are being added on development branch.
-- Current verified prototype product SHA: 8282af5805efc940471731d9916584bfc5ebc581. Hosted CI run 38803758311: SUCCESS for that exact SHA. These verify only demo code; later documentation commits need independent CI confirmation.
-- Do not assume the documentation-only handoff update commit is covered by prior CI; confirm the new SHA and check run before closing the batch.
-- Responsive website, employee dashboard AND website editor prototype committed. Backend remains NOT STARTED; fictional data, purely visual roles and no persistent page or invoice writes.
+## MUST-READ ON EVERY NEW SESSION
+Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; docs/ROADMAP.md; docs/WEBSITE_CMS_DESIGN.md; docs/DEVELOPMENT_PROTOCOL.md; docs/decisions/ADR-0001-platform-and-cms.md. Then read relevant source and tests. Verify LIVE development branch HEAD + exact SHA CI/jobs before writing. Actual repo/CI takes precedence over old handoff state.
 
-## Scope
-Read docs/PROJECT_MASTER_SPEC.md, docs/FEATURE_REGISTER.csv and docs/ROADMAP.md. Preserve the entire approved product scope. User prioritizes mobile-first simplicity for owner/manager/staff, three programs daily, hall seating/add-ons and owner-controlled grace/overtime, strict booking/payment reliability, in-app owner approval inbox with private Telegram alert and emergency delegation, and searchable audit. Public site branded Zargul Silver Marquee; management app named VenueDesk.
+## Last fully VERIFIED PRODUCT checkpoint
+- **Source commit:** `78d9629a6e9ad407b223133f9a9306c1893bd03d`
+- **Hosted CI:** `38805803519`, SUCCESS.
+- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38805803519
+- Both jobs SUCCESS: `prototype-checks`, `laravel-postgres`.
+- PHP 8.3 clean Composer package resolution of Laravel 13 + Filament 5 succeeded.
+- PostgreSQL 16 migrations succeeded, including versioned website and tenant identity tables.
+- Backend `11 passed (21 assertions)`: tenant/hall access, delegated website edit vs publish checks, cross-tenant composite FK rejection, invalid role rejection, isolation of draft/published revision, cross-page published revision rejection, immutable revisions/audit records.
+- Database **CMS migration rollback and replay** succeeded.
+- Node prototype logic and UI structure checks and JS syntax passed.
+- **Next documentation checkpoint is later than the verified product SHA.** Fetch the current head and verify its own CI. Do not mistake an older success for new code verification.
 
-## Current implementation
-- README on main documents the new repository.
-- package.json, assets/core.mjs and tests/core.test.mjs implement a DEMONSTRATION ONLY pure logic foundation; they do not persist bookings, enforce secure policies or record money.
-- Master spec, feature register, roadmap are committed to the development branch.
-- The prior session also generated a richer standalone static starter ZIP for UI reference, not yet committed. It must be reviewed/imported separately, without mistaking fake role buttons for secure authentication.
+## What is committed and what is NOT
+**Prototype UI only** (root):
+- `index.html`, `assets/site.mjs`, `assets/styles.css`: premium public venue website preview and customer enquiry demonstration.
+- `admin.html`, `assets/admin.mjs`: mobile-friendly owner/manager/staff dashboard, example calendar, customer pricing/finance/approval/search data. Role switch is COSMETIC.
+- `website-editor.html`, `assets/website-editor.mjs`, `assets/editor.css`, `assets/cms-schema.mjs`: interactive in-tab website editor demo; reorder sections/columns, desktop/mobile layout, logo/theme preview, demo draft/publish snapshots. NOTHING is saved to a server.
+- Node tests: `tests/core.test.mjs`, `tests/ui.test.mjs`, `tests/cms-schema.test.mjs`, `tests/website-editor.test.mjs`.
 
-## Latest verified product checkpoint (2026-10-15)
-- Branch: chatgpt/phase0-foundation; main and yasirskhan/property-platform are OFF LIMITS.
-- Site/dashboard/CMS prototype product commit: 8282af5805efc940471731d9916584bfc5ebc581.
-- Hosted GitHub Actions run: 38803758311, SUCCESS for this EXACT source SHA.
-- Passed: Node pure logic and CMS layout tests; prototype page/owner editor structural checks; required files; JavaScript syntax.
-- GitHub paths: website-editor.html, assets/website-editor.mjs, assets/editor.css, assets/cms-schema.mjs, tests/cms-schema.test.mjs, tests/website-editor.test.mjs.
-- Earlier responsive site/dashboard: index.html, admin.html, assets/styles.css, assets/site.mjs, assets/admin.mjs.
-- Required new specification: docs/WEBSITE_CMS_DESIGN.md. Multi-session rules: docs/DEVELOPMENT_PROTOCOL.md. Proposed architecture decision: docs/decisions/ADR-0001-platform-and-cms.md.
-- FEATURE_REGISTER.csv now tracks 33 requirements including detailed CMS IDs CMS-001 through CMS-008.
-- CRITICAL: These are demonstration/prototype screens only. No PostgreSQL, authenticated users, production CMS publishing, Telegram integration, finance ledger or real bookings yet. The owner's on-screen publish button is explicitly simulated; no changes appear on public live website.
+**New REAL server foundation** (isolated under `backend/`):
+- `composer.json`, `artisan`, `bootstrap/`, `public/index.php`, Filament `AdminPanelProvider`, Laravel `User` and company/hall/membership/access models.
+- `app/Services/TenantAccess.php`: per-company & hall checks, owner/admin roles, delegated website edit and publish flags, basic booking-management access. This is an INITIAL policy foundation, NOT complete API-level authorization or tenant security.
+- `database/migrations/2026_10_15_000000_create_identity_tables.php`: users, companies, halls, company memberships, hall assignments; company-matched FK constraints and role check.
+- `database/migrations/2026_10_15_000100_create_website_revision_tables.php`: websites, site media, pages, revisions, publication events and audit events; composite FK protections, update/delete-protecting PostgreSQL triggers, reversible schema.
+- `tests/Feature/TenantAccessTest.php`, `tests/Feature/SiteVersioningTest.php` with REAL PostgreSQL-backed verification.
+- `.github/workflows/ci.yml`: Node and PHP + PostgreSQL 16 jobs; schema rollback/replay check.
 
-## Exact next bounded implementation task
-1. Recheck live HEAD and latest CI after this handoff commit; do not assume product SHA or CI applies to subsequent doc commits.
-2. Review and validate the visual Website Editor behavior in real desktop and mobile browsers with Playwright; ensure section and column reorder controls, logo preview, safe field edits and keyboard/mobile interaction. Resolve any red CI or functional defect.
-3. Bootstrap REAL Laravel 13 + Filament 5 + PostgreSQL project in a bounded batch. Before pinning packages verify versions on clean Composer install in CI and record composer.lock; preserve mockups separately, do not overwrite source blindly.
-4. Establish tenant/company/hall identity, owner/admin roles and MFA, staff authorization, permissions, migration/audit foundation. Company scoped website page revisions and CMS media/publish rights should be integrated here.
-5. Build actual CMS page/revision/media migrations, server-side validation, safe renderer, draft optimistic locks and authenticated publication with audit; then connect public venue website dynamic blocks.
-6. Work per requirements and update FEATURE_REGISTER.csv and this handoff with exact commits/run IDs, then continue to reservation/finance/approval modules in docs/ROADMAP.md.
-7. No force push, no blind overwrite; fetch current file blob before update, reconcile HEAD drift. Do not ever mark demo tests as production acceptance.
+**Do NOT call this production-ready:** No actual booking persistence/atomic allocation, invoicing or payment ledger, owner MFA setup, Telegram, customer intake API, server-side CMS page validator, approved content publishing service, media upload pipeline, real interactive Filament resources or complete browser E2E. No live customer data or production deployment. Filament sign-in shell exists but its auth/authorization is NOT ready for real business use. Public repo: no production secrets or customer information.
 
-## Constraints
-- No changes to property-platform or any unrelated repository.
-- Do not merge unverified changes to main.
-- User-created repository is PUBLIC. Never commit secrets, customer data, live payment info, Telegram bot token, or unauthorized venue imagery.
-- Do not claim a live backend exists. Release requires secure server-side authorization, database constraints, auditable ledger, recoverability and tests.
-- Session loop: verify live HEAD/CI → inspect next uncompleted task → implement → tests → commit → hosted CI → fix reds → verify SHA → update requirement status and handoff → continue where possible.
-- A green run for one SHA never validates a different SHA.
+## Critical dependencies/known technical debts
+1. **composer.lock is NOT committed.** For initial bootstrap CI uses `composer update`; this is not a reproducible dependency graph. A vetted generated lock file is temporarily retained as GitHub Actions artifact `composer-lock-php83` ID `12005937405` from run `38805803519` (7-day retention). Retrieve and COMMIT `backend/composer.lock` after review, switch CI to `composer install --no-interaction --prefer-dist`, verify fresh exact SHA. If artifact expires, regenerate via verified Composer resolution.
+2. Model defaults `is_active` and optional permission booleans were set on fresh Eloquent models; do not remove without tests. CI formerly failed until fixed.
+3. PostgreSQL `venuedesk_immutable_history` function is `CREATE OR REPLACE` to support test-database refresh; dropping and replaying CMS schema is tested. App DB owner/superuser can still bypass ordinary trigger protection; enforce least-privilege database roles, secure external audit export and retention before production.
+4. Browser E2E responsive/accessibility tests for root mockups have NOT been executed.
+5. Current website images and capacities are illustrative; replace with owner-authorized real business details before public launch. No fake reviews/metrics.
+6. The current `backend/` is separate from static root prototypes. Do not replace/overwrite root mockups; connect them only after secure server services and verified UI paths exist.
+7. Phase 1 is **IN PROGRESS**, not complete: initial identities, migrations, basic access and tests are verified, but MFA/auth flows, production policies, scoped site publishing and audit writer are pending.
 
-## Earlier verified Phase 0 UI checkpoint (2026-10-15)
-- CI run: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38801706148
-- SHA: 03e5191f165f8a8769be871ac0a986d580cfdeaa
-- Conclusion: SUCCESS.
-- No production Laravel application, PostgreSQL data persistence, user authentication, verified Telegram integration or real audit ledger exists.
-- User-facing design should remain responsive and premium; production hall photos/prices must be sourced from owner.
+## REQUIRED NEXT BOUNDED TASK — immediately implement after cold-start
+- Step 1: verify LIVE head and CI for **this handoff commit**, reconcile any intervening commits.
+- Step 2: recover/commit `backend/composer.lock` from the artifact; make CI use locked Composer install; run hosted CI and fix failures. Keep version compatibility with verified Laravel 13 / Filament 5.
+- Step 3: implement typed **server-side page block validation** (mirror the stricter accepted CMS block schema), company-scoped SitePage/SitePageRevision models and *transactional authenticated* draft-save & publish service with optimistic concurrency, immutable revisions and audit records. Test two-editor stale revision rejection, unauthorized publish, no draft content leakage, and rollback.
+- Step 4: complete company-aware authentication, MFA for owner/admin, resources and least-privilege policy enforcement. Add email verification/session expiry as required by approved spec.
+- Step 5: add Playwright browser tests for website editor on desktop/mobile and preserve existing mockups.
+- Step 6: continue Phase 2 configurable halls/session times/capacity/add-ons and Phase 3 no-double-booking concurrency. Then finance ledger, approval center/Telegram, website CMS publishing/media, operations and pilot per docs/ROADMAP.md.
+- One bounded batch at a time: **verify live SHA → inspect next requirement → implement & tests → commit → hosted CI → fix red → verify exact SHA → update FEATURE_REGISTER.csv and AI_HANDOFF.md → immediately inspect next unblocked task**. Continue as long as the active execution environment permits; no claim of continuous background operation.
+- Never force-push, create new branches without agreement, blindly replace existing files, assume old CI verifies new HEAD, mark prototypes as complete production modules, touch `main` or touch property-platform.
+- When another session edits a file, fetch current blob SHA, compare differences and reconcile; do not overwrite concurrent work. Record unresolved blockers exactly.
+
+## Defects repaired during Phase 1
+- Run `38804939995`: backend PHPUnit could not run because Mockery development dependency absent. Added `mockery/mockery`.
+- Run `38805071892`: fresh user/hall Eloquent models initially omitted in-memory `is_active` defaults, resulting in false access denials; corrected model defaults.
+- Earlier CMS run `38805587443`: PostgreSQL test refresh kept PL/pgSQL function; corrected migration to `CREATE OR REPLACE FUNCTION`.
+- Latest verified run `38805803519` passes ALL required current checks. Future CI failures are not resolved by this historical green run.
+
+## Truthfulness and handoff update rule
+If current doc-only commit is verified, record that exact SHA and CI run only after GitHub reports completion. Last verified **product** source SHA above remains the source baseline until a later product change is tested. CI is evidence of specific jobs, not a zero-bugs guarantee or a live production release.
