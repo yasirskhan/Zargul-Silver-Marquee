@@ -11,9 +11,9 @@ GitHub connector: repository read and write successful.
 Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; docs/ROADMAP.md; docs/WEBSITE_CMS_DESIGN.md; docs/DEVELOPMENT_PROTOCOL.md; docs/decisions/ADR-0001-platform-and-cms.md. Then read relevant source and tests. Verify LIVE development branch HEAD + exact SHA CI/jobs before writing. Actual repo/CI takes precedence over old handoff state.
 
 ## Last fully VERIFIED PRODUCT checkpoint
-- **Source commit:** `e620d6c593f28f8edeb4a1c4e8c6c513778f6b3d`
-- **Hosted CI:** `38818316115`, SUCCESS.
-- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38818316115
+- **Source commit:** `df8509d94647c2491c3d09c1e586b8403559f7b3`
+- **Hosted CI:** `38818610733`, SUCCESS.
+- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38818610733
 - All three jobs SUCCESS: `prototype-checks`, `laravel-postgres`.
 - PHP 8.3 clean Composer package resolution of Laravel 13 + Filament 5 succeeded.
 - PostgreSQL 16 migrations succeeded, including versioned website and tenant identity tables.
@@ -160,3 +160,10 @@ If current doc-only commit is verified, record that exact SHA and CI run only af
 - PostgreSQL tests prove cross-company branding revision rejection, foreign-site publish pointer rejection, persisted draft/published separation, immutable revisions/publish events; source syntax, all backend tests, schema rollback/replay and prototype Chromium CI pass.
 - **NEXT** implement `SiteBrandingService` with authenticated company-scoped transactional draft-save/publish, optimistic version check, separate edit/publisher access, tenant-owned approved sanitized media requirement, append-only audit and published-only safe read; then Livewire owner controls for branding and image selection. No public website rendering or live branding release yet.
 - `main` and `property-platform` untouched.
+
+## 2026-10-15 versioned branding application service VERIFIED
+- Product `df8509d94647c2491c3d09c1e586b8403559f7b3`, GitHub Actions `38818610733`: `prototype-checks`, `laravel-postgres`, and `editor-browser-e2e` all SUCCESS (exact SHA).
+- New `SiteBrandingService` uses authenticated verified actor, active company membership and website, row locks, revision CAS, tenant-scoped media, private intact approved WebP variant verification, atomic immutable draft/publish revisions and publication events, and append-only audit.
+- Tests cover separate public vs unsaved draft branding, idempotent publishing, delegated editor without publish permission, stale concurrent drafts, cross-company actor denial, unsafe theme rollback, pending logo rejected for publication, approved logo accepted, and changed optimized variant rejected.
+- Public reads are published-pointer-only; no browser UI or public media routes exist. Owner-facing Filament branding controls, audited restore, public variant-only publication, operational MFA browser E2E and live site acceptance are still outstanding.
+- **NEXT BOUNDED TASK:** wire SiteBrandingService into existing MFA-protected Filament WebsiteWorkspace as a company-scoped owner/edit-delegated branding panel, with logo/favicon selection from authorized private library, reasons, load/save/publish permissions and Livewire PostgreSQL tests. Keep draft/public separation and prevent unsaved-form publishing.
