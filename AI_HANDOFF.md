@@ -11,9 +11,9 @@ GitHub connector: repository read and write successful.
 Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; docs/ROADMAP.md; docs/WEBSITE_CMS_DESIGN.md; docs/DEVELOPMENT_PROTOCOL.md; docs/decisions/ADR-0001-platform-and-cms.md. Then read relevant source and tests. Verify LIVE development branch HEAD + exact SHA CI/jobs before writing. Actual repo/CI takes precedence over old handoff state.
 
 ## Last fully VERIFIED PRODUCT checkpoint
-- **Source commit:** `adcafff973c9cbb603923e76acb520486ef83e59`
-- **Hosted CI:** `38815140340`, SUCCESS.
-- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38815140340
+- **Source commit:** `f8cba858f3c02442816c830a121f335088364a2d`
+- **Hosted CI:** `38817967003`, SUCCESS.
+- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38817967003
 - All three jobs SUCCESS: `prototype-checks`, `laravel-postgres`.
 - PHP 8.3 clean Composer package resolution of Laravel 13 + Filament 5 succeeded.
 - PostgreSQL 16 migrations succeeded, including versioned website and tenant identity tables.
@@ -144,3 +144,11 @@ If current doc-only commit is verified, record that exact SHA and CI run only af
 - Added `backend/app/Services/SiteMediaService.php`: checks logged-in/verified actor and active company/site with delegated editor/publisher rights; validates real JPEG/PNG/WebP bytes, MIME/dimensions/20MP/4MB, alt text, SHA-256, and private local storage with generated opaque filename. Atomic staged media row and immutable audit, cleanup staged file on transactional failures; never create a public-serving URL for staging.
 - Separate `approveImage()` requires publisher rights and image existence, uses PostgreSQL row locking, immutable audit, and safe idempotent retries. Tests reject foreign/unverified/inactive editors and disguised bytes. SOURCE `adcafff973c9cbb603923e76acb520486ef83e59`, CI `38815140340`: all 3 jobs green, 52 backend tests 204 assertions, 2 Playwright prototype browser checks.
 - **NEXT:** Filament upload/approve/insert UI scoped to tenant with Livewire integration and tests, then image processing/secure publication variants and branding controls. Staged files must remain private; no production-facing image rendering or public website deployment yet.
+
+## 2026-10-15 verified Filament image-library integration and optimized private variants
+- Intervening product source `896bf79b42ff44f2c0a707cdce018674093259be` delivered real Filament company-scoped upload, publisher approval, typed image insertion and Livewire test; hosted CI `38815515674` SUCCESS, all three jobs. Never repeat this work.
+- Product `f8cba858f3c02442816c830a121f335088364a2d` (including small test syntax correction) adds integrity validation of persisted original bytes at approval, GD decode/re-encode of private width/height-capped WebP variants with stripped source metadata, sha256/size/dimensions in private asset metadata, safe idempotent owner approval, transactional audit and new-file cleanup on error. Added tamper and image resize tests.
+- **Hosted CI `38817967003` SUCCESS for the exact product SHA:** `prototype-checks`, `laravel-postgres`, `editor-browser-e2e` all SUCCESS. PHP syntax, PostgreSQL migrations/test suite and rollback/replay passed; Chromium tests remain STATIC editor tests, not authenticated Filament acceptance.
+- No public media URLs or rendering pipeline yet. Public publication still needs secure variant-only materialization, published-snapshot isolation, authenticated panel browser E2E, operational image security hardening (including cleanup on transactional retry) and accessibility review.
+- **EXACT NEXT BOUNDED TASK:** owner-controlled branding draft/publish foundation for site themes/logo/favicon, with tenant-authorized scope, strict preset validation, optimistic concurrency, separate published vs draft state, immutable audit/revision history and PostgreSQL tests. Integrate owner controls into MFA-protected Filament after service verification. Keep media files private.
+- Only branch `chatgpt/phase0-foundation`; never touch `main` or `property-platform`. Follow verified-SHA test/commit/CI/handoff continuation cycle.
