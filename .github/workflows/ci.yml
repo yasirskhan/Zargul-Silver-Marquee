@@ -75,14 +75,8 @@ jobs:
           tools: composer:v2
       - name: Validate PHP dependency manifest
         run: composer validate --no-check-publish
-      - name: Resolve and install Laravel and Filament (initial bootstrap)
-        run: composer update --no-interaction --no-progress --prefer-dist
-      - name: Save dependency lock for a reviewable follow-up commit
-        uses: actions/upload-artifact@v4
-        with:
-          name: composer-lock-php83
-          path: backend/composer.lock
-          retention-days: 7
+      - name: Install reproducible locked PHP dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
       - name: Prepare isolated CI environment
         run: |
           cp .env.example .env
