@@ -113,6 +113,10 @@ SQL);
 
     public function down(): void
     {
+        // Remove the circular page -> published revision FK before dropping history.
+        Schema::table('site_pages', function (Blueprint $table): void {
+            $table->dropForeign(['id', 'published_revision_id']);
+        });
         Schema::dropIfExists('audit_events');
         Schema::dropIfExists('site_publishing_events');
         Schema::dropIfExists('site_page_revisions');
