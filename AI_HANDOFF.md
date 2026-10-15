@@ -11,13 +11,13 @@ GitHub connector: repository read and write successful.
 Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; docs/ROADMAP.md; docs/WEBSITE_CMS_DESIGN.md; docs/DEVELOPMENT_PROTOCOL.md; docs/decisions/ADR-0001-platform-and-cms.md. Then read relevant source and tests. Verify LIVE development branch HEAD + exact SHA CI/jobs before writing. Actual repo/CI takes precedence over old handoff state.
 
 ## Last fully VERIFIED PRODUCT checkpoint
-- **Source commit:** `078046de7028f1060cfd0651b8da83d26a571a73`
-- **Hosted CI:** `38819428701`, SUCCESS.
-- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38819428701
-- All three jobs SUCCESS: `prototype-checks`, `laravel-postgres`.
+- **Source commit:** `d526d1be8e378527d87bd25bac26438b46fd9784`
+- **Hosted CI:** `38826086694`, SUCCESS.
+- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38826086694
+- All three jobs SUCCESS: `prototype-checks`, `laravel-postgres`, `editor-browser-e2e`.
 - PHP 8.3 clean Composer package resolution of Laravel 13 + Filament 5 succeeded.
 - PostgreSQL 16 migrations succeeded, including versioned website and tenant identity tables.
-- Backend `38 passed (128 assertions)`: tenant/hall access, delegated website edit vs publish checks, cross-tenant composite FK rejection, invalid role rejection, isolation of draft/published revision, cross-page published revision rejection, immutable revisions/audit records.
+- Backend `74 passed (327 assertions)` at latest CI, covering previous security/CMS tests and new private branding preview checks. Earlier tests include: tenant/hall access, delegated website edit vs publish checks, cross-tenant composite FK rejection, invalid role rejection, isolation of draft/published revision, cross-page published revision rejection, immutable revisions/audit records.
 - Database **CMS migration rollback and replay** succeeded.
 - Node prototype logic and UI structure checks and JS syntax passed.
 - **Locked dependencies, CMS transactional foundation with audited restore and scoped authorization policy, Filament MFA and shared PostgreSQL cache/session infrastructure are verified** at the above SHA. Composer lock downloaded from the verified PHP 8.3 artifact, vetted (141 packages, content hash f199e7dfdf44e33a642f6ac51604217e), committed at 8c1e01e2; hosted CI now uses `composer install`. One-time lock-promotion workflow was removed. This documentation change must itself pass CI.
@@ -187,3 +187,10 @@ If current doc-only commit is verified, record that exact SHA and CI run only af
 - PostgreSQL Livewire acceptance covers publishing versions one and two, saving separate third draft, restoring version one while preserving draft three, and single immutable audit/restore event. Delegated editor has no publisher controls.
 - No authenticated Playwright against Filament yet; browser suite remains static prototype. No production website public rendering, branding asset release, domain setup or booking persistence.
 - **NEXT BOUNDED TASK:** accessible responsive preview of whitelist-driven owner branding presets and draft, with escaped content and NO raw staged image file URLs; regression tests. Then service-side secure published snapshot renderer/variant projection and authenticated Filament browser acceptance. Broader Phase 2 venue configuration then Phase 3 booking follow roadmap.
+
+## 2026-10-15 verified responsive branding PREVIEW (not a public renderer)
+- SOURCE `d526d1be8e378527d87bd25bac26438b46fd9784`, hosted CI `38826086694` SUCCESS for exact SHA. All three jobs green; backend 74 passed (327 assertions); PostgreSQL migration rollback/replay and static prototype Chromium checks passed.
+- Added `backend/resources/views/filament/pages/partials/branding-preview.blade.php` rendered within MFA-protected WebsiteWorkspace. Live name/tagline/palette/font and logo/favicon selections preview using server-owned four palettes and two font presets, escaped text and private-only image placeholders. Desktop/tablet/360px screen controls reuse existing checked mode.
+- Added owner and delegated-editor Livewire tests for preview escape, invalid-preset fallback, screen sizes, no unsaved draft/publish/audit writes, no raw private asset links, and denied publisher controls for editors.
+- No authenticated Filament browser E2E: Chromium job still validates static root prototype only. No public site or image URLs are published. Real photos, owner review and release gates remain outstanding.
+- **NEXT BOUNDED TASK:** implement a tenant-isolated **service-side published snapshot projection** that joins only company/site/page approved branding and page revisions, rechecks typed content and optimized approved image integrity, and returns no private storage paths/original bytes or draft revisions. Add PostgreSQL tests for draft isolation, cross-company lookup, changed asset denial and unapproved asset denial. Keep route disabled until safe asset materialization and full browser acceptance exist. Then explicitly build secure published WebP-only delivery and authenticated Filament browser test infrastructure.
