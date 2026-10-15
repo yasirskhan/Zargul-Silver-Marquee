@@ -128,4 +128,43 @@ class WebsiteWorkspaceBrandingTest extends TestCase
         $editor->assertSet('branding.siteName', 'Latest unsent draft');
     }
 
+    public function test_branding_preview_is_responsive_escaped_and_never_publishes_unsaved_changes(): void
+    {
+        [, , $site] = $this->fixture();
+        $component = Livewire::test(WebsiteWorkspace::class)
+            ->assertSee('Private branding draft preview')
+            ->assertSee('Logo preview placeholder')
+            ->set('branding.siteName', 'Private Draft Marquee')
+            ->set('branding.tagline', '<img src=x onerror=alert(1)>')
+            ->set('branding.themePreset', 'midnight')
+            ->set('branding.fontPreset', 'modern')
+            ->call('setPreviewMode', 'phone')
+            ->assertSee('Phone branding')
+            ->assertSee('Private Draft Marquee')
+            ->assertSee('&lt;img src=x onerror=alert(1)&gt;', false)
+            ->assertDontSee('<img src=x onerror=alert(1)>', false)
+            ->assertSee('max-width: 360px', false)
+            ->assertSee('background-color: #111827', false)
+            ->assertSee('font-family: system-ui, sans-serif', false)
+            ->assertDontSee('site-media/private/', false);
+
+        $this->assertSame(0, (int) DB::table('websites')->where('id', $site)->value('branding_draft_revision'));
+        $this->assertNull(DB::table('websites')->where('id', $site)->value('branding_published_revision_id'));
+        $this->assertSame(0, DB::table('audit_events')->count());
+        $component->set('branding.themePreset', 'url(javascript:alert(1))')
+            ->assertSee('background-color: #f3f4f6', false)
+            ->assertDontSee('url(javascript:alert(1))', false);
+    }
+
+    public function test_delegated_editor_can_preview_changes_without_publisher_privileges(): void
+    {
+        $this->fixture(false);
+        Livewire::test(WebsiteWorkspace::class)
+            ->set('branding.siteName', 'Editor Work In Progress')
+            ->call('setPreviewMode', 'tablet')
+            ->assertSee('Editor Work In Progress')
+            ->assertSee('max-width: 760px', false)
+            ->assertDontSee('Publish branding');
+    }
+
 }
