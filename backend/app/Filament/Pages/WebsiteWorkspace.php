@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Models\SitePage;
 use App\Models\User;
+use App\Services\SiteMediaService;
 use App\Services\SitePagePublishingService;
 use App\Services\SiteWorkspaceService;
 use BackedEnum;
@@ -16,10 +17,12 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
+use Livewire\WithFileUploads;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class WebsiteWorkspace extends Page
 {
+    use WithFileUploads;
     protected string $view = 'filament.pages.website-workspace';
 
     protected static string | BackedEnum | null $navigationIcon = Heroicon::OutlinedGlobeAlt;
@@ -38,6 +41,13 @@ final class WebsiteWorkspace extends Page
     public string $previewMode = 'desktop';
 
     public string $reason = '';
+
+    /** Livewire temporary uploads are not publicly attached until privately staged. */
+    public $pendingImage = null;
+
+    public string $mediaAltText = '';
+
+    public string $mediaReason = '';
 
     #[Locked]
     public ?string $loadedPageId = null;
@@ -153,6 +163,79 @@ final class WebsiteWorkspace extends Page
         $this->loadedCompanyId = $page->company_id;
         $this->expectedRevision = (int) $page->draft_revision;
         $this->loadedPublishedRevisionId = $page->published_revision_id;
+    }
+
+    /** Tenant-scoped media list with no object keys or raw file endpoints. */
+    public function mediaForCurrentCompany(): array
+    {
+        $actor = Filament::auth()->user();
+        $page = $this->currentPage();
+        if (! $actor instanceof User || ! $page
+            || ! Gate::forUser($actor)->allows('update', $page)) {
+            return [];
+        }
+
+        return DB::table('site_media')
+            ->where('company_id', $page->company_id)
+            ->whereIn('status', ['pending', 'approved'])
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get(['id', 'status', 'alt_text', 'mime_type'])
+            ->all();
+    }
+
+    public function stageMedia(): void
+    {
+        [$actor, $page] = $this->authorizeSelectedPage('update');
+        $this->checkEditorSnapshot($page);
+        $this->validate([
+            'pendingImage' => ['required', 'file', 'max:4096'],
+            'mediaAltText' => ['required', 'string', 'max:300'],
+            'mediaReason' => ['required', 'string', 'min:3', 'max:500'],
+        ]);
+
+        app(SiteMediaService::class)->stageImage(
+            $actor, $page->company_id, $this->pendingImage,
+            $this->mediaAltText, $this->mediaReason
+        );
+        $this->reset('pendingImage', 'mediaAltText', 'mediaReason');
+        Notification::make()->title('Image staged privately for review')->success()->send();
+    }
+
+    public function approveMedia(string $mediaId): void
+    {
+        [$actor, $page] = $this->authorizeSelectedPage('publish');
+        $this->checkEditorSnapshot($page);
+        $this->validate(['mediaReason' => ['required', 'string', 'min:3', 'max:500']]);
+
+        app(SiteMediaService::class)->approveImage(
+            $actor, $page->company_id, $mediaId, $this->mediaReason
+        );
+        $this->mediaReason = '';
+        Notification::make()->title('Image approved for publishing')->success()->send();
+    }
+
+    public function addImageFromLibrary(string $mediaId): void
+    {
+        [, $page] = $this->authorizeSelectedPage('update');
+        $this->checkEditorSnapshot($page);
+        abort_unless(count($this->sections) < 60, 422);
+        $asset = DB::table('site_media')
+            ->where('company_id', $page->company_id)
+            ->where('id', $mediaId)
+            ->whereIn('status', ['pending', 'approved'])
+            ->first(['id', 'alt_text']);
+        abort_unless($asset, 404);
+
+        $this->sections[] = [
+            'id' => 'section_'.Str::random(16),
+            'type' => 'image',
+            'data' => [
+                'imageId' => $asset->id,
+                'alt' => $asset->alt_text ?: 'Venue photograph',
+                'caption' => '',
+            ],
+        ];
     }
 
     public function addSection(string $type): void

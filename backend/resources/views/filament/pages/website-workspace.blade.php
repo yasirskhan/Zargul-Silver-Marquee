@@ -31,6 +31,55 @@
                     class="rounded-lg border px-3 py-2 text-sm">Reload latest draft</button>
             </section>
 
+            <section class="space-y-4 rounded-xl border p-4" aria-label="Website media library">
+                <h2 class="text-lg font-semibold">Media library</h2>
+                <p class="text-sm">Stage genuine venue images privately, then request owner or publisher approval before any publication. Uploading never puts a photo on the public website.</p>
+                <div class="grid gap-3 md:grid-cols-2">
+                    <label class="block space-y-1">
+                        <span class="text-sm font-medium">Venue photograph (JPEG, PNG or WebP; up to 4 MB)</span>
+                        <input type="file" wire:model="pendingImage" accept="image/jpeg,image/png,image/webp"
+                            class="block w-full rounded border p-2 text-sm">
+                        @error('pendingImage') <span role="alert" class="text-sm text-red-600">{{ $message }}</span> @enderror
+                    </label>
+                    <label class="block space-y-1">
+                        <span class="text-sm font-medium">Image description for accessibility</span>
+                        <input type="text" wire:model="mediaAltText" maxlength="300"
+                            placeholder="Describe the actual venue image" class="w-full rounded border p-2 text-gray-900">
+                        @error('mediaAltText') <span role="alert" class="text-sm text-red-600">{{ $message }}</span> @enderror
+                    </label>
+                </div>
+                <label class="block space-y-1">
+                    <span class="text-sm font-medium">Media upload or approval reason</span>
+                    <textarea wire:model="mediaReason" rows="2" maxlength="500"
+                        class="w-full rounded border p-2 text-gray-900" placeholder="Why is this approved venue image needed?"></textarea>
+                    @error('mediaReason') <span role="alert" class="text-sm text-red-600">{{ $message }}</span> @enderror
+                </label>
+                <button type="button" wire:click="stageMedia" wire:loading.attr="disabled"
+                    class="rounded-lg border px-3 py-2 font-semibold">Stage image privately</button>
+                <div class="space-y-2">
+                    <h3 class="font-semibold">Company image assets</h3>
+                    @forelse ($this->mediaForCurrentCompany() as $asset)
+                        <div wire:key="asset-{{ $asset->id }}" class="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3">
+                            <div>
+                                <p class="text-sm font-medium">{{ $asset->alt_text }}</p>
+                                <p class="text-xs">{{ $asset->mime_type }} · {{ ucfirst($asset->status) }}</p>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" wire:click="addImageFromLibrary('{{ $asset->id }}')"
+                                    class="rounded border px-2 py-1 text-sm">Add to draft</button>
+                                @if ($this->canPublishCurrentPage() && $asset->status === 'pending')
+                                    <button type="button" wire:click="approveMedia('{{ $asset->id }}')"
+                                        wire:confirm="Approve this actual venue image for a published page?"
+                                        class="rounded border px-2 py-1 text-sm">Approve image</button>
+                                @endif
+                            </div>
+                        </div>
+                    @empty
+                        <p class="text-sm">No staged venue images yet.</p>
+                    @endforelse
+                </div>
+            </section>
+
             <section class="space-y-4" aria-label="Draft page sections">
                 <h2 class="text-lg font-semibold">Page sections</h2>
                 <div class="flex flex-wrap gap-2">
