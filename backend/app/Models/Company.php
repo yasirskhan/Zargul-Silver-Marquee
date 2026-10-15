@@ -10,6 +10,8 @@ class Company extends Model
 {
     use HasUuids;
 
+    protected $attributes = ['is_active' => true];
+
     protected $fillable = ['name', 'slug', 'is_active'];
 
     protected function casts(): array
