@@ -11,9 +11,9 @@ GitHub connector: repository read and write successful.
 Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; docs/ROADMAP.md; docs/WEBSITE_CMS_DESIGN.md; docs/DEVELOPMENT_PROTOCOL.md; docs/decisions/ADR-0001-platform-and-cms.md. Then read relevant source and tests. Verify LIVE development branch HEAD + exact SHA CI/jobs before writing. Actual repo/CI takes precedence over old handoff state.
 
 ## Last fully VERIFIED PRODUCT checkpoint
-- **Source commit:** `f8cba858f3c02442816c830a121f335088364a2d`
-- **Hosted CI:** `38817967003`, SUCCESS.
-- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38817967003
+- **Source commit:** `e620d6c593f28f8edeb4a1c4e8c6c513778f6b3d`
+- **Hosted CI:** `38818316115`, SUCCESS.
+- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38818316115
 - All three jobs SUCCESS: `prototype-checks`, `laravel-postgres`.
 - PHP 8.3 clean Composer package resolution of Laravel 13 + Filament 5 succeeded.
 - PostgreSQL 16 migrations succeeded, including versioned website and tenant identity tables.
@@ -152,3 +152,11 @@ If current doc-only commit is verified, record that exact SHA and CI run only af
 - No public media URLs or rendering pipeline yet. Public publication still needs secure variant-only materialization, published-snapshot isolation, authenticated panel browser E2E, operational image security hardening (including cleanup on transactional retry) and accessibility review.
 - **EXACT NEXT BOUNDED TASK:** owner-controlled branding draft/publish foundation for site themes/logo/favicon, with tenant-authorized scope, strict preset validation, optimistic concurrency, separate published vs draft state, immutable audit/revision history and PostgreSQL tests. Integrate owner controls into MFA-protected Filament after service verification. Keep media files private.
 - Only branch `chatgpt/phase0-foundation`; never touch `main` or `property-platform`. Follow verified-SHA test/commit/CI/handoff continuation cycle.
+
+## 2026-10-15 tenant-scoped branding foundation VERIFIED
+- Product `e620d6c593f28f8edeb4a1c4e8c6c513778f6b3d`, hosted CI `38818316115` SUCCESS (all three jobs).
+- Added reversible PostgreSQL branding schema: per-website independent draft revision number and published-revision pointer, append-only `site_branding_revisions` and `site_branding_publishing_events`, website/composite company foreign keys, immutable trigger protection and same-site published FK.
+- Added `SiteBrandingValidator` with explicit site name/tagline fields, restricted theme and font presets, nullable UUID logo/favicon references. Arbitrary CSS/JS, unsafe content, unknown fields and arbitrary asset aliases rejected.
+- PostgreSQL tests prove cross-company branding revision rejection, foreign-site publish pointer rejection, persisted draft/published separation, immutable revisions/publish events; source syntax, all backend tests, schema rollback/replay and prototype Chromium CI pass.
+- **NEXT** implement `SiteBrandingService` with authenticated company-scoped transactional draft-save/publish, optimistic version check, separate edit/publisher access, tenant-owned approved sanitized media requirement, append-only audit and published-only safe read; then Livewire owner controls for branding and image selection. No public website rendering or live branding release yet.
+- `main` and `property-platform` untouched.
