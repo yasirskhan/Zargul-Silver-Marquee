@@ -23,5 +23,14 @@ jobs:
           test -s docs/ROADMAP.md
           test -s assets/core.mjs
           test -s tests/core.test.mjs
+          test -s tests/ui.test.mjs
+          test -s index.html
+          test -s admin.html
+          test -s assets/styles.css
+          test -s assets/site.mjs
+          test -s assets/admin.mjs
       - name: Check JS syntax
-        run: node --check assets/core.mjs
+        run: |
+          node --check assets/core.mjs
+          node --check assets/site.mjs
+          node --check assets/admin.mjs
