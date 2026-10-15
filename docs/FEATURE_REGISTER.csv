@@ -30,7 +30,7 @@ CMS-004,Website drafts review publish version and rollback,0.5,Backend draft pub
 CMS-005,Website menus headers footers SEO and domains,6,Not started,Public page verified with dynamic tenant content
 CMS-006,Media optimization validation and accessibility,6,Not started,Safe upload sizes formats alt and optimized responsive pictures
 CMS-007,Website enquiry forms and linked hall catalog blocks,6,Not started,Controlled form intake live hall service access and no private data leakage
-CMS-008,Website content role permissions and complete audit,1,Scoped CMS policies verified,Verified-email scoped Laravel page Gate owner and delegated edit/publish rights and service auth tested SHA a4adf3518dae789080a0c71b5a74af0e50fffc01 CI 38810316559; MFA-protected UI routes and audit export pending
+CMS-008,Website content role permissions and complete audit,1,Scoped policy and workspace navigation verified,Scoped Laravel page Gate and company-safe Filament website navigation verified SHA f5316f57638d4a84b84ddcbc21f2d6399cdf8d08 CI 38812448013; live edit/publish actions and audit export pending
 PLAT-004,Safe multi-session commit and overwrite avoidance protocol,0,Documented,Verify revision lease and exact SHA before each update
 PLAT-005,Laravel 13 Filament 5 PostgreSQL foundation,1,Initial backend CI verified,Run 38805803519 SUCCESS at SHA 78d9629a6e9ad407b223133f9a9306c1893bd03d; 11 PostgreSQL tests 21 assertions
 PLAT-006,Reproducible locked PHP dependencies,1,Verified,Lock recovered from CI artifact and checksum checked; composer install exact SHA 51c839a9d6201f206c46fd47441b7f286dc8a564 run 38807212590 SUCCESS
