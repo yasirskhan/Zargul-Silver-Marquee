@@ -1,0 +1,13 @@
+/.env
+/.env.*
+!/.env.example
+/vendor/
+/node_modules/
+/public/build/
+/storage/*.key
+/storage/logs/*
+!/storage/logs/.gitignore
+/bootstrap/cache/*
+!/bootstrap/cache/.gitignore
+/phpunit.xml.bak
+/.phpunit.cache
