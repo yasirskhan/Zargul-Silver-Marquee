@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CompanyMembership extends Model
 {
+    protected $attributes = ['is_active' => true, 'can_edit_site' => false, 'can_publish_site' => false];
+
     protected $fillable = [
         'company_id', 'user_id', 'role', 'is_active', 'can_edit_site', 'can_publish_site',
     ];
