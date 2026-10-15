@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Models\SitePage;
 use App\Models\User;
+use App\Services\SiteBrandingService;
 use App\Services\SiteMediaService;
 use App\Services\SitePagePublishingService;
 use App\Services\SiteWorkspaceService;
@@ -49,6 +50,11 @@ final class WebsiteWorkspace extends Page
 
     public string $mediaReason = '';
 
+    /** Owner-editable branding form, separate from approved public settings. */
+    public array $branding = [];
+
+    public string $brandingReason = '';
+
     #[Locked]
     public ?string $loadedPageId = null;
 
@@ -60,6 +66,18 @@ final class WebsiteWorkspace extends Page
 
     #[Locked]
     public ?string $loadedPublishedRevisionId = null;
+
+    #[Locked]
+    public ?string $loadedBrandingWebsiteId = null;
+
+    #[Locked]
+    public ?string $loadedBrandingCompanyId = null;
+
+    #[Locked]
+    public int $expectedBrandingRevision = 0;
+
+    #[Locked]
+    public ?string $loadedBrandingPublishedRevisionId = null;
 
     public static function canAccess(): bool
     {
@@ -138,6 +156,12 @@ final class WebsiteWorkspace extends Page
         $this->loadedPublishedRevisionId = null;
         $this->loadedPageId = null;
         $this->loadedCompanyId = null;
+        // Switching venue/page must never leave a different company's branding in Livewire state.
+        $this->branding = [];
+        $this->loadedBrandingWebsiteId = null;
+        $this->loadedBrandingCompanyId = null;
+        $this->expectedBrandingRevision = 0;
+        $this->loadedBrandingPublishedRevisionId = null;
 
         $page = $this->currentPage();
         if (! $page) {
@@ -163,6 +187,109 @@ final class WebsiteWorkspace extends Page
         $this->loadedCompanyId = $page->company_id;
         $this->expectedRevision = (int) $page->draft_revision;
         $this->loadedPublishedRevisionId = $page->published_revision_id;
+        $this->reloadBranding();
+    }
+
+    /** Load the current saved branding DRAFT, never the published snapshot as a fallback. */
+    public function reloadBranding(): void
+    {
+        [, $page] = $this->authorizeSelectedPage('update');
+        $this->checkEditorSnapshot($page);
+        $site = DB::table('websites')
+            ->where('company_id', $page->company_id)->where('id', $page->website_id)
+            ->where('is_active', true)->first();
+        abort_unless($site, 404);
+
+        $this->loadedBrandingWebsiteId = $site->id;
+        $this->loadedBrandingCompanyId = $site->company_id;
+        $this->expectedBrandingRevision = (int) $site->branding_draft_revision;
+        $this->loadedBrandingPublishedRevisionId = $site->branding_published_revision_id;
+        $this->branding = [
+            'siteName' => $site->name,
+            'tagline' => '',
+            'themePreset' => 'silver',
+            'fontPreset' => 'classic',
+            'logoMediaId' => null,
+            'faviconMediaId' => null,
+        ];
+        if ($this->expectedBrandingRevision > 0) {
+            $saved = DB::table('site_branding_revisions')
+                ->where('company_id', $page->company_id)->where('website_id', $site->id)
+                ->where('revision_number', $this->expectedBrandingRevision)->value('content');
+            if (! is_string($saved)) {
+                throw new ConflictHttpException('Branding draft is missing; reload your venue.');
+            }
+            $this->branding = json_decode($saved, true, 512, JSON_THROW_ON_ERROR);
+        }
+    }
+
+    private function authorizeBranding(string $ability): array
+    {
+        [$actor, $page] = $this->authorizeSelectedPage($ability);
+        $this->checkEditorSnapshot($page);
+        abort_unless($this->loadedBrandingCompanyId === $page->company_id
+            && $this->loadedBrandingWebsiteId === $page->website_id, 409);
+
+        return [$actor, $page];
+    }
+
+    private function normalizeBrandingForm(): void
+    {
+        foreach (['logoMediaId', 'faviconMediaId'] as $field) {
+            if (($this->branding[$field] ?? null) === '') {
+                $this->branding[$field] = null;
+            }
+        }
+    }
+
+    public function saveBrandingDraft(): void
+    {
+        [$actor, $page] = $this->authorizeBranding('update');
+        $this->normalizeBrandingForm();
+        $this->validate([
+            'brandingReason' => ['required', 'string', 'min:3', 'max:500'],
+            'branding.siteName' => ['required', 'string', 'max:120'],
+            'branding.tagline' => ['present', 'string', 'max:240'],
+            'branding.themePreset' => ['required', 'string'],
+            'branding.fontPreset' => ['required', 'string'],
+            'branding.logoMediaId' => ['nullable', 'uuid'],
+            'branding.faviconMediaId' => ['nullable', 'uuid'],
+        ]);
+        $this->expectedBrandingRevision = app(SiteBrandingService::class)->saveDraft(
+            $actor, $page->company_id, $page->website_id,
+            $this->branding, $this->expectedBrandingRevision, $this->brandingReason
+        );
+        $this->brandingReason = '';
+        Notification::make()->title('Branding draft saved for review')->success()->send();
+    }
+
+    public function publishBranding(): void
+    {
+        [$actor, $page] = $this->authorizeBranding('publish');
+        $this->normalizeBrandingForm();
+        $this->validate(['brandingReason' => ['required', 'string', 'min:3', 'max:500']]);
+        if ($this->expectedBrandingRevision < 1) {
+            throw ValidationException::withMessages(['branding' => 'Save a branding draft before publishing.']);
+        }
+
+        $saved = DB::table('site_branding_revisions')
+            ->where('company_id', $page->company_id)->where('website_id', $page->website_id)
+            ->where('revision_number', $this->expectedBrandingRevision)->value('content');
+        if (! is_string($saved)) {
+            throw new ConflictHttpException('Branding draft changed; reload before publishing.');
+        }
+        if (json_decode($saved, true, 512, JSON_THROW_ON_ERROR) != $this->branding) {
+            throw ValidationException::withMessages([
+                'branding' => 'Save the changes on this screen before publishing branding.',
+            ]);
+        }
+
+        $this->loadedBrandingPublishedRevisionId = app(SiteBrandingService::class)->publish(
+            $actor, $page->company_id, $page->website_id,
+            $this->expectedBrandingRevision, $this->brandingReason
+        );
+        $this->brandingReason = '';
+        Notification::make()->title('Approved branding snapshot updated')->success()->send();
     }
 
     /** Tenant-scoped media list with no object keys or raw file endpoints. */

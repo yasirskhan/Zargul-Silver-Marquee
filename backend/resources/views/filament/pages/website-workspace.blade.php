@@ -31,6 +31,78 @@
                     class="rounded-lg border px-3 py-2 text-sm">Reload latest draft</button>
             </section>
 
+            <section class="space-y-4 rounded-xl border p-4" aria-label="Website branding">
+                <h2 class="text-lg font-semibold">Branding and theme</h2>
+                <p class="text-sm">Choose approved theme presets and company-owned images. Save a draft first; only an authorized publisher can approve changes for a future public release.</p>
+                <p class="text-xs">Branding draft revision: {{ $expectedBrandingRevision }}. {{ $loadedBrandingPublishedRevisionId ? 'An approved branding snapshot exists.' : 'No published branding yet.' }}</p>
+                <div class="grid gap-3 md:grid-cols-2">
+                    <label class="block space-y-1">
+                        <span class="text-sm font-medium">Public venue name</span>
+                        <input wire:model="branding.siteName" type="text" maxlength="120" class="w-full rounded border p-2 text-gray-900">
+                    </label>
+                    <label class="block space-y-1">
+                        <span class="text-sm font-medium">Short tagline</span>
+                        <input wire:model="branding.tagline" type="text" maxlength="240" class="w-full rounded border p-2 text-gray-900">
+                    </label>
+                    <label class="block space-y-1">
+                        <span class="text-sm font-medium">Color theme preset</span>
+                        <select wire:model="branding.themePreset" class="w-full rounded border p-2 text-gray-900">
+                            <option value="silver">Silver</option>
+                            <option value="ivory">Ivory</option>
+                            <option value="midnight">Midnight</option>
+                            <option value="sage">Sage</option>
+                        </select>
+                    </label>
+                    <label class="block space-y-1">
+                        <span class="text-sm font-medium">Typography preset</span>
+                        <select wire:model="branding.fontPreset" class="w-full rounded border p-2 text-gray-900">
+                            <option value="classic">Classic</option>
+                            <option value="modern">Modern</option>
+                        </select>
+                    </label>
+                    <label class="block space-y-1">
+                        <span class="text-sm font-medium">Website logo</span>
+                        <select wire:model="branding.logoMediaId" class="w-full rounded border p-2 text-gray-900">
+                            <option value="">No logo selected</option>
+                            @foreach ($this->mediaForCurrentCompany() as $asset)
+                                <option value="{{ $asset->id }}">{{ $asset->alt_text }} ({{ $asset->status }})</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label class="block space-y-1">
+                        <span class="text-sm font-medium">Website favicon</span>
+                        <select wire:model="branding.faviconMediaId" class="w-full rounded border p-2 text-gray-900">
+                            <option value="">No favicon selected</option>
+                            @foreach ($this->mediaForCurrentCompany() as $asset)
+                                <option value="{{ $asset->id }}">{{ $asset->alt_text }} ({{ $asset->status }})</option>
+                            @endforeach
+                        </select>
+                    </label>
+                </div>
+                @error('branding') <span role="alert" class="text-sm text-red-600">{{ $message }}</span> @enderror
+                @foreach (['siteName', 'tagline', 'themePreset', 'fontPreset', 'logoMediaId', 'faviconMediaId'] as $field)
+                    @error('branding.'.$field) <span role="alert" class="text-sm text-red-600">{{ $message }}</span> @enderror
+                @endforeach
+                <label class="block space-y-1">
+                    <span class="text-sm font-medium">Reason for branding change or approval</span>
+                    <textarea wire:model="brandingReason" maxlength="500" rows="2"
+                        class="w-full rounded border p-2 text-gray-900"></textarea>
+                    @error('brandingReason') <span role="alert" class="text-sm text-red-600">{{ $message }}</span> @enderror
+                </label>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" wire:click="saveBrandingDraft" wire:loading.attr="disabled"
+                        class="rounded border px-3 py-2 font-semibold">Save branding draft</button>
+                    <button type="button" wire:click="reloadBranding"
+                        wire:confirm="Discard unsaved branding changes and load the latest draft?"
+                        class="rounded border px-3 py-2">Reload branding</button>
+                    @if ($this->canPublishCurrentPage())
+                        <button type="button" wire:click="publishBranding"
+                            wire:confirm="Approve saved branding for public release?"
+                            class="rounded border px-3 py-2 font-semibold">Publish branding</button>
+                    @endif
+                </div>
+            </section>
+
             <section class="space-y-4 rounded-xl border p-4" aria-label="Website media library">
                 <h2 class="text-lg font-semibold">Media library</h2>
                 <p class="text-sm">Stage genuine venue images privately, then request owner or publisher approval before any publication. Uploading never puts a photo on the public website.</p>
