@@ -11,16 +11,16 @@ GitHub connector: repository read and write successful.
 Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; docs/ROADMAP.md; docs/WEBSITE_CMS_DESIGN.md; docs/DEVELOPMENT_PROTOCOL.md; docs/decisions/ADR-0001-platform-and-cms.md. Then read relevant source and tests. Verify LIVE development branch HEAD + exact SHA CI/jobs before writing. Actual repo/CI takes precedence over old handoff state.
 
 ## Last fully VERIFIED PRODUCT checkpoint
-- **Source commit:** `98fb311c219028afe3c0055317f8a179a6cec3ae`
-- **Hosted CI:** `38809096372`, SUCCESS.
-- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38809096372
+- **Source commit:** `91eeafdba6b5253acf787e0b9562840363477594`
+- **Hosted CI:** `38809986246`, SUCCESS.
+- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38809986246
 - Both jobs SUCCESS: `prototype-checks`, `laravel-postgres`.
 - PHP 8.3 clean Composer package resolution of Laravel 13 + Filament 5 succeeded.
 - PostgreSQL 16 migrations succeeded, including versioned website and tenant identity tables.
-- Backend `27 passed (82 assertions)`: tenant/hall access, delegated website edit vs publish checks, cross-tenant composite FK rejection, invalid role rejection, isolation of draft/published revision, cross-page published revision rejection, immutable revisions/audit records.
+- Backend `29 passed (96 assertions)`: tenant/hall access, delegated website edit vs publish checks, cross-tenant composite FK rejection, invalid role rejection, isolation of draft/published revision, cross-page published revision rejection, immutable revisions/audit records.
 - Database **CMS migration rollback and replay** succeeded.
 - Node prototype logic and UI structure checks and JS syntax passed.
-- **Locked dependencies, initial transactional CMS services, tenant-scoped models and Filament MFA foundation are verified** at the above SHA. Composer lock downloaded from the verified PHP 8.3 artifact, vetted (141 packages, content hash f199e7dfdf44e33a642f6ac51604217e), committed at 8c1e01e2; hosted CI now uses `composer install`. One-time lock-promotion workflow was removed. This documentation change must itself pass CI.
+- **Locked dependencies, CMS transactional foundation, tenant-scoped models, Filament MFA and shared PostgreSQL cache/session infrastructure are verified** at the above SHA. Composer lock downloaded from the verified PHP 8.3 artifact, vetted (141 packages, content hash f199e7dfdf44e33a642f6ac51604217e), committed at 8c1e01e2; hosted CI now uses `composer install`. One-time lock-promotion workflow was removed. This documentation change must itself pass CI.
 
 ## What is committed and what is NOT
 **Prototype UI only** (root):
@@ -46,13 +46,13 @@ Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; d
 4. Browser E2E responsive/accessibility tests for root mockups have NOT been executed.
 5. Current website images and capacities are illustrative; replace with owner-authorized real business details before public launch. No fake reviews/metrics.
 6. The current `backend/` is separate from static root prototypes. Do not replace/overwrite root mockups; connect them only after secure server services and verified UI paths exist.
-7. Phase 1 is **IN PROGRESS**, not complete: identities/migrations/basic access/transactional draft-publish/audit inserts verified; MFA browser/operational flows, model-level policies, CMS HTTP integration, audited rollback workflow, media approval and audit export are pending.
+7. Phase 1 is **IN PROGRESS**, not complete: identities/migrations/basic access/transactional draft-publish/audit inserts, Filament MFA plus shared cache/sessions verified; MFA browser/operational flows, model-level policies, CMS HTTP integration, audited rollback workflow, media approval and audit export are pending.
 
 ## REQUIRED NEXT BOUNDED TASK — immediately implement after cold-start
 - Step 1: verify LIVE head and CI for **this handoff commit**, reconcile any intervening commits.
 - Step 2: COMPLETE/VERIFIED at SHA `51c839a9d6201f206c46fd47441b7f286dc8a564`, CI `38807212590`: locked Composer install and one-time bootstrap removal.
-- Step 3: Typed CMS validator and authenticated company-scoped transactional draft-save and publish service COMPLETE/VERIFIED at `cf2bc68be8a1d40dc6434b8bb98183e4dad325ba`, CI `38808404906` (after test fix). Tested stale revision rejection, delegation denial, published snapshot isolation, idempotent publish, audit/rollback failure handling. Filament 5 mandatory TOTP MFA, encrypted recovery codes, password reset, email verification and active-company panel admission **VERIFIED** at `98fb311c219028afe3c0055317f8a179a6cec3ae`, CI `38809096372`. **NEXT:** shared atomic MFA replay cache, central session storage/expiry, then complete CMS policies and safe routes/CSRF. Company-scoped Website/SitePage/SitePageRevision models are VERIFIED at `0d9ea64b8ab02c05940d44541fb873c44e945851`, CI `38808747998`; explicit scopes are NOT automatic authorization. Publishing service itself is not yet wired to public or Filament routes.
-- Step 4: Filament MFA/email verification foundation VERIFIED at `98fb311c219028afe3c0055317f8a179a6cec3ae`; continue shared replay-resistant cache/session-expiry infrastructure, real verification email delivery and privileged recovery procedures, then full least-privilege CMS/API policies and tests.
+- Step 3: Typed CMS validator and authenticated company-scoped transactional draft-save and publish service COMPLETE/VERIFIED at `cf2bc68be8a1d40dc6434b8bb98183e4dad325ba`, CI `38808404906` (after test fix). Tested stale revision rejection, delegation denial, published snapshot isolation, idempotent publish, audit/rollback failure handling. Filament 5 mandatory TOTP MFA, encrypted recovery codes, password reset, email verification and active-company panel admission **VERIFIED** at `98fb311c219028afe3c0055317f8a179a6cec3ae`, CI `38809096372`. Shared PostgreSQL-backed cache locks and session storage, configurable expiry, encrypted session setting, 3-migration rollback/replay **VERIFIED** at `91eeafdba6b5253acf787e0b9562840363477594`, CI `38809986246`. **NEXT:** company-scoped Laravel authorization policies for page read/update/publish and strict email verification, then authenticated MFA-protected CMS endpoints. Company-scoped Website/SitePage/SitePageRevision models are VERIFIED at `0d9ea64b8ab02c05940d44541fb873c44e945851`, CI `38808747998`; explicit scopes are NOT automatic authorization. Publishing service itself is not yet wired to public or Filament routes.
+- Step 4: Filament MFA/email verification foundation VERIFIED at `98fb311c219028afe3c0055317f8a179a6cec3ae`; shared replay-resistant cache/session infrastructure VERIFIED at `91eeafdba6b5253acf787e0b9562840363477594`. Continue real verification email delivery and privileged recovery procedures, then full least-privilege CMS/API policies and tests.
 - Step 5: add Playwright browser tests for website editor on desktop/mobile and preserve existing mockups.
 - Step 6: continue Phase 2 configurable halls/session times/capacity/add-ons and Phase 3 no-double-booking concurrency. Then finance ledger, approval center/Telegram, website CMS publishing/media, operations and pilot per docs/ROADMAP.md.
 - One bounded batch at a time: **verify live SHA → inspect next requirement → implement & tests → commit → hosted CI → fix red → verify exact SHA → update FEATURE_REGISTER.csv and AI_HANDOFF.md → immediately inspect next unblocked task**. Continue as long as the active execution environment permits; no claim of continuous background operation.
@@ -63,7 +63,7 @@ Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; d
 - Run `38804939995`: backend PHPUnit could not run because Mockery development dependency absent. Added `mockery/mockery`.
 - Run `38805071892`: fresh user/hall Eloquent models initially omitted in-memory `is_active` defaults, resulting in false access denials; corrected model defaults.
 - Earlier CMS run `38805587443`: PostgreSQL test refresh kept PL/pgSQL function; corrected migration to `CREATE OR REPLACE FUNCTION`.
-- Latest verified run `38809096372` passes ALL required checks (27 backend tests / 82 assertions) for SHA `98fb311c219028afe3c0055317f8a179a6cec3ae`. Future CI failures are not resolved by this historical green run.
+- Latest verified run `38809986246` passes ALL required checks (29 backend tests / 96 assertions) for SHA `91eeafdba6b5253acf787e0b9562840363477594`. Future CI failures are not resolved by this historical green run.
 
 ## Truthfulness and handoff update rule
 If current doc-only commit is verified, record that exact SHA and CI run only after GitHub reports completion. Last verified **product** source SHA above remains the source baseline until a later product change is tested. CI is evidence of specific jobs, not a zero-bugs guarantee or a live production release.
@@ -94,3 +94,8 @@ If current doc-only commit is verified, record that exact SHA and CI run only af
 - `User.php` implements Filament TOTP + recovery contracts/traits, Laravel MustVerifyEmail, encrypted TOTP and recovery-code casts with hidden serialization. Filament AdminPanelProvider enables mandatory app MFA, recovery, password reset, profile and email verification. Added reversible MFA column migration and tests.
 - `canAccessPanel()` additionally rejects a user with only an inactive company. Exact source SHA `98fb311c219028afe3c0055317f8a179a6cec3ae` and hosted CI `38809096372` SUCCESS, 27 PostgreSQL-backed tests / 82 assertions, both jobs green.
 - **NOT production-ready:** `.env.example` still has CACHE_STORE=array and SESSION_DRIVER=file and MAIL_MAILER=log, not shared atomic/cache sessions or real email delivery. Complete reliable shared session/cache infrastructure, MFA replay enforcement/expiries, account recovery policy and browser acceptance. Do not claim TOTP has been end-to-end browser tested.
+
+## 2026-10-15 PostgreSQL shared auth/session foundation verified
+- Added reversible migration `2026_10_15_000300_create_shared_auth_infrastructure.php` with shared `cache`, `cache_locks`, `sessions`. Local `.env.example`: `CACHE_STORE=database`, `SESSION_DRIVER=database`, `SESSION_LIFETIME=60`, encrypted session values, cache prefix; production must set secure cookie + real TLS/email/secret/backup. PHPUnit uses array stores globally for isolation, with explicit PostgreSQL integration testing for database cache locks and sessions.
+- CI rollback/replay now covers last three CMS/MFA/shared migration steps. Initial run `38809632213` failed cache key prefix assertion; run `38809809617` hit Laravel cache lock duplicate key inside PHPUnit transaction. Fixed key prefix expectation and used `DatabaseMigrations` instead of `RefreshDatabase` for the actual lock-contention test. Exact SHA `91eeafdba6b5253acf787e0b9562840363477594` CI `38809986246`, 29 passed / 96 assertions; both jobs SUCCESS.
+- NEXT pending uncommitted Git blobs: `backend/app/Policies/SitePagePolicy.php` blob `e2b4f6375b83ce14070bd3e8b5396196d4e1c411`; `backend/tests/Feature/SitePagePolicyTest.php` blob `c02ca4ac8b69c905898325738d3c4247b7806aa9`. Review against current HEAD; not yet committed or verified. Never treat model scopes alone as authorization.
