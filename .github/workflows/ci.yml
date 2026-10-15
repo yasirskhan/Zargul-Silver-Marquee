@@ -107,3 +107,28 @@ jobs:
         run: |
           php artisan migrate:rollback --step=3 --force --no-interaction
           php artisan migrate --force --no-interaction
+
+
+  editor-browser-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned Playwright test tooling
+        run: npm install --no-save --no-audit --no-fund @playwright/test@1.56.1
+      - name: Install Chromium browser and dependencies
+        run: npx playwright install --with-deps chromium
+      - name: Exercise public website editor prototype in desktop and phone browsers
+        run: npx playwright test --config=playwright.config.mjs
+      - name: Upload browser diagnostics if tests fail
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: editor-browser-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 3
+          if-no-files-found: ignore
