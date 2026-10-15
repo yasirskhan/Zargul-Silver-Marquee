@@ -42,9 +42,19 @@
                     <button type="button" wire:click="addColumns(3)" class="rounded-lg border px-3 py-2">+ 3 columns</button>
                 </div>
                 @forelse ($sections as $index => $section)
-                    <div wire:key="section-{{ $section['id'] ?? $index }}" class="space-y-3 rounded-xl border p-4">
+                    <div wire:key="section-{{ $section['id'] ?? $index }}"
+                        x-on:dragover.prevent="if ($event.dataTransfer.types.includes('application/x-venuedesk-section')) $event.dataTransfer.dropEffect = 'move'"
+                        x-on:drop.prevent.stop="if ($event.dataTransfer.types.includes('application/x-venuedesk-section')) $wire.moveSectionTo(Number($event.dataTransfer.getData('application/x-venuedesk-section')), {{ $index }})"
+                        class="space-y-3 rounded-xl border p-4">
                         <div class="flex flex-wrap items-center justify-between gap-2">
-                            <h3 class="font-semibold">{{ ucfirst($section['type'] ?? 'Section') }} #{{ $index + 1 }}</h3>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span draggable="true" role="button" tabindex="0"
+                                    title="Drag to reorder this section; use arrow buttons for keyboard or touch"
+                                    aria-label="Drag section {{ $index + 1 }} to reorder"
+                                    x-on:dragstart="$event.dataTransfer.setData('application/x-venuedesk-section', '{{ $index }}'); $event.dataTransfer.effectAllowed = 'move'"
+                                    class="cursor-grab select-none rounded border px-2 py-1 text-sm" aria-hidden="true">⠿</span>
+                                <h3 class="font-semibold">{{ ucfirst($section['type'] ?? 'Section') }} #{{ $index + 1 }}</h3>
+                            </div>
                             <div class="flex flex-wrap gap-2">
                                 <button type="button" wire:click="moveSection({{ $index }}, 'up')" @disabled($index === 0)
                                     aria-label="Move section {{ $index + 1 }} up" class="rounded border px-2 py-1">↑</button>
@@ -80,12 +90,25 @@
                                 @endif
                                 <div class="grid gap-3 md:grid-cols-2">
                                     @foreach (($section['columns'] ?? []) as $columnIndex => $column)
-                                        <div wire:key="col-{{ $column['id'] ?? $columnIndex }}" class="space-y-2 rounded-lg border p-3">
-                                            <p class="text-sm font-semibold">
-                                                Desktop column {{ $columnIndex + 1 }} ({{ $column['widthDesktop'] ?? '?' }}/12)
-                                            </p>
+                                        <div wire:key="col-{{ $column['id'] ?? $columnIndex }}"
+                                            x-on:dragover.prevent.stop="if ($event.dataTransfer.types.includes('application/x-venuedesk-column')) $event.dataTransfer.dropEffect = 'move'"
+                                            x-on:drop.prevent.stop="if ($event.dataTransfer.types.includes('application/x-venuedesk-column')) { let parts = $event.dataTransfer.getData('application/x-venuedesk-column').split(':').map(Number); if (parts[0] === {{ $index }}) $wire.moveDesktopColumn({{ $index }}, parts[1], {{ $columnIndex }}); }"
+                                            class="space-y-2 rounded-lg border p-3">
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <span draggable="true" aria-hidden="true"
+                                                    title="Drag to reorder desktop columns; keyboard and touch use buttons"
+                                                    x-on:dragstart.stop="$event.dataTransfer.setData('application/x-venuedesk-column', '{{ $index }}:{{ $columnIndex }}'); $event.dataTransfer.effectAllowed = 'move'"
+                                                    class="cursor-grab select-none rounded border px-2 py-1 text-sm">⠿</span>
+                                                <p class="text-sm font-semibold">
+                                                    Desktop column {{ $columnIndex + 1 }} ({{ $column['widthDesktop'] ?? '?' }}/12)
+                                                </p>
+                                            </div>
                                             <p class="text-sm">Phone order: {{ $column['mobileOrder'] ?? '?' }}</p>
                                             <div class="flex flex-wrap gap-2">
+                                                <button type="button" wire:click="moveDesktopColumn({{ $index }}, {{ $columnIndex }}, {{ max(0, $columnIndex - 1) }})"
+                                                    @disabled($columnIndex === 0) class="rounded border px-2 py-1 text-sm">Desktop left</button>
+                                                <button type="button" wire:click="moveDesktopColumn({{ $index }}, {{ $columnIndex }}, {{ min(count($section['columns']) - 1, $columnIndex + 1) }})"
+                                                    @disabled($columnIndex === count($section['columns']) - 1) class="rounded border px-2 py-1 text-sm">Desktop right</button>
                                                 <button type="button" wire:click="moveMobileColumn({{ $index }}, {{ $columnIndex }}, 'up')"
                                                     @disabled(($column['mobileOrder'] ?? 1) <= 1)
                                                     class="rounded border px-2 py-1 text-sm">Phone earlier</button>

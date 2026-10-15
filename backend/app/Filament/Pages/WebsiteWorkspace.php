@@ -262,6 +262,43 @@ final class WebsiteWorkspace extends Page
             [$this->sections[$target], $this->sections[$index]];
     }
 
+    /** Reorder by source and target indices; no arbitrary content enters from drop data. */
+    public function moveSectionTo(int $from, int $to): void
+    {
+        $this->authorizeSelectedPage('update');
+        abort_unless($from >= 0 && $to >= 0
+            && $from < count($this->sections) && $to < count($this->sections), 422);
+
+        if ($from === $to) {
+            return;
+        }
+
+        $items = array_splice($this->sections, $from, 1);
+        array_splice($this->sections, $to, 0, $items);
+    }
+
+    /**
+     * Change desktop column positions while preserving every column's width,
+     * original typed blocks and independently configured mobile order.
+     */
+    public function moveDesktopColumn(int $sectionIndex, int $from, int $to): void
+    {
+        $this->authorizeSelectedPage('update');
+        abort_unless($sectionIndex >= 0 && isset($this->sections[$sectionIndex])
+            && ($this->sections[$sectionIndex]['type'] ?? null) === 'columns'
+            && is_array($this->sections[$sectionIndex]['columns'] ?? null), 422);
+
+        $columns = &$this->sections[$sectionIndex]['columns'];
+        abort_unless($from >= 0 && $to >= 0
+            && $from < count($columns) && $to < count($columns), 422);
+        if ($from === $to) {
+            return;
+        }
+
+        $moved = array_splice($columns, $from, 1);
+        array_splice($columns, $to, 0, $moved);
+    }
+
     public function removeSection(int $index): void
     {
         $this->authorizeSelectedPage('update');
