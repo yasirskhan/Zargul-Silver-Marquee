@@ -57,7 +57,7 @@ class SiteMediaServiceTest extends TestCase
         $this->assertStringStartsWith('site-media/private/'.$company->id.'/', $variant['object_key']);
         Storage::disk('local')->assertExists($variant['object_key']);
         $this->assertSame($variant['sha256'], hash('sha256', Storage::disk('local')->get($variant['object_key'])));
-        $this->assertSame('image/webp', (new \\finfo(FILEINFO_MIME_TYPE))->buffer(Storage::disk('local')->get($variant['object_key'])));
+        $this->assertSame('image/webp', (new \finfo(FILEINFO_MIME_TYPE))->buffer(Storage::disk('local')->get($variant['object_key'])));
         $this->assertFalse(Storage::disk('public')->exists($variant['object_key']));
 
         $service->approveImage($owner, $company->id, $mediaId, 'Idempotent retry');
