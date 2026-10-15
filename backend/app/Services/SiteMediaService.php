@@ -114,33 +114,77 @@ final class SiteMediaService
         }
     }
 
-    /** Approval is a distinct audited publisher decision, never implied by upload. */
+    /**
+     * Approval verifies the original persisted bytes and creates a private,
+     * decoded-and-reencoded WebP asset. A later public release workflow must
+     * deliberately copy only approved variants, never raw staged uploads.
+     */
     public function approveImage(User $actor, string $companyId, string $mediaId, string $reason): void
     {
         $this->authorize($actor, $companyId, true);
         $this->validateReason($reason);
+        $generatedKey = null;
 
-        DB::transaction(function () use ($actor, $companyId, $mediaId, $reason): void {
-            $this->authorize($actor, $companyId, true);
-            $asset = DB::table('site_media')
-                ->where('company_id', $companyId)
-                ->where('id', $mediaId)
-                ->lockForUpdate()
-                ->first();
-            if (! $asset || ! in_array($asset->status, ['pending', 'approved'], true)) {
-                throw new InvalidArgumentException('The image is not available for approval in this company.');
+        try {
+            DB::transaction(function () use ($actor, $companyId, $mediaId, $reason, &$generatedKey): void {
+                $this->authorize($actor, $companyId, true);
+                $asset = DB::table('site_media')
+                    ->where('company_id', $companyId)
+                    ->where('id', $mediaId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $asset || ! in_array($asset->status, ['pending', 'approved'], true)) {
+                    throw new InvalidArgumentException('The image is not available for approval in this company.');
+                }
+                $metadata = json_decode($asset->metadata, true, 512, JSON_THROW_ON_ERROR);
+                if ($asset->status === 'approved' && isset($metadata['variants']['webp1200'])) {
+                    return; // An exact retry cannot generate another file or audit event.
+                }
+
+                $original = Storage::disk('local')->get($asset->object_key);
+                if (! is_string($original) || strlen($original) > 4_000_000
+                    || ! hash_equals($asset->sha256, hash('sha256', $original))) {
+                    throw new InvalidArgumentException('Staged image is missing or has changed since upload.');
+                }
+
+                // Real decoding and re-encoding removes embedded metadata and
+                // never publishes untrusted original bytes.
+                $variant = app(SiteMediaVariantService::class)->webp1200($original, $asset->mime_type);
+                $generatedKey = 'site-media/private/'.$companyId.'/'.Str::uuid().'-webp1200.webp';
+                if (! Storage::disk('local')->put($generatedKey, $variant['bytes'], 'private')) {
+                    throw new RuntimeException('Failed to persist private optimized image.');
+                }
+
+                $metadata['variants']['webp1200'] = [
+                    'object_key' => $generatedKey,
+                    'width' => $variant['width'],
+                    'height' => $variant['height'],
+                    'bytes' => strlen($variant['bytes']),
+                    'sha256' => hash('sha256', $variant['bytes']),
+                    'mime_type' => 'image/webp',
+                ];
+                DB::table('site_media')->where('company_id', $companyId)->where('id', $mediaId)
+                    ->update([
+                        'status' => 'approved',
+                        'metadata' => json_encode($metadata, JSON_THROW_ON_ERROR),
+                        'updated_at' => now(),
+                    ]);
+
+                $wasApproved = $asset->status === 'approved';
+                $this->audit($companyId, $actor,
+                    $wasApproved ? 'website.media_optimized' : 'website.media_approved',
+                    $mediaId,
+                    ['status' => $asset->status, 'optimized' => false],
+                    ['status' => 'approved', 'optimized' => true], $reason);
+            }, 3);
+        } catch (Throwable $exception) {
+            // The database transaction cannot roll back filesystem writes.
+            if ($generatedKey !== null) {
+                Storage::disk('local')->delete($generatedKey);
             }
-            if ($asset->status === 'approved') {
-                return; // Safe idempotent retry without duplicate audit.
-            }
-            if (! Storage::disk('local')->exists($asset->object_key)) {
-                throw new RuntimeException('Private staged image is missing.');
-            }
-            DB::table('site_media')->where('company_id', $companyId)->where('id', $mediaId)
-                ->update(['status' => 'approved', 'updated_at' => now()]);
-            $this->audit($companyId, $actor, 'website.media_approved', $mediaId,
-                ['status' => 'pending'], ['status' => 'approved'], $reason);
-        }, 3);
+            throw $exception;
+        }
     }
 
     private function authorize(User $actor, string $companyId, bool $approving): void

@@ -49,6 +49,17 @@ class SiteMediaServiceTest extends TestCase
         Storage::disk('local')->assertExists($asset->object_key);
 
         $service->approveImage($owner, $company->id, $mediaId, 'Owner reviewed this hall photo');
+        $optimized = json_decode(DB::table('site_media')->where('id', $mediaId)->value('metadata'), true);
+        $variant = $optimized['variants']['webp1200'];
+        $this->assertSame('image/webp', $variant['mime_type']);
+        $this->assertSame(300, $variant['width']);
+        $this->assertSame(200, $variant['height']);
+        $this->assertStringStartsWith('site-media/private/'.$company->id.'/', $variant['object_key']);
+        Storage::disk('local')->assertExists($variant['object_key']);
+        $this->assertSame($variant['sha256'], hash('sha256', Storage::disk('local')->get($variant['object_key'])));
+        $this->assertSame('image/webp', (new \\finfo(FILEINFO_MIME_TYPE))->buffer(Storage::disk('local')->get($variant['object_key'])));
+        $this->assertFalse(Storage::disk('public')->exists($variant['object_key']));
+
         $service->approveImage($owner, $company->id, $mediaId, 'Idempotent retry');
         $this->assertSame('approved', DB::table('site_media')->where('id', $mediaId)->value('status'));
         $this->assertSame(1, DB::table('audit_events')->where('action', 'website.media_staged')->count());
@@ -115,4 +126,41 @@ class SiteMediaServiceTest extends TestCase
         $service->stageImage($owner, $company->id, UploadedFile::fake()->image('photo.jpg'),
             'Hall', 'Inactive company');
     }
+    public function test_changed_staged_file_cannot_be_approved_or_generate_a_variant(): void
+    {
+        [$company, $owner] = $this->fixture();
+        $service = app(SiteMediaService::class);
+        $mediaId = $service->stageImage($owner, $company->id,
+            UploadedFile::fake()->image('hall.png', 200, 100), 'Hall', 'Upload original image');
+        $asset = DB::table('site_media')->where('id', $mediaId)->first();
+
+        Storage::disk('local')->put($asset->object_key, 'modified file');
+        try {
+            $service->approveImage($owner, $company->id, $mediaId, 'Approve original image');
+            $this->fail('Modified staged content must not receive approval.');
+        } catch (InvalidArgumentException) {
+            $this->assertSame('pending', DB::table('site_media')->where('id', $mediaId)->value('status'));
+            $this->assertSame(0, DB::table('audit_events')->where('action', 'website.media_approved')->count());
+            $metadata = json_decode(DB::table('site_media')->where('id', $mediaId)->value('metadata'), true);
+            $this->assertArrayNotHasKey('variants', $metadata);
+        }
+    }
+
+    public function test_large_images_are_downscaled_to_private_webp_without_upscaling(): void
+    {
+        [$company, $owner] = $this->fixture();
+        $service = app(SiteMediaService::class);
+        $mediaId = $service->stageImage($owner, $company->id,
+            UploadedFile::fake()->image('hall.jpg', 1800, 900),
+            'Venue hall', 'Official photograph');
+        $service->approveImage($owner, $company->id, $mediaId, 'Owner approves optimized image');
+
+        $metadata = json_decode(DB::table('site_media')->where('id', $mediaId)->value('metadata'), true);
+        $variant = $metadata['variants']['webp1200'];
+        $this->assertSame(1200, $variant['width']);
+        $this->assertSame(600, $variant['height']);
+        Storage::disk('local')->assertExists($variant['object_key']);
+        $this->assertSame(1, DB::table('audit_events')->where('action', 'website.media_approved')->count());
+    }
+
 }
