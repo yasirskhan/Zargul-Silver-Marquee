@@ -11,16 +11,16 @@ GitHub connector: repository read and write successful.
 Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; docs/ROADMAP.md; docs/WEBSITE_CMS_DESIGN.md; docs/DEVELOPMENT_PROTOCOL.md; docs/decisions/ADR-0001-platform-and-cms.md. Then read relevant source and tests. Verify LIVE development branch HEAD + exact SHA CI/jobs before writing. Actual repo/CI takes precedence over old handoff state.
 
 ## Last fully VERIFIED PRODUCT checkpoint
-- **Source commit:** `51c839a9d6201f206c46fd47441b7f286dc8a564`
-- **Hosted CI:** `38807212590`, SUCCESS.
-- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38807212590
+- **Source commit:** `52b52ef6d9d2c58800f634ca8bba83eb09188684`
+- **Hosted CI:** `38807658607`, SUCCESS.
+- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38807658607
 - Both jobs SUCCESS: `prototype-checks`, `laravel-postgres`.
 - PHP 8.3 clean Composer package resolution of Laravel 13 + Filament 5 succeeded.
 - PostgreSQL 16 migrations succeeded, including versioned website and tenant identity tables.
 - Backend `11 passed (21 assertions)`: tenant/hall access, delegated website edit vs publish checks, cross-tenant composite FK rejection, invalid role rejection, isolation of draft/published revision, cross-page published revision rejection, immutable revisions/audit records.
 - Database **CMS migration rollback and replay** succeeded.
 - Node prototype logic and UI structure checks and JS syntax passed.
-- **Locked dependency product checkpoint is verified** at the above SHA. Composer lock downloaded from the verified PHP 8.3 artifact, vetted (141 packages, content hash f199e7dfdf44e33a642f6ac51604217e), committed at 8c1e01e2; hosted CI now uses `composer install`. One-time lock-promotion workflow was removed. This documentation change must itself pass CI.
+- **Locked dependency and CMS validator source are verified** at the above SHA. Composer lock downloaded from the verified PHP 8.3 artifact, vetted (141 packages, content hash f199e7dfdf44e33a642f6ac51604217e), committed at 8c1e01e2; hosted CI now uses `composer install`. One-time lock-promotion workflow was removed. This documentation change must itself pass CI.
 
 ## What is committed and what is NOT
 **Prototype UI only** (root):
@@ -51,7 +51,7 @@ Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; d
 ## REQUIRED NEXT BOUNDED TASK — immediately implement after cold-start
 - Step 1: verify LIVE head and CI for **this handoff commit**, reconcile any intervening commits.
 - Step 2: COMPLETE/VERIFIED at SHA `51c839a9d6201f206c46fd47441b7f286dc8a564`, CI `38807212590`: locked Composer install and one-time bootstrap removal.
-- Step 3: NEXT UNFINISHED TASK: implement typed **server-side page block validation** (mirror the stricter accepted CMS block schema), company-scoped SitePage/SitePageRevision models and *transactional authenticated* draft-save & publish service with optimistic concurrency, immutable revisions and audit records. Test two-editor stale revision rejection, unauthorized publish, no draft content leakage, and rollback.
+- Step 3: Typed server-side CMS page validator COMPLETE/VERIFIED at `52b52ef6d9d2c58800f634ca8bba83eb09188684`, CI `38807658607`. **NEXT:** transactionally authenticated company-scoped draft-save/publish service with optimistic concurrency, immutable revisions and audit records; add two-editor stale revision, unauthorized publish, draft leakage and rollback tests. Follow with scoped models and API policies.
 - Step 4: complete company-aware authentication, MFA for owner/admin, resources and least-privilege policy enforcement. Add email verification/session expiry as required by approved spec.
 - Step 5: add Playwright browser tests for website editor on desktop/mobile and preserve existing mockups.
 - Step 6: continue Phase 2 configurable halls/session times/capacity/add-ons and Phase 3 no-double-booking concurrency. Then finance ledger, approval center/Telegram, website CMS publishing/media, operations and pilot per docs/ROADMAP.md.
@@ -63,7 +63,7 @@ Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; d
 - Run `38804939995`: backend PHPUnit could not run because Mockery development dependency absent. Added `mockery/mockery`.
 - Run `38805071892`: fresh user/hall Eloquent models initially omitted in-memory `is_active` defaults, resulting in false access denials; corrected model defaults.
 - Earlier CMS run `38805587443`: PostgreSQL test refresh kept PL/pgSQL function; corrected migration to `CREATE OR REPLACE FUNCTION`.
-- Latest verified run `38807212590` passes ALL required checks for SHA `51c839a9d6201f206c46fd47441b7f286dc8a564`. Future CI failures are not resolved by this historical green run.
+- Latest verified run `38807658607` passes ALL required checks for SHA `52b52ef6d9d2c58800f634ca8bba83eb09188684`. Future CI failures are not resolved by this historical green run.
 
 ## Truthfulness and handoff update rule
 If current doc-only commit is verified, record that exact SHA and CI run only after GitHub reports completion. Last verified **product** source SHA above remains the source baseline until a later product change is tested. CI is evidence of specific jobs, not a zero-bugs guarantee or a live production release.
@@ -73,3 +73,8 @@ If current doc-only commit is verified, record that exact SHA and CI run only af
 - Promotion workflow `c438b4f` ran successfully and GitHub Actions committed lock at `8c1e01e`. Standard CI changed from `composer update` to `composer install`; bootstrap workflow deleted.
 - Exact-source `51c839a9d6201f206c46fd47441b7f286dc8a564`, run `38807212590`, completed SUCCESS with `prototype-checks` and `laravel-postgres`.
 - Next task: strict PHP CMS schema validation, authenticated tenant-scoped transactional draft/publish operations, stale-editor and immutable-history tests. Do not mark those features implemented until green exact-SHA CI.
+
+## 2026-10-15 CMS validator verified
+- `backend/app/Services/SiteContentValidator.php` rejects raw markup, unsafe script URLs, unsupported typed blocks/fields, duplicate IDs, invalid responsive column widths/orders, and excessive sections/depth. Tests: `backend/tests/Feature/SiteContentValidatorTest.php`.
+- Exact source commit `52b52ef6d9d2c58800f634ca8bba83eb09188684`, hosted CI `38807658607`: both jobs SUCCESS. Validator is a backend foundation, not a public CMS persistence API.
+- Prepared but uncommitted Git blob objects for NEXT service batch: `backend/app/Services/SitePagePublishingService.php` blob `08e7f7db74974d9bf7d054aa882cfde832a2b7a8`, tests blob `55a9afa12652b63e337478ca39591ab2991dbf01`. Review against latest HEAD before committing; blobs are NOT tested or verified and may be discarded if intervening changes conflict.
