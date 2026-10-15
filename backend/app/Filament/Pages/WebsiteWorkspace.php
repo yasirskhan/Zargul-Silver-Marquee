@@ -46,6 +46,9 @@ final class WebsiteWorkspace extends Page
     #[Locked]
     public int $expectedRevision = 0;
 
+    #[Locked]
+    public ?string $loadedPublishedRevisionId = null;
+
     public static function canAccess(): bool
     {
         $actor = Filament::auth()->user();
@@ -120,6 +123,7 @@ final class WebsiteWorkspace extends Page
     {
         $this->sections = [];
         $this->expectedRevision = 0;
+        $this->loadedPublishedRevisionId = null;
         $this->loadedPageId = null;
         $this->loadedCompanyId = null;
 
@@ -146,6 +150,7 @@ final class WebsiteWorkspace extends Page
         $this->loadedPageId = (string) $page->getKey();
         $this->loadedCompanyId = $page->company_id;
         $this->expectedRevision = (int) $page->draft_revision;
+        $this->loadedPublishedRevisionId = $page->published_revision_id;
     }
 
     public function addSection(string $type): void
@@ -227,11 +232,56 @@ final class WebsiteWorkspace extends Page
             ]);
         }
 
-        app(SitePagePublishingService::class)->publish(
+        $this->loadedPublishedRevisionId = app(SitePagePublishingService::class)->publish(
             $actor, $page->company_id, $page->getKey(), $this->expectedRevision, $this->reason
         );
         $this->reason = '';
         Notification::make()->title('Published snapshot updated')->success()->send();
+    }
+
+    /** Only an authorized publisher may inspect prior, genuinely published snapshots. */
+    public function publishedHistory(): array
+    {
+        $actor = Filament::auth()->user();
+        $page = $this->currentPage();
+        if (! $actor instanceof User || ! $page
+            || ! Gate::forUser($actor)->allows('publish', $page)) {
+            return [];
+        }
+
+        return DB::table('site_publishing_events')
+            ->join('site_page_revisions', function ($join): void {
+                $join->on('site_publishing_events.page_id', '=', 'site_page_revisions.page_id')
+                    ->on('site_publishing_events.revision_id', '=', 'site_page_revisions.id');
+            })
+            ->where('site_publishing_events.company_id', $page->company_id)
+            ->where('site_publishing_events.page_id', $page->getKey())
+            ->select('site_page_revisions.id', 'site_page_revisions.revision_number')
+            ->distinct()
+            ->orderByDesc('site_page_revisions.revision_number')
+            ->limit(100)
+            ->get()
+            ->all();
+    }
+
+    public function restorePublishedRevision(string $targetRevisionId): void
+    {
+        [$actor, $page] = $this->authorizeSelectedPage('publish');
+        $this->checkEditorSnapshot($page);
+        $this->validate(['reason' => ['required', 'string', 'min:3', 'max:500']]);
+        if (! $this->loadedPublishedRevisionId) {
+            throw new ConflictHttpException('No published snapshot was loaded; reload this page.');
+        }
+
+        // The service checks prior-publication proof and compares the locked
+        // expected live pointer in the same transaction as its immutable audit.
+        $this->loadedPublishedRevisionId = app(SitePagePublishingService::class)
+            ->restorePublishedRevision(
+                $actor, $page->company_id, $page->getKey(),
+                $targetRevisionId, $this->loadedPublishedRevisionId, $this->reason
+            );
+        $this->reason = '';
+        Notification::make()->title('Published snapshot restored')->success()->send();
     }
 
     private function checkEditorSnapshot(SitePage $page): void

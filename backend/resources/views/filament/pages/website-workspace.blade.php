@@ -88,7 +88,27 @@
                             wire:loading.attr="disabled" class="rounded-lg border px-4 py-2 font-semibold">Publish saved draft</button>
                     @endif
                 </div>
-                <p class="text-sm">Editing does not immediately change the published site. Published restore and responsive visual preview are separate upcoming controls.</p>
+                @if ($this->canPublishCurrentPage() && $page->published_revision_id)
+                    <div class="space-y-2 border-t pt-4">
+                        <h3 class="font-semibold">Previously published versions</h3>
+                        <p class="text-sm">Restoring changes only the published pointer. Existing drafts and history are preserved. Enter a reason above.</p>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach ($this->publishedHistory() as $snapshot)
+                                @if ($snapshot->id === $page->published_revision_id)
+                                    <span class="rounded-lg border px-3 py-2 text-sm">Revision {{ $snapshot->revision_number }} is live</span>
+                                @else
+                                    <button type="button"
+                                        wire:click="restorePublishedRevision('{{ $snapshot->id }}')"
+                                        wire:confirm="Restore this previously published version? Current draft edits will be preserved."
+                                        class="rounded-lg border px-3 py-2 text-sm">
+                                        Restore revision {{ $snapshot->revision_number }}
+                                    </button>
+                                @endif
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+                <p class="text-sm">Publishing changes only the approved snapshot. Responsive visual preview is an upcoming control.</p>
             </section>
         @else
             <p role="status">No accessible page is selected.</p>
