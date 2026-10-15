@@ -2,26 +2,40 @@
 
 namespace App\Models;
 
+use Filament\Auth\MultiFactor\App\Concerns\InteractsWithAppAuthentication;
+use Filament\Auth\MultiFactor\App\Concerns\InteractsWithAppAuthenticationRecovery;
+use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthentication;
+use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthenticationRecovery;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-class User extends Authenticatable implements FilamentUser
+class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery, MustVerifyEmail
 {
     use Notifiable;
+    use InteractsWithAppAuthentication;
+    use InteractsWithAppAuthenticationRecovery;
 
     protected $attributes = ['is_active' => true];
 
     protected $fillable = ['name', 'email', 'password', 'is_active'];
 
-    protected $hidden = ['password', 'remember_token'];
+    protected $hidden = [
+        'password', 'remember_token', 'app_authentication_secret', 'app_authentication_recovery_codes',
+    ];
 
     protected function casts(): array
     {
-        return ['email_verified_at' => 'datetime', 'password' => 'hashed', 'is_active' => 'boolean'];
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+            'is_active' => 'boolean',
+            'app_authentication_secret' => 'encrypted',
+            'app_authentication_recovery_codes' => 'encrypted:array',
+        ];
     }
 
     public function memberships(): HasMany
@@ -33,6 +47,9 @@ class User extends Authenticatable implements FilamentUser
     {
         return $panel->getId() === 'admin'
             && $this->is_active
-            && $this->memberships()->where('is_active', true)->exists();
+            && $this->memberships()
+                ->where('is_active', true)
+                ->whereHas('company', fn ($query) => $query->where('is_active', true))
+                ->exists();
     }
 }
