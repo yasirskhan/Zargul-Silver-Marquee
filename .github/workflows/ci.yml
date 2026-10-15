@@ -45,3 +45,60 @@ jobs:
           node --check assets/admin.mjs
           node --check assets/cms-schema.mjs
           node --check assets/website-editor.mjs
+
+  laravel-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: venue
+          POSTGRES_PASSWORD: venue
+          POSTGRES_DB: venue_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U venue -d venue_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_pgsql, pgsql, intl, zip, bcmath, gd
+          coverage: none
+          tools: composer:v2
+      - name: Validate PHP dependency manifest
+        run: composer validate --no-check-publish
+      - name: Resolve and install Laravel and Filament (initial bootstrap)
+        run: composer update --no-interaction --no-progress --prefer-dist
+      - name: Save dependency lock for a reviewable follow-up commit
+        uses: actions/upload-artifact@v4
+        with:
+          name: composer-lock-php83
+          path: backend/composer.lock
+          retention-days: 7
+      - name: Prepare isolated CI environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force --no-interaction
+      - name: Verify PHP source syntax
+        run: |
+          find app bootstrap database routes tests public -name '*.php' -print0 | xargs -0 -n1 php -l
+          php -l artisan
+      - name: Run PostgreSQL migrations
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: '5432'
+          DB_DATABASE: venue_test
+          DB_USERNAME: venue
+          DB_PASSWORD: venue
+        run: php artisan migrate --force --no-interaction
+      - name: Run tenant-isolation backend tests
+        run: php artisan test --no-ansi
