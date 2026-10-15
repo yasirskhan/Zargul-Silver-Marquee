@@ -75,7 +75,7 @@ class SiteWorkspaceServiceTest extends TestCase
 
     public function test_filament_workspace_is_registered_only_under_admin_panel(): void
     {
-        $panel = app(\App\Providers\Filament\AdminPanelProvider::class)->panel(Panel::make());
+        $panel = (new \App\Providers\Filament\AdminPanelProvider(app()))->panel(Panel::make());
         $this->assertContains(WebsiteWorkspace::class, $panel->getPages());
         $this->assertTrue($panel->hasMultiFactorAuthentication());
     }
