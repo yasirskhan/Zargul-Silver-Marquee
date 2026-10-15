@@ -33,5 +33,5 @@ CMS-007,Website enquiry forms and linked hall catalog blocks,6,Not started,Contr
 CMS-008,Website content role permissions and complete audit,1,Partial foundation tested,Initial TenantAccess canEditWebsite and canPublishWebsite checks pass; full policies audit and endpoints pending
 PLAT-004,Safe multi-session commit and overwrite avoidance protocol,0,Documented,Verify revision lease and exact SHA before each update
 PLAT-005,Laravel 13 Filament 5 PostgreSQL foundation,1,Initial backend CI verified,Run 38805803519 SUCCESS at SHA 78d9629a6e9ad407b223133f9a9306c1893bd03d; 11 PostgreSQL tests 21 assertions
-PLAT-006,Reproducible locked PHP dependencies,1,Not started,CI currently composer update and saves composer.lock artifact; commit vetted composer.lock and switch to composer install
+PLAT-006,Reproducible locked PHP dependencies,1,Verified,Lock recovered from CI artifact and checksum checked; composer install exact SHA 51c839a9d6201f206c46fd47441b7f286dc8a564 run 38807212590 SUCCESS
 CMS-009,Website publishing owner acceptance and restore tests,6,Not started,Owner reviews mobile editor publishing rollback and real venue media
