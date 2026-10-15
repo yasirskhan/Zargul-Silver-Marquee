@@ -21,7 +21,7 @@ class SharedAuthInfrastructureTest extends TestCase
         $key = 'mfa-atomic-'.Str::random(12);
         $store->put($key, 'shared-value', 60);
         $this->assertSame('shared-value', $store->get($key));
-        $this->assertDatabaseHas('cache', ['key' => $key]);
+        $this->assertDatabaseHas('cache', ['key' => config('cache.prefix').$key]);
 
         $lockKey = 'mfa-replay-'.Str::random(12);
         $held = $store->lock($lockKey, 20);
