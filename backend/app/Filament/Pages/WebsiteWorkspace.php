@@ -35,6 +35,8 @@ final class WebsiteWorkspace extends Page
     /** Typed sections are an editable draft working copy, never live published content. */
     public array $sections = [];
 
+    public string $previewMode = 'desktop';
+
     public string $reason = '';
 
     #[Locked]
@@ -169,6 +171,85 @@ final class WebsiteWorkspace extends Page
             'type' => $type,
             'data' => $defaults[$type],
         ];
+    }
+
+    /** Safe 1/2/3-column templates; no arbitrary HTML, CSS, or script fields. */
+    public function addColumns(int $count): void
+    {
+        $this->authorizeSelectedPage('update');
+        $widths = [
+            1 => [12],
+            2 => [6, 6],
+            3 => [4, 4, 4],
+        ];
+        abort_unless(isset($widths[$count]) && count($this->sections) < 60, 422);
+
+        $columns = [];
+        foreach ($widths[$count] as $index => $width) {
+            $columns[] = [
+                'id' => 'column_'.Str::random(16),
+                'widthDesktop' => $width,
+                'mobileOrder' => $index + 1,
+                'blocks' => [[
+                    'id' => 'block_'.Str::random(16),
+                    'type' => 'text',
+                    'data' => ['title' => 'Column '.($index + 1), 'body' => ''],
+                ]],
+            ];
+        }
+
+        $this->sections[] = [
+            'id' => 'section_'.Str::random(16),
+            'type' => 'columns',
+            'columns' => $columns,
+        ];
+    }
+
+    /** Presets maintain the typed validator's total 12-unit desktop grid. */
+    public function setDesktopWidths(int $sectionIndex, string $preset): void
+    {
+        $this->authorizeSelectedPage('update');
+        $section = $this->sections[$sectionIndex] ?? null;
+        abort_unless(is_array($section) && ($section['type'] ?? null) === 'columns'
+            && is_array($section['columns'] ?? null), 422);
+
+        $presets = [
+            2 => ['equal' => [6, 6], 'wideLeft' => [8, 4], 'wideRight' => [4, 8]],
+            3 => ['equal' => [4, 4, 4], 'wideCenter' => [3, 6, 3]],
+        ];
+        $widths = $presets[count($section['columns'])][$preset] ?? null;
+        abort_unless($widths !== null, 422);
+        foreach ($widths as $index => $width) {
+            $this->sections[$sectionIndex]['columns'][$index]['widthDesktop'] = $width;
+        }
+    }
+
+    /** Change phone stacking without altering desktop column order or widths. */
+    public function moveMobileColumn(int $sectionIndex, int $columnIndex, string $direction): void
+    {
+        $this->authorizeSelectedPage('update');
+        abort_unless(in_array($direction, ['up', 'down'], true), 422);
+        $columns = $this->sections[$sectionIndex]['columns'] ?? null;
+        abort_unless(($this->sections[$sectionIndex]['type'] ?? null) === 'columns'
+            && is_array($columns) && isset($columns[$columnIndex]), 422);
+        $oldOrder = (int) ($columns[$columnIndex]['mobileOrder'] ?? 0);
+        $nextOrder = $oldOrder + ($direction === 'up' ? -1 : 1);
+        foreach ($columns as $otherIndex => $column) {
+            if ((int) ($column['mobileOrder'] ?? 0) === $nextOrder) {
+                $this->sections[$sectionIndex]['columns'][$columnIndex]['mobileOrder'] = $nextOrder;
+                $this->sections[$sectionIndex]['columns'][$otherIndex]['mobileOrder'] = $oldOrder;
+
+                return;
+            }
+        }
+        abort(422);
+    }
+
+    public function setPreviewMode(string $mode): void
+    {
+        $this->authorizeSelectedPage('view');
+        abort_unless(in_array($mode, ['desktop', 'tablet', 'phone'], true), 422);
+        $this->previewMode = $mode;
     }
 
     public function moveSection(int $index, string $direction): void

@@ -37,6 +37,9 @@
                     <button type="button" wire:click="addSection('text')" class="rounded-lg border px-3 py-2">+ Text</button>
                     <button type="button" wire:click="addSection('hero')" class="rounded-lg border px-3 py-2">+ Hero</button>
                     <button type="button" wire:click="addSection('cta')" class="rounded-lg border px-3 py-2">+ Call to action</button>
+                    <button type="button" wire:click="addColumns(1)" class="rounded-lg border px-3 py-2">+ 1 column</button>
+                    <button type="button" wire:click="addColumns(2)" class="rounded-lg border px-3 py-2">+ 2 columns</button>
+                    <button type="button" wire:click="addColumns(3)" class="rounded-lg border px-3 py-2">+ 3 columns</button>
                 </div>
                 @forelse ($sections as $index => $section)
                     <div wire:key="section-{{ $section['id'] ?? $index }}" class="space-y-3 rounded-xl border p-4">
@@ -61,7 +64,50 @@
                             @endif
                         @endforeach
                         @if (($section['type'] ?? '') === 'columns')
-                            <p class="text-sm">Existing nested columns are preserved. Visual column editing follows in the next workspace release.</p>
+                            <div class="space-y-3">
+                                <h4 class="text-sm font-semibold">Desktop proportions</h4>
+                                @if (count($section['columns'] ?? []) === 2)
+                                    <div class="flex flex-wrap gap-2">
+                                        <button type="button" wire:click="setDesktopWidths({{ $index }}, 'equal')" class="rounded border px-2 py-1">Equal 6 / 6</button>
+                                        <button type="button" wire:click="setDesktopWidths({{ $index }}, 'wideLeft')" class="rounded border px-2 py-1">Wide left 8 / 4</button>
+                                        <button type="button" wire:click="setDesktopWidths({{ $index }}, 'wideRight')" class="rounded border px-2 py-1">Wide right 4 / 8</button>
+                                    </div>
+                                @elseif (count($section['columns'] ?? []) === 3)
+                                    <div class="flex flex-wrap gap-2">
+                                        <button type="button" wire:click="setDesktopWidths({{ $index }}, 'equal')" class="rounded border px-2 py-1">Equal 4 / 4 / 4</button>
+                                        <button type="button" wire:click="setDesktopWidths({{ $index }}, 'wideCenter')" class="rounded border px-2 py-1">Wide center 3 / 6 / 3</button>
+                                    </div>
+                                @endif
+                                <div class="grid gap-3 md:grid-cols-2">
+                                    @foreach (($section['columns'] ?? []) as $columnIndex => $column)
+                                        <div wire:key="col-{{ $column['id'] ?? $columnIndex }}" class="space-y-2 rounded-lg border p-3">
+                                            <p class="text-sm font-semibold">
+                                                Desktop column {{ $columnIndex + 1 }} ({{ $column['widthDesktop'] ?? '?' }}/12)
+                                            </p>
+                                            <p class="text-sm">Phone order: {{ $column['mobileOrder'] ?? '?' }}</p>
+                                            <div class="flex flex-wrap gap-2">
+                                                <button type="button" wire:click="moveMobileColumn({{ $index }}, {{ $columnIndex }}, 'up')"
+                                                    @disabled(($column['mobileOrder'] ?? 1) <= 1)
+                                                    class="rounded border px-2 py-1 text-sm">Phone earlier</button>
+                                                <button type="button" wire:click="moveMobileColumn({{ $index }}, {{ $columnIndex }}, 'down')"
+                                                    @disabled(($column['mobileOrder'] ?? count($section['columns'])) >= count($section['columns']))
+                                                    class="rounded border px-2 py-1 text-sm">Phone later</button>
+                                            </div>
+                                            @foreach (($column['blocks'] ?? []) as $blockIndex => $block)
+                                                @foreach (($block['data'] ?? []) as $field => $value)
+                                                    @if (is_string($value) && ! in_array($field, ['imageId'], true))
+                                                        <label class="block space-y-1">
+                                                            <span class="text-sm">{{ \Illuminate\Support\Str::headline($field) }}</span>
+                                                            <textarea wire:model="sections.{{ $index }}.columns.{{ $columnIndex }}.blocks.{{ $blockIndex }}.data.{{ $field }}"
+                                                                rows="2" maxlength="5000" class="w-full rounded border p-2 text-gray-900"></textarea>
+                                                        </label>
+                                                    @endif
+                                                @endforeach
+                                            @endforeach
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
                         @endif
                         @if (array_key_exists('imageId', $section['data'] ?? []) || array_key_exists('mediaIds', $section['data'] ?? []))
                             <p class="text-sm">Existing media references are preserved. Replacements require the approved media library.</p>
@@ -70,6 +116,17 @@
                 @empty
                     <p class="text-sm">This page has no draft sections yet. Add a section to begin.</p>
                 @endforelse
+            </section>
+
+            <section class="space-y-3 rounded-xl border p-4" aria-label="Responsive draft preview">
+                <h2 class="text-lg font-semibold">Draft preview</h2>
+                <p class="text-sm">Only safe text and layout placeholders appear here. No unapproved images or live booking data.</p>
+                <div role="group" aria-label="Preview screen size" class="flex flex-wrap gap-2">
+                    <button type="button" wire:click="setPreviewMode('desktop')" class="rounded border px-3 py-2" aria-pressed="{{ $previewMode === 'desktop' ? 'true' : 'false' }}">Desktop</button>
+                    <button type="button" wire:click="setPreviewMode('tablet')" class="rounded border px-3 py-2" aria-pressed="{{ $previewMode === 'tablet' ? 'true' : 'false' }}">Tablet</button>
+                    <button type="button" wire:click="setPreviewMode('phone')" class="rounded border px-3 py-2" aria-pressed="{{ $previewMode === 'phone' ? 'true' : 'false' }}">Phone</button>
+                </div>
+                @include('filament.pages.partials.draft-preview', ['sections' => $sections, 'previewMode' => $previewMode])
             </section>
 
             <section class="space-y-3 rounded-xl border p-4" aria-label="Save and publish">
