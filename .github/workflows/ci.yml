@@ -31,6 +31,11 @@ jobs:
           test -s assets/admin.mjs
           test -s assets/cms-schema.mjs
           test -s tests/cms-schema.test.mjs
+          test -s tests/website-editor.test.mjs
+          test -s website-editor.html
+          test -s assets/website-editor.mjs
+          test -s assets/editor.css
+          test -s docs/decisions/ADR-0001-platform-and-cms.md
           test -s docs/WEBSITE_CMS_DESIGN.md
           test -s docs/DEVELOPMENT_PROTOCOL.md
       - name: Check JS syntax
@@ -39,3 +44,4 @@ jobs:
           node --check assets/site.mjs
           node --check assets/admin.mjs
           node --check assets/cms-schema.mjs
+          node --check assets/website-editor.mjs
