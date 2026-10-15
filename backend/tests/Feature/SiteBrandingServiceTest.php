@@ -146,4 +146,52 @@ class SiteBrandingServiceTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $service->publish($owner, $company->id, $site, 2, 'Reject corrupted variant');
     }
+    public function test_restore_published_branding_preserves_later_draft_and_audited_history(): void
+    {
+        [$company, $owner, $site] = $this->fixture('restore-site');
+        $service = app(SiteBrandingService::class);
+
+        $service->saveDraft($owner, $company->id, $site, $this->branding('First'), 0, 'Initial branding');
+        $first = $service->publish($owner, $company->id, $site, 1, 'Publish first');
+        $service->saveDraft($owner, $company->id, $site, $this->branding('Second'), 1, 'Second branding');
+        $second = $service->publish($owner, $company->id, $site, 2, 'Publish second');
+        $service->saveDraft($owner, $company->id, $site, $this->branding('Unpublished third'), 2, 'New unfinished draft');
+
+        $this->assertSame($first, $service->restorePublishedBranding(
+            $owner, $company->id, $site, $first, $second, 'Restore original approved brand'
+        ));
+        $this->assertEquals($this->branding('First'), $service->publishedBranding($company->id, $site));
+        $this->assertSame(3, (int) DB::table('websites')->where('id', $site)->value('branding_draft_revision'));
+        $this->assertSame(3, DB::table('site_branding_revisions')->count());
+        $this->assertSame(3, DB::table('site_branding_publishing_events')->count());
+        $this->assertSame(1, DB::table('audit_events')->where('action', 'website.branding_restored')->count());
+
+        $this->assertSame($first, $service->restorePublishedBranding(
+            $owner, $company->id, $site, $first, $first, 'Safe idempotent retry'
+        ));
+        $this->assertSame(3, DB::table('site_branding_publishing_events')->count());
+    }
+
+    public function test_restore_rejects_stale_published_pointer_and_never_published_draft(): void
+    {
+        [$company, $owner, $site] = $this->fixture('restore-conflicts');
+        $service = app(SiteBrandingService::class);
+        $service->saveDraft($owner, $company->id, $site, $this->branding('Original'), 0, 'Initial brand');
+        $first = $service->publish($owner, $company->id, $site, 1, 'Publish first');
+        $service->saveDraft($owner, $company->id, $site, $this->branding('Second'), 1, 'Second brand');
+        $second = $service->publish($owner, $company->id, $site, 2, 'Publish second');
+        $service->saveDraft($owner, $company->id, $site, $this->branding('Never published'), 2, 'Third draft');
+        $unpublished = DB::table('site_branding_revisions')->where('website_id', $site)
+            ->where('revision_number', 3)->value('id');
+
+        try {
+            $service->restorePublishedBranding($owner, $company->id, $site, $first, $first, 'Old published pointer');
+            $this->fail('Stale published pointer should never restore a website.');
+        } catch (ConflictHttpException) {
+            $this->assertSame($second, DB::table('websites')->where('id', $site)->value('branding_published_revision_id'));
+        }
+        $this->expectException(InvalidArgumentException::class);
+        $service->restorePublishedBranding($owner, $company->id, $site, $unpublished, $second, 'Unpublished branding cannot restore');
+    }
+
 }

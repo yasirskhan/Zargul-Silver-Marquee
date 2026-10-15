@@ -104,6 +104,66 @@ final class SiteBrandingService
         }, 3);
     }
 
+    /**
+     * Restore only a previously published branding snapshot. Do not rewrite or
+     * discard the editor's latest independent draft revision.
+     */
+    public function restorePublishedBranding(
+        User $actor, string $companyId, string $websiteId,
+        string $targetRevisionId, string $expectedPublishedRevisionId, string $reason,
+    ): string {
+        $this->authorize($actor, $companyId, true);
+        $this->reason($reason);
+
+        return DB::transaction(function () use (
+            $actor, $companyId, $websiteId, $targetRevisionId, $expectedPublishedRevisionId, $reason
+        ): string {
+            $this->authorize($actor, $companyId, true);
+            $website = $this->websiteForUpdate($companyId, $websiteId);
+            if (! $website->branding_published_revision_id
+                || $website->branding_published_revision_id !== $expectedPublishedRevisionId) {
+                throw new ConflictHttpException('Published branding changed; reload before restoring.');
+            }
+
+            $revision = DB::table('site_branding_revisions')
+                ->where('company_id', $companyId)->where('website_id', $websiteId)
+                ->where('id', $targetRevisionId)->first();
+            if (! $revision) {
+                throw new InvalidArgumentException('Branding snapshot was not found for this website.');
+            }
+            if (! DB::table('site_branding_publishing_events')
+                ->where('company_id', $companyId)->where('website_id', $websiteId)
+                ->where('revision_id', $targetRevisionId)->exists()) {
+                throw new InvalidArgumentException('Only previously published branding may be restored.');
+            }
+
+            $branding = json_decode($revision->content, true, 512, JSON_THROW_ON_ERROR);
+            $this->validator->validate($branding);
+            $this->assertMedia($companyId, $branding, true);
+            if ($revision->id === $website->branding_published_revision_id) {
+                return $revision->id; // Idempotent, no duplicate history or audit.
+            }
+
+            DB::table('websites')->where('company_id', $companyId)->where('id', $websiteId)
+                ->update(['branding_published_revision_id' => $revision->id, 'updated_at' => now()]);
+            DB::table('site_branding_publishing_events')->insert([
+                'id' => (string) Str::uuid(),
+                'company_id' => $companyId,
+                'website_id' => $websiteId,
+                'revision_id' => $revision->id,
+                'previous_revision_id' => $website->branding_published_revision_id,
+                'action' => 'restore',
+                'actor_id' => $actor->getKey(),
+            ]);
+            $this->audit($actor, $companyId, $websiteId, 'website.branding_restored',
+                ['published_revision_id' => $website->branding_published_revision_id],
+                ['published_revision_id' => $revision->id, 'draft_revision' => (int) $website->branding_draft_revision],
+                $reason);
+
+            return $revision->id;
+        }, 3);
+    }
+
     /** No draft fallback: unapproved branding is never publicly readable. */
     public function publishedBranding(string $companyId, string $websiteId): ?array
     {
