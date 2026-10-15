@@ -1,0 +1,27 @@
+name: Phase 0 validation
+on:
+  push:
+    branches:
+      - chatgpt/phase0-foundation
+  pull_request:
+jobs:
+  prototype-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Node prototype tests
+        run: npm test
+      - name: Verify project continuity files
+        shell: bash
+        run: |
+          test -s AI_HANDOFF.md
+          test -s docs/PROJECT_MASTER_SPEC.md
+          test -s docs/FEATURE_REGISTER.csv
+          test -s docs/ROADMAP.md
+          test -s assets/core.mjs
+          test -s tests/core.test.mjs
+      - name: Check JS syntax
+        run: node --check assets/core.mjs
