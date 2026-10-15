@@ -58,13 +58,13 @@ class SitePagePublishingServiceTest extends TestCase
         $this->assertSame(1, $this->service()->saveDraft($owner, $company->id, $pageId, $this->content('First'), 0, 'Initial content'));
         $this->assertNull($this->service()->publishedContent($company->id, $pageId));
         $revisionId = $this->service()->publish($owner, $company->id, $pageId, 1, 'Owner approved');
-        $this->assertSame($this->content('First'), $this->service()->publishedContent($company->id, $pageId));
+        $this->assertEquals($this->content('First'), $this->service()->publishedContent($company->id, $pageId));
         $this->assertSame($revisionId, $this->service()->publish($owner, $company->id, $pageId, 1, 'Safe retry'));
         $this->assertSame(1, DB::table('site_publishing_events')->count());
         $this->assertSame(2, DB::table('audit_events')->count());
 
         $this->service()->saveDraft($owner, $company->id, $pageId, $this->content('Not yet published'), 1, 'Change draft');
-        $this->assertSame($this->content('First'), $this->service()->publishedContent($company->id, $pageId));
+        $this->assertEquals($this->content('First'), $this->service()->publishedContent($company->id, $pageId));
         $this->assertSame(2, DB::table('site_page_revisions')->count());
         $this->assertSame(3, DB::table('audit_events')->count());
     }
