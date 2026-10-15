@@ -10,6 +10,8 @@ class Hall extends Model
 {
     use HasUuids;
 
+    protected $attributes = ['is_active' => true, 'included_chairs' => 0, 'included_tables' => 0];
+
     protected $fillable = ['company_id', 'slug', 'name', 'capacity', 'included_chairs', 'included_tables', 'is_active'];
 
     protected function casts(): array
