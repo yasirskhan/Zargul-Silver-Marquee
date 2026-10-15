@@ -11,9 +11,9 @@ GitHub connector: repository read and write successful.
 Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; docs/ROADMAP.md; docs/WEBSITE_CMS_DESIGN.md; docs/DEVELOPMENT_PROTOCOL.md; docs/decisions/ADR-0001-platform-and-cms.md. Then read relevant source and tests. Verify LIVE development branch HEAD + exact SHA CI/jobs before writing. Actual repo/CI takes precedence over old handoff state.
 
 ## Last fully VERIFIED PRODUCT checkpoint
-- **Source commit:** `df8509d94647c2491c3d09c1e586b8403559f7b3`
-- **Hosted CI:** `38818610733`, SUCCESS.
-- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38818610733
+- **Source commit:** `d2af406687d1d95c91ad3b62636865a01425eeca`
+- **Hosted CI:** `38818982835`, SUCCESS.
+- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38818982835
 - All three jobs SUCCESS: `prototype-checks`, `laravel-postgres`.
 - PHP 8.3 clean Composer package resolution of Laravel 13 + Filament 5 succeeded.
 - PostgreSQL 16 migrations succeeded, including versioned website and tenant identity tables.
@@ -167,3 +167,10 @@ If current doc-only commit is verified, record that exact SHA and CI run only af
 - Tests cover separate public vs unsaved draft branding, idempotent publishing, delegated editor without publish permission, stale concurrent drafts, cross-company actor denial, unsafe theme rollback, pending logo rejected for publication, approved logo accepted, and changed optimized variant rejected.
 - Public reads are published-pointer-only; no browser UI or public media routes exist. Owner-facing Filament branding controls, audited restore, public variant-only publication, operational MFA browser E2E and live site acceptance are still outstanding.
 - **NEXT BOUNDED TASK:** wire SiteBrandingService into existing MFA-protected Filament WebsiteWorkspace as a company-scoped owner/edit-delegated branding panel, with logo/favicon selection from authorized private library, reasons, load/save/publish permissions and Livewire PostgreSQL tests. Keep draft/public separation and prevent unsaved-form publishing.
+
+## 2026-10-15 authenticated Filament website branding controls VERIFIED
+- Product source `d2af406687d1d95c91ad3b62636865a01425eeca`, hosted CI `38818982835`: all three jobs SUCCESS at exact SHA, including real PostgreSQL Livewire tests, schema rollback/replay and static prototype Chromium tests.
+- The MFA-panel WebsiteWorkspace now exposes accessible, tenant-scoped branding fields: public venue name/tagline, allowed theme and font presets, dropdowns listing only currently authorized private media for logo/favicon, save/reload branding draft, and owner/delegated-publisher-only publish.
+- Locked loaded company/website IDs and current page Gate checks protect every action; service independently rechecks authenticated verified actor, membership, tenant and approved intact media. Unsaved Livewire form edits cannot be published. Switching website context clears previous company's form. Draft edits do not mutate the published pointer. Livewire tests cover owner approval, editor draft-only role, unsaved publish denial.
+- Browser E2E here still covers static prototype, not authenticated Filament. Branding is not wired into public serving; no owner go-live claim. Site media remains private until separately validated publication.
+- **NEXT BOUNDED TASK:** add audited rollback/restore for previously published BRANDING snapshots (not unpublished drafts), with expected published-pointer concurrency guard, untouched latest draft, immutable publishing events, and owner-only Livewire history/restore controls and PostgreSQL tests. Then responsive theme preview and safe public media projection (separate release gate).
