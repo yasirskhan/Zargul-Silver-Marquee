@@ -1,0 +1,149 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Company;
+use App\Models\CompanyMembership;
+use App\Models\User;
+use App\Services\SiteBrandingService;
+use App\Services\SiteMediaService;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use InvalidArgumentException;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+use Tests\TestCase;
+
+class SiteBrandingServiceTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private function fixture(string $slug = 'branding'): array
+    {
+        Storage::fake('local');
+        $company = Company::create(['name' => $slug, 'slug' => $slug]);
+        $owner = User::create(['name' => 'Owner', 'email' => $slug.'-owner@example.test', 'password' => 'test-only']);
+        $owner->markEmailAsVerified();
+        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $owner->id, 'role' => 'owner']);
+        $siteId = (string) Str::uuid();
+        DB::table('websites')->insert(['id' => $siteId, 'company_id' => $company->id, 'name' => $slug]);
+        $this->be($owner);
+
+        return [$company, $owner, $siteId];
+    }
+
+    private function branding(string $title): array
+    {
+        return [
+            'siteName' => $title,
+            'tagline' => 'Celebrate with us',
+            'themePreset' => 'silver',
+            'fontPreset' => 'classic',
+            'logoMediaId' => null,
+            'faviconMediaId' => null,
+        ];
+    }
+
+    public function test_owner_can_save_publish_and_keep_unpublished_brand_changes_private(): void
+    {
+        [$company, $owner, $site] = $this->fixture();
+        $service = app(SiteBrandingService::class);
+        $this->assertNull($service->publishedBranding($company->id, $site));
+
+        $this->assertSame(1, $service->saveDraft($owner, $company->id, $site, $this->branding('Silver'), 0, 'Initial branding'));
+        $this->assertNull($service->publishedBranding($company->id, $site));
+        $publishedId = $service->publish($owner, $company->id, $site, 1, 'Approve branding');
+        $this->assertEquals($this->branding('Silver'), $service->publishedBranding($company->id, $site));
+        $this->assertSame($publishedId, $service->publish($owner, $company->id, $site, 1, 'Retry safely'));
+
+        $this->assertSame(2, $service->saveDraft($owner, $company->id, $site, $this->branding('Draft only'), 1, 'Try new title'));
+        $this->assertEquals($this->branding('Silver'), $service->publishedBranding($company->id, $site));
+        $this->assertSame(2, DB::table('site_branding_revisions')->count());
+        $this->assertSame(1, DB::table('site_branding_publishing_events')->count());
+        $this->assertSame(3, DB::table('audit_events')->count());
+    }
+
+    public function test_editor_can_save_but_cannot_publish_and_stale_drafts_are_rejected(): void
+    {
+        [$company, $owner, $site] = $this->fixture('delegated');
+        $editor = User::create(['name' => 'Editor', 'email' => 'branding-editor@example.test', 'password' => 'test-only']);
+        $editor->markEmailAsVerified();
+        CompanyMembership::create([
+            'company_id' => $company->id, 'user_id' => $editor->id,
+            'role' => 'manager', 'can_edit_site' => true,
+        ]);
+        $service = app(SiteBrandingService::class);
+        $service->saveDraft($owner, $company->id, $site, $this->branding('Owner draft'), 0, 'Owner starts');
+        $this->be($editor);
+        try {
+            $service->saveDraft($editor, $company->id, $site, $this->branding('Stale editor'), 0, 'Old browser tab');
+            $this->fail('Stale draft was accepted');
+        } catch (ConflictHttpException) {
+            $this->assertSame(1, DB::table('site_branding_revisions')->count());
+        }
+        $this->assertSame(2, $service->saveDraft($editor, $company->id, $site, $this->branding('Editor draft'), 1, 'Authorized draft edit'));
+        $this->expectException(AuthorizationException::class);
+        $service->publish($editor, $company->id, $site, 2, 'Unauthorized publish');
+    }
+
+    public function test_cross_company_actor_and_unverified_owner_are_denied(): void
+    {
+        [$company, , $site] = $this->fixture('primary');
+        [, $outsider] = $this->fixture('secondary');
+        $this->be($outsider);
+        $this->expectException(AuthorizationException::class);
+        app(SiteBrandingService::class)->saveDraft($outsider, $company->id, $site,
+            $this->branding('Intrusion'), 0, 'Foreign venue');
+    }
+
+    public function test_invalid_theme_does_not_write_history_or_audit(): void
+    {
+        [$company, $owner, $site] = $this->fixture('unsafe');
+        $branding = $this->branding('Silver');
+        $branding['themePreset'] = '<script>evil</script>';
+        try {
+            app(SiteBrandingService::class)->saveDraft($owner, $company->id, $site, $branding, 0, 'Unsafe edit');
+            $this->fail('Unexpected unsafe branding acceptance');
+        } catch (InvalidArgumentException) {
+            $this->assertSame(0, DB::table('site_branding_revisions')->count());
+            $this->assertSame(0, DB::table('audit_events')->count());
+        }
+    }
+
+    public function test_pending_logo_may_be_drafted_but_publication_requires_integrity_checked_approval(): void
+    {
+        [$company, $owner, $site] = $this->fixture('assets');
+        $media = app(SiteMediaService::class);
+        $id = $media->stageImage($owner, $company->id,
+            UploadedFile::fake()->image('logo.png', 240, 240),
+            'Approved venue logo', 'Upload company brand logo');
+
+        $branding = $this->branding('Silver');
+        $branding['logoMediaId'] = $id;
+        $service = app(SiteBrandingService::class);
+        $service->saveDraft($owner, $company->id, $site, $branding, 0, 'Logo branding draft');
+
+        try {
+            $service->publish($owner, $company->id, $site, 1, 'Unapproved logo');
+            $this->fail('Pending logo must never publish.');
+        } catch (InvalidArgumentException) {
+            $this->assertNull($service->publishedBranding($company->id, $site));
+            $this->assertSame(0, DB::table('site_branding_publishing_events')->count());
+        }
+
+        $media->approveImage($owner, $company->id, $id, 'Approve authorized logo');
+        $service->publish($owner, $company->id, $site, 1, 'Publish owner logo');
+        $this->assertSame($id, $service->publishedBranding($company->id, $site)['logoMediaId']);
+        $this->assertSame(1, DB::table('site_branding_publishing_events')->count());
+
+        $asset = DB::table('site_media')->where('id', $id)->first();
+        $metadata = json_decode($asset->metadata, true);
+        Storage::disk('local')->put($metadata['variants']['webp1200']['object_key'], 'tampered');
+        $service->saveDraft($owner, $company->id, $site, $branding, 1, 'Revision with damaged logo');
+        $this->expectException(InvalidArgumentException::class);
+        $service->publish($owner, $company->id, $site, 2, 'Reject corrupted variant');
+    }
+}
