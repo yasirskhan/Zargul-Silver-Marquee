@@ -99,7 +99,7 @@ return new class extends Migration {
         // PostgreSQL enforces immutable versions and audit events for ordinary roles.
         // Production will additionally use separate database roles and secured log export.
         DB::unprepared(<<<'SQL'
-CREATE FUNCTION venuedesk_immutable_history() RETURNS trigger
+CREATE OR REPLACE FUNCTION venuedesk_immutable_history() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
     RAISE EXCEPTION 'VenueDesk history entries cannot be updated or deleted';
