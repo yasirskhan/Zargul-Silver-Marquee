@@ -14,6 +14,7 @@ function show(view){
  if(page==='calendar')renderCalendar();
 }
 function renderMetrics(){
+ $('#site-editor-link')?.classList.toggle('hidden',role!=='owner');
  $('#metrics').innerHTML=roles[role].metrics.map(([k,v])=>`<div class="metric"><small>${k}</small><strong>${v}</strong></div>`).join('');
 }
 function renderCalendar(){
