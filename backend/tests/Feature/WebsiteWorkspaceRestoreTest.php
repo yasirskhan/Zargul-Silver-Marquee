@@ -58,5 +58,14 @@ class WebsiteWorkspaceRestoreTest extends TestCase
         $this->assertSame(3, DB::table('site_page_revisions')->where('page_id', $page)->count());
         $this->assertSame(1, DB::table('site_publishing_events')->where('action', 'restore')->count());
         $this->assertSame(6, DB::table('audit_events')->count());
+        $editor->set('reason', 'Take approved website page offline')
+            ->call('unpublishCurrentPage')->assertHasNoErrors()
+            ->assertSee('Not published');
+        $this->assertNull(DB::table('site_pages')->where('id', $page)->value('published_revision_id'));
+        $this->assertSame(1, DB::table('site_publishing_events')->where('action', 'unpublish')->count());
+        $editor->set('reason', 'Restore original approved page')
+            ->call('restorePublishedRevision', $first)->assertHasNoErrors();
+        $this->assertSame($first, DB::table('site_pages')->where('id', $page)->value('published_revision_id'));
+        $this->assertSame(3, (int) DB::table('site_pages')->where('id', $page)->value('draft_revision'));
     }
 }

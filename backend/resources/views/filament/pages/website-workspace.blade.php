@@ -339,12 +339,18 @@
                     @if ($this->canPublishCurrentPage())
                         <button type="button" wire:click="publishDraft" wire:confirm="Publish the saved revision to your venue website?"
                             wire:loading.attr="disabled" class="rounded-lg border px-4 py-2 font-semibold">Publish saved draft</button>
+                        @if ($page->published_revision_id)
+                            <button type="button" wire:click="unpublishCurrentPage"
+                                wire:confirm="Take this published page offline? Its saved drafts, approved versions and audit history will be preserved."
+                                wire:loading.attr="disabled"
+                                class="rounded-lg border px-4 py-2 font-semibold">Take published page offline</button>
+                        @endif
                     @endif
                 </div>
-                @if ($this->canPublishCurrentPage() && $page->published_revision_id)
+                @if ($this->canPublishCurrentPage() && count($this->publishedHistory()) > 0)
                     <div class="space-y-2 border-t pt-4">
                         <h3 class="font-semibold">Previously published versions</h3>
-                        <p class="text-sm">Restoring changes only the published pointer. Existing drafts and history are preserved. Enter a reason above.</p>
+                        <p class="text-sm">Restoring a previously published version can bring an offline page back. Existing drafts and history are preserved. Enter a reason above.</p>
                         <div class="flex flex-wrap gap-2">
                             @foreach ($this->publishedHistory() as $snapshot)
                                 @if ($snapshot->id === $page->published_revision_id)

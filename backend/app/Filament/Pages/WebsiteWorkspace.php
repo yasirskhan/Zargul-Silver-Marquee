@@ -76,6 +76,9 @@ final class WebsiteWorkspace extends Page
     public ?string $loadedPublishedRevisionId = null;
 
     #[Locked]
+    public string $unpublishRequestKey = '';
+
+    #[Locked]
     public ?string $loadedBrandingWebsiteId = null;
 
     #[Locked]
@@ -191,6 +194,7 @@ final class WebsiteWorkspace extends Page
     /** Reload only an authorized page's latest draft. This also abandons unsaved changes. */
     public function reloadDraft(): void
     {
+        $this->unpublishRequestKey = (string) Str::uuid();
         $this->sections = [];
         $this->expectedRevision = 0;
         $this->loadedPublishedRevisionId = null;
@@ -677,15 +681,32 @@ final class WebsiteWorkspace extends Page
             ->all();
     }
 
+    public function unpublishCurrentPage(): void
+    {
+        [$actor, $page] = $this->authorizeSelectedPage('publish');
+        $this->checkEditorSnapshot($page);
+        abort_unless($this->loadedPublishedRevisionId !== null, 409);
+        $this->validate(['reason' => ['required', 'string', 'min:3', 'max:500']]);
+
+        try {
+            app(SitePagePublishingService::class)->unpublish(
+                $actor, $page->company_id, $page->getKey(),
+                $this->unpublishRequestKey, $this->loadedPublishedRevisionId, $this->reason
+            );
+        } catch (\InvalidArgumentException | ConflictHttpException $error) {
+            throw ValidationException::withMessages(['reason' => $error->getMessage()]);
+        }
+        $this->loadedPublishedRevisionId = null;
+        $this->unpublishRequestKey = (string) Str::uuid();
+        $this->reason = '';
+        Notification::make()->title('Published page taken offline; draft and history preserved')->success()->send();
+    }
+
     public function restorePublishedRevision(string $targetRevisionId): void
     {
         [$actor, $page] = $this->authorizeSelectedPage('publish');
         $this->checkEditorSnapshot($page);
         $this->validate(['reason' => ['required', 'string', 'min:3', 'max:500']]);
-        if (! $this->loadedPublishedRevisionId) {
-            throw new ConflictHttpException('No published snapshot was loaded; reload this page.');
-        }
-
         // The service checks prior-publication proof and compares the locked
         // expected live pointer in the same transaction as its immutable audit.
         $this->loadedPublishedRevisionId = app(SitePagePublishingService::class)

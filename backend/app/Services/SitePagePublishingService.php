@@ -115,6 +115,79 @@ final class SitePagePublishingService
 
 
     /**
+     * Explicitly remove a live published pointer without deleting the page,
+     * draft, old snapshot, or immutable history. The UUID is a retry identity.
+     * No business/customer data is exposed by this operation.
+     */
+    public function unpublish(
+        User $actor, string $companyId, string $pageId,
+        string $requestId, string $expectedPublishedRevisionId, string $reason,
+    ): void {
+        $this->authorize($actor, $companyId, true);
+        $reason = trim($reason);
+        $this->reason($reason);
+        if (! Str::isUuid($requestId) || ! Str::isUuid($expectedPublishedRevisionId)
+            || mb_strlen($reason) < 3
+            || preg_match('/[<>@[:cntrl:]]|https?:\/\/|www\./iu', $reason)) {
+            throw new InvalidArgumentException('Provide a valid publication request and plain reason.');
+        }
+
+        DB::transaction(function () use (
+            $actor, $companyId, $pageId, $requestId, $expectedPublishedRevisionId, $reason
+        ): void {
+            $page = $this->pageForUpdate($companyId, $pageId);
+            $this->authorize($actor, $companyId, true);
+            $existingEvent = DB::table('site_publishing_events')->where('id', $requestId)->first();
+            if ($existingEvent) {
+                $latest = DB::table('site_publishing_events')
+                    ->where('company_id', $companyId)->where('page_id', $pageId)
+                    ->orderByDesc('created_at')->orderByDesc('id')->first();
+                $audit = DB::table('audit_events')->where('company_id', $companyId)
+                    ->where('entity_type', 'site_page')->where('entity_id', $pageId)
+                    ->where('action', 'website.unpublished')
+                    ->where('actor_id', $actor->getKey())
+                    ->orderByDesc('created_at')->first(['context']);
+                $context = $audit
+                    ? json_decode($audit->context, true, 512, JSON_THROW_ON_ERROR)
+                    : null;
+                if ($page->published_revision_id === null
+                    && $latest?->id === $requestId
+                    && $existingEvent->company_id === $companyId
+                    && $existingEvent->page_id === $pageId
+                    && $existingEvent->action === 'unpublish'
+                    && $existingEvent->revision_id === $expectedPublishedRevisionId
+                    && $existingEvent->previous_revision_id === $expectedPublishedRevisionId
+                    && (int) $existingEvent->actor_id === (int) $actor->getKey()
+                    && ($context['requestId'] ?? null) === $requestId
+                    && ($context['reason'] ?? null) === $reason) {
+                    return; // Exact same authorized request, no duplicate event or audit.
+                }
+                throw new ConflictHttpException('Publication request key is already used.');
+            }
+
+            if ($page->published_revision_id !== $expectedPublishedRevisionId) {
+                throw new ConflictHttpException('Published snapshot changed; reload before unpublishing.');
+            }
+
+            DB::table('site_pages')->where('company_id', $companyId)
+                ->where('id', $pageId)->update([
+                    'published_revision_id' => null, 'updated_at' => now(),
+                ]);
+            // Revision_id is non-null and FK-proven in the existing event table.
+            DB::table('site_publishing_events')->insert([
+                'id' => $requestId, 'company_id' => $companyId,
+                'page_id' => $pageId, 'revision_id' => $expectedPublishedRevisionId,
+                'previous_revision_id' => $expectedPublishedRevisionId,
+                'action' => 'unpublish', 'actor_id' => $actor->getKey(),
+            ]);
+            $this->audit($companyId, $actor, 'website.unpublished', $pageId,
+                ['published_revision_id' => $expectedPublishedRevisionId],
+                ['published_revision_id' => null, 'draft_revision' => (int) $page->draft_revision],
+                $reason, $requestId);
+        }, 3);
+    }
+
+    /**
      * Restore an earlier immutable snapshot by creating a NEW publishing event.
      * Does not mutate or discard the latest draft; checked CAS avoids stale rolls.
      */
@@ -123,7 +196,7 @@ final class SitePagePublishingService
         string $companyId,
         string $pageId,
         string $targetRevisionId,
-        string $expectedPublishedRevisionId,
+        ?string $expectedPublishedRevisionId,
         string $reason,
     ): string {
         $this->authorize($actor, $companyId, true);
@@ -131,7 +204,7 @@ final class SitePagePublishingService
 
         return DB::transaction(function () use ($actor, $companyId, $pageId, $targetRevisionId, $expectedPublishedRevisionId, $reason): string {
             $page = $this->pageForUpdate($companyId, $pageId);
-            if (! $page->published_revision_id || $page->published_revision_id !== $expectedPublishedRevisionId) {
+            if ($page->published_revision_id !== $expectedPublishedRevisionId) {
                 throw new ConflictHttpException('Published snapshot changed; reload before restoring.');
             }
 
@@ -283,7 +356,7 @@ final class SitePagePublishingService
 
     private function audit(
         string $companyId, User $actor, string $action, string $pageId,
-        array $before, array $after, string $reason,
+        array $before, array $after, string $reason, ?string $requestId = null,
     ): void {
         DB::table('audit_events')->insert([
             'id' => (string) Str::uuid(),
@@ -294,7 +367,9 @@ final class SitePagePublishingService
             'entity_id' => $pageId,
             'before_values' => json_encode($before, JSON_THROW_ON_ERROR),
             'after_values' => json_encode($after, JSON_THROW_ON_ERROR),
-            'context' => json_encode(['reason' => trim($reason)], JSON_THROW_ON_ERROR),
+            'context' => json_encode($requestId === null
+                ? ['reason' => trim($reason)]
+                : ['reason' => trim($reason), 'requestId' => $requestId], JSON_THROW_ON_ERROR),
         ]);
     }
 }

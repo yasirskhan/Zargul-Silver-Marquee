@@ -261,6 +261,62 @@ class SitePagePublishingServiceTest extends TestCase
         $this->assertSame(2, DB::table('site_publishing_events')->count());
     }
 
+    public function test_unpublish_is_atomic_exact_retry_and_restores_only_approved_history(): void
+    {
+        [$company, $owner, $pageId] = $this->setupWebsite('unpublish');
+        $this->be($owner);
+        $service = $this->service();
+        $service->saveDraft($owner, $company->id, $pageId, $this->content('First public'), 0, 'Draft');
+        $first = $service->publish($owner, $company->id, $pageId, 1, 'Approve public');
+        $service->saveDraft($owner, $company->id, $pageId, $this->content('Private newer'), 1, 'Future draft');
+        $requestId = (string) Str::uuid();
+        $service->unpublish($owner, $company->id, $pageId, $requestId,
+            $first, 'Temporarily take published page offline');
+        $this->assertNull($service->publishedContent($company->id, $pageId));
+        $this->assertSame(2, (int) DB::table('site_pages')->where('id', $pageId)->value('draft_revision'));
+        $this->assertSame(1, DB::table('site_publishing_events')->where('action', 'unpublish')->count());
+        $service->unpublish($owner, $company->id, $pageId, $requestId,
+            $first, 'Temporarily take published page offline');
+        $this->assertSame(1, DB::table('audit_events')->where('action', 'website.unpublished')->count());
+        try {
+            $service->unpublish($owner, $company->id, $pageId, $requestId,
+                $first, 'Conflicting replay reason');
+            $this->fail('Changed unpublish replay was accepted.');
+        } catch (ConflictHttpException) {
+            $this->assertTrue(true);
+        }
+        $this->assertSame($first, $service->restorePublishedRevision(
+            $owner, $company->id, $pageId, $first, null, 'Restore approved public content'
+        ));
+        $this->assertEquals($this->content('First public'), $service->publishedContent($company->id, $pageId));
+        $this->assertSame(2, (int) DB::table('site_pages')->where('id', $pageId)->value('draft_revision'));
+        $this->expectException(ConflictHttpException::class);
+        $service->unpublish($owner, $company->id, $pageId, $requestId,
+            $first, 'Temporarily take published page offline');
+    }
+
+    public function test_unpublish_audit_rejection_rolls_back_pointer_and_event(): void
+    {
+        [$company, $owner, $pageId] = $this->setupWebsite('unpublish-audit');
+        $this->be($owner);
+        $service = $this->service();
+        $service->saveDraft($owner, $company->id, $pageId, $this->content('Public'), 0, 'Draft');
+        $first = $service->publish($owner, $company->id, $pageId, 1, 'Approve');
+        $this->rejectAuditWrites();
+        try {
+            $service->unpublish($owner, $company->id, $pageId, (string) Str::uuid(),
+                $first, 'Audit must be atomic');
+            $this->fail('Unpublish succeeded with failed audit.');
+        } catch (\Illuminate\Database\QueryException) {
+            $this->assertTrue(true);
+        } finally {
+            $this->allowAuditWrites();
+        }
+        $this->assertSame($first, DB::table('site_pages')->where('id', $pageId)->value('published_revision_id'));
+        $this->assertSame(1, DB::table('site_publishing_events')->count());
+        $this->assertSame(0, DB::table('audit_events')->where('action', 'website.unpublished')->count());
+    }
+
     private function rejectAuditWrites(): void
     {
         DB::unprepared(<<<'SQL'

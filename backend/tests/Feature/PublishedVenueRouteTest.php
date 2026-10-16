@@ -118,6 +118,28 @@ class PublishedVenueRouteTest extends TestCase
         $this->get('http://venue.example.test/robots.txt')->assertNotFound();
     }
 
+    public function test_owner_unpublish_immediately_hides_website_and_sitemap_then_restores(): void
+    {
+        [$company, $owner, $site, $page] = $this->fixture();
+        $this->publish($company, $owner, $site, $page);
+        $this->enable($company->id, $site);
+        config()->set('public_site.indexing_enabled', true);
+        $this->get('http://venue.example.test/')->assertOk();
+        $this->get('http://venue.example.test/sitemap.xml')->assertOk();
+        $first = DB::table('site_pages')->where('id', $page)->value('published_revision_id');
+        $service = app(SitePagePublishingService::class);
+        $service->unpublish($owner, $company->id, $page, (string) Str::uuid(),
+            $first, 'Temporarily take page offline');
+        $this->get('http://venue.example.test/')->assertNotFound();
+        $this->get('http://venue.example.test/sitemap.xml')->assertNotFound();
+        $this->get('http://venue.example.test/robots.txt')->assertOk()->assertSee('Disallow: /');
+        $service->restorePublishedRevision($owner, $company->id, $page,
+            $first, null, 'Return approved page online');
+        $this->get('http://venue.example.test/')->assertOk()
+            ->assertSee('Approved Hall Opening');
+        $this->get('http://venue.example.test/sitemap.xml')->assertOk();
+    }
+
     public function test_sitemap_lists_only_valid_published_allowlisted_pages_after_indexing_signoff(): void
     {
         [$company, $owner, $site, $home] = $this->fixture();
