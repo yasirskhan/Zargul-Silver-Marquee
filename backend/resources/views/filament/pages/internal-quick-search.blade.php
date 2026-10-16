@@ -18,6 +18,15 @@
                     placeholder="Reference, date, program or task">
             </label>
             @error('searchTerm') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+            <label class="block space-y-1">
+                <span class="text-sm font-medium">Record type</span>
+                <select wire:model="searchKind" class="w-full rounded-lg border p-3 text-gray-900">
+                    @foreach ($this->sourceOptions() as $kind => $label)
+                        <option value="{{ $kind }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+            </label>
+            @error('searchKind') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
             <button type="submit" wire:loading.attr="disabled"
                 class="rounded-lg border px-4 py-2 font-semibold">Search company records</button>
         </form>

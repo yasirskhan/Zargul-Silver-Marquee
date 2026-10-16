@@ -22,6 +22,7 @@ final class InternalQuickSearch extends Page
 
     public ?string $companyId = null;
     public string $searchTerm = '';
+    public string $searchKind = 'all';
 
     #[Locked]
     public ?string $loadedCompanyId = null;
@@ -63,6 +64,9 @@ final class InternalQuickSearch extends Page
     public function hydrate(): void
     {
         $this->authorizeCurrent();
+        // Never replay a prior result snapshot across changes to the search,
+        // member role or hall assignment. Only the current server search fills it.
+        $this->results = [];
     }
 
     private function authorizeCurrent(): User
@@ -74,9 +78,28 @@ final class InternalQuickSearch extends Page
         return $actor;
     }
 
+    public function sourceOptions(): array
+    {
+        $actor = $this->authorizeCurrent();
+        $membership = CompanyMembership::query()->where('company_id', $this->companyId)
+            ->where('user_id', $actor->getKey())->where('is_active', true)->first();
+        if (! $membership) {
+            abort(403);
+        }
+        if (in_array($membership->role, ['manager', 'operations'], true)) {
+            return ['all' => 'All permitted records', 'planning' => 'Planning tasks'];
+        }
+        return [
+            'all' => 'All permitted records', 'proposal' => 'Booking proposals',
+            'planning' => 'Planning tasks', 'approval' => 'Approval requests',
+            'finance' => 'Nonbinding finance previews', 'audit' => 'Audit actions',
+        ];
+    }
+
     public function updatedCompanyId(): void
     {
         $this->authorizeCurrent();
+        $this->searchKind = 'all';
         $this->searchTerm = '';
         $this->results = [];
         $this->loadedCompanyId = $this->companyId;
@@ -86,10 +109,13 @@ final class InternalQuickSearch extends Page
     {
         $actor = $this->authorizeCurrent();
         abort_unless($this->loadedCompanyId === $this->companyId, 403);
-        $this->validate(['searchTerm' => ['required', 'string', 'min:3', 'max:80']]);
+        $this->validate([
+            'searchTerm' => ['required', 'string', 'min:3', 'max:80'],
+            'searchKind' => ['required', 'in:all,proposal,planning,approval,finance,audit'],
+        ]);
         try {
             $this->results = app(InternalQuickSearchService::class)
-                ->search($actor, $this->companyId, $this->searchTerm);
+                ->search($actor, $this->companyId, $this->searchTerm, 20, $this->searchKind);
         } catch (InvalidArgumentException $error) {
             throw ValidationException::withMessages(['searchTerm' => $error->getMessage()]);
         }

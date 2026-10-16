@@ -35,7 +35,7 @@ final class InternalQuickSearchService
             'path' => '/admin/audit-history'],
     ];
 
-    public function search(User $actor, string $companyId, string $term, int $limit = 20): array
+    public function search(User $actor, string $companyId, string $term, int $limit = 20, string $kind = 'all'): array
     {
         $membership = CompanyMembership::query()->where('company_id', $companyId)
             ->where('user_id', $actor->getKey())->where('is_active', true)
@@ -46,6 +46,13 @@ final class InternalQuickSearchService
             || ! $membership) {
             throw new AuthorizationException('An active verified company staff session is required.');
         }
+        $restricted = in_array($membership->role, ['manager', 'operations'], true);
+        if (! in_array($kind, ['all', 'proposal', 'planning', 'approval', 'finance', 'audit'], true)) {
+            throw new InvalidArgumentException('Unknown internal record type.');
+        }
+        if ($restricted && ! in_array($kind, ['all', 'planning'], true)) {
+            throw new AuthorizationException('This record category is not permitted for assigned staff.');
+        }
         $term = trim($term);
         if (mb_strlen($term) < 3 || mb_strlen($term) > 80 || $limit < 1 || $limit > 40
             || preg_match('/[<>@[:cntrl:]]|https?:\/\/|www\./iu', $term)) {
@@ -55,7 +62,9 @@ final class InternalQuickSearchService
         // the same active company membership boundary as that page.
         $matches = [];
         foreach (self::SOURCES as $source) {
-            $restricted = in_array($membership->role, ['manager', 'operations'], true);
+            if ($kind !== 'all' && $source['kind'] !== $kind) {
+                continue;
+            }
             // BookingProposals, finance, approval and audit workspaces have
             // independent policies; assigned staff can ONLY search planning.
             if ($restricted && $source['kind'] !== 'planning') {

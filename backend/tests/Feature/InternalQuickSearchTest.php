@@ -251,6 +251,35 @@ class InternalQuickSearchTest extends TestCase
         $this->assertSame($planning['path'], $staffPlanning['path']);
     }
 
+    public function test_record_type_filters_are_server_authorized_and_reset_stale_results(): void
+    {
+        [$company, , $members] = $this->fixture();
+        $service = app(InternalQuickSearchService::class);
+        $onlyApprovals = $service->search($members['owner'][0], $company->id, 'expense', 20, 'approval');
+        $this->assertNotEmpty($onlyApprovals);
+        $this->assertSame(['approval'], array_values(array_unique(array_column($onlyApprovals, 'kind'))));
+        $this->assertSame([], $service->search($members['owner'][0], $company->id, 'expense', 20, 'planning'));
+        Livewire::test(InternalQuickSearch::class)
+            ->set('searchTerm', 'stage')->set('searchKind', 'planning')
+            ->call('runSearch')->assertHasNoErrors()->assertSee('Arrange stage light cables')
+            ->set('searchKind', 'approval')->assertDontSee('Arrange stage light cables')
+            ->call('runSearch')->assertHasNoErrors()->assertDontSee('Arrange stage light cables');
+        try {
+            $service->search($members['owner'][0], $company->id, 'stage', 20, 'forged');
+            $this->fail('Unrecognized category was accepted.');
+        } catch (InvalidArgumentException) {
+            $this->assertTrue(true);
+        }
+        $this->be($members['manager'][0]);
+        Livewire::test(InternalQuickSearch::class)
+            ->assertSee('Planning tasks')
+            ->assertDontSee('Nonbinding finance previews')
+            ->set('searchTerm', 'expense')->set('searchKind', 'finance')
+            ->call('runSearch')->assertForbidden();
+        $this->expectException(AuthorizationException::class);
+        $service->search($members['manager'][0], $company->id, 'expense', 20, 'audit');
+    }
+
     public function test_term_and_result_bounds_reject_contact_and_large_queries(): void
     {
         [$company, , $members] = $this->fixture();
