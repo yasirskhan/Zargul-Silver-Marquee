@@ -96,14 +96,17 @@ class WebsiteWorkspaceLivewireTest extends TestCase
         [$company, $editor, $pageId] = $this->fixture(false);
         $mountedEditor = Livewire::test(WebsiteWorkspace::class)
             ->call('addSection', 'text')
-            ->set('sections.0.data.title', 'Unapproved post-revocation draft');
+            ->set('sections.0.data.title', 'Unapproved post-revocation draft')
+            ->set('reason', 'Old editor tab must be blocked');
 
         DB::table('company_memberships')
             ->where('company_id', $company->id)->where('user_id', $editor->id)
             ->update(['can_edit_site' => false]);
 
-        $mountedEditor->set('reason', 'Old editor tab must be blocked')
-            ->call('saveDraft')->assertForbidden();
+        // Invoke exactly one Livewire request after revocation. A separate
+        // ->set() request would already deny hydration and invalidate this
+        // test component before the actual action can be asserted.
+        $mountedEditor->call('saveDraft')->assertForbidden();
 
         $this->assertSame(0, (int) DB::table('site_pages')->where('id', $pageId)->value('draft_revision'));
         $this->assertSame(0, DB::table('site_page_revisions')->where('page_id', $pageId)->count());
