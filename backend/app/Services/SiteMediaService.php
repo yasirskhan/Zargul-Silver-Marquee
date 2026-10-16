@@ -127,12 +127,14 @@ final class SiteMediaService
 
         try {
             DB::transaction(function () use ($actor, $companyId, $mediaId, $reason, &$generatedKey): void {
-                $this->authorize($actor, $companyId, true);
                 $asset = DB::table('site_media')
                     ->where('company_id', $companyId)
                     ->where('id', $mediaId)
                     ->lockForUpdate()
                     ->first();
+                // A delegated publisher may lose approval permission while
+                // waiting on the media row lock. Re-read privileges after it.
+                $this->authorize($actor, $companyId, true);
 
                 if (! $asset || ! in_array($asset->status, ['pending', 'approved'], true)) {
                     throw new InvalidArgumentException('The image is not available for approval in this company.');
@@ -191,6 +193,10 @@ final class SiteMediaService
     {
         if (! Auth::check() || (int) Auth::id() !== (int) $actor->getKey()
             || ! $actor->hasVerifiedEmail()
+            // Never trust an in-memory authenticated model after a database
+            // account shutdown or revoked email verification.
+            || ! DB::table('users')->where('id', $actor->getKey())
+                ->where('is_active', true)->whereNotNull('email_verified_at')->exists()
             || ! ($approving
                 ? $this->access->canPublishWebsite($actor, $companyId)
                 : $this->access->canEditWebsite($actor, $companyId))

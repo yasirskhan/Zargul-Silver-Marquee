@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\User;
 use App\Services\SiteMediaService;
+use App\Services\TenantAccess;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -64,6 +65,76 @@ class SiteMediaServiceTest extends TestCase
         $this->assertSame('approved', DB::table('site_media')->where('id', $mediaId)->value('status'));
         $this->assertSame(1, DB::table('audit_events')->where('action', 'website.media_staged')->count());
         $this->assertSame(1, DB::table('audit_events')->where('action', 'website.media_approved')->count());
+    }
+
+    public function test_stale_authenticated_account_cannot_stage_or_approve_media_after_database_revocation(): void
+    {
+        [$company, $owner] = $this->fixture();
+        $service = app(SiteMediaService::class);
+        $assetId = $service->stageImage($owner, $company->id,
+            UploadedFile::fake()->image('approved-room.png', 250, 160),
+            'Private ballroom photograph', 'Stage owner room photo');
+        $this->assertTrue($owner->hasVerifiedEmail());
+
+        DB::table('users')->where('id', $owner->id)->update(['email_verified_at' => null]);
+        try {
+            $service->approveImage($owner, $company->id, $assetId,
+                'Account email verification revoked');
+            $this->fail('Stale verified account approved an image.');
+        } catch (AuthorizationException) {
+            $this->assertSame('pending', DB::table('site_media')->where('id', $assetId)->value('status'));
+            $this->assertSame(0, DB::table('audit_events')->where('action', 'website.media_approved')->count());
+        }
+
+        DB::table('users')->where('id', $owner->id)
+            ->update(['email_verified_at' => now(), 'is_active' => false]);
+        try {
+            $service->stageImage($owner, $company->id,
+                UploadedFile::fake()->image('revoked-room.jpg', 200, 150),
+                'Revoked room photograph', 'Disabled user must not stage');
+            $this->fail('Disabled account staged private media.');
+        } catch (AuthorizationException) {
+            $this->assertSame(1, DB::table('site_media')->count());
+            $this->assertSame(1, DB::table('audit_events')->count());
+        }
+    }
+
+    public function test_media_publisher_revoked_between_initial_check_and_row_lock_cannot_approve(): void
+    {
+        [$company, $owner] = $this->fixture();
+        $assetId = app(SiteMediaService::class)->stageImage($owner, $company->id,
+            UploadedFile::fake()->image('stage-room.png', 300, 180),
+            'Photograph of hall', 'Stage private event venue photo');
+
+        $access = new class extends TenantAccess {
+            public int $checks = 0;
+
+            public function canPublishWebsite(User $user, string $companyId): bool
+            {
+                $allowed = parent::canPublishWebsite($user, $companyId);
+                if (++$this->checks === 1) {
+                    DB::table('company_memberships')->where('company_id', $companyId)
+                        ->where('user_id', $user->getKey())->update(['is_active' => false]);
+                }
+                return (bool) $allowed;
+            }
+        };
+        $this->app->instance(TenantAccess::class, $access);
+        try {
+            app(SiteMediaService::class)->approveImage($owner, $company->id, $assetId,
+                'Image approval revoked while awaiting media lock');
+            $this->fail('Revoked publisher approved an image.');
+        } catch (AuthorizationException) {
+            $this->assertSame(2, $access->checks);
+        } finally {
+            $this->app->forgetInstance(TenantAccess::class);
+        }
+
+        $asset = DB::table('site_media')->where('id', $assetId)->first();
+        $this->assertSame('pending', $asset->status);
+        $meta = json_decode($asset->metadata, true, 512, JSON_THROW_ON_ERROR);
+        $this->assertArrayNotHasKey('variants', $meta);
+        $this->assertSame(0, DB::table('audit_events')->where('action', 'website.media_approved')->count());
     }
 
     public function test_delegated_editor_cannot_approve_image_and_other_company_cannot_approve(): void
