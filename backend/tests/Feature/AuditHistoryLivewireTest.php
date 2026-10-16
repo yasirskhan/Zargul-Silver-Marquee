@@ -55,7 +55,7 @@ class AuditHistoryLivewireTest extends TestCase
         $this->record($foreign->id, $owner->id, 'hall.private', (string) Str::uuid());
 
         $component = Livewire::test(AuditHistory::class)
-            ->assertSee('Audit history')
+            ->assertSee('Owner/admin-only, read-only company audit history.')
             ->assertSee('hall.seating_updated')
             ->assertDontSee('hall.private')
             ->set('filters.action', 'hall.seating_updated')
