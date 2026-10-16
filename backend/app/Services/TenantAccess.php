@@ -73,6 +73,14 @@ class TenantAccess
         return $membership !== null && in_array($membership->role, ['owner', 'admin'], true);
     }
 
+    /** Owner/admin audit scope; sensitive before/after values require least privilege. */
+    public function canReadAuditHistory(User $user, string $companyId): bool
+    {
+        $membership = $this->membership($user, $companyId);
+
+        return $membership !== null && in_array($membership->role, ['owner', 'admin'], true);
+    }
+
     public function canManageBookings(User $user, Hall $hall): bool
     {
         $membership = $this->membership($user, $hall->company_id);
