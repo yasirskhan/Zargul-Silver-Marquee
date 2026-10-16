@@ -140,6 +140,16 @@ class SitePublishedWebpTest extends TestCase
             ->assertHeader('X-Content-Type-Options', 'nosniff')
             ->assertHeader('ETag', $expected['etag']);
         $this->assertSame($expected['bytes'], $http->getContent());
+        $this->get('http://venue.example.test/')->assertOk()
+            ->assertSee('src="/_venue-media/home/'.$published.'.webp"', false)
+            ->assertSee('alt="Verified real venue image"', false)
+            ->assertDontSee('Approved image placeholder')
+            ->assertDontSee('site-media/private/');
+        // Rendering internally must never invent a public image URL.
+        $direct = app(\App\Services\SitePublishedHtmlService::class)
+            ->render($company->id, $site, '/');
+        $this->assertStringContainsString('Approved image placeholder', $direct);
+        $this->assertStringNotContainsString('/_venue-media/', $direct);
         $this->assertSame([], Storage::disk('public')->allFiles());
         $this->get('http://wrong.example.test/_venue-media/home/'.$published.'.webp')->assertNotFound();
         $this->get('http://venue.example.test/_venue-media/halls/'.$published.'.webp')->assertNotFound();

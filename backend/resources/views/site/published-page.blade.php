@@ -14,6 +14,14 @@
         $branding = $snapshot['branding'];
         $palette = $palettes[$branding['themePreset']] ?? $palettes['silver'];
         $font = $branding['fontPreset'] === 'modern' ? 'system-ui, sans-serif' : 'Georgia, serif';
+        // Only the configured published-domain renderer may emit image URLs;
+        // direct internal server previews still use non-network placeholders.
+        $mediaPageSlug = $snapshot['page']['slug'] === '/'
+            ? 'home' : ltrim($snapshot['page']['slug'], '/');
+        $allowedMediaPages = ['home', 'halls', 'packages', 'services', 'gallery',
+            'about', 'contact', 'privacy', 'terms'];
+        $mediaBase = $canonicalUrl !== null && in_array($mediaPageSlug, $allowedMediaPages, true)
+            ? '/_venue-media/'.$mediaPageSlug.'/' : null;
     @endphp
     <title>{{ $snapshot['page']['title'] }} | {{ $branding['siteName'] }}</title>
     <meta name="description" content="{{ $branding['tagline'] !== '' ? $branding['tagline'] : $branding['siteName'] }}">
@@ -40,6 +48,8 @@
         a:focus-visible { outline: 3px solid {{ $palette['accent'] }}; outline-offset: 4px; }
         .layout-columns { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; }
         .layout-column { grid-column: span var(--desktop-span); min-width: 0; }
+        .site-section img, .brand-logo { display: block; max-width: 100%; height: auto; border-radius: 10px; }
+        .brand-logo { margin-top: 16px; }
         .media-placeholder { padding: 30px 15px; border: 2px dashed {{ $palette['accent'] }}; border-radius: 10px; text-align: center; }
         @@media (max-width: 640px) {
             .shell { padding: 15px; }
@@ -57,7 +67,16 @@
                 <p class="site-tagline">{{ $branding['tagline'] }}</p>
             @endif
             @if ($branding['logoMediaId'] !== null)
-                <p class="media-placeholder" aria-label="Venue logo pending public asset release">Approved logo placeholder</p>
+                @if ($mediaBase !== null && isset($snapshot['media'][$branding['logoMediaId']]))
+                    <img class="brand-logo"
+                        src="{{ $mediaBase.$branding['logoMediaId'].'.webp' }}"
+                        alt="{{ $snapshot['media'][$branding['logoMediaId']]['alt'] }}"
+                        width="{{ (int) $snapshot['media'][$branding['logoMediaId']]['width'] }}"
+                        height="{{ (int) $snapshot['media'][$branding['logoMediaId']]['height'] }}"
+                        decoding="async">
+                @else
+                    <p class="media-placeholder" aria-label="Venue logo pending public asset release">Approved logo placeholder</p>
+                @endif
             @endif
             @if (count($snapshot['navigation']) > 1)
                 <nav class="site-navigation" aria-label="Published venue pages">
@@ -70,7 +89,7 @@
         <main id="main-content">
             <h1>{{ $snapshot['page']['title'] }}</h1>
             @foreach ($snapshot['page']['sections'] as $block)
-                @include('site.partials.published-block', ['block' => $block, 'media' => $snapshot['media']])
+                @include('site.partials.published-block', ['block' => $block, 'media' => $snapshot['media'], 'mediaBase' => $mediaBase])
             @endforeach
         </main>
         <footer class="site-footer">
