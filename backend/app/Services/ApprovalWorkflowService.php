@@ -389,6 +389,24 @@ final class ApprovalWorkflowService
         return ['items' => $items, 'fingerprint' => $fingerprint];
     }
 
+    /** Current authorized owner-only emergency grants, never expired grants. */
+    public function activeDelegations(User $actor, string $companyId, int $limit = 30): array
+    {
+        if ($this->member($actor, $companyId)->role !== 'owner') {
+            throw new AuthorizationException('Only an active company owner can view emergency grants.');
+        }
+        if ($limit < 1 || $limit > 50) {
+            throw new InvalidArgumentException('Invalid delegation history page size.');
+        }
+
+        return DB::table('approval_delegations')
+            ->where('company_id', $companyId)->whereNull('revoked_at')
+            ->where('ends_at', '>', now())
+            ->orderBy('ends_at')->orderBy('id')->limit($limit)
+            ->get(['id', 'delegated_to', 'ceiling_minor', 'starts_at', 'ends_at'])
+            ->map(fn ($row) => (array) $row)->all();
+    }
+
     private function summary(object $row): array
     {
         return ['id' => $row->id, 'status' => $row->status, 'revision' => (int) $row->revision,

@@ -95,6 +95,50 @@ class ApprovalCenterLivewireTest extends TestCase
         $members['owner'][0]->forceFill(['email_verified_at' => null])->save();
         Livewire::test(ApprovalCenter::class)->assertForbidden();
     }
+    public function test_owner_delegations_are_fresh_authorized_and_hide_expired_or_revoked_grants(): void
+    {
+        [$company, $foreign, $members] = $this->fixture();
+        $owner = $members['owner'][0];
+        $admin = $members['admin'][0];
+        $service = app(\App\Services\ApprovalWorkflowService::class);
+        $active = (string) \Illuminate\Support\Str::uuid();
+        $expired = (string) \Illuminate\Support\Str::uuid();
+        $service->grant($owner, $company->id, $active, $admin->id, ['discount'], 1000,
+            now()->toIso8601String(), now()->addHours(2)->toIso8601String(),
+            'Owner limited exception authority');
+        $service->grant($owner, $company->id, $expired, $admin->id, ['expense'], 250,
+            now()->toIso8601String(), now()->addHour()->toIso8601String(),
+            'Second restricted trial grant');
+        // Advance the real test clock past the earlier grant's legitimate
+        // expiry; do not violate PostgreSQL chronological CHECK constraints.
+        \Carbon\Carbon::setTestNow(now()->addMinutes(65));
+        try {
+            $current = $service->activeDelegations($owner, $company->id);
+        $this->assertCount(1, $current);
+        $this->assertSame($active, $current[0]['id']);
+        Livewire::test(ApprovalCenter::class)->assertSee('Active / scheduled grants')
+            ->assertSee('Admin #'.$admin->id);
+        $this->be($admin);
+        try {
+            $service->activeDelegations($admin, $company->id);
+            $this->fail('Admin viewed owner emergency grants.');
+        } catch (\Illuminate\Auth\Access\AuthorizationException) {
+            $this->assertTrue(true);
+        }
+        $this->be($owner);
+        try {
+            $service->activeDelegations($owner, $foreign->id);
+            $this->fail('Foreign owner emergency grants leaked.');
+        } catch (\Illuminate\Auth\Access\AuthorizationException) {
+            $this->assertTrue(true);
+        }
+            $service->revoke($owner, $company->id, $active, 'Remove delegated administrator access');
+            $this->assertSame([], $service->activeDelegations($owner, $company->id));
+        } finally {
+            \Carbon\Carbon::setTestNow();
+        }
+    }
+
     public function test_only_owner_can_generate_private_telegram_pairing_link(): void
     {
         [$company, , $members] = $this->fixture();

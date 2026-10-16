@@ -1,3 +1,7 @@
+## 2026-10-16 APR-003 EXPIRY-SAFE EMERGENCY GRANT LIST — EXACT-SHA CI PENDING
+- Previous baseline 98878266a25600021d4d8d24b50cdd66ac8efe7d (synthetic private MFA/browser acceptance awaiting hosted CI). Owner-only active emergency grants now read through a policy-checked ApprovalWorkflowService; server filters grants whose end is <= current time, revoked grants excluded, bounded stable sorting. Filament listing delegates to same authorization service. PostgreSQL Livewire tests verify active, naturally expired, revoked, manager/admin denial and foreign company denial using clock travel without circumventing SQL CHECKs. Approvals continue to be nonapplying; no real money or customer bookings.
+- This handoff preserves the previous popup E2E batch history. Verify latest exact SHA and all four jobs before VERIFIED claim.
+
 ## 2026-10-16 APR-002 AUTHENTICATED BROWSER ACCEPTANCE — EXACT CI PENDING
 - On top of ce2ba4dfdc7e4148b3af56dfbf8f62992ee87308, this bounded batch adds an isolated testing-environment-only synthetic administrator and ONE nonapplying expense approval to the guarded Artisan E2E fixture. The existing real Chromium owner password and TOTP journey must show private company-scoped owner popup, no synthetic customer contact leakage, and successful session dismissal before continuing proposal -> finance -> approval. Tests never issue a customer invoice, booking or payment.
 - Respect exact SHA all four jobs and fix genuine browser failures; no real credentials, production fixture seeding or MFA bypass.

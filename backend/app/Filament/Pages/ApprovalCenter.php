@@ -185,13 +185,13 @@ final class ApprovalCenter extends Page
 
     public function delegations(): array
     {
+        $actor = $this->authorizeLoaded();
         if ($this->role() !== 'owner') {
             return [];
         }
-        return DB::table('approval_delegations')->where('company_id', $this->companyId)
-            ->whereNull('revoked_at')->orderByDesc('created_at')->limit(30)
-            ->get(['id', 'delegated_to', 'ceiling_minor', 'starts_at', 'ends_at'])
-            ->map(fn ($row) => (array) $row)->all();
+        return app(ApprovalWorkflowService::class)->activeDelegations(
+            $actor, $this->companyId
+        );
     }
 
     public function mount(): void
