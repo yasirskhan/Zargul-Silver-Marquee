@@ -112,7 +112,11 @@ class WebsiteWorkspaceBrandingTest extends TestCase
         // Revoked membership on the same mounted Livewire editor is forbidden.
         $actorId = DB::table('site_domain_claims')->where('website_id', $site)->value('requested_by');
         DB::table('company_memberships')->where('company_id', $company->id)
-            ->where('user_id', $actorId)->update(['can_publish_site' => false, 'role' => 'manager']);
+            ->where('user_id', $actorId)->update([
+                'can_publish_site' => false,
+                'can_edit_site' => true,
+                'role' => 'manager',
+            ]);
         $owner->call('verifyDomainOwnership')->assertForbidden();
         $this->assertSame('pending', DB::table('site_domain_claims')->where('website_id', $site)->value('status'));
     }

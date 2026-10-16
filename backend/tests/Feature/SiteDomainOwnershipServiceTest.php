@@ -153,13 +153,19 @@ class SiteDomainOwnershipServiceTest extends TestCase
         };
         $resolver->oldProof = $claim['txtValue'];
         $this->app->instance(SiteDomainTxtResolver::class, $resolver);
+        // The request service was resolved before fake DNS injection.
+        // Resolve verification anew so the test exercises the interleaved
+        // database mutation, rather than merely a failed real DNS lookup.
+        $verifier = app(SiteDomainOwnershipService::class);
 
         try {
-            $service->verify($owner, $company->id, $site, $claim['domain'],
+            $verifier->verify($owner, $company->id, $site, $claim['domain'],
                 'Reject old proof after concurrent token rotation');
             $this->fail('Old proof was accepted after challenge rotation.');
         } catch (ConflictHttpException) {
             $this->assertSame('pending', DB::table('site_domain_claims')->value('status'));
+            $this->assertSame(hash('sha256', 'a-new-challenge-not-in-dns'),
+                DB::table('site_domain_claims')->value('token_hash'));
             $this->assertSame(0, DB::table('audit_events')
                 ->where('action', 'website.domain_ownership_verified')->count());
         }
