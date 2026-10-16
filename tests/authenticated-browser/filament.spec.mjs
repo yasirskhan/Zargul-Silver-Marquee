@@ -196,9 +196,15 @@ test('real operations MFA grants only assigned-hall search and planning on mobil
   await page.goto('/admin/internal-search');
   await expect(page.getByText('Private role-scoped reference search')).toBeVisible();
   await page.waitForFunction(() => Boolean(window.Livewire?.all?.().length), null, { timeout: 30_000 });
-  await expect(page.getByRole('option', { name: 'Planning tasks' })).toBeVisible();
-  await expect(page.getByRole('option', { name: 'Nonbinding finance previews' })).toHaveCount(0);
-  await expect(page.getByRole('option', { name: 'Audit actions' })).toHaveCount(0);
+  const recordType = page.getByRole('combobox', { name: 'Record type' });
+  await expect(recordType).toBeVisible();
+  // Native <option> elements are correctly hidden until the select opens.
+  // Assert the policy-controlled choices and exercise the actual selection.
+  await expect(recordType.locator('option[value="planning"]')).toHaveCount(1);
+  await expect(recordType.locator('option[value="finance"]')).toHaveCount(0);
+  await expect(recordType.locator('option[value="audit"]')).toHaveCount(0);
+  await recordType.selectOption('planning');
+  await expect(recordType).toHaveValue('planning');
   await page.getByRole('searchbox').fill('stage');
   await page.getByRole('button', { name: 'Search company records' }).click();
   await expect(page.getByText('Synthetic stage lighting checklist')).toBeVisible({ timeout: 30_000 });
