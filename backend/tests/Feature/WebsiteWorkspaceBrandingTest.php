@@ -53,6 +53,7 @@ class WebsiteWorkspaceBrandingTest extends TestCase
             ->assertSee('Publish branding')
             ->set('branding.siteName', 'Zargul Silver Marquee')
             ->set('branding.tagline', 'Wedding and event venue')
+            ->set('branding.footerText', 'Celebrate moments at Zargul Silver Marquee')
             ->set('branding.themePreset', 'ivory')
             ->set('brandingReason', 'Update approved company identity')
             ->call('saveBrandingDraft')
@@ -63,6 +64,9 @@ class WebsiteWorkspaceBrandingTest extends TestCase
         $component->set('brandingReason', 'Owner approved current branding')
             ->call('publishBranding')->assertHasNoErrors();
         $this->assertNotNull(DB::table('websites')->where('id', $site)->value('branding_published_revision_id'));
+        $publishedId = DB::table('websites')->where('id', $site)->value('branding_published_revision_id');
+        $published = json_decode(DB::table('site_branding_revisions')->where('id', $publishedId)->value('content'), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame('Celebrate moments at Zargul Silver Marquee', $published['footerText']);
         $this->assertSame(1, DB::table('site_branding_publishing_events')->count());
         $this->assertSame(2, DB::table('audit_events')->count());
     }

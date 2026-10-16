@@ -152,6 +152,24 @@ class SiteBrandingServiceTest extends TestCase
             $this->branding('Intrusion'), 0, 'Foreign venue');
     }
 
+    public function test_footer_requires_safe_bounded_plain_text_and_is_never_persisted_when_invalid(): void
+    {
+        [$company, $owner, $site] = $this->fixture('unsafe-footer');
+        foreach (['<script>alert(1)</script>', 'javascript:alert(1)', str_repeat('x', 241)] as $unsafe) {
+            $branding = $this->branding('Silver');
+            $branding['footerText'] = $unsafe;
+            try {
+                app(SiteBrandingService::class)->saveDraft(
+                    $owner, $company->id, $site, $branding, 0, 'Reject unsafe footer'
+                );
+                $this->fail('Unsafe footer was accepted.');
+            } catch (InvalidArgumentException) {
+                $this->assertSame(0, DB::table('site_branding_revisions')->where('website_id', $site)->count());
+                $this->assertSame(0, DB::table('audit_events')->where('entity_id', $site)->count());
+            }
+        }
+    }
+
     public function test_invalid_theme_does_not_write_history_or_audit(): void
     {
         [$company, $owner, $site] = $this->fixture('unsafe');

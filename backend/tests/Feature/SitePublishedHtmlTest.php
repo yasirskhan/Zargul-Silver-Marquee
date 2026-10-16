@@ -89,6 +89,33 @@ class SitePublishedHtmlTest extends TestCase
         $this->assertNull($reader->render((string) Str::uuid(), $site, '/'));
     }
 
+    public function test_versioned_footer_is_not_visible_until_approved_and_legacy_branding_renders(): void
+    {
+        [$company, $owner, $site, $page] = $this->fixture();
+        $this->brand($owner, $company->id, $site);
+        $pages = app(SitePagePublishingService::class);
+        $pages->saveDraft($owner, $company->id, $page, ['sections' => [[
+            'id' => 'intro', 'type' => 'text', 'data' => ['title' => 'Approved home'],
+        ]]], 0, 'Approved home content');
+        $pages->publish($owner, $company->id, $page, 1, 'Publish approved home');
+
+        $reader = app(SitePublishedHtmlService::class);
+        $legacy = $reader->render($company->id, $site, '/');
+        $this->assertStringContainsString('<p>Zargul Silver &amp; Gold</p>', $legacy);
+
+        $brandingService = app(SiteBrandingService::class);
+        $newDraft = $brandingService->publishedBranding($company->id, $site);
+        $newDraft['footerText'] = 'Celebrations & treasured moments';
+        $brandingService->saveDraft($owner, $company->id, $site, $newDraft, 1, 'Prepare short public footer');
+        $this->assertSame($legacy, $reader->render($company->id, $site, '/'));
+        $brandingService->publish($owner, $company->id, $site, 2, 'Approve public footer message');
+
+        $approved = $reader->render($company->id, $site, '/');
+        $this->assertStringContainsString('<p>Celebrations &amp; treasured moments</p>', $approved);
+        $this->assertStringNotContainsString('<p>Zargul Silver &amp; Gold</p>', $approved);
+        $this->assertStringNotContainsString('site-media/private/', $approved);
+    }
+
     public function test_responsive_mobile_order_and_approved_image_placeholder_do_not_expose_raw_media(): void
     {
         [$company, $owner, $site, $page] = $this->fixture();

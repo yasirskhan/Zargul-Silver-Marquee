@@ -17,12 +17,18 @@ final class SiteBrandingValidator
     public function validate(array $branding): void
     {
         $required = ['siteName', 'tagline', 'themePreset', 'fontPreset', 'logoMediaId', 'faviconMediaId'];
-        if (array_is_list($branding) || array_diff(array_keys($branding), $required)
+        // Older immutable branding revisions have no footerText field.
+        // An optional, strictly plain-text addition preserves their validity.
+        $allowed = [...$required, 'footerText'];
+        if (array_is_list($branding) || array_diff(array_keys($branding), $allowed)
             || array_diff($required, array_keys($branding))) {
             throw new InvalidArgumentException('Unsupported or missing site branding properties.');
         }
         $this->text($branding['siteName'], 1, 120, 'Venue name');
         $this->text($branding['tagline'], 0, 240, 'Venue tagline');
+        if (array_key_exists('footerText', $branding)) {
+            $this->text($branding['footerText'], 0, 240, 'Footer message');
+        }
 
         if (! is_string($branding['themePreset']) || ! in_array($branding['themePreset'], self::PRESETS, true)
             || ! is_string($branding['fontPreset']) || ! in_array($branding['fontPreset'], self::FONTS, true)) {

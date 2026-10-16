@@ -251,6 +251,7 @@ final class WebsiteWorkspace extends Page
         $this->branding = [
             'siteName' => $site->name,
             'tagline' => '',
+            'footerText' => '',
             'themePreset' => 'silver',
             'fontPreset' => 'classic',
             'logoMediaId' => null,
@@ -263,7 +264,8 @@ final class WebsiteWorkspace extends Page
             if (! is_string($saved)) {
                 throw new ConflictHttpException('Branding draft is missing; reload your venue.');
             }
-            $this->branding = json_decode($saved, true, 512, JSON_THROW_ON_ERROR);
+            // Old approved branding revisions omit the new optional footer.
+            $this->branding = array_replace($this->branding, json_decode($saved, true, 512, JSON_THROW_ON_ERROR));
         }
     }
 
@@ -294,6 +296,7 @@ final class WebsiteWorkspace extends Page
             'brandingReason' => ['required', 'string', 'min:3', 'max:500'],
             'branding.siteName' => ['required', 'string', 'max:120'],
             'branding.tagline' => ['present', 'string', 'max:240'],
+            'branding.footerText' => ['present', 'string', 'max:240'],
             'branding.themePreset' => ['required', 'string'],
             'branding.fontPreset' => ['required', 'string'],
             'branding.logoMediaId' => ['nullable', 'uuid'],
@@ -322,7 +325,7 @@ final class WebsiteWorkspace extends Page
         if (! is_string($saved)) {
             throw new ConflictHttpException('Branding draft changed; reload before publishing.');
         }
-        if (json_decode($saved, true, 512, JSON_THROW_ON_ERROR) != $this->branding) {
+        if (array_replace(['footerText' => ''], json_decode($saved, true, 512, JSON_THROW_ON_ERROR)) != $this->branding) {
             throw ValidationException::withMessages([
                 'branding' => 'Save the changes on this screen before publishing branding.',
             ]);
