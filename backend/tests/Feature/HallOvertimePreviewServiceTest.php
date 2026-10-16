@@ -113,6 +113,33 @@ class HallOvertimePreviewServiceTest extends TestCase
         }
     }
 
+    public function test_stale_loaded_hall_revision_refuses_overtime_preview_until_reload(): void
+    {
+        [$company, $hall, $owner] = $this->fixture();
+        $service = app(HallOvertimePreviewService::class);
+        $this->assertSame(5000, $service->preview(
+            $owner, $company->id, $hall->id, 'morning', '11:16', 1
+        )['projectedAmountMinor']);
+        $saved = app(HallProgramRulesService::class)->current($owner, $company->id, $hall->id);
+        $changed = $saved['rules'];
+        $changed['morning']['overtimeRateMinor'] = 7500;
+        app(HallProgramRulesService::class)->configure(
+            $owner, $company->id, $hall->id, $changed, 'PKR', 1,
+            'Synthetic rate revision changed during another editing session'
+        );
+        try {
+            $service->preview($owner, $company->id, $hall->id, 'morning', '11:16', 1);
+            $this->fail('Stale price was silently accepted for financial-looking preview.');
+        } catch (\Symfony\Component\HttpKernel\Exception\ConflictHttpException $error) {
+            $this->assertStringContainsString('Reload the latest', $error->getMessage());
+        }
+        $latest = $service->preview($owner, $company->id, $hall->id, 'morning', '11:16', 2);
+        $this->assertSame(2, $latest['sourceRevision']);
+        $this->assertSame(7500, $latest['projectedAmountMinor']);
+        $this->assertFalse($latest['extensionAuthorized']);
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
     public function test_filament_preview_uses_saved_revision_not_unsaved_price_edits(): void
     {
         [$company, $hall, $owner] = $this->fixture();

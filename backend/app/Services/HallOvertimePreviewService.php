@@ -19,11 +19,17 @@ final class HallOvertimePreviewService
     public function preview(
         User $actor, string $companyId, string $hallId,
         string $program, string $observedEnd,
+        ?int $expectedRulesRevision = null,
     ): array {
         // Reuse the current live, verified, assigned-hall read policy.
         $saved = $this->rules->current($actor, $companyId, $hallId);
         if ($saved === null) {
             throw new ConflictHttpException('A saved hall program revision is required.');
+        }
+        // A Filament preview must not silently switch prices, grace or hard
+        // stops if another editor saved a new revision since the screen loaded.
+        if ($expectedRulesRevision !== null && $saved['revision'] !== $expectedRulesRevision) {
+            throw new ConflictHttpException('Hall program rules changed. Reload the latest saved revision.');
         }
         $index = array_search($program, self::PROGRAMS, true);
         if ($index === false || ! isset($saved['rules'][$program])) {

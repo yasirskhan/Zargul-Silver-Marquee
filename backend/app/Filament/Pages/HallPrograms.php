@@ -278,7 +278,8 @@ final class HallPrograms extends Page
         try {
             $this->overtimePreview = app(HallOvertimePreviewService::class)->preview(
                 $actor, $hall->company_id, $hall->id,
-                $this->overtimeProgram, $this->overtimeObservedEnd
+                $this->overtimeProgram, $this->overtimeObservedEnd,
+                $this->expectedRevision
             );
         } catch (InvalidArgumentException | ConflictHttpException $error) {
             $this->overtimePreview = null;
