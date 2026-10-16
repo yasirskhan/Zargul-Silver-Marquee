@@ -29,7 +29,8 @@ return new class extends Migration {
             $table->index(['company_id', 'hall_id', 'revision_number']);
         });
 
-        DB::statement(<<<'SQL'
+        // DB::statement treats PostgreSQL JSONB '?' operators as PDO bind placeholders.
+        DB::unprepared(<<<'SQL'
 ALTER TABLE hall_program_rule_revisions
 ADD CONSTRAINT hall_program_rules_three_sessions CHECK (
     jsonb_typeof(rules) = 'object'
