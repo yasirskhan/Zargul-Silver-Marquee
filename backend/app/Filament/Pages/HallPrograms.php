@@ -262,6 +262,16 @@ final class HallPrograms extends Page
         }
     }
 
+    public function updatedOvertimeProgram(): void
+    {
+        $this->overtimePreview = null;
+    }
+
+    public function updatedOvertimeObservedEnd(): void
+    {
+        $this->overtimePreview = null;
+    }
+
     public function calculateOvertimePreview(): void
     {
         $actor = Filament::auth()->user();
@@ -269,6 +279,8 @@ final class HallPrograms extends Page
         abort_unless($actor instanceof User && $hall && $this->expectedRevision > 0
             && $this->loadedCompanyId === $hall->company_id
             && $this->loadedHallId === $hall->id, 403);
+        // Clear a previous quote even if validation rejects the new input.
+        $this->overtimePreview = null;
         $this->validate([
             'overtimeProgram' => ['required', 'in:morning,noon,evening'],
             'overtimeObservedEnd' => ['required', 'date_format:H:i'],

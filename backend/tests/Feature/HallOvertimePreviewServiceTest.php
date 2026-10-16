@@ -140,6 +140,23 @@ class HallOvertimePreviewServiceTest extends TestCase
         $this->assertSame(0, DB::table('finance_journals')->count());
     }
 
+    public function test_livewire_clears_stale_overtime_projection_on_changed_or_invalid_input(): void
+    {
+        $this->fixture();
+        $component = Livewire::test(HallPrograms::class)
+            ->set('overtimeProgram', 'morning')
+            ->set('overtimeObservedEnd', '11:16')
+            ->call('calculateOvertimePreview')->assertHasNoErrors()
+            ->assertSee('5000 minor units');
+        $component->set('overtimeObservedEnd', '11:17')
+            ->assertDontSee('5000 minor units');
+        $component->call('calculateOvertimePreview')->assertHasNoErrors()
+            ->assertSee('5000 minor units');
+        $component->set('overtimeObservedEnd', '25:00')
+            ->call('calculateOvertimePreview')->assertHasErrors(['overtimeObservedEnd'])
+            ->assertDontSee('5000 minor units');
+    }
+
     public function test_filament_preview_uses_saved_revision_not_unsaved_price_edits(): void
     {
         [$company, $hall, $owner] = $this->fixture();
