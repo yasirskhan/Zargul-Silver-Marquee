@@ -175,14 +175,14 @@ class SiteDomainOwnershipServiceTest extends TestCase
     {
         DB::unprepared(<<<'SQL'
 CREATE OR REPLACE FUNCTION fail_test_domain_audit_insert() RETURNS trigger
-LANGUAGE plpgsql AS $
+LANGUAGE plpgsql AS $domain_audit_body$
 BEGIN
     IF NEW.action IN ('website.domain_claim_requested', 'website.domain_ownership_verified') THEN
         RAISE EXCEPTION 'Injected domain audit rejection';
     END IF;
     RETURN NEW;
 END;
-$;
+$domain_audit_body$;
 SQL);
         DB::statement('CREATE TRIGGER fail_test_domain_audit_insert_trigger BEFORE INSERT ON audit_events FOR EACH ROW EXECUTE FUNCTION fail_test_domain_audit_insert()');
     }
