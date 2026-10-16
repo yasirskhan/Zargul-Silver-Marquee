@@ -35,7 +35,7 @@ final class OperationsPlanning extends Page
     public string $createRequestKey = '';
 
     public string $bookingId = '';
-    public string $title = '';
+    public string $taskTitle = '';
     public string $reason = '';
     public string $reviewReason = '';
 
@@ -127,18 +127,18 @@ final class OperationsPlanning extends Page
     {
         $actor = $this->authorizeLoaded();
         $this->validate([
-            'bookingId' => ['required', 'uuid'], 'title' => ['required', 'string', 'min:3', 'max:120'],
+            'bookingId' => ['required', 'uuid'], 'taskTitle' => ['required', 'string', 'min:3', 'max:120'],
             'reason' => ['required', 'string', 'min:3', 'max:500'],
         ]);
         abort_unless(array_key_exists($this->bookingId, $this->proposalOptions()), 403);
         try {
             app(OperationsPlanningService::class)->create($actor, $this->companyId,
-                $this->createRequestKey, $this->bookingId, $this->title, $this->reason);
+                $this->createRequestKey, $this->bookingId, $this->taskTitle, $this->reason);
         } catch (InvalidArgumentException | ConflictHttpException $error) {
             throw ValidationException::withMessages(['reason' => $error->getMessage()]);
         }
         $this->createRequestKey = (string) Str::uuid();
-        $this->title = '';
+        $this->taskTitle = '';
         $this->reason = '';
         $this->refresh();
     }

@@ -1,3 +1,6 @@
+## 2026-10-16 OPS-001 FILAMENT PROPERTY COLLISION REPAIR — EXACT SHA CI PENDING
+- Live source e362e0fb258901075130782dea68107c98b02a26, run 38852194203 failed in real PostgreSQL and authenticated-panel E2E during Composer autoload because OperationsPlanning declared public instance $title conflicting with static Filament BasePage::$title. Renamed solely the Livewire task input to taskTitle in page, validation and Blade, preserving all server-side policy/audit and planning rules. Exact new source CI must be green before declaring OPS foundation verified.
+
 ## 2026-10-16 OPS-001 CONCURRENT WITHDRAWAL AND AUDIT ROLLBACK HARDENING — CI PENDING
 - OPS-001 nonbinding setup planning batch now locks the associated proposal row when transitioning an existing task, serializing with BookingDraftReviewService withdrawal and preventing review after the withdrawal transaction wins. Adds PostgreSQL tests for post-withdrawal refusal and induced audit failure rolling back task/events atomically. No confirmed booking, physical setup or finance record is claimed. This refinement is included BEFORE publishing the OPS foundation commit, not a change to a verified production workflow.
 

@@ -23,7 +23,7 @@
                     </select>
                 </label>
                 <label class="block space-y-1"><span class="text-sm">Task description (no contact information)</span>
-                    <input type="text" maxlength="120" wire:model="title" class="w-full rounded-lg border p-3 text-gray-900">
+                    <input type="text" maxlength="120" wire:model="taskTitle" class="w-full rounded-lg border p-3 text-gray-900">
                 </label>
                 <label class="block space-y-1"><span class="text-sm">Planning reason</span>
                     <textarea wire:model="reason" rows="2" maxlength="500" class="w-full rounded-lg border p-3 text-gray-900"></textarea>
