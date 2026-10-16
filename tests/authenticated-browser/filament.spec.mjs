@@ -112,5 +112,39 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   await page.getByRole('button', { name: 'Save draft changes' }).click();
   await expect(page.getByText('Saved revision 2')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText('No action here reserves a hall')).toBeVisible();
+  // Prove a saved internal draft can reach the new nonbinding finance review
+  // without confirming a booking, invoicing a client, or claiming a hall.
+  await page.getByRole('textbox', { name: /Required change reason/ })
+    .fill('Browser owner submitted a saved internal draft');
+  await page.getByRole('button', { name: 'Submit saved draft for review' }).click();
+  await expect(page.getByText('State: under review')).toBeVisible({ timeout: 20_000 });
+
+  await page.goto('/admin/finance-review');
+  await expect(page.getByText('Finance review is internal only.')).toBeVisible();
+  await page.waitForFunction(() => Boolean(window.Livewire?.all?.().length), null, { timeout: 30_000 });
+  await expect(page.getByText('Financial posting is disabled', { exact: false })).toBeVisible();
+  await page.getByLabel('Internal proposal under review').selectOption({ index: 1 });
+  await page.getByLabel('Internal purpose (no customer contact)')
+    .fill('Synthetic owner review of frozen rental-only price');
+  await page.getByRole('button', { name: 'Save immutable internal preview' }).click();
+  await expect(page.getByText('Nonbinding PKR 0 minor units')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText('browser-e2e-private@example.test')).toHaveCount(0);
+  await expect(page.getByText('Synthetic Browser Customer')).toHaveCount(0);
+
+  // The approval is a separate, still-non-applying exception proposal. The
+  // owner may request one but cannot approve their own request.
+  await page.goto('/admin/approval-center');
+  await expect(page.getByText('Internal, company-scoped exception requests.')).toBeVisible();
+  await page.waitForFunction(() => Boolean(window.Livewire?.all?.().length), null, { timeout: 30_000 });
+  await page.getByLabel('Linked internal proposal (required except for expense)').selectOption({ index: 1 });
+  await page.getByLabel('Proposed amount in minor currency units').fill('100');
+  await page.getByLabel('ISO currency code').fill('PKR');
+  await page.getByLabel('Operational reason (no personal/contact data)')
+    .fill('Synthetic approval proposal without finance mutation');
+  await page.getByRole('button', { name: 'Submit non-applying approval request' }).click();
+  await expect(page.getByText('Synthetic approval proposal without finance mutation'))
+    .toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText('browser-e2e-private@example.test')).toHaveCount(0);
+  await expect(page.getByText('Synthetic Browser Customer')).toHaveCount(0);
   await expect(page.getByText('Synthetic Browser Customer')).toHaveCount(0);
 });
