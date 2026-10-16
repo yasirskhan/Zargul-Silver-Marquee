@@ -161,7 +161,8 @@ class BookingProposalsWorkflowTest extends TestCase
 
         $component = Livewire::test(BookingProposals::class)->call('selectDraft', $draftId);
         $membership->update(['is_active' => false]);
-        $component->set('editReason', 'Attempt by revoked operator')->call('submitReview')->assertForbidden();
+        // Filament conceals a formerly visible page after role revocation (404).
+        $component->set('editReason', 'Attempt by revoked operator')->call('submitReview')->assertNotFound();
         $this->assertSame(1, (int) DB::table('booking_drafts')->where('id', $draftId)->value('revision'));
         $membership->update(['is_active' => true]);
 
