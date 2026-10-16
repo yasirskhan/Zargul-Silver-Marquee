@@ -314,7 +314,7 @@ SQL);
         $service->decide($people['owner'][0], $company->id, $id, 1, 'rejected', 'Does not meet rules');
         foreach (['approval_decisions', 'approval_alert_outbox'] as $table) {
             try {
-                DB::table($table)->delete();
+                DB::transaction(static fn () => DB::table($table)->delete());
                 $this->fail('Protected history was deleted: '.$table);
             } catch (QueryException $error) {
                 $this->assertStringContainsString('history entries cannot be updated or deleted', $error->getMessage());

@@ -7,6 +7,10 @@ Default `main`: untouched since README initialization at `83ee684f8b08e65bd67323
 STRICTLY OUT OF SCOPE: yasirskhan/property-platform and all other repositories.
 GitHub connector: repository read and write successful.
 
+## 2026-10-16 approval first CI failure and narrow repair
+- Source `f27994dee04ce7c9c19302a3b570b8ed4ed3de66`, run `38844464546`: prototype checks, authenticated Filament browser and editor browser SUCCESS; PostgreSQL 202 passed and 2 failed. Failed grant using second-rounded start-now timestamp vs fractional server now, and immutable-delete two-step test lacking PostgreSQL savepoint after first expected SQL error. Production fix allows only <=60s start clock rounding for a time-limited owner grant; test uses an actual nested transaction/savepoint and preserves both delete-failure assertions. Repair CI not yet verified in this document.
+- Continue hosted exact-SHA validation and do not claim approvals verified until all four jobs pass.
+
 ## 2026-10-16 APPROVALS IMPLEMENTATION BATCH (hosted CI pending at commit creation)
 - Locked baseline BEFORE this batch: source `e7afd6a60636accc7f1e3a349c9839cd2aa423e8`, GitHub Actions `38843362193` SUCCESS exact SHA with four jobs: `prototype-checks`, `editor-browser-e2e`, `authenticated-panel-e2e`, `laravel-postgres` (192 tests, 916 assertions). The authenticated Filament booking-proposal Playwright fix is verified; earlier claims about its E2E being pending are historical.
 - New bounded requirement cluster: APR-001, APR-003, and safe APR-002 in-app alert foundation. Files added: `backend/database/migrations/2026_10_15_001200_create_approval_workflow.php`, `backend/app/Services/ApprovalWorkflowService.php`, `backend/app/Filament/Pages/ApprovalCenter.php`, `backend/resources/views/filament/pages/approval-center.blade.php`, `backend/tests/Feature/ApprovalWorkflowServiceTest.php`, `backend/tests/Feature/ApprovalCenterLivewireTest.php`. Panel registers the page. Feature register updated in THIS SAME commit.
