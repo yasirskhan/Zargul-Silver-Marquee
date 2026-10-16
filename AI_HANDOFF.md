@@ -1,3 +1,6 @@
+## 2026-10-16 OPS-001 ROLE-SCOPED MOBILE CHECKLIST FILTER — EXACT SHA CI PENDING
+- On baseline 040244003558459c480fcbc868ca44022942e23a, added server-side reviewed/planned status filter with strict enum validation, company/hall-scoped task queries and Livewire UI reset on tenant changes. PostgreSQL service and Filament tests prove server-filtering and invalid status refusal. No data moved to client without active company membership and no claims of actual event setup, invoicing or booking confirmation. Feature register updated in same commit. Verify all four CI jobs at exact new SHA, fix reds before marking verified.
+
 ## 2026-10-16 OPS-001 REVOKED ACCESS AND REVIEW AUDIT ROLLBACK — EXACT SHA CI PENDING
 - Latest production repair 69add8f428b9e5fe9079af6e2da1b01432289cef restores repeated PostgreSQL schema initialization by using CREATE OR REPLACE FUNCTION while retaining immutable task protections; verify hosted CI exact SHA. This follow-up adds real PostgreSQL and Livewire tests for revoked hall assignment, revoked mounted owner session and injected review audit failure preserving task, revision and events. No assertion bypass, no real booking/financial effect. Feature register and handoff updated together. OPS remains planning-only and PARTIAL until physical event closeout is approved.
 

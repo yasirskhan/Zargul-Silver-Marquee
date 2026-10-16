@@ -36,6 +36,14 @@
             <section aria-label="Authorized internal planning tasks" class="space-y-3">
                 <h2 class="text-lg font-semibold">Planning checklist</h2>
                 <label class="block space-y-1">
+                    <span class="text-sm">Planning status</span>
+                    <select wire:model.live="statusFilter" class="w-full rounded-lg border p-3 text-gray-900">
+                        <option value="all">All planning tasks</option>
+                        <option value="planned">Awaiting review</option>
+                        <option value="reviewed">Reviewed planning tasks</option>
+                    </select>
+                </label>
+                <label class="block space-y-1">
                     <span class="text-sm">Review/change reason (required for each transition)</span>
                     <textarea wire:model="reviewReason" rows="2" maxlength="500" class="w-full rounded-lg border p-3 text-gray-900"></textarea>
                 </label>

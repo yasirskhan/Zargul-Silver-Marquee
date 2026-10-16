@@ -18,6 +18,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use Livewire\Livewire;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Tests\TestCase;
@@ -308,6 +309,34 @@ SQL);
         $this->assertSame(1, (int) $saved->revision);
         $this->assertSame(1, DB::table('operations_plan_events')->where('task_id', $id)->count());
         $this->assertSame(1, DB::table('audit_events')->where('entity_id', $id)->count());
+    }
+
+    public function test_server_side_status_filter_remains_tenant_and_role_scoped(): void
+    {
+        [$company, , , , $actors, $booking] = $this->fixture();
+        $service = app(OperationsPlanningService::class);
+        $reviewed = (string) Str::uuid();
+        $planned = (string) Str::uuid();
+        $service->create($actors['owner'][0], $company->id, $reviewed,
+            $booking, 'Check reviewed stage checklist', 'First planning record');
+        $service->create($actors['owner'][0], $company->id, $planned,
+            $booking, 'Check pending lighting checklist', 'Second planning record');
+        $service->setReviewed($actors['owner'][0], $company->id,
+            $reviewed, 1, true, 'Owner reviewed one checklist');
+        $this->assertSame([$planned], array_column(
+            $service->tasks($actors['owner'][0], $company->id, 30, 'planned'), 'id'
+        ));
+        $this->assertSame([$reviewed], array_column(
+            $service->tasks($actors['owner'][0], $company->id, 30, 'reviewed'), 'id'
+        ));
+        Livewire::test(OperationsPlanning::class)
+            ->assertSee('Check reviewed stage checklist')
+            ->assertSee('Check pending lighting checklist')
+            ->set('statusFilter', 'reviewed')
+            ->assertSee('Check reviewed stage checklist')
+            ->assertDontSee('Check pending lighting checklist');
+        $this->expectException(InvalidArgumentException::class);
+        $service->tasks($actors['owner'][0], $company->id, 30, 'forged');
     }
 
     public function test_filament_planning_page_follows_role_and_company_scoping(): void

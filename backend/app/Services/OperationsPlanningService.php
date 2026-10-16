@@ -43,13 +43,19 @@ final class OperationsPlanningService
             'status' => $row->status, 'revision' => (int) $row->revision];
     }
 
-    public function tasks(User $actor, string $companyId, int $limit = 30): array
+    public function tasks(User $actor, string $companyId, int $limit = 30, string $status = 'all'): array
     {
         $member = $this->policy->membership($actor, $companyId);
         if (! $member || $limit < 1 || $limit > 50) {
             throw new AuthorizationException('Company operations planning is inaccessible.');
         }
+        if (! in_array($status, ['all', 'planned', 'reviewed'], true)) {
+            throw new InvalidArgumentException('Invalid planning status filter.');
+        }
         $q = DB::table('operations_plan_tasks')->where('company_id', $companyId);
+        if ($status !== 'all') {
+            $q->where('status', $status);
+        }
         if (in_array($member->role, ['manager', 'operations'], true)) {
             $halls = DB::table('hall_assignments')
                 ->where('company_id', $companyId)->where('membership_id', $member->id)

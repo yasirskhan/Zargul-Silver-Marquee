@@ -38,6 +38,7 @@ final class OperationsPlanning extends Page
     public string $taskTitle = '';
     public string $reason = '';
     public string $reviewReason = '';
+    public string $statusFilter = 'all';
 
     public static function canAccess(): bool
     {
@@ -95,6 +96,7 @@ final class OperationsPlanning extends Page
     public function updatedCompanyId(): void
     {
         $this->bookingId = '';
+        $this->statusFilter = 'all';
         $this->createRequestKey = (string) Str::uuid();
         $this->refresh();
     }
@@ -116,10 +118,15 @@ final class OperationsPlanning extends Page
             ->mapWithKeys(fn ($row) => [$row->id => $row->event_date.' '.$row->program])->all();
     }
 
+    public function updatedStatusFilter(): void
+    {
+        $this->refresh();
+    }
+
     public function refresh(): void
     {
         $actor = $this->authorizeCompany();
-        $this->tasks = app(OperationsPlanningService::class)->tasks($actor, $this->companyId);
+        $this->tasks = app(OperationsPlanningService::class)->tasks($actor, $this->companyId, 30, $this->statusFilter);
         $this->loadedCompanyId = $this->companyId;
     }
 
