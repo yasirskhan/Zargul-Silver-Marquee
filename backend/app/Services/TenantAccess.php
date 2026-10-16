@@ -55,6 +55,16 @@ class TenantAccess
         );
     }
 
+    /** Sensitive hall pricing and hours are configured by active owner/admin only. */
+    public function canConfigureHall(User $user, Hall $hall): bool
+    {
+        $membership = $this->membership($user, $hall->company_id);
+
+        return $hall->is_active
+            && $membership !== null
+            && in_array($membership->role, ['owner', 'admin'], true);
+    }
+
     public function canManageBookings(User $user, Hall $hall): bool
     {
         $membership = $this->membership($user, $hall->company_id);
