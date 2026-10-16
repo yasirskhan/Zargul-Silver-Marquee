@@ -86,6 +86,17 @@ test('real owner password and TOTP flow protects mobile proposal editing without
     null,
     { timeout: 30_000 },
   );
+  // A different synthetic staff member requested an internal approval before
+  // the owner signed in. It must appear in the protected panel after MFA,
+  // not as a customer-facing or pre-authentication alert.
+  const ownerNotice = page.getByRole('dialog', { name: 'Pending owner approval requests' });
+  await expect(ownerNotice).toBeVisible({ timeout: 30_000 });
+  await expect(ownerNotice.getByText('Synthetic Marquee Venue')).toBeVisible();
+  await expect(ownerNotice.getByText('1 pending request')).toBeVisible();
+  await expect(ownerNotice.getByText('browser-e2e-private@example.test')).toHaveCount(0);
+  await expect(ownerNotice.getByText('Synthetic Browser Customer')).toHaveCount(0);
+  await ownerNotice.getByRole('button', { name: 'Dismiss for this session' }).click();
+  await expect(ownerNotice).toHaveCount(0);
   await expect(page.locator('tbody').getByText('Synthetic Test Hall')).toBeVisible();
   await expect(page.getByText('Synthetic Browser Customer')).toHaveCount(0);
   await expect(page.getByText('browser-e2e-private@example.test')).toHaveCount(0);

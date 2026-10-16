@@ -76,8 +76,26 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
             120, 'Synthetic proposal for browser acceptance',
         );
     }
+    // Synthetic cross-actor approval ensures an owner login shows a real
+    // tenant-scoped pending notice, without any actual expense or payment.
+    $admin = \App\Models\User::query()->firstOrCreate(
+        ['email' => 'browser-e2e-admin@example.test'],
+        ['name' => 'Synthetic Approval Administrator', 'password' => 'synthetic-browser-admin-only',
+            'is_active' => true],
+    );
+    $admin->markEmailAsVerified();
+    \App\Models\CompanyMembership::query()->firstOrCreate(
+        ['company_id' => $company->id, 'user_id' => $admin->id],
+        ['role' => 'admin', 'is_active' => true],
+    );
+    \Illuminate\Support\Facades\Auth::login($admin);
+    app(\App\Services\ApprovalWorkflowService::class)->request(
+        $admin, $company->id, '00000000-0000-4000-8000-000000000042',
+        'expense', 1, 'PKR', null,
+        'Synthetic nonapplying expense approval for owner browser review',
+    );
     \Illuminate\Support\Facades\Auth::logout();
-    $this->info('Synthetic owner MFA and private unconfirmed proposal fixture created.');
+    $this->info('Synthetic owner MFA, private draft, and nonapplying approval fixture created.');
 
     return 0;
 })->purpose('Seed synthetic authenticated browser fixtures in testing only');
