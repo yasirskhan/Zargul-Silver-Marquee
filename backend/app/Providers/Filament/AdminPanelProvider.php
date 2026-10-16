@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\HallPrograms;
 use App\Filament\Pages\WebsiteWorkspace;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Http\Middleware\Authenticate;
@@ -34,7 +35,7 @@ class AdminPanelProvider extends PanelProvider
             ->multiFactorAuthentication([
                 AppAuthentication::make()->recoverable(),
             ], isRequired: true)
-            ->pages([WebsiteWorkspace::class])
+            ->pages([HallPrograms::class, WebsiteWorkspace::class])
             ->brandName('VenueDesk')
             ->colors(['primary' => Color::Emerald])
             ->middleware([
