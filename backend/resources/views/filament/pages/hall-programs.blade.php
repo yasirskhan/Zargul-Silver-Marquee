@@ -188,6 +188,104 @@
                     </div>
                 @endif
             </section>
+
+            <section class="space-y-4 rounded-xl border p-4" aria-label="Hall optional services catalog">
+                <h2 class="text-lg font-semibold">Catering and optional services</h2>
+                <p class="text-sm">Catalog revision: {{ $expectedAddonRevision }}.
+                    {{ $expectedAddonRevision ? 'An approved catalog exists.' : 'No approved add-on catalog yet.' }}
+                </p>
+                <p class="text-xs">Each service uses a chosen charge unit. Prices are integer currency minor units, not automatic booking or invoice charges. Exact package and billing rules require owner acceptance.</p>
+                @if ($this->canConfigureSelectedHall())
+                    <form wire:submit="saveAddons" class="space-y-4">
+                        @foreach ($addons as $index => $addon)
+                            <fieldset class="space-y-3 rounded-lg border p-3">
+                                <legend class="px-1 font-medium">Optional service {{ $index + 1 }}</legend>
+                                <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                                    <label class="block space-y-1 text-sm">
+                                        <span>Unique code</span>
+                                        <input type="text" maxlength="40" wire:model="addons.{{ $index }}.code"
+                                            placeholder="e.g. catering_standard" class="w-full rounded-lg border p-2 text-gray-900" required>
+                                        @error("addons.$index.code") <span class="text-xs text-red-600">{{ $message }}</span> @enderror
+                                    </label>
+                                    <label class="block space-y-1 text-sm">
+                                        <span>Service name</span>
+                                        <input type="text" maxlength="120" wire:model="addons.{{ $index }}.name"
+                                            class="w-full rounded-lg border p-2 text-gray-900" required>
+                                        @error("addons.$index.name") <span class="text-xs text-red-600">{{ $message }}</span> @enderror
+                                    </label>
+                                    <label class="block space-y-1 text-sm">
+                                        <span>Category</span>
+                                        <select wire:model="addons.{{ $index }}.category" class="w-full rounded-lg border p-2 text-gray-900" required>
+                                            <option value="">Choose category</option>
+                                            @foreach (['catering' => 'Catering', 'music' => 'Music/DJ', 'lighting' => 'Lighting', 'bridal_entry' => 'Bride and groom entry', 'stage' => 'Stage', 'photography' => 'Photography', 'other' => 'Other'] as $key => $label)
+                                                <option value="{{ $key }}">{{ $label }}</option>
+                                            @endforeach
+                                        </select>
+                                        @error("addons.$index.category") <span class="text-xs text-red-600">{{ $message }}</span> @enderror
+                                    </label>
+                                    <label class="block space-y-1 text-sm">
+                                        <span>Charge unit</span>
+                                        <select wire:model="addons.{{ $index }}.chargeUnit" class="w-full rounded-lg border p-2 text-gray-900" required>
+                                            <option value="">Choose charge unit</option>
+                                            <option value="flat">Per event</option>
+                                            <option value="per_guest">Per guest</option>
+                                            <option value="per_unit">Per item</option>
+                                        </select>
+                                        @error("addons.$index.chargeUnit") <span class="text-xs text-red-600">{{ $message }}</span> @enderror
+                                    </label>
+                                    <label class="block space-y-1 text-sm">
+                                        <span>Rate (minor units)</span>
+                                        <input type="number" min="0" step="1" wire:model.number="addons.{{ $index }}.rateMinor"
+                                            class="w-full rounded-lg border p-2 text-gray-900" required>
+                                        @error("addons.$index.rateMinor") <span class="text-xs text-red-600">{{ $message }}</span> @enderror
+                                    </label>
+                                    <label class="flex items-center gap-2 text-sm">
+                                        <input type="checkbox" wire:model="addons.{{ $index }}.enabled">
+                                        <span>Available for selection</span>
+                                    </label>
+                                </div>
+                                <button type="button" wire:click="removeAddon({{ $index }})"
+                                    class="rounded-lg border px-3 py-2 text-sm">Remove local item</button>
+                            </fieldset>
+                        @endforeach
+                        <button type="button" wire:click="addAddon" class="rounded-lg border px-3 py-2 text-sm">Add optional service</button>
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <label class="block space-y-1 text-sm">
+                                <span>Catalog currency code</span>
+                                <input type="text" maxlength="3" autocomplete="off" placeholder="e.g. PKR"
+                                    wire:model="addonCurrencyCode" class="w-full rounded-lg border p-3 text-gray-900" required>
+                                @error('addonCurrencyCode') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
+                            </label>
+                            <label class="block space-y-1 text-sm">
+                                <span>Change reason</span>
+                                <textarea rows="2" maxlength="500" wire:model="addonReason"
+                                    class="w-full rounded-lg border p-3 text-gray-900" required></textarea>
+                                @error('addonReason') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
+                            </label>
+                        </div>
+                        @error('addons') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                        <button type="submit" class="rounded-lg bg-emerald-700 px-4 py-3 font-medium text-white">Save optional services</button>
+                        <p class="text-xs">A saved revision updates catalog settings only. Current bookings and issued contracts are never rewritten.</p>
+                    </form>
+                @else
+                    <p class="text-sm">Assigned hall catalog is read-only.</p>
+                    @if ($expectedAddonRevision)
+                        <p class="text-sm">Currency: {{ $addonCurrencyCode }}</p>
+                        <ul class="space-y-2">
+                            @foreach ($addons as $addon)
+                                <li class="rounded-lg border p-3 text-sm">
+                                    <span class="font-semibold">{{ $addon['name'] ?? '' }}</span>
+                                    ({{ $addon['category'] ?? '' }}, {{ $addon['chargeUnit'] ?? '' }})
+                                    Rate: {{ $addon['rateMinor'] ?? '' }} minor units.
+                                    {{ ($addon['enabled'] ?? false) ? 'Enabled' : 'Disabled' }}
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <p class="text-sm">Optional service prices are not configured.</p>
+                    @endif
+                @endif
+            </section>
         @else
             <p class="text-sm">No authorized hall is selected.</p>
         @endif

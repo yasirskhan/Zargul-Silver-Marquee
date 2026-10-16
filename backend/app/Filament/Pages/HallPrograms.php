@@ -6,6 +6,7 @@ use App\Models\CompanyMembership;
 use App\Models\Hall;
 use App\Models\User;
 use App\Services\HallProgramRulesService;
+use App\Services\HallAddonCatalogService;
 use App\Services\HallSeatingPriceService;
 use App\Services\TenantAccess;
 use BackedEnum;
@@ -44,6 +45,16 @@ final class HallPrograms extends Page
     public string $seatingCurrencyCode = '';
 
     public string $seatingReason = '';
+
+    /** No add-ons or prices exist until explicitly approved by the owner. */
+    public array $addons = [];
+
+    public string $addonCurrencyCode = '';
+
+    public string $addonReason = '';
+
+    #[Locked]
+    public int $expectedAddonRevision = 0;
 
     #[Locked]
     public int $expectedSeatingRevision = 0;
@@ -198,6 +209,10 @@ final class HallPrograms extends Page
         $this->seating = [];
         $this->seatingCurrencyCode = '';
         $this->seatingReason = '';
+        $this->addons = [];
+        $this->addonCurrencyCode = '';
+        $this->addonReason = '';
+        $this->expectedAddonRevision = 0;
 
         if (! $this->hallId) {
             return;
@@ -228,6 +243,12 @@ final class HallPrograms extends Page
             $this->seating = $seatingCurrent['config'];
             $this->seatingCurrencyCode = $seatingCurrent['currencyCode'];
             $this->expectedSeatingRevision = $seatingCurrent['revision'];
+        }
+        $addonsCurrent = app(HallAddonCatalogService::class)->current($actor, $hall->company_id, $hall->id);
+        if ($addonsCurrent !== null) {
+            $this->addons = $addonsCurrent['items'];
+            $this->addonCurrencyCode = $addonsCurrent['currencyCode'];
+            $this->expectedAddonRevision = $addonsCurrent['revision'];
         }
     }
 
@@ -303,6 +324,67 @@ final class HallPrograms extends Page
         $this->expectedSeatingRevision = $next;
         $this->seatingReason = '';
         Notification::make()->title('Hall seating and unit prices saved with audit history')->success()->send();
+    }
+
+    private function authorizeAddonEditor(): array
+    {
+        $actor = Filament::auth()->user();
+        $hall = $this->selectedHall();
+        abort_unless($actor instanceof User && $hall && $this->canConfigureSelectedHall()
+            && $this->loadedCompanyId === $hall->company_id && $this->loadedHallId === $hall->id, 403);
+
+        return [$actor, $hall];
+    }
+
+    /** Unsaved local catalog form changes do not touch approved catalog revisions. */
+    public function addAddon(): void
+    {
+        $this->authorizeAddonEditor();
+        if (count($this->addons) >= 100) {
+            throw ValidationException::withMessages(['addons' => 'A hall may have no more than 100 catalog items.']);
+        }
+        $this->addons[] = [
+            'code' => '', 'name' => '', 'category' => '', 'chargeUnit' => '',
+            'rateMinor' => '', 'enabled' => true,
+        ];
+    }
+
+    public function removeAddon(int $index): void
+    {
+        $this->authorizeAddonEditor();
+        abort_unless(array_is_list($this->addons) && array_key_exists($index, $this->addons), 422);
+        array_splice($this->addons, $index, 1);
+    }
+
+    public function saveAddons(): void
+    {
+        [$actor, $hall] = $this->authorizeAddonEditor();
+        $this->validate([
+            'addons' => ['array', 'max:100'],
+            'addons.*.code' => ['required', 'string', 'regex:/\A[a-z][a-z0-9_-]{1,39}\z/'],
+            'addons.*.name' => ['required', 'string', 'min:2', 'max:120'],
+            'addons.*.category' => ['required', 'in:catering,music,lighting,bridal_entry,stage,photography,other'],
+            'addons.*.chargeUnit' => ['required', 'in:flat,per_guest,per_unit'],
+            'addons.*.rateMinor' => ['required', 'integer', 'min:0', 'max:100000000000'],
+            'addons.*.enabled' => ['required', 'boolean'],
+            'addonCurrencyCode' => ['required', 'regex:/\A[A-Z]{3}\z/'],
+            'addonReason' => ['required', 'string', 'min:3', 'max:500'],
+        ]);
+
+        try {
+            $next = app(HallAddonCatalogService::class)->configure(
+                $actor, $hall->company_id, $hall->id, $this->addons,
+                $this->addonCurrencyCode, $this->expectedAddonRevision, $this->addonReason,
+            );
+        } catch (InvalidArgumentException | ConflictHttpException $exception) {
+            throw ValidationException::withMessages([
+                'addons' => $exception->getMessage().' Reload the latest catalog before retrying.',
+            ]);
+        }
+
+        $this->expectedAddonRevision = $next;
+        $this->addonReason = '';
+        Notification::make()->title('Hall add-on catalog saved with audit history')->success()->send();
     }
 
 }
