@@ -78,6 +78,8 @@ class PublishedVenueRouteTest extends TestCase
             ->assertHeader('X-Frame-Options', 'DENY')
             ->assertHeader('Cache-Control', 'no-store, private');
         $response->assertSee('Approved Hall Opening');
+        $response->assertSee('https://venue.example.test/');
+        $response->assertSee('content="index, follow"', false);
         $response->assertSee('Zargul Approved Site');
         $response->assertDontSee('site-media/private/');
         $response->assertDontSee('<script', false);
@@ -91,6 +93,35 @@ class PublishedVenueRouteTest extends TestCase
         $this->get('http://venue.example.test/')->assertOk()
             ->assertDontSee('UNPUBLISHED PRIVATE DRAFT')
             ->assertSee('Approved Hall Opening');
+    }
+
+    public function test_only_published_allowlisted_secondary_page_uses_same_approved_hostname(): void
+    {
+        [$company, $owner, $site, $home] = $this->fixture();
+        $this->publish($company, $owner, $site, $home);
+        $hallsPage = (string) Str::uuid();
+        DB::table('site_pages')->insert([
+            'id' => $hallsPage, 'company_id' => $company->id,
+            'website_id' => $site, 'slug' => '/halls',
+            'title' => 'Official Hall Details',
+        ]);
+        $pages = app(SitePagePublishingService::class);
+        $pages->saveDraft($owner, $company->id, $hallsPage, ['sections' => [[
+            'id' => 'halls', 'type' => 'text',
+            'data' => ['title' => 'Approved hall catalogue'],
+        ]]], 0, 'Create hall information page');
+        $this->enable($company->id, $site);
+        $this->get('http://venue.example.test/halls')->assertNotFound();
+        $pages->publish($owner, $company->id, $hallsPage, 1, 'Approve hall page');
+        $this->get('http://venue.example.test/halls')->assertOk()
+            ->assertSee('Approved hall catalogue')
+            ->assertSee('https://venue.example.test/halls')
+            ->assertDontSee('site-media/private/');
+        $this->get('http://wrong.example.test/halls')->assertNotFound();
+        $this->get('http://venue.example.test/contact')->assertNotFound();
+        $this->get('http://venue.example.test/secret-private')->assertNotFound();
+        config()->set('public_site.enabled', false);
+        $this->get('http://venue.example.test/halls')->assertNotFound();
     }
 
     public function test_tenant_or_site_mismatch_and_missing_operator_configuration_fail_closed(): void

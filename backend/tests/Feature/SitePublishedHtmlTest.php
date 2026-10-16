@@ -75,6 +75,9 @@ class SitePublishedHtmlTest extends TestCase
         ]], 1, 'New private draft');
         $html = $reader->render($company->id, $site, '/');
         $this->assertStringContainsString('Zargul Silver &amp; Gold', $html);
+        $this->assertStringContainsString('content="Events &amp; celebrations"', $html);
+        $this->assertStringContainsString('content="noindex, nofollow"', $html);
+        $this->assertStringNotContainsString('rel="canonical"', $html);
         $this->assertStringContainsString('Official Home &amp; Venue', $html);
         $this->assertStringContainsString('Our Wedding &amp; Event Hall', $html);
         $this->assertStringContainsString('background: #fffdf5', $html);

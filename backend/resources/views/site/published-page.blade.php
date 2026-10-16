@@ -16,6 +16,13 @@
         $font = $branding['fontPreset'] === 'modern' ? 'system-ui, sans-serif' : 'Georgia, serif';
     @endphp
     <title>{{ $snapshot['page']['title'] }} | {{ $branding['siteName'] }}</title>
+    <meta name="description" content="{{ $branding['tagline'] !== '' ? $branding['tagline'] : $branding['siteName'] }}">
+    @if ($canonicalUrl !== null)
+        <link rel="canonical" href="{{ $canonicalUrl }}">
+        <meta name="robots" content="index, follow">
+    @else
+        <meta name="robots" content="noindex, nofollow">
+    @endif
     <style>
         * { box-sizing: border-box; }
         body { margin: 0; line-height: 1.55; background: {{ $palette['background'] }}; color: {{ $palette['foreground'] }}; font-family: {{ $font }}; }

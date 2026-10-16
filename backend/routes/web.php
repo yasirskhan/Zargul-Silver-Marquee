@@ -3,6 +3,10 @@
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', \App\Http\Controllers\PublishedVenuePageController::class);
+ 
+// Finite public slugs only. Never intercept /admin, /livewire, or private APIs.
+Route::get('/{pageSlug}', \App\Http\Controllers\PublishedVenuePageController::class)
+    ->whereIn('pageSlug', ['halls', 'packages', 'services', 'gallery', 'about', 'contact', 'privacy', 'terms']);
 
 /**
  * Only Telegram itself may call this endpoint. In production, reject plain

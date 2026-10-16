@@ -17,9 +17,10 @@ use JsonException;
  */
 final class PublishedVenuePageController
 {
-    public function __invoke(Request $request, SitePublishedHtmlService $renderer): Response|JsonResponse
+    public function __invoke(Request $request, SitePublishedHtmlService $renderer, ?string $pageSlug = null): Response|JsonResponse
     {
         if (config('public_site.enabled') !== true) {
+            abort_if($pageSlug !== null, 404);
             return response()->json([
                 'application' => 'VenueDesk',
                 'state' => 'foundation',
@@ -45,7 +46,9 @@ final class PublishedVenuePageController
         }
 
         try {
-            $html = $renderer->render($companyId, $websiteId, '/');
+            $page = $pageSlug === null ? '/' : '/'.$pageSlug;
+            $canonical = 'https://'.$host.$page;
+            $html = $renderer->render($companyId, $websiteId, $page, $canonical);
         } catch (InvalidArgumentException | JsonException) {
             abort(503, 'The approved public website is unavailable.');
         }
