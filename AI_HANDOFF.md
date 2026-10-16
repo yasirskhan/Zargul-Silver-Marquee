@@ -11,9 +11,9 @@ GitHub connector: repository read and write successful.
 Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; docs/ROADMAP.md; docs/WEBSITE_CMS_DESIGN.md; docs/DEVELOPMENT_PROTOCOL.md; docs/decisions/ADR-0001-platform-and-cms.md. Then read relevant source and tests. Verify LIVE development branch HEAD + exact SHA CI/jobs before writing. Actual repo/CI takes precedence over old handoff state.
 
 ## Last fully VERIFIED PRODUCT checkpoint
-- **Source commit:** `8769008594237a0d0c83b2534fe3c15cf29c82c3`
-- **Hosted CI:** `38831051137`, SUCCESS.
-- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38831051137
+- **Source commit:** `b93948377dcf77ee12cfc37cad495ebe17482cc9`
+- **Hosted CI:** `38831377792`, SUCCESS.
+- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38831377792
 - All three jobs SUCCESS: `prototype-checks`, `laravel-postgres`, `editor-browser-e2e`.
 - PHP 8.3 clean Composer package resolution of Laravel 13 + Filament 5 succeeded.
 - PostgreSQL 16 migrations succeeded, including versioned website and tenant identity tables.
@@ -259,3 +259,10 @@ If current doc-only commit is verified, record that exact SHA and CI run only af
 - `HallAddonCatalogService` owner/admin-only configure with current authenticated verified actor, strict category `catering/music/lighting/bridal_entry/stage/photography/other`, safe unique code and plain name, explicit `flat/per_guest/per_unit` charge unit, integer minor-unit price, boolean enabled, CAS under row lock, audit reason/before/after and rollback on audit failure. Assigned active hall managers can read, not update. Five PostgreSQL tests verify owner revisions, assigned manager, unsafe/duplicate codes, stale/cross-tenant denial, and transactional audit failure rollback.
 - New `docs/decisions/ADR-0002-hall-addon-charge-units.md` PROPOSED: charge-unit semantics and the real billing quantity, currency, tax, package, discount and complimentary policies are explicitly not yet signed off. No quotes/invoices use this service. Do not invent rates or treat this as a production charge engine.
 - **NEXT BOUNDED TASK:** add responsive Filament Hall Programs owner catalog UI with add/remove service rows, explicitly chosen category/charge unit, separate locked revision token, loaded hall and permission checks, manager read-only catalog and PostgreSQL Livewire tests. Then Phase 3 booking hold/calendar and exact pricing snapshot foundations while continuing public CMS and authenticated browser release gates.
+
+## 2026-10-16 optional-services Filament owner catalog controls VERIFIED
+- Product SOURCE `b93948377dcf77ee12cfc37cad495ebe17482cc9`, hosted CI `38831377792` SUCCESS exact SHA: `laravel-postgres`, `prototype-checks`, `editor-browser-e2e` all green, 114 PostgreSQL tests / 537 assertions, PHP syntax, migrations rollback/replay and static Chromium prototype checks green.
+- Existing responsive `HallPrograms` MFA panel now includes owner/admin only add/remove local service rows, typed safe code and plain service title, explicitly selected catering/music/lighting/bridal_entry/stage/photography/other category, charge unit flat/per_guest/per_unit, minor-unit rate, enabled flag, change reason and currency code; nothing saved until explicit service-backed submit. This shares company/hall selector and independently locked `expectedAddonRevision` with previous times/seating settings.
+- Current membership, hall scope, user authorization and loaded company/hall checked for edits. Assigned managers see catalog read-only. Livewire tests cover initial blank prices, owner save, stale edit conflict and reload, manager denial, unsaved changes not persisted.
+- No quotation/invoicing/booking engine or real approved prices; `ADR-0002` proposed, not signed-off. No authenticated Filament Playwright test or public website release route. Do not confuse static prototype Chromium with real panel acceptance.
+- **NEXT BOUNDED TASK:** Phase 3 booking occupancy schema with physical per-hall per-day per-program unique active claim, audited immutable event history and tenant composite FKs. This is NOT a full booking/hold service. Implement PostgreSQL tests; next create authorized idempotent hold/expiry/confirm service with clock and concurrency safety before any live availability or booking UI.
