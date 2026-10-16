@@ -6,6 +6,7 @@ use App\Models\CompanyMembership;
 use App\Models\Hall;
 use App\Models\User;
 use App\Services\HallProgramRulesService;
+use App\Services\HallOvertimePreviewService;
 use App\Services\HallAddonCatalogService;
 use App\Services\HallSeatingPriceService;
 use App\Services\TenantAccess;
@@ -38,6 +39,12 @@ final class HallPrograms extends Page
     public string $currencyCode = '';
 
     public string $reason = '';
+
+    public string $overtimeProgram = 'morning';
+    public string $overtimeObservedEnd = '';
+
+    #[Locked]
+    public ?array $overtimePreview = null;
 
     /** Separate approved seating snapshot and optimistic revision token. */
     public array $seating = [];
@@ -199,6 +206,9 @@ final class HallPrograms extends Page
     /** Reload is intentional: it discards unsaved edits and the old revision token. */
     public function reloadRules(): void
     {
+        $this->overtimeProgram = 'morning';
+        $this->overtimeObservedEnd = '';
+        $this->overtimePreview = null;
         $this->rules = $this->emptyRules();
         $this->currencyCode = '';
         $this->reason = '';
@@ -252,6 +262,30 @@ final class HallPrograms extends Page
         }
     }
 
+    public function calculateOvertimePreview(): void
+    {
+        $actor = Filament::auth()->user();
+        $hall = $this->selectedHall();
+        abort_unless($actor instanceof User && $hall && $this->expectedRevision > 0
+            && $this->loadedCompanyId === $hall->company_id
+            && $this->loadedHallId === $hall->id, 403);
+        $this->validate([
+            'overtimeProgram' => ['required', 'in:morning,noon,evening'],
+            'overtimeObservedEnd' => ['required', 'date_format:H:i'],
+        ]);
+        // Always read saved approved rules, NEVER trust potentially unsaved
+        // editable Filament form state for a financial-looking preview.
+        try {
+            $this->overtimePreview = app(HallOvertimePreviewService::class)->preview(
+                $actor, $hall->company_id, $hall->id,
+                $this->overtimeProgram, $this->overtimeObservedEnd
+            );
+        } catch (InvalidArgumentException | ConflictHttpException $error) {
+            $this->overtimePreview = null;
+            throw ValidationException::withMessages(['overtimeObservedEnd' => $error->getMessage()]);
+        }
+    }
+
     public function saveRules(): void
     {
         $actor = Filament::auth()->user();
@@ -288,6 +322,7 @@ final class HallPrograms extends Page
         }
 
         $this->expectedRevision = $next;
+        $this->overtimePreview = null;
         $this->reason = '';
         Notification::make()->title('Hall program rules saved with audit history')->success()->send();
     }

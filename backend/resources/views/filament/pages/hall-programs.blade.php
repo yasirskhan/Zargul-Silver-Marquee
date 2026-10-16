@@ -124,6 +124,52 @@
                 </section>
             @endif
 
+            @if ($expectedRevision > 0)
+                <section class="space-y-3 rounded-xl border p-4" aria-label="Nonbinding overtime and turnover preview">
+                    <h2 class="text-lg font-semibold">Grace and overtime safety preview</h2>
+                    <p class="text-sm">A read-only same-day calculation from the saved hall rules, not unsaved form edits.
+                        It is NOT actual event attendance, permission to extend, an invoice or a charge.
+                        Any turnover conflict remains prohibited even if a projected overtime amount exists.</p>
+                    <form wire:submit="calculateOvertimePreview" class="space-y-3">
+                        <label class="block space-y-1 text-sm">
+                            <span>Program to check</span>
+                            <select wire:model="overtimeProgram" class="w-full rounded-lg border p-3 text-gray-900">
+                                <option value="morning">Morning</option>
+                                <option value="noon">Noon</option>
+                                <option value="evening">Evening</option>
+                            </select>
+                        </label>
+                        <label class="block space-y-1 text-sm">
+                            <span>Simulated end time (same-day hall clock)</span>
+                            <input type="time" wire:model="overtimeObservedEnd" class="w-full rounded-lg border p-3 text-gray-900">
+                        </label>
+                        @error('overtimeObservedEnd') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                        <button type="submit" class="rounded-lg border px-4 py-2 font-semibold">
+                            Calculate nonbinding overtime safety preview
+                        </button>
+                    </form>
+                    @if ($overtimePreview && $overtimePreview['companyId'] === $companyId && $overtimePreview['hallId'] === $hallId)
+                        <div class="space-y-1 rounded-lg border p-3 text-sm">
+                            <p>Saved rule revision {{ $overtimePreview['sourceRevision'] }}.
+                                Scheduled end {{ $overtimePreview['scheduledEnd'] }},
+                                simulated end {{ $overtimePreview['observedEnd'] }}.</p>
+                            <p>Free grace {{ $overtimePreview['graceMinutes'] }} min,
+                                observed overrun {{ $overtimePreview['overtimeMinutes'] }} min,
+                                chargeable {{ $overtimePreview['chargeableMinutes'] }} min,
+                                started billing intervals {{ $overtimePreview['startedIntervals'] }}.</p>
+                            <p>Projected internal amount: {{ $overtimePreview['currency'] }}
+                                {{ $overtimePreview['projectedAmountMinor'] }} minor units (NOT payable).</p>
+                            <p>Maximum simulated safe end before turnover: {{ $overtimePreview['hardStopClock'] }}.</p>
+                            <p class="font-semibold">
+                                {{ $overtimePreview['conflictsWithTurnover']
+                                    ? 'TURNOVER CONFLICT: Extension must NOT be authorized.'
+                                    : 'No turnover conflict in this static simulation. Extension is still NOT authorized.' }}
+                            </p>
+                        </div>
+                    @endif
+                </section>
+            @endif
+
             <section class="space-y-4 rounded-xl border p-4" aria-label="Hall seating and extra-unit pricing">
                 <h2 class="text-lg font-semibold">Guest capacity, chairs and tables</h2>
                 <p class="text-sm">Seating pricing revision: {{ $expectedSeatingRevision }}.
