@@ -11,9 +11,9 @@ GitHub connector: repository read and write successful.
 Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; docs/ROADMAP.md; docs/WEBSITE_CMS_DESIGN.md; docs/DEVELOPMENT_PROTOCOL.md; docs/decisions/ADR-0001-platform-and-cms.md. Then read relevant source and tests. Verify LIVE development branch HEAD + exact SHA CI/jobs before writing. Actual repo/CI takes precedence over old handoff state.
 
 ## Last fully VERIFIED PRODUCT checkpoint
-- **Source commit:** `6f1a5a0d8ed74d7166320bf2ff33c98eec30494c`
-- **Hosted CI:** `38830275531`, SUCCESS.
-- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38830275531
+- **Source commit:** `004680c8b91318fb0679ef48d55d17ebe3c82856`
+- **Hosted CI:** `38830630308`, SUCCESS.
+- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38830630308
 - All three jobs SUCCESS: `prototype-checks`, `laravel-postgres`, `editor-browser-e2e`.
 - PHP 8.3 clean Composer package resolution of Laravel 13 + Filament 5 succeeded.
 - PostgreSQL 16 migrations succeeded, including versioned website and tenant identity tables.
@@ -246,3 +246,9 @@ If current doc-only commit is verified, record that exact SHA and CI run only af
 - `HallSeatingPriceService::configure` enforces signed-in verified owner/admin with active hall/tenant, strict five-field typed config, optimistic version compare under hall row lock, drift detection, immutable history and before/after/reason audit in the same transaction. No rate is assumed for live billing. `current` permits assigned staff read only and rejects unapproved/unversioned rates.
 - Five PostgreSQL tests verify owner versions, assigned manager read-only, over-capacity/cross-tenant refusal, stale revisions/drift, and rollback on inserted audit failure. No quotation or booking engine consumes this yet.
 - **NEXT BOUNDED TASK:** expose seating and additional-unit rate controls in the existing responsive MFA Filament Hall Programs page, keeping one authorized company/hall selector, independent locked seating revision, owner-only save vs staff read-only and Livewire PostgreSQL tests. Then implement owner-defined services/catering add-on catalog, before bookings.
+
+## 2026-10-16 owner seating settings integrated in Filament Hall Programs VERIFIED
+- Product `004680c8b91318fb0679ef48d55d17ebe3c82856` CI `38830630308` SUCCESS all three jobs; PHP/PostgreSQL 105 tests 494 assertions, migrations and rollback/replay and static prototype browser tests green.
+- The existing HallPrograms Filament page now supports owner/admin-only guest capacity, included chairs/tables, explicitly entered additional chair/table rates and currency code. Extra rates start blank until owner input; no fabricated default prices. Separate locked `expectedSeatingRevision` prevents overwriting newer seating settings independent of hall program schedule revision.
+- Manager assigned to a hall sees saved seating configuration read-only; tenant selector, active membership checks, loaded hall ID and current auth checks apply on every save. Invalid/blank prices fail, stale writes are refused and reload uses trusted versioned service. Livewire regression tests exercise owner save, stale editor reload, manager denial, missing prices and two independent history pointers.
+- **NEXT BOUNDED TASK:** Phase 2 ADD-001 owner-controlled optional services/catering catalog: strict typed versioned tenant/hall snapshot, price-unit semantics proposed in ADR-0002 subject to business signoff, owner-admin write/assigned manager read, audit and PostgreSQL validation/concurrency tests. Then Filament add-on catalog controls and broader booking/availability domain. No live quotations, booking conflicts, customer form backend or invoices exist yet.
