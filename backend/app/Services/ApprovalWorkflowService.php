@@ -177,6 +177,19 @@ final class ApprovalWorkflowService
                 throw new AuthorizationException('Approval request unavailable.');
             }
             if ($request->status !== 'pending' || (int) $request->revision !== $expectedRevision) {
+                // A lost HTTP response may retry the identical already-committed
+                // decision. Return its stored result, never write a second event
+                // or permit a different actor, action, reason or revision.
+                if (in_array($membership->role, ['owner', 'admin'], true)
+                    && $request->status === $decision
+                    && (int) $request->revision === $expectedRevision + 1
+                    && DB::table('approval_decisions')->where('company_id', $companyId)
+                        ->where('approval_id', $requestId)
+                        ->where('decided_by', $actor->getKey())
+                        ->where('decision', $decision)->where('reason', $reason)->exists()) {
+                    return ['id' => $requestId, 'status' => $decision,
+                        'revision' => $expectedRevision + 1];
+                }
                 throw new ConflictHttpException('This request is no longer pending at the selected revision.');
             }
             if ((int) $request->requested_by === (int) $actor->getKey()) {

@@ -110,6 +110,45 @@ class ApprovalWorkflowServiceTest extends TestCase
         $service->decide($owner, $company->id, $id, 1, 'rejected', 'Duplicate conflicting decision');
     }
 
+    public function test_exact_same_owner_decision_retry_is_read_only_and_mismatched_retry_rejected(): void
+    {
+        [$company, , , $people, $booking] = $this->fixture();
+        $service = app(ApprovalWorkflowService::class);
+        $this->be($people['manager'][0]);
+        $request = (string) Str::uuid();
+        $service->request($people['manager'][0], $company->id, $request, 'discount',
+            300, 'PKR', $booking, 'Controlled synthetic discount proposal');
+        $this->be($people['owner'][0]);
+        $first = $service->decide($people['owner'][0], $company->id,
+            $request, 1, 'approved', 'Approved private proposal without posting');
+        $again = $service->decide($people['owner'][0], $company->id,
+            $request, 1, 'approved', 'Approved private proposal without posting');
+        $this->assertSame($first, $again);
+        $this->assertSame(1, DB::table('approval_decisions')->where('approval_id', $request)->count());
+        $this->assertSame(1, DB::table('audit_events')
+            ->where('entity_id', $request)->where('action', 'approval.approved')->count());
+        $this->assertSame(2, DB::table('approval_alert_outbox')->where('approval_id', $request)->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+        try {
+            $service->decide($people['owner'][0], $company->id,
+                $request, 1, 'approved', 'Modified owner decision reason');
+            $this->fail('Different decision reason replay accepted.');
+        } catch (ConflictHttpException) {
+            $this->assertTrue(true);
+        }
+        try {
+            $service->decide($people['owner'][0], $company->id,
+                $request, 1, 'rejected', 'Approved private proposal without posting');
+            $this->fail('Conflicting reject replay accepted.');
+        } catch (ConflictHttpException) {
+            $this->assertTrue(true);
+        }
+        $this->be($people['admin'][0]);
+        $this->expectException(ConflictHttpException::class);
+        $service->decide($people['admin'][0], $company->id,
+            $request, 1, 'approved', 'Approved private proposal without posting');
+    }
+
     public function test_self_approval_and_request_key_payload_reuse_are_blocked(): void
     {
         [$company, , , $people] = $this->fixture();

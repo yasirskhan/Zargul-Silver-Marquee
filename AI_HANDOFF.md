@@ -1,3 +1,7 @@
+## 2026-10-16 APR-001/003 OWNER/ADMIN EXACT DECISION REPLAY — EXACT CI PENDING
+- On top of URL-bound company-selector repair c0c1b398870c46ac41502fed5d6c381a632b9e79, approval decision duplicate responses are idempotently replayed only when original decision belongs to SAME actor, still active verified company owner/admin, exact expected previous revision, exact decision and reason, proven by unique PostgreSQL approval_decisions under request row lock. Changed action/reason/actor/stale revision fails. No new audit, alert, booking or financial journal on retry. PostgreSQL tests cover exact one write and all forbidden changes. No new finance release gate.
+- Verify all CI jobs at exact new SHA, do not claim live production approval application.
+
 ## 2026-10-16 APR-002 URL-BOUND OWNER COMPANY SELECTOR — EXACT CI PENDING
 - The synthetic Livewire company deep-link test now exercises a real #[Url(as: 'company')] typed companyId property, not only an unobservable raw request query. The mount explicitly chooses the URL-bound company or request query, then aborts 403 unless it is among CURRENT active verified actor memberships; actions reauthorize on hydrate/loaded company checks. Company dropdown can preserve selection in the URL. This is a production behavior repair, not an assertion skip. Previous withQueryParams harness correction commit 5e1a33b6aa47d2a6d729ea726a91e46e83f08128 still undergoing hosted CI; verify new exact SHA jobs.
 
