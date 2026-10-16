@@ -34,8 +34,9 @@ final class SiteBrandingService
         return DB::transaction(function () use (
             $actor, $companyId, $websiteId, $branding, $expectedRevision, $reason
         ): int {
-            $this->authorize($actor, $companyId, false);
             $website = $this->websiteForUpdate($companyId, $websiteId);
+            // Recheck after acquiring the write lock, not only before waiting.
+            $this->authorize($actor, $companyId, false);
             if ($expectedRevision < 0 || (int) $website->branding_draft_revision !== $expectedRevision) {
                 throw new ConflictHttpException('Branding has changed; reload before saving.');
             }
@@ -67,8 +68,9 @@ final class SiteBrandingService
         $this->reason($reason);
 
         return DB::transaction(function () use ($actor, $companyId, $websiteId, $expectedRevision, $reason): string {
-            $this->authorize($actor, $companyId, true);
             $website = $this->websiteForUpdate($companyId, $websiteId);
+            // Publisher delegation can be revoked while awaiting this lock.
+            $this->authorize($actor, $companyId, true);
             if ($expectedRevision < 1 || (int) $website->branding_draft_revision !== $expectedRevision) {
                 throw new ConflictHttpException('Branding draft is stale; reload before publishing.');
             }
@@ -118,8 +120,9 @@ final class SiteBrandingService
         return DB::transaction(function () use (
             $actor, $companyId, $websiteId, $targetRevisionId, $expectedPublishedRevisionId, $reason
         ): string {
-            $this->authorize($actor, $companyId, true);
             $website = $this->websiteForUpdate($companyId, $websiteId);
+            // Publisher delegation can be revoked while awaiting this lock.
+            $this->authorize($actor, $companyId, true);
             if (! $website->branding_published_revision_id
                 || $website->branding_published_revision_id !== $expectedPublishedRevisionId) {
                 throw new ConflictHttpException('Published branding changed; reload before restoring.');
@@ -195,6 +198,10 @@ final class SiteBrandingService
     {
         if (! Auth::check() || (int) Auth::id() !== (int) $actor->getKey()
             || ! $actor->hasVerifiedEmail()
+            // A cached authenticated model may remain active even after an
+            // account is disabled or email verification is revoked in SQL.
+            || ! DB::table('users')->where('id', $actor->getKey())
+                ->where('is_active', true)->whereNotNull('email_verified_at')->exists()
             || ! ($publishing
                 ? $this->access->canPublishWebsite($actor, $companyId)
                 : $this->access->canEditWebsite($actor, $companyId))) {

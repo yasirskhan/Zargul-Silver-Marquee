@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\User;
 use App\Services\SiteBrandingService;
+use App\Services\TenantAccess;
 use App\Services\SiteMediaService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -64,6 +65,58 @@ class SiteBrandingServiceTest extends TestCase
         $this->assertSame(2, DB::table('site_branding_revisions')->count());
         $this->assertSame(1, DB::table('site_branding_publishing_events')->count());
         $this->assertSame(3, DB::table('audit_events')->count());
+    }
+
+    public function test_branding_edit_revoked_after_initial_check_cannot_commit_under_website_lock(): void
+    {
+        [$company, $owner, $site] = $this->fixture('branding-lock-revoke');
+
+        $access = new class extends TenantAccess {
+            public int $checks = 0;
+
+            public function canEditWebsite(User $user, string $companyId): bool
+            {
+                $wasAllowed = parent::canEditWebsite($user, $companyId);
+                if (++$this->checks === 1) {
+                    DB::table('company_memberships')->where('company_id', $companyId)
+                        ->where('user_id', $user->getKey())->update(['is_active' => false]);
+                }
+
+                return (bool) $wasAllowed;
+            }
+        };
+        $this->app->instance(TenantAccess::class, $access);
+        try {
+            app(SiteBrandingService::class)->saveDraft($owner, $company->id, $site,
+                $this->branding('Revoked branding'), 0, 'Old branding permissions');
+            $this->fail('Revoked brand editor wrote an immutable revision.');
+        } catch (AuthorizationException) {
+            $this->assertSame(2, $access->checks);
+        } finally {
+            $this->app->forgetInstance(TenantAccess::class);
+        }
+
+        $this->assertSame(0, (int) DB::table('websites')->where('id', $site)->value('branding_draft_revision'));
+        $this->assertSame(0, DB::table('site_branding_revisions')->where('website_id', $site)->count());
+        $this->assertSame(0, DB::table('audit_events')->where('entity_id', $site)->count());
+    }
+
+    public function test_stale_authenticated_owner_cannot_publish_branding_after_account_deactivation(): void
+    {
+        [$company, $owner, $site] = $this->fixture('brand-account-shutdown');
+        $service = app(SiteBrandingService::class);
+        $service->saveDraft($owner, $company->id, $site, $this->branding('Still private'), 0, 'Initial branding draft');
+        DB::table('users')->where('id', $owner->getKey())->update(['is_active' => false]);
+        $this->assertTrue((bool) $owner->is_active, 'Cached session model intentionally remains stale.');
+        try {
+            $service->publish($owner, $company->id, $site, 1, 'Disabled owner publish');
+            $this->fail('A database-disabled owner published brand settings.');
+        } catch (AuthorizationException) {
+            $this->assertTrue(true);
+        }
+        $this->assertNull(DB::table('websites')->where('id', $site)->value('branding_published_revision_id'));
+        $this->assertSame(0, DB::table('site_branding_publishing_events')->where('website_id', $site)->count());
+        $this->assertSame(1, DB::table('audit_events')->where('entity_id', $site)->count());
     }
 
     public function test_editor_can_save_but_cannot_publish_and_stale_drafts_are_rejected(): void
