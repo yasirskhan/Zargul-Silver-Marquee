@@ -342,6 +342,53 @@ final class ApprovalWorkflowService
             ->map(fn ($row) => $this->summary($row))->all();
     }
 
+    /**
+     * First protected-panel visit: private, aggregate-only owner notices.
+     * A requester's own proposal is never represented as an actionable item.
+     * No raw customer, reason, token, or financial document enters the shell.
+     */
+    public function ownerPendingAttention(User $actor): array
+    {
+        if (! Auth::check() || (int) Auth::id() !== (int) $actor->getKey()
+            || ! $actor->is_active || ! $actor->hasVerifiedEmail()) {
+            throw new AuthorizationException('An active verified owner session is required.');
+        }
+
+        $rows = DB::table('approval_requests as req')
+            ->join('company_memberships as member', function ($join): void {
+                $join->on('member.company_id', '=', 'req.company_id')
+                    ->where('member.role', '=', 'owner')
+                    ->where('member.is_active', '=', true);
+            })
+            ->join('companies as company', function ($join): void {
+                $join->on('company.id', '=', 'req.company_id')
+                    ->where('company.is_active', '=', true);
+            })
+            ->where('member.user_id', $actor->getKey())
+            ->where('req.status', 'pending')
+            ->where('req.requested_by', '<>', $actor->getKey())
+            ->groupBy('req.company_id', 'company.name')
+            ->orderBy('req.company_id')
+            ->limit(25)
+            ->get([
+                'req.company_id', 'company.name',
+                DB::raw('COUNT(*) AS pending_count'),
+                DB::raw('MAX(req.created_at) AS newest_request'),
+                DB::raw('MAX(req.id::text) AS newest_id'),
+            ]);
+
+        $items = $rows->map(fn ($row) => [
+            'companyId' => $row->company_id, 'company' => $row->name,
+            'pending' => (int) $row->pending_count,
+        ])->all();
+        $fingerprint = $rows->isEmpty() ? '' : hash('sha256',
+            $rows->map(fn ($row) => implode(':', [
+                $row->company_id, $row->pending_count, $row->newest_request, $row->newest_id,
+            ]))->implode('|'));
+
+        return ['items' => $items, 'fingerprint' => $fingerprint];
+    }
+
     private function summary(object $row): array
     {
         return ['id' => $row->id, 'status' => $row->status, 'revision' => (int) $row->revision,

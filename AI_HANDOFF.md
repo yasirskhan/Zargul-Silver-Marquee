@@ -1,3 +1,8 @@
+## 2026-10-16 APR-001/002/003 OWNER ATTENTION MODAL — NEW EXACT-SHA CI PENDING
+- Previous source b7c1c9961f2d61bae3da128c8d90b2ba05e1ecd7 and hosted run 38848797487 SUCCESS exact SHA.
+- This batch adds a Filament PAGE_START owner popup using a Livewire component, only on protected pages: active email-verified owner only, authorized active company memberships, pending requests by other staff only. Aggregated company counts/labels (not customer contact, pricing reasons, bot tokens or private records). Session dismissal fingerprint invalidates upon newly pending requests; stale Livewire actions re-check fresh server authority. Popup links to owner Approval Center; no direct decisions, real payments or booking confirmation. Adds PostgreSQL and Livewire tests for owner/admin/manager/foreign tenant/dismiss/new request/revocation. Requirement register and handoff updated in SAME commit.
+- Need exact-SHA 4-job hosted CI verification and real browser presence/appearance acceptance. An actual Telegram owner deployment/pilot remains pending.
+
 ## 2026-10-16 FIN-001/002/003 READ-BOUNDARY HARDENING — HOSTED CI PENDING
 - Branch live baseline 3ca4d8853e6499ca5ebbfdb48e869a9fa7227725 hosted CI 38846827433 SUCCESS. Current batch routes finance journals and closeout history through policy-checked FinanceControlService methods, in addition to already protected preview listings; bounds query limits and orders stable. Livewire panel no longer performs its own direct finance history reads. Adds real PostgreSQL same-tenant, manager and foreign-company authorization and upper-bound regression tests. Finance customer invoices/deposits/custody remain gated OFF; no real payments, refunds or completed OPS-001 claimed. Exact-SHA CI pending until verified.
 

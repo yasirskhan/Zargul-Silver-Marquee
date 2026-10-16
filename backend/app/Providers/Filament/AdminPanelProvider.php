@@ -15,6 +15,7 @@ use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
+use Filament\View\PanelsRenderHook;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -41,6 +42,10 @@ class AdminPanelProvider extends PanelProvider
                 AppAuthentication::make()->recoverable(),
             ], isRequired: true)
             ->pages([ApprovalCenter::class, FinanceDesk::class, AuditHistory::class, BookingProposals::class, HallCalendar::class, HallPrograms::class, WebsiteWorkspace::class])
+            ->renderHook(
+                PanelsRenderHook::PAGE_START,
+                fn (): \Illuminate\Contracts\View\View => view('filament.hooks.owner-approval-attention'),
+            )
             ->brandName('VenueDesk')
             ->colors(['primary' => Color::Emerald])
             ->middleware([
