@@ -11,9 +11,9 @@ GitHub connector: repository read and write successful.
 Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; docs/ROADMAP.md; docs/WEBSITE_CMS_DESIGN.md; docs/DEVELOPMENT_PROTOCOL.md; docs/decisions/ADR-0001-platform-and-cms.md. Then read relevant source and tests. Verify LIVE development branch HEAD + exact SHA CI/jobs before writing. Actual repo/CI takes precedence over old handoff state.
 
 ## Last fully VERIFIED PRODUCT checkpoint
-- **Source commit:** `9c0331c353e6783d61a29ce0d0671db9298748b7`
-- **Hosted CI:** `38829911961`, SUCCESS.
-- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38829911961
+- **Source commit:** `6f1a5a0d8ed74d7166320bf2ff33c98eec30494c`
+- **Hosted CI:** `38830275531`, SUCCESS.
+- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38830275531
 - All three jobs SUCCESS: `prototype-checks`, `laravel-postgres`, `editor-browser-e2e`.
 - PHP 8.3 clean Composer package resolution of Laravel 13 + Filament 5 succeeded.
 - PostgreSQL 16 migrations succeeded, including versioned website and tenant identity tables.
@@ -239,3 +239,10 @@ If current doc-only commit is verified, record that exact SHA and CI run only af
 - `backend/tests/Feature/HallProgramsLivewireTest.php` verifies owner save, stale conflict and reload, assigned-manager cannot edit, foreign tenant denial, revoked membership denial and incomplete form denial. Filament panel registers HallPrograms beside WebsiteWorkspace, and enforces mandatory app MFA in panel config.
 - Browser tests are STATIC editor prototype only, NOT real authenticated Filament end-to-end. No venue pricing approved for live use, no reservations, invoicing, public CMS route or Telegram.
 - **NEXT BOUNDED TASK:** Phase 2 HALL-001: tenant-scoped, versioned hall capacity/included chairs/tables + additional seating unit-price configuration, strict limits, owner-only audited service, role-scoped read, stale concurrency guards and PostgreSQL tests. Then connect responsive owner settings and approved catalog/add-ons. Preserve previously completed work. Do not touch main or property-platform.
+
+## 2026-10-16 hall capacity and extra-unit prices backend VERIFIED
+- Product SOURCE `6f1a5a0d8ed74d7166320bf2ff33c98eec30494c`, CI `38830275531` SUCCESS on all three jobs. PostgreSQL backend 101 passed (466 assertions); migration and rollback/replay, PHP syntax, static Chromium and Node checks passed.
+- New `2026_10_15_000600_create_hall_seating_price_revisions.php` creates tenant+hall-scoped immutable revision table, signed positive capacity bounds, included chairs/tables and extra chair/table rate-minor constraints, currency format constraint and existing PostgreSQL update/delete prohibition. `halls.seating_price_revision = 0` means prices unconfigured. Older hall capacity counts remain without assuming new rates.
+- `HallSeatingPriceService::configure` enforces signed-in verified owner/admin with active hall/tenant, strict five-field typed config, optimistic version compare under hall row lock, drift detection, immutable history and before/after/reason audit in the same transaction. No rate is assumed for live billing. `current` permits assigned staff read only and rejects unapproved/unversioned rates.
+- Five PostgreSQL tests verify owner versions, assigned manager read-only, over-capacity/cross-tenant refusal, stale revisions/drift, and rollback on inserted audit failure. No quotation or booking engine consumes this yet.
+- **NEXT BOUNDED TASK:** expose seating and additional-unit rate controls in the existing responsive MFA Filament Hall Programs page, keeping one authorized company/hall selector, independent locked seating revision, owner-only save vs staff read-only and Livewire PostgreSQL tests. Then implement owner-defined services/catering add-on catalog, before bookings.
