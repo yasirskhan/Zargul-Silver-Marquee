@@ -197,7 +197,13 @@ final class ApprovalCenter extends Page
     public function mount(): void
     {
         abort_unless(static::canAccess(), 403);
-        $this->companyId = array_key_first($this->companyOptions());
+        $options = $this->companyOptions();
+        $requested = request()->query('company');
+        // A deep link from the authenticated owner notice may select only an
+        // active member company, never an arbitrary UUID supplied by a client.
+        abort_unless($requested === null || (is_string($requested)
+            && array_key_exists($requested, $options)), 403);
+        $this->companyId = $requested ?? array_key_first($options);
         $this->refreshInbox();
     }
 

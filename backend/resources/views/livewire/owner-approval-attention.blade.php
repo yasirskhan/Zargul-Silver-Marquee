@@ -15,6 +15,10 @@
                         <li wire:key="owner-approval-company-{{ $item['companyId'] }}" class="rounded-lg border p-3">
                             <strong>{{ $item['company'] }}</strong>:
                             {{ $item['pending'] }} pending {{ $item['pending'] === 1 ? 'request' : 'requests' }}
+                            <a href="{{ \App\Filament\Pages\ApprovalCenter::getUrl(['company' => $item['companyId']]) }}"
+                                class="mt-2 block font-semibold underline">
+                                Review this company's requests
+                            </a>
                         </li>
                     @endforeach
                 </ul>

@@ -83,6 +83,26 @@ class OwnerApprovalAttentionTest extends TestCase
         $this->assertSame(0, DB::table('finance_journals')->count());
     }
 
+    public function test_new_login_clears_only_previous_owner_attention_dismissal(): void
+    {
+        [$company, , $people] = $this->fixture();
+        $this->expense($people['admin'], $company->id, 'Pending on next owner login');
+        $this->be($people['owner']);
+        $component = Livewire::test(OwnerApprovalAttention::class)
+            ->assertSee('Pending owner approval requests')->call('dismiss')
+            ->assertDontSee('Pending owner approval requests');
+        $key = 'venuedesk.owner_approval_notice_dismissed.'.$people['owner']->id;
+        $this->assertNotNull(session($key));
+        // A real Laravel login event, never mock out or bypass the MFA flow.
+        request()->setLaravelSession(app('session')->driver());
+        \Illuminate\Support\Facades\Event::dispatch(
+            new \Illuminate\Auth\Events\Login('web', $people['owner'], false)
+        );
+        $this->assertNull(session($key));
+        Livewire::test(OwnerApprovalAttention::class)
+            ->assertSee('Pending owner approval requests');
+    }
+
     public function test_manager_and_nonowner_cannot_get_owner_attention_or_cross_tenant_records(): void
     {
         [$company, $foreign, $people] = $this->fixture();

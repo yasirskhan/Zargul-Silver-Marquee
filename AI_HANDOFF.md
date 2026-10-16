@@ -1,3 +1,7 @@
+## 2026-10-16 APR-002 OWNER NOTICE NAVIGATION AND LOGIN RESET — EXACT-SHA CI PENDING
+- On top of pending APR-003 owner-only unexpired delegation listing, the approval popup now routes directly to a selected owner-member company, with fresh server-side company membership authorization in ApprovalCenter mount (foreign query UUID denied). A real Laravel Login event clears only the ephemeral per-user owner-alert dismissal marker; no MFA/session security weakening. PostgreSQL and Livewire tests check authorized second company, forbidden foreign company and reappearance on fresh Login event after dismissal. Customer finance and real bookings remain gated off.
+- Preserve prior handoff history and verify latest 4-job hosted CI at exact SHA.
+
 ## 2026-10-16 APR-003 EXPIRY-SAFE EMERGENCY GRANT LIST — EXACT-SHA CI PENDING
 - Previous baseline 98878266a25600021d4d8d24b50cdd66ac8efe7d (synthetic private MFA/browser acceptance awaiting hosted CI). Owner-only active emergency grants now read through a policy-checked ApprovalWorkflowService; server filters grants whose end is <= current time, revoked grants excluded, bounded stable sorting. Filament listing delegates to same authorization service. PostgreSQL Livewire tests verify active, naturally expired, revoked, manager/admin denial and foreign company denial using clock travel without circumventing SQL CHECKs. Approvals continue to be nonapplying; no real money or customer bookings.
 - This handoff preserves the previous popup E2E batch history. Verify latest exact SHA and all four jobs before VERIFIED claim.

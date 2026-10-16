@@ -139,6 +139,28 @@ class ApprovalCenterLivewireTest extends TestCase
         }
     }
 
+    public function test_pending_company_link_enforces_membership_before_loading_inbox(): void
+    {
+        [$company, $foreign, $members] = $this->fixture();
+        $owner = $members['owner'][0];
+        $this->be($owner);
+        $secondary = Company::create(['name' => 'Other owned venue', 'slug' => 'approval-ui-owned']);
+        CompanyMembership::create(['company_id' => $secondary->id,
+            'user_id' => $owner->id, 'role' => 'owner']);
+        request()->query->set('company', $secondary->id);
+        try {
+            Livewire::test(ApprovalCenter::class)->assertSet('companyId', $secondary->id);
+        } finally {
+            request()->query->remove('company');
+        }
+        request()->query->set('company', $foreign->id);
+        try {
+            Livewire::test(ApprovalCenter::class)->assertForbidden();
+        } finally {
+            request()->query->remove('company');
+        }
+    }
+
     public function test_only_owner_can_generate_private_telegram_pairing_link(): void
     {
         [$company, , $members] = $this->fixture();
