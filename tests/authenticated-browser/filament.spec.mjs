@@ -51,7 +51,23 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   ).first();
   await expect(code).toBeVisible({ timeout: 25_000 });
   await code.fill(totp(fixtureSecret));
-  await page.getByRole('button', { name: /confirm sign in|verify|continue|sign in/i }).last().click();
+
+  // Filament may auto-submit its MFA code and navigate immediately. Never
+  // click a stale disabled login button after the authenticated redirect.
+  const authenticated = (url) => {
+    const path = new URL(url).pathname;
+    return path.startsWith('/admin') &&
+      !['/admin/login', '/admin/multi-factor-authentication', '/admin/password-reset']
+        .some((blocked) => path.startsWith(blocked));
+  };
+  try {
+    await page.waitForURL(authenticated, { timeout: 8_000 });
+  } catch {
+    const verify = page.getByRole('button', { name: /confirm sign in|verify|continue|sign in/i }).last();
+    await expect(verify).toBeEnabled({ timeout: 15_000 });
+    await verify.click();
+    await page.waitForURL(authenticated, { timeout: 25_000 });
+  }
 
   await page.goto('/admin/booking-proposals');
   await expect(page.getByText('Internal booking proposals')).toBeVisible({ timeout: 25_000 });
