@@ -9,7 +9,7 @@ return new class extends Migration {
         // Preserve the immutable task identity and history. Status can change
         // only through a monotone planned/reviewed revision transition.
         DB::unprepared(<<<'SQL'
-CREATE FUNCTION venuedesk_guard_operations_plan_tasks() RETURNS trigger
+CREATE OR REPLACE FUNCTION venuedesk_guard_operations_plan_tasks() RETURNS trigger
 LANGUAGE plpgsql AS $ops_guard$
 BEGIN
     IF TG_OP = 'DELETE' THEN
