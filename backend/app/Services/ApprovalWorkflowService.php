@@ -256,7 +256,10 @@ final class ApprovalWorkflowService
         } catch (\Throwable) {
             throw new InvalidArgumentException('Invalid delegation start or end time.');
         }
-        // Human datetime-local values are minute-precision and API ISO values may be\n        // second-precision. Allow at most one minute of clock/rounding skew,\n        // never a backdated or indefinite grant.\n        if ($start->lt(now()->subMinute()) || $end->lte($start) || $end->gt($start->addDays(7))) {
+        // Human datetime-local values are minute-precision and API ISO values may be
+        // second-precision. Allow at most one minute of clock/rounding skew,
+        // never a backdated or indefinite grant.
+        if ($start->lt(now()->subMinute()) || $end->lte($start) || $end->gt($start->addDays(7))) {
             throw new InvalidArgumentException('Emergency grants must start now or later and last at most seven days.');
         }
 

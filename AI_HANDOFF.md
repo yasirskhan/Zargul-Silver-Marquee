@@ -7,6 +7,9 @@ Default `main`: untouched since README initialization at `83ee684f8b08e65bd67323
 STRICTLY OUT OF SCOPE: yasirskhan/property-platform and all other repositories.
 GitHub connector: repository read and write successful.
 
+## 2026-10-16 second CI failure: PHP literal linefeed escape
+- Source `e703dae81fa386a779fc6854232fb43957dfa809`, CI `38844713678` three non-backend jobs SUCCESS. Backend PHP lint FAIL: source comment contained literal `\\n` escape sequences, swallowing the subsequent grant validation branch and raising a PHP parse error. The next source commit replaces only these literal escapes with real source line breaks, keeping the original strict logic and regression assertions unchanged. Its exact-SHA CI must pass before verification.
+
 ## 2026-10-16 approval first CI failure and narrow repair
 - Source `f27994dee04ce7c9c19302a3b570b8ed4ed3de66`, run `38844464546`: prototype checks, authenticated Filament browser and editor browser SUCCESS; PostgreSQL 202 passed and 2 failed. Failed grant using second-rounded start-now timestamp vs fractional server now, and immutable-delete two-step test lacking PostgreSQL savepoint after first expected SQL error. Production fix allows only <=60s start clock rounding for a time-limited owner grant; test uses an actual nested transaction/savepoint and preserves both delete-failure assertions. Repair CI not yet verified in this document.
 - Continue hosted exact-SHA validation and do not claim approvals verified until all four jobs pass.
