@@ -176,6 +176,7 @@ jobs:
           cp .env.example .env
           php artisan key:generate --force --no-interaction
           php artisan migrate --force --no-interaction
+          php artisan filament:assets --no-interaction
           php artisan venuedesk:seed-browser-e2e
       - name: Start authenticated Laravel panel
         working-directory: backend

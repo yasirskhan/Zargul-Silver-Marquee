@@ -43,7 +43,7 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   await page.goto('/admin/login');
   await expect(page.locator('input[type="email"]')).toBeVisible();
   await page.locator('input[type="email"]').fill('browser-e2e-owner@example.test');
-  await page.locator('input[type="password"]').fill('synthetic-browser-password-only');
+  await page.getByLabel(/Password/).fill('synthetic-browser-password-only');
   await page.getByRole('button', { name: /sign in|log in/i }).first().click();
 
   const code = page.locator(
