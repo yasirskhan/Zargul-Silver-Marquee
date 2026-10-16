@@ -71,7 +71,7 @@ test('real owner password and TOTP flow protects mobile proposal editing without
 
   await page.goto('/admin/booking-proposals');
   await expect(page.getByText('Internal booking proposals')).toBeVisible({ timeout: 25_000 });
-  await expect(page.getByText('Synthetic Test Hall')).toBeVisible();
+  await expect(page.locator('tbody').getByText('Synthetic Test Hall')).toBeVisible();
   await expect(page.getByText('Synthetic Browser Customer')).toHaveCount(0);
   await expect(page.getByText('browser-e2e-private@example.test')).toHaveCount(0);
 
