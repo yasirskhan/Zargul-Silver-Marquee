@@ -27,7 +27,8 @@ final class PublishedVenueRobotsController
             }
         }
 
-        return response("User-agent: *\n".($allow ? "Allow: /" : "Disallow: /")."\n", 200, [
+        return response("User-agent: *\n".($allow ? "Allow: /" : "Disallow: /")."\n"
+            .($allow ? "Sitemap: https://".$context['host']."/sitemap.xml\n" : ''), 200, [
             'Content-Type' => 'text/plain; charset=UTF-8',
             'Cache-Control' => 'no-store, private',
             'X-Content-Type-Options' => 'nosniff',

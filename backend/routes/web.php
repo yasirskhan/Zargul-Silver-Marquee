@@ -17,6 +17,7 @@ Route::get('/_venue-media/{pageSlug}/{mediaId}.webp',
     ->whereUuid('mediaId');
 
 Route::get('/robots.txt', \App\Http\Controllers\PublishedVenueRobotsController::class);
+Route::get('/sitemap.xml', \App\Http\Controllers\PublishedVenueSitemapController::class);
 
 /**
  * Only Telegram itself may call this endpoint. In production, reject plain

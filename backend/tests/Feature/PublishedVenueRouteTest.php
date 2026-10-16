@@ -118,6 +118,41 @@ class PublishedVenueRouteTest extends TestCase
         $this->get('http://venue.example.test/robots.txt')->assertNotFound();
     }
 
+    public function test_sitemap_lists_only_valid_published_allowlisted_pages_after_indexing_signoff(): void
+    {
+        [$company, $owner, $site, $home] = $this->fixture();
+        $this->enable($company->id, $site);
+        config()->set('public_site.indexing_enabled', true);
+        $this->get('http://venue.example.test/sitemap.xml')->assertNotFound();
+        $this->publish($company, $owner, $site, $home);
+        $this->get('http://venue.example.test/robots.txt')->assertOk()
+            ->assertSee('Sitemap: https://venue.example.test/sitemap.xml');
+        $this->get('http://venue.example.test/sitemap.xml')->assertOk()
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertSee('<urlset', false)
+            ->assertSee('https://venue.example.test/')
+            ->assertDontSee('https://venue.example.test/halls');
+        $hallPage = (string) Str::uuid();
+        DB::table('site_pages')->insert([
+            'id' => $hallPage, 'company_id' => $company->id,
+            'website_id' => $site, 'slug' => '/halls', 'title' => 'Owners hall page',
+        ]);
+        $pages = app(SitePagePublishingService::class);
+        $pages->saveDraft($owner, $company->id, $hallPage,
+            ['sections' => []], 0, 'Draft-only sitemap page');
+        $this->get('http://venue.example.test/sitemap.xml')->assertOk()
+            ->assertDontSee('https://venue.example.test/halls');
+        $pages->publish($owner, $company->id, $hallPage, 1, 'Approve hall page for public website');
+        $this->get('http://venue.example.test/sitemap.xml')->assertOk()
+            ->assertSee('https://venue.example.test/halls')
+            ->assertDontSee('site-media/private/');
+        $this->get('http://wrong.example.test/sitemap.xml')->assertNotFound();
+        config()->set('public_site.indexing_enabled', false);
+        $this->get('http://venue.example.test/sitemap.xml')->assertNotFound();
+        $this->get('http://venue.example.test/robots.txt')->assertOk()
+            ->assertSee('Disallow: /')->assertDontSee('Sitemap:');
+    }
+
     public function test_only_published_allowlisted_secondary_page_uses_same_approved_hostname(): void
     {
         [$company, $owner, $site, $home] = $this->fixture();
