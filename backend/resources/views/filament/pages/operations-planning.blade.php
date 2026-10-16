@@ -55,6 +55,8 @@
                             <span>Planning status: {{ $task['status'] }} | revision {{ $task['revision'] }}</span>
                         </div>
                         <p class="break-all text-xs">Proposal {{ $task['bookingId'] }}</p>
+                        <button type="button" wire:click="showHistory('{{ $task['id'] }}')"
+                            class="rounded-lg border px-3 py-2">View immutable review history</button>
                         @if ($task['status'] === 'planned')
                             <button type="button" wire:click="markReviewed('{{ $task['id'] }}', true)"
                                 class="rounded-lg border px-3 py-2">Mark plan reviewed</button>
@@ -66,6 +68,19 @@
                 @empty
                     <p class="rounded-lg border p-4 text-sm">No internal planning tasks in your assigned halls.</p>
                 @endforelse
+                @if ($historyTaskId)
+                    <section aria-label="Immutable planning review history" class="space-y-2 rounded-xl border p-4 text-sm">
+                        <h3 class="font-semibold">Planning review history</h3>
+                        <p class="break-all text-xs">Task {{ $historyTaskId }}</p>
+                        @foreach ($historyEvents as $event)
+                            <div wire:key="ops-history-{{ $historyTaskId }}-{{ $event['revision'] }}" class="border-t py-2">
+                                <p>Revision {{ $event['revision'] }}: {{ $event['action'] }} by staff #{{ $event['actorId'] }}</p>
+                                <p>{{ $event['at'] }} | {{ $event['status'] }}</p>
+                                <p class="break-words">{{ $event['reason'] }}</p>
+                            </div>
+                        @endforeach
+                    </section>
+                @endif
             </section>
         @endif
     </div>

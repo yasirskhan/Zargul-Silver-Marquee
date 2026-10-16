@@ -32,6 +32,12 @@ final class OperationsPlanning extends Page
     public array $tasks = [];
 
     #[Locked]
+    public ?string $historyTaskId = null;
+
+    #[Locked]
+    public array $historyEvents = [];
+
+    #[Locked]
     public string $createRequestKey = '';
 
     public string $bookingId = '';
@@ -125,9 +131,22 @@ final class OperationsPlanning extends Page
 
     public function refresh(): void
     {
+        // Prevent stale history from surviving tenant/filter/task transitions.
+        $this->historyTaskId = null;
+        $this->historyEvents = [];
         $actor = $this->authorizeCompany();
         $this->tasks = app(OperationsPlanningService::class)->tasks($actor, $this->companyId, 30, $this->statusFilter);
         $this->loadedCompanyId = $this->companyId;
+    }
+
+    public function showHistory(string $taskId): void
+    {
+        $actor = $this->authorizeLoaded();
+        abort_unless(Str::isUuid($taskId)
+            && collect($this->tasks)->contains('id', $taskId), 404);
+        $this->historyEvents = app(OperationsPlanningService::class)
+            ->history($actor, $this->companyId, $taskId);
+        $this->historyTaskId = $taskId;
     }
 
     public function createTask(): void

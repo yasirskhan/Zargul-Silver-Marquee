@@ -371,6 +371,35 @@ SQL);
         $this->assertSame(1, DB::table('operations_plan_events')->where('task_id', $id)->count());
     }
 
+    public function test_immutable_history_is_visible_only_to_current_assigned_staff(): void
+    {
+        [$company, $foreign, , , $actors, $booking] = $this->fixture();
+        $service = app(OperationsPlanningService::class);
+        $id = (string) Str::uuid();
+        $service->create($actors['owner'][0], $company->id, $id, $booking,
+            'Internal equipment layout task', 'Initial planning note');
+        $service->setReviewed($actors['owner'][0], $company->id, $id, 1,
+            true, 'Approved internal setup review');
+        $events = $service->history($actors['owner'][0], $company->id, $id);
+        $this->assertSame([2, 1], array_column($events, 'revision'));
+        $this->assertSame('Approved internal setup review', $events[0]['reason']);
+        Livewire::test(OperationsPlanning::class)
+            ->call('showHistory', $id)->assertSee('Planning review history')
+            ->assertSee('Approved internal setup review');
+        $this->be($actors['manager'][0]);
+        $this->assertCount(2, $service->history($actors['manager'][0], $company->id, $id));
+        DB::table('hall_assignments')->where('membership_id', $actors['manager'][1]->id)->delete();
+        try {
+            $service->history($actors['manager'][0], $company->id, $id);
+            $this->fail('Revoked hall staff read private planning history.');
+        } catch (AuthorizationException) {
+            $this->assertTrue(true);
+        }
+        $this->be($actors['owner'][0]);
+        $this->expectException(AuthorizationException::class);
+        $service->history($actors['owner'][0], $foreign->id, $id);
+    }
+
     public function test_filament_planning_page_follows_role_and_company_scoping(): void
     {
         [$company, $other, , , $actors, $booking] = $this->fixture();

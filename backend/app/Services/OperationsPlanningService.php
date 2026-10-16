@@ -83,6 +83,28 @@ final class OperationsPlanningService
             ->map(fn ($row) => $this->snapshot($row))->all();
     }
 
+    /** Read-only chronological provenance, with fresh company and hall policy. */
+    public function history(User $actor, string $companyId, string $taskId, int $limit = 30): array
+    {
+        if (! Str::isUuid($taskId) || $limit < 1 || $limit > 50) {
+            throw new InvalidArgumentException('Invalid planning history request.');
+        }
+        $task = DB::table('operations_plan_tasks')->where('company_id', $companyId)
+            ->where('id', $taskId)->first(['hall_id']);
+        if (! $task) {
+            throw new AuthorizationException('Planning history is unavailable.');
+        }
+        $this->authorize($actor, $companyId, $task->hall_id);
+        return DB::table('operations_plan_events')->where('company_id', $companyId)
+            ->where('task_id', $taskId)->orderByDesc('revision')->limit($limit)
+            ->get(['revision', 'action', 'status', 'actor_id', 'reason', 'created_at'])
+            ->map(fn ($row) => [
+                'revision' => (int) $row->revision, 'action' => $row->action,
+                'status' => $row->status, 'actorId' => (int) $row->actor_id,
+                'reason' => $row->reason, 'at' => (string) $row->created_at,
+            ])->all();
+    }
+
     public function create(
         User $actor, string $companyId, string $taskId, string $bookingId,
         string $title, string $reason,
