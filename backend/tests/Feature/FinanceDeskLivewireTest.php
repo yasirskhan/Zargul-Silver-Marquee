@@ -88,6 +88,28 @@ class FinanceDeskLivewireTest extends TestCase
         $this->assertSame(0, DB::table('finance_journals')->count());
     }
 
+    public function test_finance_livewire_keys_are_stable_until_success_and_then_rotated(): void
+    {
+        [$company, , , $booking] = $this->fixture();
+        $component = Livewire::test(FinanceDesk::class);
+        $initialPreview = $component->get('previewRequestKey');
+        $initialOpen = $component->get('openingRequestKey');
+        $this->assertTrue(Str::isUuid($initialPreview));
+        $this->assertTrue(Str::isUuid($initialOpen));
+        $component->set('draftBookingId', $booking)
+            ->set('previewReason', 'Synthetic stable key test')
+            ->call('createPreview')->assertHasNoErrors();
+        $this->assertNotSame($initialPreview, $component->get('previewRequestKey'));
+        $this->assertSame($initialOpen, $component->get('openingRequestKey'));
+        $this->assertSame(1, DB::table('finance_quote_previews')->where('company_id', $company->id)->count());
+
+        $component->set('currency', 'PKR')->set('openingMinor', '500')
+            ->set('journalReason', 'Posting deliberately disabled')
+            ->call('openCash')->assertHasErrors(['journalReason']);
+        $this->assertSame($initialOpen, $component->get('openingRequestKey'));
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
     public function test_finance_authorization_blocks_manager_and_foreign_company_selector(): void
     {
         [$company, $other, $people] = $this->fixture();

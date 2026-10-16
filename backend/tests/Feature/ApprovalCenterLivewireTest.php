@@ -65,6 +65,26 @@ class ApprovalCenterLivewireTest extends TestCase
         $this->assertSame(2, DB::table('approval_alert_outbox')->count());
     }
 
+    public function test_approval_livewire_request_key_rotates_only_after_server_success(): void
+    {
+        [$company, , $members] = $this->fixture();
+        $this->be($members['admin'][0]);
+        $component = Livewire::test(ApprovalCenter::class);
+        $key = $component->get('newRequestKey');
+        $this->assertTrue(\Illuminate\Support\Str::isUuid($key));
+        $component->set('newCategory', 'expense')->set('newAmount', '0')
+            ->set('newCurrency', 'PKR')->set('newBookingId', '')
+            ->set('newReason', 'Do not create invalid expense')
+            ->call('submitRequest')->assertHasErrors(['newAmount']);
+        $this->assertSame($key, $component->get('newRequestKey'));
+        $component->set('newAmount', '250')
+            ->call('submitRequest')->assertHasNoErrors();
+        $this->assertNotSame($key, $component->get('newRequestKey'));
+        $this->assertSame($key, DB::table('approval_requests')
+            ->where('company_id', $company->id)->value('id'));
+        $this->assertSame(1, DB::table('approval_requests')->count());
+    }
+
     public function test_manager_cannot_view_other_staff_approval_or_other_company(): void
     {
         [$company, $foreign, $members] = $this->fixture();

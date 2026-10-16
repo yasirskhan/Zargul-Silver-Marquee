@@ -69,6 +69,10 @@ final class ApprovalCenter extends Page
     #[Locked]
     public ?string $telegramPairingUrl = null;
 
+    /** Retry-stable caller key; no second approval on a lost Livewire response. */
+    #[Locked]
+    public string $newRequestKey = '';
+
     public function telegramConfigured(): bool
     {
         return config('approval_alerts.enabled') === true;
@@ -204,6 +208,7 @@ final class ApprovalCenter extends Page
         abort_unless($requested === null || (is_string($requested)
             && array_key_exists($requested, $options)), 403);
         $this->companyId = $requested ?? array_key_first($options);
+        $this->newRequestKey = (string) Str::uuid();
         $this->refreshInbox();
     }
 
@@ -235,6 +240,7 @@ final class ApprovalCenter extends Page
         $this->selectedId = null;
         $this->selectedRevision = 0;
         $this->telegramPairingUrl = null;
+        $this->newRequestKey = (string) Str::uuid();
         $this->refreshInbox();
     }
 
@@ -271,7 +277,7 @@ final class ApprovalCenter extends Page
         ]);
         try {
             app(ApprovalWorkflowService::class)->request(
-                $actor, $this->companyId, (string) Str::uuid(), $this->newCategory,
+                $actor, $this->companyId, $this->newRequestKey, $this->newCategory,
                 (int) $this->newAmount, $this->newCurrency,
                 $this->newBookingId === '' ? null : $this->newBookingId, $this->newReason,
             );
@@ -280,6 +286,7 @@ final class ApprovalCenter extends Page
         }
         $this->newReason = '';
         $this->newAmount = '';
+        $this->newRequestKey = (string) Str::uuid();
         $this->refreshInbox();
     }
 

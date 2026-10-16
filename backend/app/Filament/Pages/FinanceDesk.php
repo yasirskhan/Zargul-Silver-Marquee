@@ -43,6 +43,26 @@ final class FinanceDesk extends Page
     #[Locked]
     public ?array $lastCloseResult = null;
 
+    #[Locked]
+    public string $previewRequestKey = '';
+
+    #[Locked]
+    public string $openingRequestKey = '';
+
+    #[Locked]
+    public string $reversalRequestKey = '';
+
+    #[Locked]
+    public string $closeoutRequestKey = '';
+
+    private function initializeKeys(): void
+    {
+        $this->previewRequestKey = (string) Str::uuid();
+        $this->openingRequestKey = (string) Str::uuid();
+        $this->reversalRequestKey = (string) Str::uuid();
+        $this->closeoutRequestKey = (string) Str::uuid();
+    }
+
     public string $draftBookingId = '';
 
     public string $previewReason = '';
@@ -117,6 +137,7 @@ final class FinanceDesk extends Page
         abort_unless(static::canAccess(), 403);
         $this->companyId = array_key_first($this->companyOptions());
         $this->closeDate = now('UTC')->toDateString();
+        $this->initializeKeys();
         $this->refresh();
     }
 
@@ -146,6 +167,7 @@ final class FinanceDesk extends Page
         $this->draftBookingId = '';
         $this->lastCloseResult = null;
         $this->currency = '';
+        $this->initializeKeys();
         $this->refresh();
     }
 
@@ -171,13 +193,14 @@ final class FinanceDesk extends Page
         abort_unless($booking !== null, 404);
         try {
             app(FinanceControlService::class)->preview(
-                $actor, $this->companyId, (string) Str::uuid(), $this->draftBookingId,
+                $actor, $this->companyId, $this->previewRequestKey, $this->draftBookingId,
                 (int) $booking->revision, $this->previewReason
             );
         } catch (InvalidArgumentException | ConflictHttpException $error) {
             throw ValidationException::withMessages(['previewReason' => $error->getMessage()]);
         }
         $this->previewReason = '';
+        $this->previewRequestKey = (string) Str::uuid();
         $this->refresh();
     }
 
@@ -192,7 +215,7 @@ final class FinanceDesk extends Page
         ]);
         try {
             app(FinanceControlService::class)->openCash(
-                $actor, $this->companyId, (string) Str::uuid(), $this->currency,
+                $actor, $this->companyId, $this->openingRequestKey, $this->currency,
                 (int) $this->openingMinor, $this->journalReason
             );
         } catch (InvalidArgumentException | ConflictHttpException $error) {
@@ -200,6 +223,7 @@ final class FinanceDesk extends Page
         }
         $this->openingMinor = '';
         $this->journalReason = '';
+        $this->openingRequestKey = (string) Str::uuid();
         $this->refresh();
     }
 
@@ -210,13 +234,14 @@ final class FinanceDesk extends Page
         $this->validate(['reversalReason' => ['required', 'string', 'min:3', 'max:500']]);
         try {
             app(FinanceControlService::class)->reverseOpening(
-                $actor, $this->companyId, (string) Str::uuid(),
+                $actor, $this->companyId, $this->reversalRequestKey,
                 $journalId, $this->reversalReason
             );
         } catch (InvalidArgumentException | ConflictHttpException $error) {
             throw ValidationException::withMessages(['reversalReason' => $error->getMessage()]);
         }
         $this->reversalReason = '';
+        $this->reversalRequestKey = (string) Str::uuid();
         $this->refresh();
     }
 
@@ -232,13 +257,14 @@ final class FinanceDesk extends Page
         ]);
         try {
             $this->lastCloseResult = app(FinanceControlService::class)->closeCash(
-                $actor, $this->companyId, (string) Str::uuid(), $this->currency,
+                $actor, $this->companyId, $this->closeoutRequestKey, $this->currency,
                 $this->closeDate, (int) $this->countedMinor, $this->closeReason
             );
         } catch (InvalidArgumentException | ConflictHttpException $error) {
             throw ValidationException::withMessages(['closeReason' => $error->getMessage()]);
         }
         $this->closeReason = '';
+        $this->closeoutRequestKey = (string) Str::uuid();
         $this->refresh();
     }
 }
