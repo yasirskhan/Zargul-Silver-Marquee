@@ -136,6 +136,32 @@ final class FinanceControlService
             ->get()->map(fn ($row) => $this->previewSummary($row))->all();
     }
 
+    /** Company-scoped, policy-checked immutable ledger history; no customer finance. */
+    public function journals(User $actor, string $companyId, int $limit = 30): array
+    {
+        $this->authorize($actor, $companyId);
+        if ($limit < 1 || $limit > 50) {
+            throw new InvalidArgumentException('Invalid ledger history page size.');
+        }
+        return DB::table('finance_journals')->where('company_id', $companyId)
+            ->orderByDesc('created_at')->orderByDesc('id')->limit($limit)
+            ->get(['id', 'entry_type', 'currency_code', 'amount_minor', 'reversal_of'])
+            ->map(fn ($row) => (array) $row)->all();
+    }
+
+    /** Company-scoped, policy-checked UTC cash-count history; no payout actions. */
+    public function closeouts(User $actor, string $companyId, int $limit = 30): array
+    {
+        $this->authorize($actor, $companyId);
+        if ($limit < 1 || $limit > 50) {
+            throw new InvalidArgumentException('Invalid closeout history page size.');
+        }
+        return DB::table('finance_cash_closeouts')->where('company_id', $companyId)
+            ->orderByDesc('close_date')->orderByDesc('created_at')->orderByDesc('id')->limit($limit)
+            ->get(['id', 'close_date', 'currency_code', 'expected_minor',
+                'counted_minor', 'variance_minor'])->map(fn ($row) => (array) $row)->all();
+    }
+
     private function previewSummary(object $row): array
     {
         return ['id' => $row->id, 'status' => 'internal_nonbinding',

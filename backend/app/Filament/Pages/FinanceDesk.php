@@ -153,15 +153,8 @@ final class FinanceDesk extends Page
     {
         $actor = $this->authorizeCompany();
         $this->previews = app(FinanceControlService::class)->previews($actor, $this->companyId);
-        $this->journals = DB::table('finance_journals')->where('company_id', $this->companyId)
-            ->orderByDesc('created_at')->orderByDesc('id')->limit(30)
-            ->get(['id', 'entry_type', 'currency_code', 'amount_minor', 'reversal_of'])
-            ->map(fn ($row) => (array) $row)->all();
-        $this->closeouts = DB::table('finance_cash_closeouts')
-            ->where('company_id', $this->companyId)
-            ->orderByDesc('close_date')->limit(30)
-            ->get(['id', 'close_date', 'currency_code', 'expected_minor',
-                'counted_minor', 'variance_minor'])->map(fn ($row) => (array) $row)->all();
+        $this->journals = app(FinanceControlService::class)->journals($actor, $this->companyId);
+        $this->closeouts = app(FinanceControlService::class)->closeouts($actor, $this->companyId);
         $this->loadedCompanyId = $this->companyId;
     }
 

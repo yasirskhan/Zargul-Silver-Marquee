@@ -297,6 +297,44 @@ SQL);
             $booking, 2, 'Unverified owner attempted preview');
     }
 
+    public function test_financial_histories_enforce_active_company_membership_and_bounded_reads(): void
+    {
+        [$company, $other, , $people] = $this->fixture();
+        config()->set('finance_controls.posting_enabled', true);
+        $service = app(FinanceControlService::class);
+        $opening = (string) Str::uuid();
+        $service->openCash($people['owner'], $company->id, $opening, 'PKR', 1200,
+            'Synthetic history scope test');
+        $close = (string) Str::uuid();
+        $service->closeCash($people['owner'], $company->id, $close, 'PKR',
+            now('UTC')->toDateString(), 1200, 'History read boundary');
+        $this->assertSame($opening, $service->journals($people['owner'], $company->id)[0]['id']);
+        $this->assertSame($close, $service->closeouts($people['owner'], $company->id)[0]['id']);
+        try {
+            $service->journals($people['owner'], $other->id);
+            $this->fail('Cross-tenant journals were visible.');
+        } catch (AuthorizationException) {
+            $this->assertTrue(true);
+        }
+        try {
+            $service->closeouts($people['owner'], $other->id);
+            $this->fail('Cross-tenant closeouts were visible.');
+        } catch (AuthorizationException) {
+            $this->assertTrue(true);
+        }
+        foreach (['journals', 'closeouts'] as $method) {
+            try {
+                $service->{$method}($people['owner'], $company->id, 51);
+                $this->fail('Unbounded finance history was accepted.');
+            } catch (InvalidArgumentException) {
+                $this->assertTrue(true);
+            }
+        }
+        $this->be($people['manager']);
+        $this->expectException(AuthorizationException::class);
+        $service->journals($people['manager'], $company->id);
+    }
+
     public function test_immutability_applies_to_frozen_quote_and_cash_closeout(): void
     {
         [$company, , , $people, $booking] = $this->fixture();

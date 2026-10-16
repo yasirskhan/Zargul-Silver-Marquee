@@ -1,3 +1,6 @@
+## 2026-10-16 FIN-001/002/003 READ-BOUNDARY HARDENING — HOSTED CI PENDING
+- Branch live baseline 3ca4d8853e6499ca5ebbfdb48e869a9fa7227725 hosted CI 38846827433 SUCCESS. Current batch routes finance journals and closeout history through policy-checked FinanceControlService methods, in addition to already protected preview listings; bounds query limits and orders stable. Livewire panel no longer performs its own direct finance history reads. Adds real PostgreSQL same-tenant, manager and foreign-company authorization and upper-bound regression tests. Finance customer invoices/deposits/custody remain gated OFF; no real payments, refunds or completed OPS-001 claimed. Exact-SHA CI pending until verified.
+
 # AI HANDOFF — Zargul Silver Marquee / VenueDesk
 
 Last verified at: 2026-10-16 UTC
