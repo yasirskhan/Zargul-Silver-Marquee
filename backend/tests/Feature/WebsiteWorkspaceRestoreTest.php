@@ -67,5 +67,10 @@ class WebsiteWorkspaceRestoreTest extends TestCase
             ->call('restorePublishedRevision', $first)->assertHasNoErrors();
         $this->assertSame($first, DB::table('site_pages')->where('id', $page)->value('published_revision_id'));
         $this->assertSame(3, (int) DB::table('site_pages')->where('id', $page)->value('draft_revision'));
+        $editor->set('reason', 'Revoked publisher attempt must fail');
+        DB::table('company_memberships')->where('company_id', $company->id)
+            ->where('user_id', $owner->id)->update(['is_active' => false]);
+        $editor->call('unpublishCurrentPage')->assertForbidden();
+        $this->assertSame($first, DB::table('site_pages')->where('id', $page)->value('published_revision_id'));
     }
 }

@@ -278,6 +278,15 @@ class SitePagePublishingServiceTest extends TestCase
         $service->unpublish($owner, $company->id, $pageId, $requestId,
             $first, 'Temporarily take published page offline');
         $this->assertSame(1, DB::table('audit_events')->where('action', 'website.unpublished')->count());
+        $privateRevision = DB::table('site_page_revisions')->where('page_id', $pageId)
+            ->where('revision_number', 2)->value('id');
+        try {
+            $service->restorePublishedRevision($owner, $company->id, $pageId,
+                $privateRevision, null, 'Unsafe unseen draft restore');
+            $this->fail('Never-published draft was restored while page offline.');
+        } catch (InvalidArgumentException) {
+            $this->assertTrue(true);
+        }
         try {
             $service->unpublish($owner, $company->id, $pageId, $requestId,
                 $first, 'Conflicting replay reason');
