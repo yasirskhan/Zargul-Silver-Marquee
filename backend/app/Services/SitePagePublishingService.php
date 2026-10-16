@@ -74,6 +74,7 @@ final class SitePagePublishingService
 
         return DB::transaction(function () use ($actor, $companyId, $pageId, $expectedDraftRevision, $reason): string {
             $page = $this->pageForUpdate($companyId, $pageId);
+            $this->authorize($actor, $companyId, true);
             if ($expectedDraftRevision < 1 || (int) $page->draft_revision !== $expectedDraftRevision) {
                 throw new ConflictHttpException('Stale website draft; reload before publishing.');
             }
@@ -204,6 +205,7 @@ final class SitePagePublishingService
 
         return DB::transaction(function () use ($actor, $companyId, $pageId, $targetRevisionId, $expectedPublishedRevisionId, $reason): string {
             $page = $this->pageForUpdate($companyId, $pageId);
+            $this->authorize($actor, $companyId, true);
             if ($page->published_revision_id !== $expectedPublishedRevisionId) {
                 throw new ConflictHttpException('Published snapshot changed; reload before restoring.');
             }

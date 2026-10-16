@@ -70,6 +70,36 @@ class SitePagePublishingServiceTest extends TestCase
         $this->assertSame(3, DB::table('audit_events')->count());
     }
 
+    public function test_revoked_publisher_cannot_publish_or_restore_previous_site_content(): void
+    {
+        [$company, $owner, $pageId] = $this->setupWebsite('revoked-publisher');
+        $this->be($owner);
+        $service = $this->service();
+        $service->saveDraft($owner, $company->id, $pageId, $this->content('Approved initial'), 0, 'Initial draft');
+        $first = $service->publish($owner, $company->id, $pageId, 1, 'First publish');
+        $service->saveDraft($owner, $company->id, $pageId, $this->content('Second approved'), 1, 'Next draft');
+        $second = $service->publish($owner, $company->id, $pageId, 2, 'Second publish');
+        $membership = CompanyMembership::query()->where('company_id', $company->id)
+            ->where('user_id', $owner->id)->firstOrFail();
+        $membership->update(['is_active' => false]);
+        try {
+            $service->restorePublishedRevision($owner, $company->id, $pageId,
+                $first, $second, 'Unauthorized restore after revocation');
+            $this->fail('Revoked publisher restored a public page.');
+        } catch (AuthorizationException) {
+            $this->assertTrue(true);
+        }
+        try {
+            $service->publish($owner, $company->id, $pageId, 2,
+                'Unauthorized publish retry after revocation');
+            $this->fail('Revoked publisher retried publication.');
+        } catch (AuthorizationException) {
+            $this->assertTrue(true);
+        }
+        $this->assertSame($second, DB::table('site_pages')->where('id', $pageId)->value('published_revision_id'));
+        $this->assertSame(2, DB::table('site_publishing_events')->count());
+    }
+
     public function test_two_editors_cannot_silently_overwrite_a_stale_draft(): void
     {
         [$company, $owner, $pageId] = $this->setupWebsite();

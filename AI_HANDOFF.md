@@ -1,3 +1,6 @@
+## 2026-10-16 CMS-004/005 PUBLISH/RESTORE REAUTHORIZATION HARDENING — CI PENDING
+- Based on live VERIFIED HEAD 96efe4d3d15abf779891896756e07143ad26c8ad, hosted CI 38915701161 SUCCESS. Rechecks active publisher authorization inside locked publication and restoration transactions, mirroring already existing unpublish lock-time authorization. Adds PostgreSQL regression showing revoked owner cannot publish/replay or restore a previously published page; page pointer and immutable event count unaffected. All real customer/payment/public deployment gates unchanged. Requirement register remains partial. Exact SHA four-job CI required.
+
 ## 2026-10-16 CMS-004/005 OFFLINE RESTORE SECURITY REGRESSIONS — CI PENDING
 - Adds PostgreSQL proof that an unpublished newer draft cannot be restored while the current public page pointer is NULL (restore requires prior publication event), plus Livewire test that an already-mounted publisher loses unpublish permission immediately when membership is revoked. No test weakening and no new scope; the existing company-scoped CAS service remains authoritative. Previous source df5ce2306faa678b80ff73b312ee0f219f992548 CI 38915444968 under verification. Verify new exact SHA all four hosted jobs before marking this security refinement green.
 
