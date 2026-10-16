@@ -1,3 +1,6 @@
+## 2026-10-16 OPS-001 REGRESSION FIXUP — CI PENDING
+- Fix real operations PostgreSQL test fixture PL/pgSQL dollar quoting ($$) in audit rejection trigger. Update Livewire test to use collision-free taskTitle input after Filament Page static title repair. Assertions preserved, production audit behavior unchanged. Previous CI 38852194203 failed before tests in Composer fatal; exact new SHA required.
+
 ## 2026-10-16 OPS-001 FILAMENT PROPERTY COLLISION REPAIR — EXACT SHA CI PENDING
 - Live source e362e0fb258901075130782dea68107c98b02a26, run 38852194203 failed in real PostgreSQL and authenticated-panel E2E during Composer autoload because OperationsPlanning declared public instance $title conflicting with static Filament BasePage::$title. Renamed solely the Livewire task input to taskTitle in page, validation and Blade, preserving all server-side policy/audit and planning rules. Exact new source CI must be green before declaring OPS foundation verified.
 

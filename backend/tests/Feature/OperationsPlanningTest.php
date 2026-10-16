@@ -201,7 +201,7 @@ SQL);
         Livewire::test(OperationsPlanning::class)
             ->assertSee('Internal planning checklist only')
             ->set('bookingId', $booking)
-            ->set('title', 'Review stage lighting plan')
+            ->set('taskTitle', 'Review stage lighting plan')
             ->set('reason', 'For internal setup planning')
             ->call('createTask')->assertHasNoErrors()
             ->assertSee('Review stage lighting plan');
