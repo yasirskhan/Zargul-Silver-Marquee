@@ -94,6 +94,29 @@ class WebsiteWorkspaceBrandingTest extends TestCase
         $editor->assertSet('expectedBrandingRevision', 1);
     }
 
+    public function test_owner_can_request_private_dns_proof_but_editor_cannot(): void
+    {
+        [$company, , $site] = $this->fixture();
+        $owner = Livewire::test(WebsiteWorkspace::class)
+            ->assertSee('Domain ownership')
+            ->set('domainCandidate', 'owner.marquee.org')
+            ->set('domainReason', 'Confirm control of venue website domain')
+            ->call('requestDomainOwnership')->assertHasNoErrors()
+            ->assertSee('_venuedesk-verification.owner.marquee.org')
+            ->assertSee('venuedesk-verification=')
+            ->assertSee('operator approval');
+        $this->assertSame('pending', DB::table('site_domain_claims')->where('website_id', $site)->value('status'));
+        $this->assertSame(1, DB::table('audit_events')->where('action', 'website.domain_claim_requested')->count());
+        $this->assertFalse((bool) config('public_site.enabled'));
+
+        // Revoked membership on the same mounted Livewire editor is forbidden.
+        $actorId = DB::table('site_domain_claims')->where('website_id', $site)->value('requested_by');
+        DB::table('company_memberships')->where('company_id', $company->id)
+            ->where('user_id', $actorId)->update(['can_publish_site' => false, 'role' => 'manager']);
+        $owner->call('verifyDomainOwnership')->assertForbidden();
+        $this->assertSame('pending', DB::table('site_domain_claims')->where('website_id', $site)->value('status'));
+    }
+
     public function test_owner_cannot_publish_unsaved_branding_form_changes(): void
     {
         [, , $site] = $this->fixture();

@@ -1,0 +1,158 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Company;
+use App\Models\CompanyMembership;
+use App\Models\User;
+use App\Services\SiteDomainOwnershipService;
+use App\Services\SiteDomainTxtResolver;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use InvalidArgumentException;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+use Tests\TestCase;
+
+class SiteDomainOwnershipServiceTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private function fixture(string $slug = 'domain-venue', bool $publisher = true): array
+    {
+        $company = Company::create(['name' => $slug, 'slug' => $slug]);
+        $user = User::create([
+            'name' => 'DNS Publisher', 'email' => $slug.'@example.test', 'password' => 'synthetic-only',
+        ]);
+        $user->markEmailAsVerified();
+        CompanyMembership::create([
+            'company_id' => $company->id, 'user_id' => $user->id,
+            'role' => $publisher ? 'owner' : 'manager', 'can_edit_site' => ! $publisher,
+        ]);
+        $websiteId = (string) Str::uuid();
+        DB::table('websites')->insert([
+            'id' => $websiteId, 'company_id' => $company->id, 'name' => $slug,
+        ]);
+        $this->be($user);
+
+        return [$company, $user, $websiteId];
+    }
+
+    private function resolver(): SiteDomainTxtResolver
+    {
+        $resolver = new class extends SiteDomainTxtResolver {
+            public array $answers = [];
+
+            public function lookupTxt(string $name): array
+            {
+                return $this->answers[$name] ?? [];
+            }
+        };
+        $this->app->instance(SiteDomainTxtResolver::class, $resolver);
+        return $resolver;
+    }
+
+    public function test_owner_proves_exact_dns_txt_but_cannot_auto_launch_public_website(): void
+    {
+        [$company, $owner, $site] = $this->fixture();
+        $resolver = $this->resolver();
+        $service = app(SiteDomainOwnershipService::class);
+        $this->assertFalse((bool) config('public_site.enabled'));
+        $this->assertFalse((bool) config('public_site.indexing_enabled'));
+
+        $challenge = $service->request($owner, $company->id, $site,
+            'marquee.example.org', 'Prepare private domain proof');
+        $this->assertSame('_venuedesk-verification.marquee.example.org', $challenge['txtName']);
+        $this->assertStringStartsWith('venuedesk-verification=', $challenge['txtValue']);
+        $this->assertSame(40, strlen(substr($challenge['txtValue'], strlen('venuedesk-verification='))));
+        $this->assertSame('pending', DB::table('site_domain_claims')->value('status'));
+        $record = DB::table('site_domain_claims')->first();
+        $this->assertNotSame($challenge['txtValue'], $record->token_hash);
+        $this->assertSame(hash('sha256', substr($challenge['txtValue'], strlen('venuedesk-verification='))),
+            $record->token_hash);
+        $audits = json_encode(DB::table('audit_events')->get()->all(), JSON_THROW_ON_ERROR);
+        $this->assertStringNotContainsString($challenge['txtValue'], $audits);
+
+        $resolver->answers[$challenge['txtName']] = ['venuedesk-verification=incorrect'];
+        try {
+            $service->verify($owner, $company->id, $site,
+                $challenge['domain'], 'Confirm owner DNS record');
+            $this->fail('Wrong DNS challenge was accepted.');
+        } catch (ConflictHttpException) {
+            $this->assertSame('pending', DB::table('site_domain_claims')->value('status'));
+        }
+        $resolver->answers[$challenge['txtName']] = [$challenge['txtValue']];
+        $service->verify($owner, $company->id, $site, $challenge['domain'], 'Confirm owner DNS record');
+        $this->assertSame('verified', DB::table('site_domain_claims')->value('status'));
+        $this->assertSame($owner->id, (int) DB::table('site_domain_claims')->value('verified_by'));
+        $this->assertSame(1, DB::table('audit_events')->where('action', 'website.domain_ownership_verified')->count());
+        $this->assertFalse((bool) config('public_site.enabled'));
+        $this->assertFalse((bool) config('public_site.indexing_enabled'));
+        $this->assertSame('', config('public_site.host'));
+        $this->assertNull(DB::table('websites')->where('id', $site)->value('branding_published_revision_id'));
+    }
+
+    public function test_unverified_and_reserved_domain_claims_fail_without_persisting(): void
+    {
+        [$company, $owner, $site] = $this->fixture('invalid-dns');
+        $service = app(SiteDomainOwnershipService::class);
+        foreach (['localhost', '127.0.0.1', 'http://marquee.com',
+            'www.internal', 'x.example.test', 'marquee.com:443', '<marquee.com>'] as $invalid) {
+            try {
+                $service->request($owner, $company->id, $site, $invalid, 'Reject invalid owner domain');
+                $this->fail('Unsupported domain '.$invalid.' accepted.');
+            } catch (InvalidArgumentException) {
+                $this->assertSame(0, DB::table('site_domain_claims')->count());
+            }
+        }
+    }
+
+    public function test_editor_cannot_claim_and_other_company_cannot_take_claimed_domain(): void
+    {
+        [$company, $owner, $site] = $this->fixture('primary-domain');
+        $service = app(SiteDomainOwnershipService::class);
+        $service->request($owner, $company->id, $site, 'events.marquee.net', 'Claim private domain');
+        [$foreign, $editor, $foreignSite] = $this->fixture('foreign-domain', false);
+        try {
+            $service->request($editor, $foreign->id, $foreignSite, 'events.marquee.net', 'Forged editor request');
+            $this->fail('Unprivileged editor claimed a domain.');
+        } catch (AuthorizationException) {
+            $this->assertSame(1, DB::table('site_domain_claims')->count());
+        }
+        CompanyMembership::where('company_id', $foreign->id)->where('user_id', $editor->id)
+            ->update(['role' => 'owner', 'can_edit_site' => false]);
+        try {
+            $service->request($editor, $foreign->id, $foreignSite,
+                'events.marquee.net', 'Cross company domain takeover');
+            $this->fail('Claimed domain was stolen.');
+        } catch (ConflictHttpException) {
+            $this->assertSame(1, DB::table('site_domain_claims')->count());
+        }
+        $this->assertSame($company->id, DB::table('site_domain_claims')->value('company_id'));
+    }
+
+    public function test_expired_and_rotated_dns_tokens_cannot_be_verified(): void
+    {
+        [$company, $owner, $site] = $this->fixture('rotate-domain');
+        $resolver = $this->resolver();
+        $service = app(SiteDomainOwnershipService::class);
+        $original = $service->request($owner, $company->id, $site, 'silver-marquee.com', 'Initial challenge');
+        $rotated = $service->request($owner, $company->id, $site, 'silver-marquee.com', 'Rotate old challenge');
+        $resolver->answers[$original['txtName']] = [$original['txtValue']];
+        try {
+            $service->verify($owner, $company->id, $site, 'silver-marquee.com', 'Reject old TXT token');
+            $this->fail('Previously rotated DNS token was accepted.');
+        } catch (ConflictHttpException) {
+            $this->assertSame('pending', DB::table('site_domain_claims')->value('status'));
+        }
+        $resolver->answers[$rotated['txtName']] = [$rotated['txtValue']];
+        DB::table('site_domain_claims')->update(['expires_at' => now()->subMinute()]);
+        try {
+            $service->verify($owner, $company->id, $site, 'silver-marquee.com', 'Expired domain proof');
+            $this->fail('Expired domain challenge was accepted.');
+        } catch (ConflictHttpException) {
+            $this->assertSame('pending', DB::table('site_domain_claims')->value('status'));
+        }
+    }
+}

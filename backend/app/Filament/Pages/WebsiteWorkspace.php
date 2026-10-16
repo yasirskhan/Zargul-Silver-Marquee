@@ -6,6 +6,7 @@ use App\Models\SitePage;
 use App\Models\User;
 use App\Services\SiteBrandingService;
 use App\Services\SiteBrandingValidator;
+use App\Services\SiteDomainOwnershipService;
 use App\Services\SiteMediaService;
 use App\Services\SitePagePublishingService;
 use App\Services\SiteWorkspaceService;
@@ -63,6 +64,19 @@ final class WebsiteWorkspace extends Page
     public array $branding = [];
 
     public string $brandingReason = '';
+
+    /** Private DNS ownership workflow. Never enables public routing. */
+    public string $domainCandidate = '';
+    public string $domainReason = '';
+
+    #[Locked]
+    public ?string $domainChallengeName = null;
+
+    #[Locked]
+    public ?string $domainChallengeValue = null;
+
+    #[Locked]
+    public ?string $domainChallengeExpiresAt = null;
 
     #[Locked]
     public ?string $loadedPageId = null;
@@ -245,6 +259,9 @@ final class WebsiteWorkspace extends Page
             ->where('is_active', true)->first();
         abort_unless($site, 404);
 
+        $this->domainChallengeName = null;
+        $this->domainChallengeValue = null;
+        $this->domainChallengeExpiresAt = null;
         $this->loadedBrandingWebsiteId = $site->id;
         $this->loadedBrandingCompanyId = $site->company_id;
         $this->expectedBrandingRevision = (int) $site->branding_draft_revision;
@@ -321,6 +338,53 @@ final class WebsiteWorkspace extends Page
             $paths[] = $path;
         }
         $this->branding['navigationOrder'] = $paths;
+    }
+
+    /** The domain remains operator-gated even after a positive DNS proof. */
+    public function requestDomainOwnership(): void
+    {
+        [$actor, $page] = $this->authorizeBranding('publish');
+        $this->validate([
+            'domainCandidate' => ['required', 'string', 'max:253'],
+            'domainReason' => ['required', 'string', 'min:3', 'max:500'],
+        ]);
+        $claim = app(SiteDomainOwnershipService::class)->request(
+            $actor, $page->company_id, $page->website_id,
+            $this->domainCandidate, $this->domainReason
+        );
+        $this->domainCandidate = $claim['domain'];
+        $this->domainChallengeName = $claim['txtName'];
+        $this->domainChallengeValue = $claim['txtValue'];
+        $this->domainChallengeExpiresAt = $claim['expiresAt'];
+        $this->domainReason = '';
+        Notification::make()->title('Private DNS TXT ownership challenge created')->success()->send();
+    }
+
+    public function verifyDomainOwnership(): void
+    {
+        [$actor, $page] = $this->authorizeBranding('publish');
+        $this->validate([
+            'domainCandidate' => ['required', 'string', 'max:253'],
+            'domainReason' => ['required', 'string', 'min:3', 'max:500'],
+        ]);
+        app(SiteDomainOwnershipService::class)->verify(
+            $actor, $page->company_id, $page->website_id,
+            $this->domainCandidate, $this->domainReason
+        );
+        $this->domainChallengeValue = null;
+        $this->domainReason = '';
+        Notification::make()->title('DNS ownership verified; operator approval is still required for public release')->success()->send();
+    }
+
+    public function verifiedDomainClaims(): array
+    {
+        if (! $this->canPublishCurrentPage()) {
+            return [];
+        }
+        [, $page] = $this->authorizeBranding('publish');
+        return DB::table('site_domain_claims')->where('company_id', $page->company_id)
+            ->where('website_id', $page->website_id)
+            ->where('status', 'verified')->orderBy('domain')->pluck('domain')->all();
     }
 
     public function saveBrandingDraft(): void

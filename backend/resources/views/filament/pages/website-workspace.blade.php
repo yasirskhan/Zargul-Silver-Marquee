@@ -155,6 +155,41 @@
                         placeholder="Describe your venue in up to 160 characters"></textarea>
                     <span class="text-xs">Appears in search metadata only after separate branding publication. Indexing still requires operator approval.</span>
                 </label>
+                @if ($this->canPublishCurrentPage())
+                    <section class="space-y-3 rounded-lg border p-3" aria-label="Private domain ownership">
+                        <h3 class="font-semibold">Domain ownership</h3>
+                        <p class="text-sm">Verify that you control a public DNS domain. Verification does not turn on the public website, publish drafts, or permit search indexing. Public launch still needs separate operator approval.</p>
+                        <label class="block space-y-1">
+                            <span class="text-sm font-medium">Public domain name only (no https://)</span>
+                            <input type="text" wire:model="domainCandidate" maxlength="253"
+                                placeholder="events.yourdomain.com" class="w-full rounded border p-2 text-gray-900">
+                        </label>
+                        @error('domainCandidate') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                        <label class="block space-y-1">
+                            <span class="text-sm font-medium">Reason for domain ownership request</span>
+                            <textarea wire:model="domainReason" maxlength="500" rows="2"
+                                class="w-full rounded border p-2 text-gray-900"></textarea>
+                        </label>
+                        @error('domainReason') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" wire:click="requestDomainOwnership"
+                                wire:loading.attr="disabled" class="rounded border px-3 py-2">Create DNS TXT proof</button>
+                            <button type="button" wire:click="verifyDomainOwnership"
+                                wire:loading.attr="disabled" class="rounded border px-3 py-2">Verify DNS TXT proof</button>
+                        </div>
+                        @if ($domainChallengeName && $domainChallengeValue)
+                            <div class="space-y-1 rounded border p-3" aria-label="Private DNS verification instructions">
+                                <p class="text-sm">Create a TXT record in your DNS provider:</p>
+                                <p class="text-sm">Name: <code class="break-all">{{ $domainChallengeName }}</code></p>
+                                <p class="text-sm">Value: <code class="break-all">{{ $domainChallengeValue }}</code></p>
+                                <p class="text-xs">Challenge expires: {{ $domainChallengeExpiresAt }}. The value is displayed only while this private editing session is open. Requesting a new challenge invalidates the previous one.</p>
+                            </div>
+                        @endif
+                        @if (count($this->verifiedDomainClaims()))
+                            <p class="text-sm">Verified DNS ownership only: {{ implode(', ', $this->verifiedDomainClaims()) }}. Public release is still disabled until separately approved.</p>
+                        @endif
+                    </section>
+                @endif
                 <div class="space-y-3" role="region" aria-label="Branding draft appearance">
                     <div role="group" aria-label="Branding preview screen size" class="flex flex-wrap gap-2">
                         <button type="button" wire:click="setPreviewMode('desktop')" class="rounded border px-3 py-2" aria-pressed="{{ $previewMode === 'desktop' ? 'true' : 'false' }}">Desktop branding</button>
