@@ -1,3 +1,6 @@
+## 2026-10-16 SLOT-002 PROGRAM SWITCH REGRESSION — HOSTED CI PENDING
+- Added further Livewire regression proving that changing from morning to noon invalidates the previous nonbinding amount, recalculates from saved noon rules and clears projected results on invalid subsequent input. Updated SLOT-002 register to distinguish the exact verified saved-rules foundation from this unverified UX hardening; no fee posting or extension authorization. Previous repair source 9a84aa6a2c146df04aa8228a79cd7233b86f9e2c, CI 38870003585 was still running at commit creation. New exact-SHA four-job CI required.
+
 ## 2026-10-16 SLOT-002 STALE OVERTIME PREVIEW DISPLAY SAFETY — CI PENDING
 - Previous source a865b7ff60c04a0017cefaea1042678fb954b95e GitHub Actions 38864328201 SUCCESS all four jobs. Filament now clears a previously computed nonbinding overtime amount whenever session/end input changes and BEFORE validation, so invalid new inputs cannot leave a stale amount visible. Added real Livewire regression covering changed inputs and failed time validation. No ledger, booking, customer claim, extension authority or MFA policy changed. Verify new exact SHA four-job CI.
 

@@ -152,6 +152,11 @@ class HallOvertimePreviewServiceTest extends TestCase
             ->assertDontSee('5000 minor units');
         $component->call('calculateOvertimePreview')->assertHasNoErrors()
             ->assertSee('5000 minor units');
+        $component->set('overtimeProgram', 'noon')
+            ->assertDontSee('5000 minor units')
+            ->set('overtimeObservedEnd', '15:16')
+            ->call('calculateOvertimePreview')->assertHasNoErrors()
+            ->assertSee('5000 minor units');
         $component->set('overtimeObservedEnd', '25:00')
             ->call('calculateOvertimePreview')->assertHasErrors(['overtimeObservedEnd'])
             ->assertDontSee('5000 minor units');
