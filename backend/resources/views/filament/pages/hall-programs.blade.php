@@ -123,6 +123,71 @@
                     @endif
                 </section>
             @endif
+
+            <section class="space-y-4 rounded-xl border p-4" aria-label="Hall seating and extra-unit pricing">
+                <h2 class="text-lg font-semibold">Guest capacity, chairs and tables</h2>
+                <p class="text-sm">Seating pricing revision: {{ $expectedSeatingRevision }}.
+                    {{ $expectedSeatingRevision ? 'Approved configuration saved.' : 'Additional seating prices are not configured.' }}
+                </p>
+                <p class="text-xs">Included chairs and tables are covered by venue setup. Additional item rates are per unit, in integer currency minor units. Guest capacity is a maximum, never an authorization to overbook. These rules do not create a quotation or invoice.</p>
+                @if ($this->canConfigureSelectedHall())
+                    <form wire:submit="saveSeating" class="space-y-4">
+                        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                            @foreach ([
+                                'capacity' => 'Maximum guests',
+                                'includedChairs' => 'Chairs included',
+                                'includedTables' => 'Tables included',
+                                'extraChairRateMinor' => 'Additional chair price (minor units)',
+                                'extraTableRateMinor' => 'Additional table price (minor units)',
+                            ] as $field => $label)
+                                <label class="block space-y-2">
+                                    <span class="text-sm font-medium">{{ $label }}</span>
+                                    <input type="number" min="{{ $field === 'capacity' ? 1 : 0 }}" step="1"
+                                        wire:model.number="seating.{{ $field }}"
+                                        class="w-full rounded-lg border p-3 text-gray-900" required>
+                                    @error("seating.$field") <span class="block text-sm text-red-600">{{ $message }}</span> @enderror
+                                </label>
+                            @endforeach
+                            <label class="block space-y-2">
+                                <span class="text-sm font-medium">Seating rate currency code</span>
+                                <input type="text" maxlength="3" autocomplete="off" placeholder="e.g. PKR"
+                                    wire:model="seatingCurrencyCode"
+                                    class="w-full rounded-lg border p-3 text-gray-900" required>
+                                @error('seatingCurrencyCode') <span class="block text-sm text-red-600">{{ $message }}</span> @enderror
+                            </label>
+                        </div>
+                        <label class="block space-y-2">
+                            <span class="text-sm font-medium">Reason for seating or rate change</span>
+                            <textarea wire:model="seatingReason" rows="2" maxlength="500" required
+                                class="w-full rounded-lg border p-3 text-gray-900"></textarea>
+                            @error('seatingReason') <span class="block text-sm text-red-600">{{ $message }}</span> @enderror
+                        </label>
+                        @error('seating') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                        <button type="submit" class="rounded-lg bg-emerald-700 px-4 py-3 font-medium text-white">Save seating rules</button>
+                        <p class="text-xs">Saved seating prices and times have independent revision histories. Reload if someone else has saved changes.</p>
+                    </form>
+                @else
+                    <div class="space-y-2 text-sm">
+                        <p>Assigned hall seating is read-only.</p>
+                        @if ($expectedSeatingRevision)
+                            <p>Currency: {{ $seatingCurrencyCode }}</p>
+                            <dl class="grid gap-3 sm:grid-cols-2">
+                                @foreach ([
+                                    'capacity' => 'Maximum guests',
+                                    'includedChairs' => 'Included chairs',
+                                    'includedTables' => 'Included tables',
+                                    'extraChairRateMinor' => 'Extra chair rate (minor units)',
+                                    'extraTableRateMinor' => 'Extra table rate (minor units)',
+                                ] as $field => $label)
+                                    <div><dt class="font-medium">{{ $label }}</dt><dd>{{ $seating[$field] ?? '' }}</dd></div>
+                                @endforeach
+                            </dl>
+                        @else
+                            <p>Existing guest capacity: {{ $seating['capacity'] ?? '' }}. Approved additional seating prices are not available.</p>
+                        @endif
+                    </div>
+                @endif
+            </section>
         @else
             <p class="text-sm">No authorized hall is selected.</p>
         @endif

@@ -6,6 +6,7 @@ use App\Models\CompanyMembership;
 use App\Models\Hall;
 use App\Models\User;
 use App\Services\HallProgramRulesService;
+use App\Services\HallSeatingPriceService;
 use App\Services\TenantAccess;
 use BackedEnum;
 use Filament\Facades\Filament;
@@ -36,6 +37,16 @@ final class HallPrograms extends Page
     public string $currencyCode = '';
 
     public string $reason = '';
+
+    /** Separate approved seating snapshot and optimistic revision token. */
+    public array $seating = [];
+
+    public string $seatingCurrencyCode = '';
+
+    public string $seatingReason = '';
+
+    #[Locked]
+    public int $expectedSeatingRevision = 0;
 
     #[Locked]
     public ?string $loadedCompanyId = null;
@@ -183,6 +194,10 @@ final class HallPrograms extends Page
         $this->loadedCompanyId = null;
         $this->loadedHallId = null;
         $this->expectedRevision = 0;
+        $this->expectedSeatingRevision = 0;
+        $this->seating = [];
+        $this->seatingCurrencyCode = '';
+        $this->seatingReason = '';
 
         if (! $this->hallId) {
             return;
@@ -198,6 +213,21 @@ final class HallPrograms extends Page
             $this->rules = $current['rules'];
             $this->currencyCode = $current['currencyCode'];
             $this->expectedRevision = $current['revision'];
+        }
+
+        // Existing physical hall counts are visible but extra-unit prices start
+        // blank until an owner explicitly approves a priced revision.
+        $this->seating = [
+            'capacity' => (int) $hall->capacity,
+            'includedChairs' => (int) $hall->included_chairs,
+            'includedTables' => (int) $hall->included_tables,
+            'extraChairRateMinor' => '', 'extraTableRateMinor' => '',
+        ];
+        $seatingCurrent = app(HallSeatingPriceService::class)->current($actor, $hall->company_id, $hall->id);
+        if ($seatingCurrent !== null) {
+            $this->seating = $seatingCurrent['config'];
+            $this->seatingCurrencyCode = $seatingCurrent['currencyCode'];
+            $this->expectedSeatingRevision = $seatingCurrent['revision'];
         }
     }
 
@@ -240,4 +270,39 @@ final class HallPrograms extends Page
         $this->reason = '';
         Notification::make()->title('Hall program rules saved with audit history')->success()->send();
     }
+    /** Owner/admin-only extra seating and capacity settings, separate from session rules. */
+    public function saveSeating(): void
+    {
+        $actor = Filament::auth()->user();
+        $hall = $this->selectedHall();
+        abort_unless($actor instanceof User && $hall && $this->canConfigureSelectedHall()
+            && $this->loadedCompanyId === $hall->company_id && $this->loadedHallId === $hall->id, 403);
+
+        $this->validate([
+            'seating' => ['required', 'array', 'size:5'],
+            'seating.capacity' => ['required', 'integer', 'min:1', 'max:100000'],
+            'seating.includedChairs' => ['required', 'integer', 'min:0', 'max:100000'],
+            'seating.includedTables' => ['required', 'integer', 'min:0', 'max:100000'],
+            'seating.extraChairRateMinor' => ['required', 'integer', 'min:0', 'max:100000000000'],
+            'seating.extraTableRateMinor' => ['required', 'integer', 'min:0', 'max:100000000000'],
+            'seatingCurrencyCode' => ['required', 'regex:/\A[A-Z]{3}\z/'],
+            'seatingReason' => ['required', 'string', 'min:3', 'max:500'],
+        ]);
+
+        try {
+            $next = app(HallSeatingPriceService::class)->configure(
+                $actor, $hall->company_id, $hall->id, $this->seating,
+                $this->seatingCurrencyCode, $this->expectedSeatingRevision, $this->seatingReason,
+            );
+        } catch (InvalidArgumentException | ConflictHttpException $exception) {
+            throw ValidationException::withMessages([
+                'seating' => $exception->getMessage().' Reload the latest hall settings before retrying.',
+            ]);
+        }
+
+        $this->expectedSeatingRevision = $next;
+        $this->seatingReason = '';
+        Notification::make()->title('Hall seating and unit prices saved with audit history')->success()->send();
+    }
+
 }
