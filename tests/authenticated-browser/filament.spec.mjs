@@ -218,4 +218,24 @@ test('real operations MFA grants only assigned-hall search and planning on mobil
   await expect(page.getByText('Synthetic stage lighting checklist')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText('Internal planning checklist only.')).toBeVisible();
   await expect(page.getByText('browser-e2e-private@example.test')).toHaveCount(0);
+
+  // A verified operations user may inspect SAVED owner rules but cannot edit
+  // them, authorize an extension, or silently produce an invoice or payment.
+  await page.goto('/admin/hall-programs');
+  const overtime = page.locator('section[aria-label="Nonbinding overtime and turnover preview"]');
+  await expect(overtime).toBeVisible({ timeout: 30_000 });
+  await page.waitForFunction(() => Boolean(window.Livewire?.all?.().length), null, { timeout: 30_000 });
+  await expect(page.getByText('Assigned hall programs (read-only)')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save program rules' })).toHaveCount(0);
+  await overtime.getByLabel('Program to check').selectOption('morning');
+  await overtime.getByLabel('Simulated end time (same-day hall clock)').fill('11:21');
+  await overtime.getByRole('button', { name: 'Calculate nonbinding overtime safety preview' }).click();
+  await expect(overtime.getByText('TURNOVER CONFLICT: Extension must NOT be authorized.'))
+    .toBeVisible({ timeout: 25_000 });
+  await expect(overtime.getByText('Maximum simulated safe end before turnover: 11:20.'))
+    .toBeVisible();
+  await expect(overtime.getByText('Projected internal amount: PKR 0 minor units (NOT payable).'))
+    .toBeVisible();
+  await expect(page.getByText('browser-e2e-private@example.test')).toHaveCount(0);
+  await expect(page.getByText('Synthetic Browser Customer')).toHaveCount(0);
 });
