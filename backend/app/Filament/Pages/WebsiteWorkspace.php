@@ -253,6 +253,7 @@ final class WebsiteWorkspace extends Page
             'siteName' => $site->name,
             'tagline' => '',
             'footerText' => '',
+            'seoDescription' => '',
             'navigationOrder' => SiteBrandingValidator::NAVIGATION_PATHS,
             'themePreset' => 'silver',
             'fontPreset' => 'classic',
@@ -331,6 +332,7 @@ final class WebsiteWorkspace extends Page
             'branding.siteName' => ['required', 'string', 'max:120'],
             'branding.tagline' => ['present', 'string', 'max:240'],
             'branding.footerText' => ['present', 'string', 'max:240'],
+            'branding.seoDescription' => ['present', 'string', 'max:160'],
             'branding.navigationOrder' => ['required', 'array', 'min:1', 'max:9'],
             'branding.themePreset' => ['required', 'string'],
             'branding.fontPreset' => ['required', 'string'],
@@ -362,6 +364,7 @@ final class WebsiteWorkspace extends Page
         }
         if (array_replace([
             'footerText' => '',
+            'seoDescription' => '',
             'navigationOrder' => SiteBrandingValidator::NAVIGATION_PATHS,
         ], json_decode($saved, true, 512, JSON_THROW_ON_ERROR)) != $this->branding) {
             throw ValidationException::withMessages([

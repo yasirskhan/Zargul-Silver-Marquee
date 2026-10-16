@@ -148,6 +148,13 @@
                     </div>
                     @error('branding.navigationOrder') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
                 </section>
+                <label class="block space-y-1">
+                    <span class="text-sm font-medium">Search description (optional)</span>
+                    <textarea wire:model="branding.seoDescription" rows="2" maxlength="160"
+                        class="w-full rounded border p-2 text-gray-900"
+                        placeholder="Describe your venue in up to 160 characters"></textarea>
+                    <span class="text-xs">Appears in search metadata only after separate branding publication. Indexing still requires operator approval.</span>
+                </label>
                 <div class="space-y-3" role="region" aria-label="Branding draft appearance">
                     <div role="group" aria-label="Branding preview screen size" class="flex flex-wrap gap-2">
                         <button type="button" wire:click="setPreviewMode('desktop')" class="rounded border px-3 py-2" aria-pressed="{{ $previewMode === 'desktop' ? 'true' : 'false' }}">Desktop branding</button>
@@ -157,7 +164,7 @@
                     @include('filament.pages.partials.branding-preview', ['branding' => $branding, 'previewMode' => $previewMode])
                 </div>
                 @error('branding') <span role="alert" class="text-sm text-red-600">{{ $message }}</span> @enderror
-                @foreach (['siteName', 'tagline', 'footerText', 'themePreset', 'fontPreset', 'logoMediaId', 'faviconMediaId'] as $field)
+                @foreach (['siteName', 'tagline', 'footerText', 'seoDescription', 'themePreset', 'fontPreset', 'logoMediaId', 'faviconMediaId'] as $field)
                     @error('branding.'.$field) <span role="alert" class="text-sm text-red-600">{{ $message }}</span> @enderror
                 @endforeach
                 <label class="block space-y-1">

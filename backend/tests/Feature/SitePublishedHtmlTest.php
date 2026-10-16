@@ -116,6 +116,35 @@ class SitePublishedHtmlTest extends TestCase
         $this->assertStringNotContainsString('site-media/private/', $approved);
     }
 
+    public function test_seo_description_is_approved_snapshot_only_and_legacy_tagline_remains_fallback(): void
+    {
+        [$company, $owner, $site, $page] = $this->fixture();
+        $this->brand($owner, $company->id, $site);
+        $pages = app(SitePagePublishingService::class);
+        $pages->saveDraft($owner, $company->id, $page, ['sections' => [[
+            'id' => 'intro', 'type' => 'text', 'data' => ['title' => 'Venue overview'],
+        ]]], 0, 'Approve public page');
+        $pages->publish($owner, $company->id, $page, 1, 'Publish page');
+        $reader = app(SitePublishedHtmlService::class);
+
+        $legacy = $reader->render($company->id, $site, '/');
+        $this->assertStringContainsString('content="Events &amp; celebrations"', $legacy);
+        $this->assertStringContainsString('content="noindex, nofollow"', $legacy);
+
+        $brand = app(SiteBrandingService::class);
+        $draft = $brand->publishedBranding($company->id, $site);
+        $draft['seoDescription'] = 'Special occasions & private celebrations';
+        $brand->saveDraft($owner, $company->id, $site, $draft, 1, 'Propose safe search description');
+        $this->assertSame($legacy, $reader->render($company->id, $site, '/'));
+        $brand->publish($owner, $company->id, $site, 2, 'Approve search metadata');
+
+        $published = $reader->render($company->id, $site, '/');
+        $this->assertStringContainsString('content="Special occasions &amp; private celebrations"', $published);
+        $this->assertStringNotContainsString('content="Events &amp; celebrations"', $published);
+        $this->assertStringContainsString('content="noindex, nofollow"', $published);
+        $this->assertStringNotContainsString('rel="canonical"', $published);
+    }
+
     public function test_responsive_mobile_order_and_approved_image_placeholder_do_not_expose_raw_media(): void
     {
         [$company, $owner, $site, $page] = $this->fixture();

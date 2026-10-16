@@ -24,7 +24,7 @@
             ? '/_venue-media/'.$mediaPageSlug.'/' : null;
     @endphp
     <title>{{ $snapshot['page']['title'] }} | {{ $branding['siteName'] }}</title>
-    <meta name="description" content="{{ $branding['tagline'] !== '' ? $branding['tagline'] : $branding['siteName'] }}">
+    <meta name="description" content="{{ ($branding['seoDescription'] ?? '') !== '' ? $branding['seoDescription'] : ($branding['tagline'] !== '' ? $branding['tagline'] : $branding['siteName']) }}">
     @if ($canonicalUrl !== null)
         <link rel="canonical" href="{{ $canonicalUrl }}">
         <meta name="robots" content="{{ config('public_site.indexing_enabled') === true ? 'index, follow' : 'noindex, nofollow' }}">

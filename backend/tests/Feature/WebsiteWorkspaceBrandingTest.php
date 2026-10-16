@@ -54,6 +54,7 @@ class WebsiteWorkspaceBrandingTest extends TestCase
             ->set('branding.siteName', 'Zargul Silver Marquee')
             ->set('branding.tagline', 'Wedding and event venue')
             ->set('branding.footerText', 'Celebrate moments at Zargul Silver Marquee')
+            ->set('branding.seoDescription', 'Celebrate weddings and events at our silver marquee.')
             ->set('branding.themePreset', 'ivory')
             ->set('brandingReason', 'Update approved company identity')
             ->call('saveBrandingDraft')
@@ -67,6 +68,7 @@ class WebsiteWorkspaceBrandingTest extends TestCase
         $publishedId = DB::table('websites')->where('id', $site)->value('branding_published_revision_id');
         $published = json_decode(DB::table('site_branding_revisions')->where('id', $publishedId)->value('content'), true, 512, JSON_THROW_ON_ERROR);
         $this->assertSame('Celebrate moments at Zargul Silver Marquee', $published['footerText']);
+        $this->assertSame('Celebrate weddings and events at our silver marquee.', $published['seoDescription']);
         $this->assertSame(1, DB::table('site_branding_publishing_events')->count());
         $this->assertSame(2, DB::table('audit_events')->count());
     }
