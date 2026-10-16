@@ -84,7 +84,7 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
             'password' => 'synthetic-browser-operations-only', 'is_active' => true],
     );
     $ops->markEmailAsVerified();
-    $ops->app_authentication_secret = 'JBSWY3DPEHPK3PXP';
+    $ops->app_authentication_secret = 'MFRGGZDFMZTWQ2LK';
     $ops->save();
     $opsMembership = \App\Models\CompanyMembership::query()->firstOrCreate(
         ['company_id' => $company->id, 'user_id' => $ops->id],

@@ -171,7 +171,7 @@ test('real operations MFA grants only assigned-hall search and planning on mobil
     'input[autocomplete="one-time-code"]:visible, input[id*="code"]:visible, input[name*="code"]:visible, input[inputmode="numeric"]:visible',
   ).first();
   await expect(code).toBeVisible({ timeout: 25_000 });
-  await code.fill(totp(fixtureSecret));
+  await code.fill(totp('MFRGGZDFMZTWQ2LK'));
   const authenticated = (url) => {
     const path = new URL(url).pathname;
     return path.startsWith('/admin') &&
