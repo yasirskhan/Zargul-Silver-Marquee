@@ -12,6 +12,7 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Url;
 
 final class AuditHistory extends Page
 {
@@ -25,6 +26,7 @@ final class AuditHistory extends Page
 
     private const PAGE_SIZE = 25;
 
+    #[Url(as: 'company')]
     public ?string $companyId = null;
 
     public array $filters = [
@@ -79,7 +81,12 @@ final class AuditHistory extends Page
     public function mount(): void
     {
         abort_unless(static::canAccess(), 403);
-        $this->companyId = array_key_first($this->companyOptions());
+        $options = $this->companyOptions();
+        $requested = $this->companyId ?? request()->query('company');
+        // Server-authorized company selection for private search navigation.
+        abort_unless($requested === null || (is_string($requested)
+            && array_key_exists($requested, $options)), 403);
+        $this->companyId = $requested ?? array_key_first($options);
         $this->applyFilters();
     }
 

@@ -313,6 +313,22 @@ class InternalQuickSearchTest extends TestCase
         $service->search($members['operations'][0], $company->id, 'discount', 20, 'approval');
     }
 
+    public function test_all_allowed_owner_destinations_carry_authorized_company_context(): void
+    {
+        [$company, , $members, $booking, , $preview] = $this->fixture();
+        $service = app(InternalQuickSearchService::class);
+        foreach ([
+            ['term' => '2027-05-20', 'kind' => 'proposal', 'path' => '/admin/booking-proposals'],
+            ['term' => substr($preview, 0, 8), 'kind' => 'finance', 'path' => '/admin/finance-review'],
+            ['term' => 'operations', 'kind' => 'audit', 'path' => '/admin/audit-history'],
+        ] as $item) {
+            $row = collect($service->search($members['owner'][0], $company->id, $item['term']))
+                ->firstWhere('kind', $item['kind']);
+            $this->assertNotNull($row);
+            $this->assertSame($item['path'].'?company='.$company->id, $row['path']);
+        }
+    }
+
     public function test_term_and_result_bounds_reject_contact_and_large_queries(): void
     {
         [$company, , $members] = $this->fixture();
