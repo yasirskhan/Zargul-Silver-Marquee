@@ -87,7 +87,9 @@ final class InternalQuickSearchService
                     'kind' => $source['kind'], 'id' => $row->id,
                     'label' => $row->result_label,
                     'status' => $source['status'] ? $row->status : 'internal',
-                    'path' => $source['path'],
+                    'path' => in_array($source['kind'], ['planning', 'approval'], true)
+                        ? $source['path'].'?company='.rawurlencode($companyId)
+                        : $source['path'],
                 ];
             }
         }

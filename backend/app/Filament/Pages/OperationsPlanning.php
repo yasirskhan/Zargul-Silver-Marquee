@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Url;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class OperationsPlanning extends Page
@@ -23,6 +24,7 @@ final class OperationsPlanning extends Page
     protected static ?string $navigationLabel = 'Event planning checklist';
     protected static ?string $slug = 'operations-planning';
 
+    #[Url(as: 'company')]
     public ?string $companyId = null;
 
     #[Locked]
@@ -89,7 +91,12 @@ final class OperationsPlanning extends Page
     public function mount(): void
     {
         abort_unless(static::canAccess(), 403);
-        $this->companyId = array_key_first($this->companyOptions());
+        $options = $this->companyOptions();
+        $requested = $this->companyId ?? request()->query('company');
+        // Search deep links select ONLY a current authorized company.
+        abort_unless($requested === null || (is_string($requested)
+            && array_key_exists($requested, $options)), 403);
+        $this->companyId = $requested ?? array_key_first($options);
         $this->createRequestKey = (string) Str::uuid();
         $this->refresh();
     }

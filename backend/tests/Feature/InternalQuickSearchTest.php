@@ -235,6 +235,22 @@ class InternalQuickSearchTest extends TestCase
             ->assertDontSee('Arrange stage light cables');
     }
 
+    public function test_search_workspace_links_preserve_company_for_authorized_destinations(): void
+    {
+        [$company, , $members, , $task] = $this->fixture();
+        $service = app(InternalQuickSearchService::class);
+        $planning = collect($service->search($members['owner'][0], $company->id, 'stage'))
+            ->firstWhere('id', $task);
+        $this->assertSame('/admin/operations-planning?company='.$company->id, $planning['path']);
+        $approval = collect($service->search($members['owner'][0], $company->id, 'expense'))
+            ->firstWhere('kind', 'approval');
+        $this->assertSame('/admin/approval-center?company='.$company->id, $approval['path']);
+        $this->be($members['operations'][0]);
+        $staffPlanning = collect($service->search($members['operations'][0], $company->id, 'stage'))
+            ->firstWhere('id', $task);
+        $this->assertSame($planning['path'], $staffPlanning['path']);
+    }
+
     public function test_term_and_result_bounds_reject_contact_and_large_queries(): void
     {
         [$company, , $members] = $this->fixture();

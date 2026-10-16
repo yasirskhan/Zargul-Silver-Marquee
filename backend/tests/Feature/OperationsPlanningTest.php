@@ -408,6 +408,28 @@ SQL);
             ->assertHasErrors(['statusFilter']);
     }
 
+    public function test_planning_company_deep_link_allows_only_current_member_companies(): void
+    {
+        [$company, $other, , , $actors, $booking] = $this->fixture();
+        $owner = $actors['owner'][0];
+        $task = (string) Str::uuid();
+        app(OperationsPlanningService::class)->create($owner, $company->id, $task,
+            $booking, 'Private approved hall lighting plan', 'Search navigation test');
+        CompanyMembership::create([
+            'company_id' => $other->id, 'user_id' => $owner->id, 'role' => 'owner',
+        ]);
+        Livewire::withQueryParams(['company' => $other->id])
+            ->test(OperationsPlanning::class)->assertSet('companyId', $other->id)
+            ->assertDontSee('Private approved hall lighting plan');
+        Livewire::withQueryParams(['company' => $company->id])
+            ->test(OperationsPlanning::class)->assertSet('companyId', $company->id)
+            ->assertSee('Private approved hall lighting plan');
+
+        $foreign = Company::create(['name' => 'Forbidden Planning Company', 'slug' => 'forbidden-ops-deeplink']);
+        Livewire::withQueryParams(['company' => $foreign->id])
+            ->test(OperationsPlanning::class)->assertForbidden();
+    }
+
     public function test_filament_planning_page_follows_role_and_company_scoping(): void
     {
         [$company, $other, , , $actors, $booking] = $this->fixture();
