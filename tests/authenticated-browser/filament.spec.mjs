@@ -159,3 +159,57 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   await expect(page.getByText('Synthetic Browser Customer')).toHaveCount(0);
   await expect(page.getByText('Synthetic Browser Customer')).toHaveCount(0);
 });
+
+test('real operations MFA grants only assigned-hall search and planning on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/admin/login');
+  await page.locator('input[type="email"]').fill('browser-e2e-operations@example.test');
+  await page.getByLabel(/Password/).fill('synthetic-browser-operations-only');
+  await page.getByRole('button', { name: /sign in|log in/i }).first().click();
+
+  const code = page.locator(
+    'input[autocomplete="one-time-code"]:visible, input[id*="code"]:visible, input[name*="code"]:visible, input[inputmode="numeric"]:visible',
+  ).first();
+  await expect(code).toBeVisible({ timeout: 25_000 });
+  await code.fill(totp(fixtureSecret));
+  const authenticated = (url) => {
+    const path = new URL(url).pathname;
+    return path.startsWith('/admin') &&
+      !['/admin/login', '/admin/multi-factor-authentication', '/admin/password-reset']
+        .some((blocked) => path.startsWith(blocked));
+  };
+  if (!authenticated(page.url())) {
+    try {
+      await page.waitForURL(authenticated, { timeout: 30_000 });
+    } catch {
+      if (!authenticated(page.url())) {
+        const verify = page.getByRole('button', {
+          name: /confirm sign in|verify|continue|sign in/i,
+        }).last();
+        await expect(verify).toBeEnabled({ timeout: 30_000 });
+        if (!authenticated(page.url())) await verify.click();
+        await page.waitForURL(authenticated, { timeout: 30_000 });
+      }
+    }
+  }
+
+  await page.goto('/admin/internal-search');
+  await expect(page.getByText('Private role-scoped reference search')).toBeVisible();
+  await page.waitForFunction(() => Boolean(window.Livewire?.all?.().length), null, { timeout: 30_000 });
+  await expect(page.getByRole('option', { name: 'Planning tasks' })).toBeVisible();
+  await expect(page.getByRole('option', { name: 'Nonbinding finance previews' })).toHaveCount(0);
+  await expect(page.getByRole('option', { name: 'Audit actions' })).toHaveCount(0);
+  await page.getByRole('searchbox').fill('stage');
+  await page.getByRole('button', { name: 'Search company records' }).click();
+  await expect(page.getByText('Synthetic stage lighting checklist')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('browser-e2e-private@example.test')).toHaveCount(0);
+  await expect(page.getByText('Synthetic Browser Customer')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Open finance workspace' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Open approval workspace' })).toHaveCount(0);
+
+  await page.getByRole('link', { name: 'Open planning workspace' }).click();
+  await expect(page).toHaveURL(/\/admin\/operations-planning\?company=/, { timeout: 30_000 });
+  await expect(page.getByText('Synthetic stage lighting checklist')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('Internal planning checklist only.')).toBeVisible();
+  await expect(page.getByText('browser-e2e-private@example.test')).toHaveCount(0);
+});

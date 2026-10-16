@@ -76,6 +76,34 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
             120, 'Synthetic proposal for browser acceptance',
         );
     }
+    // Isolated browser-only operations user: required MFA, assigned-hall
+    // planning permission, and one genuine nonbinding task. No real event.
+    $ops = \App\Models\User::query()->firstOrCreate(
+        ['email' => 'browser-e2e-operations@example.test'],
+        ['name' => 'Synthetic Operations Staff',
+            'password' => 'synthetic-browser-operations-only', 'is_active' => true],
+    );
+    $ops->markEmailAsVerified();
+    $ops->app_authentication_secret = 'JBSWY3DPEHPK3PXP';
+    $ops->save();
+    $opsMembership = \App\Models\CompanyMembership::query()->firstOrCreate(
+        ['company_id' => $company->id, 'user_id' => $ops->id],
+        ['role' => 'operations', 'is_active' => true],
+    );
+    \App\Models\HallAssignment::query()->firstOrCreate([
+        'company_id' => $company->id, 'hall_id' => $hall->id,
+        'membership_id' => $opsMembership->id,
+    ]);
+    if (! \Illuminate\Support\Facades\DB::table('operations_plan_tasks')
+        ->where('company_id', $company->id)->exists()) {
+        $draftId = \Illuminate\Support\Facades\DB::table('booking_drafts')
+            ->where('company_id', $company->id)->value('id');
+        app(\App\Services\OperationsPlanningService::class)->create(
+            $owner, $company->id, (string) \Illuminate\Support\Str::uuid(), $draftId,
+            'Synthetic stage lighting checklist', 'Synthetic test-only staff planning',
+        );
+    }
+
     // Synthetic cross-actor approval ensures an owner login shows a real
     // tenant-scoped pending notice, without any actual expense or payment.
     $admin = \App\Models\User::query()->firstOrCreate(
