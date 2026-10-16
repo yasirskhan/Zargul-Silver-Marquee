@@ -11,9 +11,9 @@ GitHub connector: repository read and write successful.
 Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; docs/ROADMAP.md; docs/WEBSITE_CMS_DESIGN.md; docs/DEVELOPMENT_PROTOCOL.md; docs/decisions/ADR-0001-platform-and-cms.md. Then read relevant source and tests. Verify LIVE development branch HEAD + exact SHA CI/jobs before writing. Actual repo/CI takes precedence over old handoff state.
 
 ## Last fully VERIFIED PRODUCT checkpoint
-- **Source commit:** `004680c8b91318fb0679ef48d55d17ebe3c82856`
-- **Hosted CI:** `38830630308`, SUCCESS.
-- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38830630308
+- **Source commit:** `8769008594237a0d0c83b2534fe3c15cf29c82c3`
+- **Hosted CI:** `38831051137`, SUCCESS.
+- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38831051137
 - All three jobs SUCCESS: `prototype-checks`, `laravel-postgres`, `editor-browser-e2e`.
 - PHP 8.3 clean Composer package resolution of Laravel 13 + Filament 5 succeeded.
 - PostgreSQL 16 migrations succeeded, including versioned website and tenant identity tables.
@@ -252,3 +252,10 @@ If current doc-only commit is verified, record that exact SHA and CI run only af
 - The existing HallPrograms Filament page now supports owner/admin-only guest capacity, included chairs/tables, explicitly entered additional chair/table rates and currency code. Extra rates start blank until owner input; no fabricated default prices. Separate locked `expectedSeatingRevision` prevents overwriting newer seating settings independent of hall program schedule revision.
 - Manager assigned to a hall sees saved seating configuration read-only; tenant selector, active membership checks, loaded hall ID and current auth checks apply on every save. Invalid/blank prices fail, stale writes are refused and reload uses trusted versioned service. Livewire regression tests exercise owner save, stale editor reload, manager denial, missing prices and two independent history pointers.
 - **NEXT BOUNDED TASK:** Phase 2 ADD-001 owner-controlled optional services/catering catalog: strict typed versioned tenant/hall snapshot, price-unit semantics proposed in ADR-0002 subject to business signoff, owner-admin write/assigned manager read, audit and PostgreSQL validation/concurrency tests. Then Filament add-on catalog controls and broader booking/availability domain. No live quotations, booking conflicts, customer form backend or invoices exist yet.
+
+## 2026-10-16 versioned per-hall catering and optional-service catalog backend VERIFIED
+- SOURCE `8769008594237a0d0c83b2534fe3c15cf29c82c3` CI `38831051137` SUCCESS for all 3 jobs. PostgreSQL tests 110 passed 510 assertions, migrations rollback/replay, PHP lint and static prototype browser checks passed.
+- Migration `2026_10_15_000700_create_hall_addon_catalog_revisions.php`: immutable versioned company/hall composite-FK catalog snapshots (JSONB list at most 100), currency code format check, catalog pointer on halls and PostgreSQL update/delete history trigger. Zero pointer means no approved catalog.
+- `HallAddonCatalogService` owner/admin-only configure with current authenticated verified actor, strict category `catering/music/lighting/bridal_entry/stage/photography/other`, safe unique code and plain name, explicit `flat/per_guest/per_unit` charge unit, integer minor-unit price, boolean enabled, CAS under row lock, audit reason/before/after and rollback on audit failure. Assigned active hall managers can read, not update. Five PostgreSQL tests verify owner revisions, assigned manager, unsafe/duplicate codes, stale/cross-tenant denial, and transactional audit failure rollback.
+- New `docs/decisions/ADR-0002-hall-addon-charge-units.md` PROPOSED: charge-unit semantics and the real billing quantity, currency, tax, package, discount and complimentary policies are explicitly not yet signed off. No quotes/invoices use this service. Do not invent rates or treat this as a production charge engine.
+- **NEXT BOUNDED TASK:** add responsive Filament Hall Programs owner catalog UI with add/remove service rows, explicitly chosen category/charge unit, separate locked revision token, loaded hall and permission checks, manager read-only catalog and PostgreSQL Livewire tests. Then Phase 3 booking hold/calendar and exact pricing snapshot foundations while continuing public CMS and authenticated browser release gates.
