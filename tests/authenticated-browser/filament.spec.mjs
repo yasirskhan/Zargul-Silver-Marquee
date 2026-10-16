@@ -31,6 +31,16 @@ function totp(secret) {
   return String(number).padStart(6, '0');
 }
 
+async function waitForLoginHydration(page) {
+  // A displayed Filament form is not necessarily interactive. Wait for the
+  // actual Livewire login component, not the unrelated notifications widget.
+  // This keeps genuine MFA mandatory while avoiding a lost early click.
+  await page.waitForFunction(() =>
+    Boolean(window.Livewire?.all?.().some(component =>
+      component.el?.querySelector?.('input[type="email"]'))),
+  null, { timeout: 30_000 });
+}
+
 test('private proposal route requires authentication and does not reveal customer data', async ({ page }) => {
   await page.goto('/admin/booking-proposals');
   await expect(page).toHaveURL(/\/admin\/login/, { timeout: 20_000 });
@@ -42,6 +52,7 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   await page.setViewportSize({ width: 360, height: 740 });
   await page.goto('/admin/login');
   await expect(page.locator('input[type="email"]')).toBeVisible();
+  await waitForLoginHydration(page);
   await page.locator('input[type="email"]').fill('browser-e2e-owner@example.test');
   await page.getByLabel(/Password/).fill('synthetic-browser-password-only');
   await page.getByRole('button', { name: /sign in|log in/i }).first().click();
@@ -230,6 +241,7 @@ test('real owner password and TOTP flow protects mobile proposal editing without
 test('real operations MFA grants only assigned-hall search and planning on mobile', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await page.goto('/admin/login');
+  await waitForLoginHydration(page);
   await page.locator('input[type="email"]').fill('browser-e2e-operations@example.test');
   await page.getByLabel(/Password/).fill('synthetic-browser-operations-only');
   await page.getByRole('button', { name: /sign in|log in/i }).first().click();
