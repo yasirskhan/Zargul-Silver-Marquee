@@ -119,16 +119,24 @@ final class OperationsPlanningService
         return DB::transaction(function () use (
             $actor, $companyId, $taskId, $expectedRevision, $reviewed, $reason
         ): array {
-            $saved = DB::table('operations_plan_tasks')->where('company_id', $companyId)
-                ->where('id', $taskId)->lockForUpdate()->first();
-            if (! $saved) {
+            // Discover the immutable task/booking relationship first. Lock the
+            // proposal BEFORE the task, matching create() and withdrawal lock order.
+            // This avoids an inverted booking/task lock cycle under concurrent staff edits.
+            $lookup = DB::table('operations_plan_tasks')->where('company_id', $companyId)
+                ->where('id', $taskId)->first();
+            if (! $lookup) {
                 throw new AuthorizationException('Task is unavailable.');
             }
-            $this->authorize($actor, $companyId, $saved->hall_id);
-            // Serialize with a concurrent proposal withdrawal; no checklist
-            // transition may slip in after a withdrawal commits.
+            $this->authorize($actor, $companyId, $lookup->hall_id);
             $booking = DB::table('booking_drafts')->where('company_id', $companyId)
-                ->where('id', $saved->booking_id)->lockForUpdate()->first();
+                ->where('id', $lookup->booking_id)->lockForUpdate()->first();
+            $saved = DB::table('operations_plan_tasks')->where('company_id', $companyId)
+                ->where('id', $taskId)->lockForUpdate()->first();
+            if (! $saved || $saved->booking_id !== $lookup->booking_id
+                || $saved->hall_id !== $lookup->hall_id) {
+                throw new ConflictHttpException('Planning relationship changed; reload.');
+            }
+            $this->authorize($actor, $companyId, $saved->hall_id);
             if (! $booking || ! in_array($booking->status, ['draft', 'under_review'], true)) {
                 throw new ConflictHttpException('Withdrawn proposal cannot progress planning.');
             }

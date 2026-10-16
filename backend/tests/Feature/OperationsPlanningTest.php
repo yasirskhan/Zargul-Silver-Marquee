@@ -148,6 +148,22 @@ class OperationsPlanningTest extends TestCase
             $task, 1, true, 'Forbidden review after withdrawal');
     }
 
+    public function test_review_rejects_stale_revision_even_after_reopening(): void
+    {
+        [$company, , , , $actors, $booking] = $this->fixture();
+        $service = app(OperationsPlanningService::class);
+        $id = (string) Str::uuid();
+        $service->create($actors['owner'][0], $company->id, $id,
+            $booking, 'Stage safety planning note', 'Initial internal planning');
+        $service->setReviewed($actors['owner'][0], $company->id, $id,
+            1, true, 'Private setup plan reviewed');
+        $service->setReviewed($actors['owner'][0], $company->id, $id,
+            2, false, 'Planning review reopened');
+        $this->expectException(ConflictHttpException::class);
+        $service->setReviewed($actors['owner'][0], $company->id, $id,
+            1, true, 'Replay stale previous revision');
+    }
+
     public function test_audit_rejection_rolls_back_task_and_planning_event(): void
     {
         [$company, , , , $actors, $booking] = $this->fixture();

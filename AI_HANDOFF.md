@@ -1,3 +1,6 @@
+## 2026-10-16 OPS-001 DETERMINISTIC LOCK ORDER — EXACT SHA CI PENDING
+- Follow-up to OPS Filament class collision and real audit fixture corrections: OperationsPlanningService::setReviewed now discovers task linkage, locks immutable booking proposal BEFORE locking task, and reauthorizes under lock. This matches create() and serializes with withdrawal without introducing task/booking reversed lock acquisition. Added PostgreSQL stale revision after reopen regression. No physical booking/finance release, main or property-platform changes. Verify new exact SHA hosted CI.
+
 ## 2026-10-16 OPS-001 REGRESSION FIXUP — CI PENDING
 - Fix real operations PostgreSQL test fixture PL/pgSQL dollar quoting ($$) in audit rejection trigger. Update Livewire test to use collision-free taskTitle input after Filament Page static title repair. Assertions preserved, production audit behavior unchanged. Previous CI 38852194203 failed before tests in Composer fatal; exact new SHA required.
 
