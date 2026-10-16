@@ -1,23 +1,30 @@
 # AI HANDOFF — Zargul Silver Marquee / VenueDesk
 
-Last verified at: 2026-10-15 UTC
+Last verified at: 2026-10-16 UTC
 Repository: yasirskhan/Zargul-Silver-Marquee
 ONLY working branch: `chatgpt/phase0-foundation`
 Default `main`: untouched since README initialization at `83ee684f8b08e65bd673231e71f7d6ad6e817080`
 STRICTLY OUT OF SCOPE: yasirskhan/property-platform and all other repositories.
 GitHub connector: repository read and write successful.
 
+## CURRENT VERIFIED CHECKPOINT (read this first; older NEXT notes below are historical)
+- As of 2026-10-16 UTC, latest VERIFIED product source is `6ea71313b10333c3524b7bd001400fffe33acf4f`, hosted CI `38838321886` **SUCCESS** for EXACT SHA, all three jobs: prototype-checks, laravel-postgres, editor-browser-e2e. PHP/PostgreSQL 159 passing tests / 744 assertions, clean migrations and rollback/replay. See https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38838321886.
+- Owner/admin scoped internal audit-history service and responsive Filament Audit History page are verified. Action/entity/date filters, bounded pagination, company selection, escaped before/after and context, revoked role denial, Livewire tenant tests. Page runs within mandatory-MFA Filament panel; this does NOT constitute real authenticated panel Playwright E2E.
+- Internal `AuditExportService` prepares an APP_KEY-encrypted JSON package for a strict up-to-31-day, maximum-500-event owner/admin search; writes a redacted audit-export preparation event transactionally, rejects foreign staff/tenants/bad filters; fail-audit rollback test. It has NO download HTTP route, no private archive storage, no independently managed encryption key, no WORM/retention backup and no restoration acceptance. Never portray as an operational encrypted audit backup.
+- NEXT bounded task: strengthen audit export consistency (point-in-time snapshot and retry/idempotency) before any authorized secure storage/download workflow. Respect PROPOSED `docs/decisions/ADR-0005-audit-export-security.md` and `ADR-0004` privacy/key retention signoffs. Alternatively proceed with unblocked INTERNAL Phase 3 booking/customer linkage foundation while retaining confirmation and PII collection gates. No real bookings, quotes, invoices, payments, Telegram or production owner CMS/public website integrated yet.
+- Preserve EVERY requirement in PROJECT_MASTER_SPEC.md and FEATURE_REGISTER.csv: full premium public venue site, responsive owner page builder, manager/staff app, calendar, double-booking control, approvals/Telegram, money ledger, and traceable audit. Never edit main or property-platform. Update this handoff after each verified batch; docs-only commit itself needs exact-SHA CI.
+
 ## MUST-READ ON EVERY NEW SESSION
 Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; docs/ROADMAP.md; docs/WEBSITE_CMS_DESIGN.md; docs/DEVELOPMENT_PROTOCOL.md; docs/decisions/ADR-0001-platform-and-cms.md. Then read relevant source and tests. Verify LIVE development branch HEAD + exact SHA CI/jobs before writing. Actual repo/CI takes precedence over old handoff state.
 
 ## Last fully VERIFIED PRODUCT checkpoint
-- **Source commit:** `78c3b178c4da69acf850de22e00b47fbf330bbf8`
-- **Hosted CI:** `38835630900`, SUCCESS.
-- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38835630900
+- **Source commit:** `6ea71313b10333c3524b7bd001400fffe33acf4f`
+- **Hosted CI:** `38838321886`, SUCCESS.
+- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38838321886
 - All three jobs SUCCESS: `prototype-checks`, `laravel-postgres`, `editor-browser-e2e`.
 - PHP 8.3 clean Composer package resolution of Laravel 13 + Filament 5 succeeded.
 - PostgreSQL 16 migrations succeeded, including versioned website and tenant identity tables.
-- Backend `145 passed (665 assertions)` at latest CI, covering previous security/CMS tests and new private branding preview checks. Earlier tests include: tenant/hall access, delegated website edit vs publish checks, cross-tenant composite FK rejection, invalid role rejection, isolation of draft/published revision, cross-page published revision rejection, immutable revisions/audit records.
+- Backend `159 passed (744 assertions)` at latest CI, covering previous security/CMS tests and new private branding preview checks. Earlier tests include: tenant/hall access, delegated website edit vs publish checks, cross-tenant composite FK rejection, invalid role rejection, isolation of draft/published revision, cross-page published revision rejection, immutable revisions/audit records.
 - Database **CMS migration rollback and replay** succeeded.
 - Node prototype logic and UI structure checks and JS syntax passed.
 - **Locked dependencies, CMS transactional foundation with audited restore and scoped authorization policy, Filament MFA and shared PostgreSQL cache/session infrastructure are verified** at the above SHA. Composer lock downloaded from the verified PHP 8.3 artifact, vetted (141 packages, content hash f199e7dfdf44e33a642f6ac51604217e), committed at 8c1e01e2; hosted CI now uses `composer install`. One-time lock-promotion workflow was removed. This documentation change must itself pass CI.
@@ -308,3 +315,9 @@ If current doc-only commit is verified, record that exact SHA and CI run only af
 - Added `TenantAccess::canManageCustomerProfiles` initial strict current active owner/admin-only permission (managers/reception/cashiers excluded pending approved privacy policy). `CustomerProfileService` validates authenticated verified user and company, encrypts name/email/phone, allows same request-key/actor/details creation retries, locks customer record for CAS revision updates, and writes append-only redacted customer history plus audit atomically. Test coverage includes retry without duplicate events, stale edits, wrong-company/manager access denied, and rollback of encrypted profile/history when audit insertion fails. `docs/decisions/ADR-0004-customer-privacy.md` records privacy/consent/retention/key-management signoff gates as PROPOSED.
 - This is an INTERNAL service only with no public controller, no customer data and no approved external use. Contact plaintext stays out of programmatic history summaries, but operator-entered free-text audit reasons and future logging must be reviewed/redacted before production. Real authorized staff workflows and customer consent/privacy policy still pending.
 - **NEXT BOUNDED TASK:** searchable read-only company-scoped owner/admin audit history with filters, bounded pagination and live revoked-membership checks, plus PostgreSQL tests. Prepared UNCOMMITTED Git blobs (review against live HEAD): `backend/app/Services/TenantAccess.php` `0892aa8bbca194df126c8400d43f2876736327b4`, `backend/app/Services/AuditHistoryService.php` `54f23b04d059150c356124d3bed0f88315ec3ffe`, `backend/tests/Feature/AuditHistoryServiceTest.php` `828f75e7c353ec018675b06004e6fc11ef0cc53b`. Then owner-only audited search UI and secured export/backup with no private data leaking to unauthorized staff. Keep all booking/finance/Telegram/CMS/public venue website scope, real authenticated Filament E2E, signing off venue hold/confirmation and customer privacy policy.
+
+
+## 2026-10-16 searchable audit panel and encrypted export foundations VERIFIED
+- Audit History read-only MFA Filament page, Livewire owner/admin tenancy and revoked membership tests, action/entity/date filters, escaped before/after details and bounded pagination: initial commit `50476b23b5793136b2b6a6028fd8020b0c607a59` run `38837890255` FAILED only on a wrong heading assertion, repaired test in `3a4ac0bd615df89df3b6ca3ff66c0cda868c76f0` with exact-SHA CI `38838059329` SUCCESS all three jobs.
+- Internal protected `AuditExportService` exports ONLY encrypted ciphertext for bounded owner company date range and row count, with audit event write and failure rollback, tested for cross-tenant and revoked staff. Product SHA `6ea71313b10333c3524b7bd001400fffe33acf4f`, hosted CI `38838321886` all three jobs SUCCESS, 159 backend tests / 744 assertions. Export storage, key separation/rotation, immutable off-site backup, privacy retention, signed downloads, browser acceptance and actual restore verification remain unimplemented. ADR-0005 is PROPOSED.
+- CURRENT NEXT: strengthen encrypted export snapshot consistency plus request idempotency and test; then approved secure delivery/storage and backup restore policies. Continue Phase 3 booking/customer domain foundations without enabling actual booking/payment or collecting live PII until policies and venue business decisions are authorized. Keep all wider product requirements in scope.
