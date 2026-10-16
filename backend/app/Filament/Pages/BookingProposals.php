@@ -5,6 +5,8 @@ namespace App\Filament\Pages;
 use App\Models\CompanyMembership;
 use App\Models\Hall;
 use App\Models\User;
+use App\Services\BookingDraftService;
+use App\Services\BookingDraftReviewService;
 use App\Services\TenantAccess;
 use BackedEnum;
 use DateTimeImmutable;
@@ -14,6 +16,8 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
+use InvalidArgumentException;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class BookingProposals extends Page
 {
@@ -48,6 +52,28 @@ final class BookingProposals extends Page
 
     #[Locked]
     public ?string $loadedCompanyId = null;
+
+    #[Locked]
+    public ?string $selectedBookingId = null;
+
+    #[Locked]
+    public ?string $selectedCompanyId = null;
+
+    #[Locked]
+    public int $selectedRevision = 0;
+
+    #[Locked]
+    public string $selectedStatus = '';
+
+    public string $editHallId = '';
+
+    public string $editDate = '';
+
+    public string $editProgram = '';
+
+    public string $editGuests = '';
+
+    public string $editReason = '';
 
     public static function canAccess(): bool
     {
@@ -108,6 +134,7 @@ final class BookingProposals extends Page
 
     public function updatedCompanyId(): void
     {
+        $this->clearSelection();
         $this->hallId = null;
         $this->refreshResults();
     }
@@ -133,6 +160,137 @@ final class BookingProposals extends Page
         $this->authorizeLoaded();
         $this->offset = max(0, $this->offset - self::PAGE_SIZE);
         $this->loadResults();
+    }
+
+    public function clearSelection(): void
+    {
+        $this->selectedBookingId = null;
+        $this->selectedCompanyId = null;
+        $this->selectedRevision = 0;
+        $this->selectedStatus = '';
+        $this->editHallId = '';
+        $this->editDate = '';
+        $this->editProgram = '';
+        $this->editGuests = '';
+        $this->editReason = '';
+    }
+
+    /** Load only a same-company saved draft. No customer contact enters Livewire state. */
+    public function selectDraft(string $bookingId): void
+    {
+        $this->authorizeLoaded();
+        abort_unless(\Illuminate\Support\Str::isUuid($bookingId), 404);
+        $actor = Filament::auth()->user();
+        abort_unless($actor instanceof User, 403);
+        $record = app(BookingDraftService::class)->current($actor, $this->companyId, $bookingId);
+        abort_unless($record !== null, 404);
+        $this->selectedCompanyId = $this->companyId;
+        $this->selectedBookingId = $record['bookingId'];
+        $this->selectedRevision = $record['revision'];
+        $this->selectedStatus = $record['status'];
+        $this->editHallId = $record['hallId'];
+        $this->editDate = $record['date'];
+        $this->editProgram = $record['program'];
+        $this->editGuests = (string) $record['guests'];
+        $this->editReason = '';
+    }
+
+    public function saveDraft(): void
+    {
+        [$actor, $saved] = $this->editorContext();
+        abort_unless($saved['status'] === 'draft', 409);
+        $this->validate([
+            'editHallId' => ['required', 'uuid'],
+            'editDate' => ['required', 'date_format:Y-m-d'],
+            'editProgram' => ['required', 'in:morning,noon,evening'],
+            'editGuests' => ['required', 'integer', 'min:1', 'max:200000'],
+            'editReason' => ['required', 'string', 'min:3', 'max:500'],
+        ]);
+        abort_unless(array_key_exists($this->editHallId, $this->hallOptions()), 403);
+        try {
+            app(BookingDraftService::class)->update(
+                $actor, $this->companyId, $this->selectedBookingId,
+                $this->editHallId, $saved['customerId'], $this->editDate,
+                $this->editProgram, (int) $this->editGuests,
+                $this->selectedRevision, $this->editReason,
+            );
+        } catch (ConflictHttpException $error) {
+            throw ValidationException::withMessages([
+                'editReason' => 'The saved proposal changed or is no longer editable. Reload it before retrying.',
+            ]);
+        } catch (InvalidArgumentException $error) {
+            throw ValidationException::withMessages(['editReason' => $error->getMessage()]);
+        }
+        $this->refreshResults();
+        $this->selectDraft($saved['bookingId']);
+    }
+
+    public function submitReview(): void
+    {
+        $this->changeStatus('submit');
+    }
+
+    public function withdrawDraft(): void
+    {
+        $this->changeStatus('withdraw');
+    }
+
+    private function changeStatus(string $action): void
+    {
+        [$actor, $saved] = $this->editorContext();
+        $this->requireSavedForm($saved);
+        $this->validate(['editReason' => ['required', 'string', 'min:3', 'max:500']]);
+
+        try {
+            $service = app(BookingDraftReviewService::class);
+            if ($action === 'submit') {
+                $service->submit($actor, $this->companyId,
+                    $this->selectedBookingId, $this->selectedRevision, $this->editReason);
+            } else {
+                $service->withdraw($actor, $this->companyId,
+                    $this->selectedBookingId, $this->selectedRevision, $this->editReason);
+            }
+        } catch (ConflictHttpException $error) {
+            throw ValidationException::withMessages([
+                'editReason' => 'The saved proposal changed or cannot make this transition. Reload it before retrying.',
+            ]);
+        } catch (InvalidArgumentException $error) {
+            throw ValidationException::withMessages(['editReason' => $error->getMessage()]);
+        }
+        $this->refreshResults();
+        $this->selectDraft($saved['bookingId']);
+    }
+
+    private function requireSavedForm(array $saved): void
+    {
+        if ($this->editHallId !== $saved['hallId']
+            || $this->editDate !== $saved['date']
+            || $this->editProgram !== $saved['program']
+            || $this->editGuests !== (string) $saved['guests']) {
+            throw ValidationException::withMessages([
+                'editReason' => 'Save or discard unsaved changes before changing proposal status.',
+            ]);
+        }
+    }
+
+    private function editorContext(): array
+    {
+        $this->authorizeLoaded();
+        abort_unless($this->selectedCompanyId === $this->companyId
+            && $this->selectedBookingId !== null, 403);
+        $actor = Filament::auth()->user();
+        abort_unless($actor instanceof User, 403);
+        $saved = app(BookingDraftService::class)->current(
+            $actor, $this->companyId, $this->selectedBookingId,
+        );
+        abort_unless($saved !== null, 404);
+        if ($saved['revision'] !== $this->selectedRevision) {
+            throw ValidationException::withMessages([
+                'editReason' => 'The proposal changed. Reload it before making another change.',
+            ]);
+        }
+
+        return [$actor, $saved];
     }
 
     private function authorizeLoaded(): void
