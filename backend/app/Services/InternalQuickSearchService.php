@@ -50,8 +50,16 @@ final class InternalQuickSearchService
             || preg_match('/[<>@[:cntrl:]]|https?:\/\/|www\./iu', $term)) {
             throw new InvalidArgumentException('Use 3-80 plain characters; contact details are prohibited.');
         }
+        // Audit History is an owner-only workspace. Do not disclose its
+        // action metadata to administrators through the unified search.
+        $isOwner = CompanyMembership::query()->where('company_id', $companyId)
+            ->where('user_id', $actor->getKey())->where('is_active', true)
+            ->where('role', 'owner')->exists();
         $matches = [];
         foreach (self::SOURCES as $source) {
+            if ($source['kind'] === 'audit' && ! $isOwner) {
+                continue;
+            }
             $query = DB::table($source['table'])->where('company_id', $companyId)
                 ->where(function ($query) use ($source, $term): void {
                     foreach ($source['fields'] as $field) {
