@@ -27,7 +27,7 @@
     <meta name="description" content="{{ $branding['tagline'] !== '' ? $branding['tagline'] : $branding['siteName'] }}">
     @if ($canonicalUrl !== null)
         <link rel="canonical" href="{{ $canonicalUrl }}">
-        <meta name="robots" content="index, follow">
+        <meta name="robots" content="{{ config('public_site.indexing_enabled') === true ? 'index, follow' : 'noindex, nofollow' }}">
     @else
         <meta name="robots" content="noindex, nofollow">
     @endif

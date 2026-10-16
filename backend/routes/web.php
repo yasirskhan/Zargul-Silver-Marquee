@@ -16,6 +16,8 @@ Route::get('/_venue-media/{pageSlug}/{mediaId}.webp',
         'contact', 'privacy', 'terms'])
     ->whereUuid('mediaId');
 
+Route::get('/robots.txt', \App\Http\Controllers\PublishedVenueRobotsController::class);
+
 /**
  * Only Telegram itself may call this endpoint. In production, reject plain
  * HTTP even behind an accidentally misconfigured reverse proxy.

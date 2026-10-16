@@ -79,7 +79,7 @@ class PublishedVenueRouteTest extends TestCase
             ->assertHeader('Cache-Control', 'no-store, private');
         $response->assertSee('Approved Hall Opening');
         $response->assertSee('https://venue.example.test/');
-        $response->assertSee('content="index, follow"', false);
+        $response->assertSee('content="noindex, nofollow"', false);
         $response->assertSee('Zargul Approved Site');
         $response->assertDontSee('site-media/private/');
         $response->assertDontSee('<script', false);
@@ -93,6 +93,29 @@ class PublishedVenueRouteTest extends TestCase
         $this->get('http://venue.example.test/')->assertOk()
             ->assertDontSee('UNPUBLISHED PRIVATE DRAFT')
             ->assertSee('Approved Hall Opening');
+    }
+
+    public function test_robots_and_indexing_require_separate_opt_in_and_approved_home(): void
+    {
+        [$company, $owner, $site, $page] = $this->fixture();
+        $this->enable($company->id, $site);
+        config()->set('public_site.indexing_enabled', true);
+        $this->get('http://venue.example.test/robots.txt')->assertOk()
+            ->assertSee('Disallow: /');
+        $this->get('http://venue.example.test/')->assertNotFound();
+        $this->publish($company, $owner, $site, $page);
+        $this->get('http://venue.example.test/robots.txt')->assertOk()
+            ->assertSee('Allow: /');
+        $this->get('http://venue.example.test/')->assertOk()
+            ->assertSee('content="index, follow"', false);
+        config()->set('public_site.indexing_enabled', false);
+        $this->get('http://venue.example.test/robots.txt')->assertOk()
+            ->assertSee('Disallow: /');
+        $this->get('http://venue.example.test/')->assertOk()
+            ->assertSee('content="noindex, nofollow"', false);
+        $this->get('http://wrong.example.test/robots.txt')->assertNotFound();
+        config()->set('public_site.enabled', false);
+        $this->get('http://venue.example.test/robots.txt')->assertNotFound();
     }
 
     public function test_only_published_allowlisted_secondary_page_uses_same_approved_hostname(): void
