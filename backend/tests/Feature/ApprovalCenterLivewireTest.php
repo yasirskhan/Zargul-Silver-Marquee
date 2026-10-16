@@ -167,18 +167,12 @@ class ApprovalCenterLivewireTest extends TestCase
         $secondary = Company::create(['name' => 'Other owned venue', 'slug' => 'approval-ui-owned']);
         CompanyMembership::create(['company_id' => $secondary->id,
             'user_id' => $owner->id, 'role' => 'owner']);
-        request()->query->set('company', $secondary->id);
-        try {
-            Livewire::test(ApprovalCenter::class)->assertSet('companyId', $secondary->id);
-        } finally {
-            request()->query->remove('company');
-        }
-        request()->query->set('company', $foreign->id);
-        try {
-            Livewire::test(ApprovalCenter::class)->assertForbidden();
-        } finally {
-            request()->query->remove('company');
-        }
+        // Livewire boots each test with its own synthetic HTTP request. Use
+        // its URL-query harness, not a different global Laravel request object.
+        Livewire::withQueryParams(['company' => $secondary->id])
+            ->test(ApprovalCenter::class)->assertSet('companyId', $secondary->id);
+        Livewire::withQueryParams(['company' => $foreign->id])
+            ->test(ApprovalCenter::class)->assertForbidden();
     }
 
     public function test_only_owner_can_generate_private_telegram_pairing_link(): void
