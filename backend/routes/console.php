@@ -104,6 +104,27 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
         );
     }
 
+    // Website acceptance fixture is private, synthetic and created only by
+    // this testing-only CLI command, never through a production endpoint.
+    $syntheticSiteId = \Illuminate\Support\Facades\DB::table('websites')
+        ->where('company_id', $company->id)->value('id');
+    if ($syntheticSiteId === null) {
+        $syntheticSiteId = (string) \Illuminate\Support\Str::uuid();
+        \Illuminate\Support\Facades\DB::table('websites')->insert([
+            'id' => $syntheticSiteId, 'company_id' => $company->id,
+            'name' => 'Synthetic Website Browser Fixture',
+        ]);
+    }
+    if (! \Illuminate\Support\Facades\DB::table('site_pages')
+        ->where('company_id', $company->id)->where('website_id', $syntheticSiteId)
+        ->where('slug', '/')->exists()) {
+        \Illuminate\Support\Facades\DB::table('site_pages')->insert([
+            'id' => (string) \Illuminate\Support\Str::uuid(),
+            'company_id' => $company->id, 'website_id' => $syntheticSiteId,
+            'slug' => '/', 'title' => 'Synthetic Home Page',
+        ]);
+    }
+
     // Synthetic cross-actor approval ensures an owner login shows a real
     // tenant-scoped pending notice, without any actual expense or payment.
     $admin = \App\Models\User::query()->firstOrCreate(

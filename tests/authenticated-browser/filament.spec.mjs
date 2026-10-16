@@ -158,6 +158,45 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   await expect(page.getByText('browser-e2e-private@example.test')).toHaveCount(0);
   await expect(page.getByText('Synthetic Browser Customer')).toHaveCount(0);
   await expect(page.getByText('Synthetic Browser Customer')).toHaveCount(0);
+
+  // CMS-004/009: exercise REAL owner-authorized Website Workspace at 360px,
+  // using a distinct synthetic page with no customer data or public release.
+  await page.goto('/admin/website');
+  await expect(page.locator('section[aria-label="Website page status"]'))
+    .toContainText('Synthetic Home Page', { timeout: 25_000 });
+  await page.waitForFunction(() => Boolean(window.Livewire?.all?.().length), null, { timeout: 30_000 });
+  const pageStatus = page.locator('section[aria-label="Website page status"]');
+  const pageSections = page.locator('section[aria-label="Draft page sections"]');
+  const reason = page.getByRole('textbox', { name: 'Reason for this change (required)' });
+
+  await expect(pageStatus).toContainText('Not published');
+  await pageSections.getByRole('button', { name: '+ Text' }).click();
+  await pageSections.getByRole('textbox', { name: 'Title', exact: true })
+    .fill('Synthetic mobile publishing acceptance');
+  await reason.fill('Browser owner saves approved synthetic introduction');
+  await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(pageStatus).toContainText('Editor loaded revision: 1', { timeout: 25_000 });
+  await expect(pageStatus).toContainText('Not published');
+
+  await reason.fill('Browser owner publishes saved synthetic introduction');
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Publish saved draft' }).click();
+  await expect(pageStatus).toContainText('A published snapshot exists', { timeout: 25_000 });
+  await expect(page.getByText('Revision 1 is live')).toBeVisible();
+
+  await reason.fill('Browser owner temporarily takes synthetic page offline');
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Take published page offline' }).click();
+  await expect(pageStatus).toContainText('Not published', { timeout: 25_000 });
+  await expect(page.getByRole('button', { name: 'Restore revision 1' })).toBeVisible();
+
+  await reason.fill('Browser owner restores previously approved synthetic revision');
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Restore revision 1' }).click();
+  await expect(pageStatus).toContainText('A published snapshot exists', { timeout: 25_000 });
+  await expect(page.getByText('Revision 1 is live')).toBeVisible();
+  await expect(page.getByText('browser-e2e-private@example.test')).toHaveCount(0);
+  await expect(page.getByText('Synthetic Browser Customer')).toHaveCount(0);
 });
 
 test('real operations MFA grants only assigned-hall search and planning on mobile', async ({ page }) => {
