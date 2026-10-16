@@ -132,3 +132,82 @@ jobs:
             test-results/
           retention-days: 3
           if-no-files-found: ignore
+
+  authenticated-panel-e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: venue
+          POSTGRES_PASSWORD: venue
+          POSTGRES_DB: venue_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U venue -d venue_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      APP_ENV: testing
+      APP_DEBUG: 'false'
+      BROWSER_E2E_SEED: '1'
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: '5432'
+      DB_DATABASE: venue_test
+      DB_USERNAME: venue
+      DB_PASSWORD: venue
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_pgsql, pgsql, intl, zip, bcmath, gd
+          coverage: none
+          tools: composer:v2
+      - name: Install exact PHP dependencies
+        working-directory: backend
+        run: composer install --no-interaction --no-progress --prefer-dist
+      - name: Create isolated synthetic MFA owner and proposal
+        working-directory: backend
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force --no-interaction
+          php artisan migrate --force --no-interaction
+          php artisan venuedesk:seed-browser-e2e
+      - name: Start authenticated Laravel panel
+        working-directory: backend
+        run: |
+          nohup php artisan serve --host=127.0.0.1 --port=8000 > /tmp/venuedesk-e2e-server.log 2>&1 </dev/null &
+          for attempt in {1..40}; do
+            if curl -fsS -o /dev/null http://127.0.0.1:8000/admin/login; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/venuedesk-e2e-server.log
+          exit 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned authenticated browser tooling
+        run: npm install --no-save --no-audit --no-fund @playwright/test@1.56.1
+      - name: Install Chromium for authenticated acceptance
+        run: npx playwright install --with-deps chromium
+      - name: Browser verify owner password TOTP and proposal editing
+        run: npx playwright test --config=playwright.auth.config.mjs
+      - name: Show application log on failed browser acceptance
+        if: failure()
+        run: |
+          tail -n 120 /tmp/venuedesk-e2e-server.log || true
+          if test -f backend/storage/logs/laravel.log; then tail -n 100 backend/storage/logs/laravel.log; fi
+      - name: Save browser failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: authenticated-panel-browser-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 3
+          if-no-files-found: ignore
