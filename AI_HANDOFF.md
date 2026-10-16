@@ -1,3 +1,7 @@
+## 2026-10-16 OPS-001 POSTGRESQL TASK HISTORY PROTECTION — HOSTED CI PENDING
+- Added migration 001600 to reject direct SQL deletion, task identity/contact-free title rewrites, skipped/nonalternating status revisions for internal operations_plan_tasks. Existing OperationsPlanningService CAS and immutable event/audit writes remain authoritative; no new physical booking, billing, live event closeout or denied staff scope. Added real PostgreSQL trigger regression tests (including legitimate reviewed transition), updated feature register and handoff in same commit. Baseline cc60b20fb60a9d300773b19978efe273af5ff18e; full exact-SHA CI required before VERIFIED.
+- Prior tagged-dollar quote test repair SHA cc60b20fb60a9d300773b19978efe273af5ff18e under hosted CI 38854182627. That repair retains injected PostgreSQL audit failure assertions without suppression.
+
 ## 2026-10-16 OPS-001 AUDIT TEST SQL QUOTE REPAIR — CI PENDING
 - On live HEAD 7a6665cc15b9ed2df155d042ba0db08e28962769, exact GitHub Actions 38853914985: browser authenticated, editor browser, and prototype green; PostgreSQL 242 passed, one failed in OperationsPlanningTest audit rejection function definition. The test's SQL contained invalid single-dollar delimiters even after earlier attempted repair. Replace opening/closing delimiter with PostgreSQL tagged $tag$ delimiters; retain real trigger injection, rollback expectation and assertions without skips. New exact-SHA all-job CI required. No live business permission changed.
 

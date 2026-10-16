@@ -211,6 +211,44 @@ SQL);
         });
     }
 
+    public function test_postgresql_rejects_silent_planning_task_rewrites_deletes_and_skipped_revisions(): void
+    {
+        [$company, , , , $actors, $booking] = $this->fixture();
+        $service = app(OperationsPlanningService::class);
+        $taskId = (string) Str::uuid();
+        $service->create($actors['owner'][0], $company->id, $taskId, $booking,
+            'Verify safe stage preparation', 'Synthetic no-contact task plan');
+
+        foreach ([
+            ['title' => 'Silently replaced planning title'],
+            ['status' => 'reviewed', 'revision' => 5],
+            ['status' => 'reviewed'],
+        ] as $rewrite) {
+            try {
+                DB::transaction(fn () => DB::table('operations_plan_tasks')
+                    ->where('id', $taskId)->update($rewrite));
+                $this->fail('Direct PostgreSQL task rewrite was accepted.');
+            } catch (QueryException $exception) {
+                $this->assertStringContainsString('VenueDesk planning task', $exception->getMessage());
+            }
+        }
+        try {
+            DB::transaction(fn () => DB::table('operations_plan_tasks')
+                ->where('id', $taskId)->delete());
+            $this->fail('Direct PostgreSQL task deletion was accepted.');
+        } catch (QueryException $exception) {
+            $this->assertStringContainsString('cannot be hard deleted', $exception->getMessage());
+        }
+        $this->assertSame(1, (int) DB::table('operations_plan_tasks')
+            ->where('id', $taskId)->value('revision'));
+        $this->assertSame(1, DB::table('operations_plan_events')->where('task_id', $taskId)->count());
+        $result = $service->setReviewed($actors['owner'][0], $company->id,
+            $taskId, 1, true, 'Legitimate approved review transition');
+        $this->assertSame('reviewed', $result['status']);
+        $this->assertSame(2, $result['revision']);
+        $this->assertSame(2, DB::table('operations_plan_events')->where('task_id', $taskId)->count());
+    }
+
     public function test_filament_planning_page_follows_role_and_company_scoping(): void
     {
         [$company, $other, , , $actors, $booking] = $this->fixture();
