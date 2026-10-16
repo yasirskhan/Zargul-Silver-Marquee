@@ -11,13 +11,13 @@ GitHub connector: repository read and write successful.
 Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; docs/ROADMAP.md; docs/WEBSITE_CMS_DESIGN.md; docs/DEVELOPMENT_PROTOCOL.md; docs/decisions/ADR-0001-platform-and-cms.md. Then read relevant source and tests. Verify LIVE development branch HEAD + exact SHA CI/jobs before writing. Actual repo/CI takes precedence over old handoff state.
 
 ## Last fully VERIFIED PRODUCT checkpoint
-- **Source commit:** `72bb9dc8d31db3634fe1c87bc25bb37865f417ea`
-- **Hosted CI:** `38826775925`, SUCCESS.
-- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38826775925
+- **Source commit:** `9de44062cd212125f6958c556a6e4ecb3dd91515`
+- **Hosted CI:** `38827218511`, SUCCESS.
+- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38827218511
 - All three jobs SUCCESS: `prototype-checks`, `laravel-postgres`, `editor-browser-e2e`.
 - PHP 8.3 clean Composer package resolution of Laravel 13 + Filament 5 succeeded.
 - PostgreSQL 16 migrations succeeded, including versioned website and tenant identity tables.
-- Backend `81 passed (366 assertions)` at latest CI, covering previous security/CMS tests and new private branding preview checks. Earlier tests include: tenant/hall access, delegated website edit vs publish checks, cross-tenant composite FK rejection, invalid role rejection, isolation of draft/published revision, cross-page published revision rejection, immutable revisions/audit records.
+- Backend `83 passed (385 assertions)` at latest CI, covering previous security/CMS tests and new private branding preview checks. Earlier tests include: tenant/hall access, delegated website edit vs publish checks, cross-tenant composite FK rejection, invalid role rejection, isolation of draft/published revision, cross-page published revision rejection, immutable revisions/audit records.
 - Database **CMS migration rollback and replay** succeeded.
 - Node prototype logic and UI structure checks and JS syntax passed.
 - **Locked dependencies, CMS transactional foundation with audited restore and scoped authorization policy, Filament MFA and shared PostgreSQL cache/session infrastructure are verified** at the above SHA. Composer lock downloaded from the verified PHP 8.3 artifact, vetted (141 packages, content hash f199e7dfdf44e33a642f6ac51604217e), committed at 8c1e01e2; hosted CI now uses `composer install`. One-time lock-promotion workflow was removed. This documentation change must itself pass CI.
@@ -209,3 +209,10 @@ If current doc-only commit is verified, record that exact SHA and CI run only af
 - PostgreSQL tests cover optimized bytes, digest/cache metadata, tenant/site/slug exclusion, unrelated approved assets, pending assets and newer unpublished draft media, tampered bytes, and foreign-company private key swaps.
 - **No public HTTP endpoint** exists yet; this is a server component and must not be called website delivery or release. No browser acceptance against authenticated Filament, SEO/domain, media cache/operational review or customer enquiry backend.
 - **NEXT BOUNDED TASK:** add an internal strict typed HTML renderer from the published-only snapshot and whitelisted theme templates (escaping names, text, CTA URLs, accessibility fallbacks, no raw media URLs or arbitrary HTML). Add real PostgreSQL/Blade tests demonstrating draft isolation and safe rendering. DO NOT expose route until publication and asset delivery gates pass. Then work on authenticated Filament browser acceptance/security and Phase 2 hall business rules.
+
+## 2026-10-16 strict published-only HTML server renderer VERIFIED
+- SOURCE `9de44062cd212125f6958c556a6e4ecb3dd91515`, hosted CI `38827218511` SUCCESS exact SHA. Three jobs green, backend 83 tests / 385 assertions, PostgreSQL migrations and rollback/replay passed.
+- New internal `SitePublishedHtmlService::render` uses `SitePublishedSnapshotService` approved immutable branding and page snapshots, with server-owned four theme palettes, two font presets, escaped page/branding text and strict CTA links. Responsive desktop 12-column/mobile independent order supported. Image/gallery/branding logo are private-safe placeholders only; no raw file URL, unreviewed image or executable CMS content. Dynamic catalog/enquiry blocks deliberately show nonfunctional release-gate placeholders.
+- Real PostgreSQL/Blade tests assert no rendering before both approvals, published-vs-unsaved isolation, tenant mismatch, escaped ampersands and URL queries, theme tokens, column widths and mobile order and no leaked private media paths.
+- **NO PUBLIC HTTP ROUTE** connected to this server renderer. Static root prototype is not a deployed website. No functional customer enquiry, booking, finance or Telegram. No authenticated Filament Playwright browser E2E (static root-only browser checks still). Launch is not approved.
+- **NEXT BOUNDED TASK:** start Phase 2 persistent tenant/hall-scoped three-program schedule and pricing/grace/buffer rules, database constraints, authorized audited writes, optimistic versioning and PostgreSQL tests. Keep security work planned: authenticated Filament browser acceptance and secure public website/media route release gate, media accessibility/performance and operational identity recovery. Continue owner settings for seating, add-ons and slot pricing; then robust booking concurrency without double bookings.
