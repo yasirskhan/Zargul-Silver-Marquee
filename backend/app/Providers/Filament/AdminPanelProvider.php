@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\AuditHistory;
 use App\Filament\Pages\HallCalendar;
 use App\Filament\Pages\HallPrograms;
 use App\Filament\Pages\WebsiteWorkspace;
@@ -36,7 +37,7 @@ class AdminPanelProvider extends PanelProvider
             ->multiFactorAuthentication([
                 AppAuthentication::make()->recoverable(),
             ], isRequired: true)
-            ->pages([HallCalendar::class, HallPrograms::class, WebsiteWorkspace::class])
+            ->pages([AuditHistory::class, HallCalendar::class, HallPrograms::class, WebsiteWorkspace::class])
             ->brandName('VenueDesk')
             ->colors(['primary' => Color::Emerald])
             ->middleware([
