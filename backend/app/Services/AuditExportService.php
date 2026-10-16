@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /**
  * Internal encrypted audit export foundation. No HTTP/download route,
@@ -17,7 +18,6 @@ use InvalidArgumentException;
  */
 final class AuditExportService
 {
-    private const PAGE_SIZE = 100;
     private const MAX_ENTRIES = 500;
 
     public function __construct(
@@ -31,6 +31,7 @@ final class AuditExportService
      */
     public function prepare(
         User $actor, string $companyId, array $filters, string $reason,
+        ?string $requestId = null,
     ): array {
         $this->authorize($actor, $companyId);
         $reason = trim($reason);
@@ -39,48 +40,89 @@ final class AuditExportService
             throw new InvalidArgumentException('A safe audit export reason is required.');
         }
 
-        // Require an explicit small date window for expensive private exports.
         $start = $this->date($filters['fromDate'] ?? null);
         $end = $this->date($filters['toDate'] ?? null);
         if ($start > $end || (int) $start->diff($end)->format('%a') > 30) {
             throw new InvalidArgumentException('Audit export window must be at most 31 days.');
         }
+        // Reuse the same strict filter validation and actor authorization as
+        // owner-only audit search before minting an idempotency fingerprint.
+        $this->history->search($actor, $companyId, $filters, 1, 0);
+        $requestId ??= (string) Str::uuid();
+        if (! Str::isUuid($requestId)) {
+            throw new InvalidArgumentException('Audit export request key must be a UUID.');
+        }
+        $canonicalFilters = $filters;
+        ksort($canonicalFilters);
+        $requestHash = hash('sha256', json_encode([
+            'actorId' => (int) $actor->getKey(),
+            'filters' => $canonicalFilters, 'reason' => $reason,
+        ], JSON_THROW_ON_ERROR));
 
-        return DB::transaction(function () use ($actor, $companyId, $filters, $reason): array {
+        return DB::transaction(function () use (
+            $actor, $companyId, $filters, $reason, $requestId, $requestHash,
+        ): array {
             $this->authorize($actor, $companyId);
-            $entries = [];
-            for ($offset = 0; $offset <= self::MAX_ENTRIES; $offset += self::PAGE_SIZE) {
-                // Underlying query rechecks company/role and validates all filters.
-                $page = $this->history->search($actor, $companyId, $filters, self::PAGE_SIZE, $offset);
-                $entries = array_merge($entries, $page['entries']);
-                if (count($entries) > self::MAX_ENTRIES) {
-                    throw new InvalidArgumentException('Audit export exceeds the protected row limit.');
-                }
-                if (! $page['hasMore']) {
-                    break;
-                }
+            // Serialize same-company requests so competing retries cannot
+            // produce two different encrypted packages for one request UUID.
+            $company = DB::table('companies')->where('id', $companyId)
+                ->lockForUpdate()->first(['id']);
+            if (! $company) {
+                throw new AuthorizationException('Audit export company is not accessible.');
             }
-            $id = (string) Str::uuid();
+            $existing = DB::table('audit_export_requests')->where('id', $requestId)->first();
+            if ($existing) {
+                if ($existing->company_id !== $companyId
+                    || (int) $existing->actor_id !== (int) $actor->getKey()
+                    || ! hash_equals($existing->request_hash, $requestHash)) {
+                    throw new ConflictHttpException('Audit export request key has already been used.');
+                }
+
+                return [
+                    'exportId' => $existing->id,
+                    'entryCount' => (int) $existing->entry_count,
+                    'sha256' => $existing->sha256,
+                    'encryptedPayload' => $existing->encrypted_payload,
+                ];
+            }
+
+            // One SELECT for the full capped result is one coherent PostgreSQL
+            // MVCC snapshot, unlike multiple offset pages across concurrent writes.
+            $entries = $this->history->exportSnapshot(
+                $actor, $companyId, $filters, self::MAX_ENTRIES,
+            );
             $snapshot = json_encode([
-                'format' => 'venuedesk-audit-v1', 'exportId' => $id,
+                'format' => 'venuedesk-audit-v1', 'exportId' => $requestId,
                 'companyId' => $companyId, 'filters' => $filters,
                 'exportedAt' => now()->toIso8601String(), 'entries' => $entries,
             ], JSON_THROW_ON_ERROR);
             $digest = hash('sha256', $snapshot);
             $ciphertext = Crypt::encryptString($snapshot);
 
-            // Log who prepared the encrypted package. No event details in the log.
+            // Store ciphertext only. This internal idempotency cache is NOT
+            // approved immutable off-site backup, key custody or secure delivery.
+            DB::table('audit_export_requests')->insert([
+                'id' => $requestId, 'company_id' => $companyId,
+                'actor_id' => $actor->getKey(), 'request_hash' => $requestHash,
+                'entry_count' => count($entries), 'sha256' => $digest,
+                'encrypted_payload' => $ciphertext, 'created_at' => now(),
+            ]);
             DB::table('audit_events')->insert([
                 'id' => (string) Str::uuid(), 'company_id' => $companyId,
                 'actor_id' => $actor->getKey(), 'action' => 'audit.export_prepared',
-                'entity_type' => 'audit_export', 'entity_id' => $id,
+                'entity_type' => 'audit_export', 'entity_id' => $requestId,
                 'before_values' => null,
-                'after_values' => json_encode(['entryCount' => count($entries), 'sha256' => $digest], JSON_THROW_ON_ERROR),
-                'context' => json_encode(['reason' => $reason, 'dateRange' => [$filters['fromDate'], $filters['toDate']]], JSON_THROW_ON_ERROR),
+                'after_values' => json_encode([
+                    'entryCount' => count($entries), 'sha256' => $digest,
+                ], JSON_THROW_ON_ERROR),
+                'context' => json_encode([
+                    'reason' => $reason,
+                    'dateRange' => [$filters['fromDate'], $filters['toDate']],
+                ], JSON_THROW_ON_ERROR),
             ]);
 
             return [
-                'exportId' => $id, 'entryCount' => count($entries),
+                'exportId' => $requestId, 'entryCount' => count($entries),
                 'sha256' => $digest, 'encryptedPayload' => $ciphertext,
             ];
         }, 3);

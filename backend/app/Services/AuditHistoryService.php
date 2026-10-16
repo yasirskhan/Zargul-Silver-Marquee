@@ -96,6 +96,54 @@ final class AuditHistoryService
         ];
     }
 
+    /**
+     * Export-safe bounded projection. Unlike repeated offset queries, the full
+     * result set is obtained in ONE PostgreSQL SELECT (one MVCC snapshot),
+     * avoiding missing/duplicated rows when concurrent audit events arrive.
+     * This is internal only; it does not expose a download endpoint.
+     */
+    public function exportSnapshot(
+        User $actor, string $companyId, array $filters, int $maxEntries = 500,
+    ): array {
+        if ($maxEntries < 1 || $maxEntries > 500) {
+            throw new InvalidArgumentException('Audit export row limit is invalid.');
+        }
+
+        // Reuse existing authorization and strict input validation.
+        $this->search($actor, $companyId, $filters, 1, 0);
+
+        $query = DB::table('audit_events')->where('company_id', $companyId);
+        foreach (['action' => 'action', 'entityType' => 'entity_type', 'entityId' => 'entity_id'] as $field => $column) {
+            if (isset($filters[$field])) {
+                $query->where($column, $filters[$field]);
+            }
+        }
+        if (isset($filters['fromDate'])) {
+            $query->whereDate('created_at', '>=', $filters['fromDate']);
+        }
+        if (isset($filters['toDate'])) {
+            $query->whereDate('created_at', '<=', $filters['toDate']);
+        }
+        $rows = $query->orderByDesc('created_at')->orderByDesc('id')
+            ->limit($maxEntries + 1)->get([
+                'id', 'action', 'entity_type', 'entity_id', 'actor_id',
+                'before_values', 'after_values', 'context', 'created_at',
+            ]);
+        if ($rows->count() > $maxEntries) {
+            throw new InvalidArgumentException('Audit export exceeds the protected row limit.');
+        }
+
+        return $rows->map(fn (object $record): array => [
+            'id' => $record->id, 'action' => $record->action,
+            'entityType' => $record->entity_type, 'entityId' => $record->entity_id,
+            'actorId' => $record->actor_id,
+            'before' => $this->decode($record->before_values),
+            'after' => $this->decode($record->after_values),
+            'context' => $this->decode($record->context),
+            'createdAt' => $record->created_at,
+        ])->values()->all();
+    }
+
     private function decode(?string $json): mixed
     {
         return $json === null ? null : json_decode($json, true, 512, JSON_THROW_ON_ERROR);
