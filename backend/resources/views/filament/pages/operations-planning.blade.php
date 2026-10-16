@@ -42,6 +42,7 @@
                         <option value="planned">Awaiting review</option>
                         <option value="reviewed">Reviewed planning tasks</option>
                     </select>
+                    @error('statusFilter') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
                 </label>
                 <label class="block space-y-1">
                     <span class="text-sm">Review/change reason (required for each transition)</span>

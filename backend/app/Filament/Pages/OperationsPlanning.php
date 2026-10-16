@@ -126,6 +126,8 @@ final class OperationsPlanning extends Page
 
     public function updatedStatusFilter(): void
     {
+        $this->authorizeLoaded();
+        $this->validate(['statusFilter' => ['required', 'in:all,planned,reviewed']]);
         $this->refresh();
     }
 

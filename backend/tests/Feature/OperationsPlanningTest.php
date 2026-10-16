@@ -400,6 +400,14 @@ SQL);
         $service->history($actors['owner'][0], $foreign->id, $id);
     }
 
+    public function test_livewire_rejects_invalid_status_filter_without_querying_tasks(): void
+    {
+        $this->fixture();
+        Livewire::test(OperationsPlanning::class)
+            ->set('statusFilter', 'forged-status')
+            ->assertHasErrors(['statusFilter']);
+    }
+
     public function test_filament_planning_page_follows_role_and_company_scoping(): void
     {
         [$company, $other, , , $actors, $booking] = $this->fixture();

@@ -1,3 +1,6 @@
+## 2026-10-16 OPS-001 FILTER INPUT VALIDATION — EXACT SHA CI PENDING
+- Follow-up to a0249872b5e5053531143d0d1dd28b20118b40ab: the Filament planning status control now validates the precise allowed enum and active loaded company on Livewire update, yielding a normal field error for forged input rather than an unhandled service exception. Added Livewire regression. No new roles, no changes to server-side tenant checks, no booking/finance permissions. Feature register and handoff same commit. Latest exact-SHA hosted CI required.
+
 ## 2026-10-16 OPS-001 READ-ONLY REVIEW HISTORY — EXACT SHA CI PENDING
 - Added OperationsPlanningService::history with fresh tenant+assigned hall authorization, 1..50 capped revision timeline, and responsive Filament "View immutable review history" per-task control. Clears the loaded history whenever a company, status filter or task list is refreshed, preventing stale tenant history in Livewire. PostgreSQL and Livewire tests assert owner/manager access, revoked assignment denial, foreign tenant denial, immutable reason display. This does not approve event completion, send contact data, confirm booking or post money. Baseline 98480d4693e2d17c00f33c32013b1cf2a67f5a17, exact-SHA all four jobs required. Feature register and handoff same commit.
 
