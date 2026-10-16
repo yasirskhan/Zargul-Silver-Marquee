@@ -60,22 +60,52 @@ test('real owner password and TOTP flow protects mobile proposal editing without
       !['/admin/login', '/admin/multi-factor-authentication', '/admin/password-reset']
         .some((blocked) => path.startsWith(blocked));
   };
-  try {
-    await page.waitForURL(authenticated, { timeout: 8_000 });
-  } catch {
-    const verify = page.getByRole('button', { name: /confirm sign in|verify|continue|sign in/i }).last();
-    await expect(verify).toBeEnabled({ timeout: 15_000 });
-    await verify.click();
-    await page.waitForURL(authenticated, { timeout: 25_000 });
+  // Filament can auto-submit a completed TOTP challenge. Give Livewire time
+  // to complete the server-side authentication before attempting an explicit
+  // verification click; never click a button during its disabled transition.
+  if (!authenticated(page.url())) {
+    try {
+      await page.waitForURL(authenticated, { timeout: 30_000 });
+    } catch {
+      if (!authenticated(page.url())) {
+        const verify = page.getByRole('button', {
+          name: /confirm sign in|verify|continue|sign in/i,
+        }).last();
+        await expect(verify).toBeEnabled({ timeout: 30_000 });
+        if (!authenticated(page.url())) await verify.click();
+        await page.waitForURL(authenticated, { timeout: 30_000 });
+      }
+    }
   }
 
   await page.goto('/admin/booking-proposals');
-  await expect(page.getByText('Internal booking proposals')).toBeVisible({ timeout: 25_000 });
+  await expect(page.getByText('Internal booking proposals')).toBeVisible();
+  // Wait for Livewire hydration, not just the server-rendered table.
+  await page.waitForFunction(
+    () => Boolean(window.Livewire?.all?.().length),
+    null,
+    { timeout: 30_000 },
+  );
   await expect(page.locator('tbody').getByText('Synthetic Test Hall')).toBeVisible();
   await expect(page.getByText('Synthetic Browser Customer')).toHaveCount(0);
   await expect(page.getByText('browser-e2e-private@example.test')).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Review/edit' }).first().click();
+  // The responsive table is intentionally wider than a 360px phone. Scroll
+  // its actual overflow container, then exercise its keyboard-accessible
+  // review action. Playwright's pointer click can otherwise report the last
+  // column outside the viewport even though the button is usable.
+  const scroller = page.locator(
+    'section[aria-label="Private company proposal results"] .overflow-x-auto',
+  );
+  await expect(scroller).toBeVisible();
+  await scroller.evaluate((element) => {
+    element.scrollLeft = element.scrollWidth - element.clientWidth;
+  });
+  const reviewButton = page.getByRole('button', { name: 'Review/edit' }).first();
+  await expect(reviewButton).toBeEnabled();
+  await reviewButton.focus();
+  await expect(reviewButton).toBeFocused();
+  await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: 'Internal proposal review' })).toBeVisible();
   await page.getByRole('spinbutton', { name: 'Expected guests' }).fill('135');
   await page.getByRole('textbox', { name: /Required change reason/ }).fill('Synthetic owner browser audit check');
