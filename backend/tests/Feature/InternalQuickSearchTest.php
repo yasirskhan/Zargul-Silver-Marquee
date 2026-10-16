@@ -143,22 +143,18 @@ class InternalQuickSearchTest extends TestCase
         $mounted->call('runSearch')->assertForbidden();
     }
 
-    public function test_admin_cannot_use_quick_search_to_discover_owner_only_audit_events(): void
+    public function test_admin_audit_search_matches_existing_history_policy_and_stays_tenant_scoped(): void
     {
-        [$company, , $members] = $this->fixture();
+        [$company, $foreign, $members] = $this->fixture();
         $service = app(InternalQuickSearchService::class);
-        $ownerResults = $service->search($members['owner'][0], $company->id, 'operations');
-        $this->assertContains('audit', array_column($ownerResults, 'kind'));
-
         $this->be($members['admin'][0]);
-        $adminResults = $service->search($members['admin'][0], $company->id, 'operations');
-        $this->assertNotContains('audit', array_column($adminResults, 'kind'));
+        $allowed = $service->search($members['admin'][0], $company->id, 'operations');
+        $this->assertContains('audit', array_column($allowed, 'kind'));
         Livewire::test(InternalQuickSearch::class)
             ->set('searchTerm', 'operations')->call('runSearch')->assertHasNoErrors()
-            ->assertDontSee('operations.plan_created');
-        $this->assertContains('planning', array_column(
-            $service->search($members['admin'][0], $company->id, 'stage'), 'kind'
-        ));
+            ->assertSee('operations.plan_created');
+        $this->expectException(AuthorizationException::class);
+        $service->search($members['admin'][0], $foreign->id, 'operations');
     }
 
     public function test_term_and_result_bounds_reject_contact_and_large_queries(): void

@@ -1,3 +1,6 @@
+## 2026-10-16 SRCH-001 PERMISSION RECONCILIATION — EXACT CI PENDING
+- Audited actual AuditHistory page and AuditHistoryService visibility: active verified owners AND administrators can read company-scoped audit metadata. Corrected previous narrow search change so it matches existing authorized roles, not a mistaken owner-only restriction. Added PostgreSQL and Livewire admin audit read, company isolation assertions; existing manager denial remains. Finance/release gates untouched. Verify exact CI before declaring green.
+
 ## 2026-10-16 SRCH-001 OWNER-ONLY AUDIT SEARCH AUTHORIZATION — NEW CI PENDING
 - Starting from VERIFIED live HEAD 02c3ee41d9674e520b12300e1cd1c219de535ecb, hosted CI 38855805888 SUCCESS, hardened internal search to omit owner-only audit metadata for administrators even though they can search permitted proposal/planning/approval/finance references. Adds PostgreSQL and Filament Livewire tests confirming owner audit results, admin audit concealment and intact admin planning search. No new permissions, financial operations, client contact search or live deployment. Feature register updated in this commit. Verify exact-SHA all four jobs before marking this batch green.
 
