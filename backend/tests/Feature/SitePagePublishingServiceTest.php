@@ -141,6 +141,67 @@ class SitePagePublishingServiceTest extends TestCase
         $this->assertSame(0, DB::table('site_publishing_events')->where('page_id', $pageId)->count());
     }
 
+    public function test_stale_authenticated_owner_cannot_mutate_cms_after_database_account_shutdown(): void
+    {
+        [$company, $owner, $pageId] = $this->setupWebsite('stale-owner');
+        $this->be($owner);
+        $service = $this->service();
+        $service->saveDraft($owner, $company->id, $pageId, $this->content('Public one'), 0, 'First draft');
+        $first = $service->publish($owner, $company->id, $pageId, 1, 'Publish first');
+        $service->saveDraft($owner, $company->id, $pageId, $this->content('Public two'), 1, 'Second draft');
+        $second = $service->publish($owner, $company->id, $pageId, 2, 'Publish second');
+        $service->saveDraft($owner, $company->id, $pageId, $this->content('Private third'), 2, 'Third draft');
+
+        $revisions = DB::table('site_page_revisions')->where('page_id', $pageId)->count();
+        $history = DB::table('site_publishing_events')->where('page_id', $pageId)->count();
+        $audits = DB::table('audit_events')->where('entity_id', $pageId)->count();
+        DB::table('users')->where('id', $owner->getKey())->update(['is_active' => false]);
+        $this->assertTrue((bool) $owner->is_active, 'The authenticated model is intentionally stale.');
+
+        $actions = [
+            fn () => $service->saveDraft($owner, $company->id, $pageId,
+                $this->content('Forbidden fourth'), 3, 'Revoked owner write'),
+            fn () => $service->publish($owner, $company->id, $pageId, 3, 'Revoked owner publish'),
+            fn () => $service->restorePublishedRevision($owner, $company->id, $pageId,
+                $first, $second, 'Revoked owner rollback'),
+            fn () => $service->unpublish($owner, $company->id, $pageId,
+                (string) Str::uuid(), $second, 'Revoked owner unpublish'),
+        ];
+        foreach ($actions as $operation) {
+            try {
+                $operation();
+                $this->fail('A disabled account passed a CMS mutation.');
+            } catch (AuthorizationException) {
+                $this->assertTrue(true);
+            }
+        }
+
+        $this->assertSame(3, (int) DB::table('site_pages')->where('id', $pageId)->value('draft_revision'));
+        $this->assertSame($second, DB::table('site_pages')->where('id', $pageId)->value('published_revision_id'));
+        $this->assertSame($revisions, DB::table('site_page_revisions')->where('page_id', $pageId)->count());
+        $this->assertSame($history, DB::table('site_publishing_events')->where('page_id', $pageId)->count());
+        $this->assertSame($audits, DB::table('audit_events')->where('entity_id', $pageId)->count());
+    }
+
+    public function test_stale_verified_owner_cannot_publish_after_database_email_revocation(): void
+    {
+        [$company, $owner, $pageId] = $this->setupWebsite('revoked-email');
+        $this->be($owner);
+        $service = $this->service();
+        $service->saveDraft($owner, $company->id, $pageId, $this->content('Private draft'), 0, 'Initial draft');
+        DB::table('users')->where('id', $owner->getKey())->update(['email_verified_at' => null]);
+        $this->assertTrue($owner->hasVerifiedEmail(), 'The authenticated model is intentionally stale.');
+        try {
+            $service->publish($owner, $company->id, $pageId, 1, 'Email no longer verified');
+            $this->fail('Publishing with revoked email verification succeeded.');
+        } catch (AuthorizationException) {
+            $this->assertTrue(true);
+        }
+        $this->assertNull(DB::table('site_pages')->where('id', $pageId)->value('published_revision_id'));
+        $this->assertSame(0, DB::table('site_publishing_events')->where('page_id', $pageId)->count());
+        $this->assertSame(1, DB::table('audit_events')->where('entity_id', $pageId)->count());
+    }
+
     public function test_two_editors_cannot_silently_overwrite_a_stale_draft(): void
     {
         [$company, $owner, $pageId] = $this->setupWebsite();

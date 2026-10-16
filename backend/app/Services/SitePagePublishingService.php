@@ -306,6 +306,11 @@ final class SitePagePublishingService
     {
         if (! Auth::check() || ! $actor->hasVerifiedEmail()
             || (int) Auth::id() !== (int) $actor->getKey()
+            // Auth::user() can be an older in-memory model within this
+            // request. A mid-request account shutdown or email revocation
+            // must invalidate every transaction-time CMS permission check.
+            || ! DB::table('users')->where('id', $actor->getKey())
+                ->where('is_active', true)->whereNotNull('email_verified_at')->exists()
             || ! ($publish
                 ? $this->access->canPublishWebsite($actor, $companyId)
                 : $this->access->canEditWebsite($actor, $companyId))) {
