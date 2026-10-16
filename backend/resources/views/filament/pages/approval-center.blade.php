@@ -89,6 +89,34 @@
 
         @if ($this->role() === 'owner' && $loadedCompanyId === $companyId)
             <section class="space-y-3 rounded-xl border p-4" aria-label="Emergency approval delegation">
+            <section class="space-y-2 rounded-xl border p-3" aria-label="Private Telegram owner alerts">
+                <h3 class="font-semibold">Optional private Telegram alerts</h3>
+                <p class="text-sm">Link your own private chat using the bot. No customer contact,
+                    price or approval decision is sent through Telegram. Every decision still requires
+                    signing in to VenueDesk with MFA. Delivery is disabled until an operator securely
+                    configures the bot, webhook and HTTPS domain.</p>
+                @if (! $this->telegramConfigured())
+                    <p class="text-sm">Telegram is not configured for this venue installation.</p>
+                @else
+                    <p class="text-sm">Status: {{ $this->telegramConnected() ? 'Private owner chat linked' : 'Not linked' }}</p>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" wire:click="beginTelegramPairing" class="rounded-lg border px-3 py-2">
+                            Generate one-time private-chat pairing link
+                        </button>
+                        @if ($this->telegramConnected())
+                            <button type="button" wire:click="revokeTelegramPairing" class="rounded-lg border px-3 py-2">Disconnect Telegram</button>
+                        @endif
+                    </div>
+                    @if ($telegramPairingUrl)
+                        <p class="text-sm">This link expires in 10 minutes and can be used only once.
+                            Open it in your own Telegram app. Anyone with access to your chat may see the
+                            link, so do not share it.</p>
+                        <a href="{{ $telegramPairingUrl }}" rel="noopener noreferrer" target="_blank"
+                            class="break-all text-sm underline">{{ $telegramPairingUrl }}</a>
+                    @endif
+                    @error('telegramPairingUrl') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                @endif
+            </section>
                 <h2 class="font-semibold">Emergency delegation (owner only)</h2>
                 <p class="text-sm">Admin-only recipients. Seven-day maximum; category and amount ceilings, no self-approval. Times are UTC.</p>
                 <div class="grid gap-3 md:grid-cols-2">

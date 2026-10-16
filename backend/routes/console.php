@@ -81,3 +81,13 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
 
     return 0;
 })->purpose('Seed synthetic authenticated browser fixtures in testing only');
+
+/**
+ * Opt-in operator scheduled command. No real sending unless all secrets,
+ * private owner linking and HTTPS app URL have been configured.
+ */
+Artisan::command('venuedesk:deliver-approval-alerts', function (): int {
+    $result = app(\App\Services\TelegramApprovalAlertService::class)->deliverPending(10);
+    $this->info('Private approval delivery: '.json_encode($result));
+    return 0;
+})->purpose('Send bounded opt-in owner Telegram alerts; never act on decisions');

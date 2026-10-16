@@ -12,6 +12,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Telegram Bot API calls are authenticated by a separate configured
+        // webhook secret header. This is not a browser/session endpoint.
+        $middleware->validateCsrfTokens(except: ['integrations/telegram/approval-webhook']);
         // All tenant / hall authorization must also be enforced server-side.
     })
     ->withExceptions(function (Exceptions $exceptions): void {

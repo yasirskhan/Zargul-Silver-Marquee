@@ -66,6 +66,49 @@ final class ApprovalCenter extends Page
 
     public string $revokeReason = '';
 
+    #[Locked]
+    public ?string $telegramPairingUrl = null;
+
+    public function telegramConfigured(): bool
+    {
+        return config('approval_alerts.enabled') === true;
+    }
+
+    public function telegramConnected(): bool
+    {
+        $actor = Filament::auth()->user();
+        return $this->role() === 'owner' && $actor instanceof User
+            && app(\App\Services\TelegramApprovalAlertService::class)
+                ->hasActiveLink($actor, $this->companyId);
+    }
+
+    public function beginTelegramPairing(): void
+    {
+        $actor = $this->authorizeLoaded();
+        abort_unless($this->role() === 'owner', 403);
+        try {
+            $start = app(\App\Services\TelegramApprovalAlertService::class)
+                ->beginPairing($actor, $this->companyId);
+            $this->telegramPairingUrl = $start['url'];
+        } catch (ConflictHttpException $error) {
+            throw ValidationException::withMessages(['telegramPairingUrl' => $error->getMessage()]);
+        }
+    }
+
+    public function revokeTelegramPairing(): void
+    {
+        $actor = $this->authorizeLoaded();
+        abort_unless($this->role() === 'owner', 403);
+        try {
+            app(\App\Services\TelegramApprovalAlertService::class)->revoke(
+                $actor, $this->companyId
+            );
+        } catch (ConflictHttpException $error) {
+            throw ValidationException::withMessages(['telegramPairingUrl' => $error->getMessage()]);
+        }
+        $this->telegramPairingUrl = null;
+    }
+
     public static function canAccess(): bool
     {
         $actor = Filament::auth()->user();
@@ -185,6 +228,7 @@ final class ApprovalCenter extends Page
     {
         $this->selectedId = null;
         $this->selectedRevision = 0;
+        $this->telegramPairingUrl = null;
         $this->refreshInbox();
     }
 

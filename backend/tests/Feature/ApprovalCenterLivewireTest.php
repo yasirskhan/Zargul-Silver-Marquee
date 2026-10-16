@@ -95,4 +95,21 @@ class ApprovalCenterLivewireTest extends TestCase
         $members['owner'][0]->forceFill(['email_verified_at' => null])->save();
         Livewire::test(ApprovalCenter::class)->assertForbidden();
     }
+    public function test_only_owner_can_generate_private_telegram_pairing_link(): void
+    {
+        [$company, , $members] = $this->fixture();
+        config()->set('approval_alerts.enabled', true);
+        config()->set('approval_alerts.bot_token', '123456:synthetic_telegram_bot_token_123456789012345');
+        config()->set('approval_alerts.webhook_secret', 'synthetic_private_webhook_token_123456789012');
+        config()->set('approval_alerts.bot_username', 'VenueDeskTestBot');
+        Livewire::test(ApprovalCenter::class)
+            ->call('beginTelegramPairing')->assertHasNoErrors()
+            ->assertSee('https://t.me/VenueDeskTestBot?start=VD', false);
+        $this->assertSame(1, DB::table('telegram_pair_challenges')->where('company_id', $company->id)->count());
+
+        $this->be($members['admin'][0]);
+        Livewire::test(ApprovalCenter::class)->call('beginTelegramPairing')->assertForbidden();
+        $this->assertSame(1, DB::table('telegram_pair_challenges')->count());
+    }
+
 }
