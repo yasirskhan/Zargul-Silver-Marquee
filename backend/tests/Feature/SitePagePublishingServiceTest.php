@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\User;
 use App\Services\SitePagePublishingService;
+use App\Services\TenantAccess;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -98,6 +99,46 @@ class SitePagePublishingServiceTest extends TestCase
         }
         $this->assertSame($second, DB::table('site_pages')->where('id', $pageId)->value('published_revision_id'));
         $this->assertSame(2, DB::table('site_publishing_events')->count());
+    }
+
+    public function test_editor_revoked_between_initial_authorization_and_page_lock_cannot_save_draft(): void
+    {
+        [$company, $owner, $pageId] = $this->setupWebsite('draft-revocation');
+        $this->be($owner);
+
+        // Return an initially authorized result, then revoke the actual
+        // membership before the locked operation runs its second check.
+        $interleavedAccess = new class extends TenantAccess {
+            public int $checks = 0;
+
+            public function canEditWebsite(User $user, string $companyId): bool
+            {
+                $allowed = parent::canEditWebsite($user, $companyId);
+                if (++$this->checks === 1) {
+                    DB::table('company_memberships')
+                        ->where('company_id', $companyId)
+                        ->where('user_id', $user->getKey())
+                        ->update(['is_active' => false]);
+                }
+
+                return (bool) $allowed;
+            }
+        };
+        $this->app->instance(TenantAccess::class, $interleavedAccess);
+        try {
+            $this->service()->saveDraft($owner, $company->id, $pageId,
+                $this->content('Revoked draft must not be committed'), 0, 'Stale editing permission');
+            $this->fail('A revoked editor saved a draft after the initial check.');
+        } catch (AuthorizationException) {
+            $this->assertSame(2, $interleavedAccess->checks);
+        } finally {
+            $this->app->forgetInstance(TenantAccess::class);
+        }
+
+        $this->assertSame(0, (int) DB::table('site_pages')->where('id', $pageId)->value('draft_revision'));
+        $this->assertSame(0, DB::table('site_page_revisions')->where('page_id', $pageId)->count());
+        $this->assertSame(0, DB::table('audit_events')->where('entity_id', $pageId)->count());
+        $this->assertSame(0, DB::table('site_publishing_events')->where('page_id', $pageId)->count());
     }
 
     public function test_two_editors_cannot_silently_overwrite_a_stale_draft(): void

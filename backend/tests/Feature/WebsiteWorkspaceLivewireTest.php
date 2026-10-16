@@ -91,6 +91,25 @@ class WebsiteWorkspaceLivewireTest extends TestCase
         $this->assertSame(0, DB::table('site_publishing_events')->count());
     }
 
+    public function test_already_open_editor_loses_draft_save_after_delegation_is_revoked(): void
+    {
+        [$company, $editor, $pageId] = $this->fixture(false);
+        $mountedEditor = Livewire::test(WebsiteWorkspace::class)
+            ->call('addSection', 'text')
+            ->set('sections.0.data.title', 'Unapproved post-revocation draft');
+
+        DB::table('company_memberships')
+            ->where('company_id', $company->id)->where('user_id', $editor->id)
+            ->update(['can_edit_site' => false]);
+
+        $mountedEditor->set('reason', 'Old editor tab must be blocked')
+            ->call('saveDraft')->assertForbidden();
+
+        $this->assertSame(0, (int) DB::table('site_pages')->where('id', $pageId)->value('draft_revision'));
+        $this->assertSame(0, DB::table('site_page_revisions')->where('page_id', $pageId)->count());
+        $this->assertSame(0, DB::table('audit_events')->where('entity_id', $pageId)->count());
+    }
+
     public function test_unsaved_live_editor_changes_cannot_be_silently_published(): void
     {
         [, , $pageId] = $this->fixture(true);

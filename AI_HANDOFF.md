@@ -1,3 +1,9 @@
+## 2026-10-16 CMS-004/008 LOCKED DRAFT EDITOR AUTHORIZATION — EXACT SHA CI PENDING
+- Verified starting branch HEAD f78bf48d7999673d6ef1bef28afd395e0a9bbc2b, hosted CI 38953196756 SUCCESS with all four required jobs.
+- SitePagePublishingService::saveDraft now rechecks current verified editor delegation INSIDE the transaction after locking the site_page, matching existing publish/unpublish/restore revocation protection. No stale pre-lock editor permission may write draft/history.
+- PostgreSQL test interleaves a REAL membership revocation after initially granted editor authorization; confirms locked reauthorization denies the operation and no revision/publishing/audit write survives. Mounted Livewire editor regression verifies revoked delegated edit access denies Save Draft without persistence. No customer, finance or public release changed.
+- Updated CMS-004 and CMS-008 feature rows in same commit. New commit requires all-four hosted exact-SHA CI before claiming VERIFIED; owner/mobile publish/unpublish/offline restore browser acceptance and custom CMS-005 menus/footer/domain remain unfinished. Preserve existing gates and continue bounded batches.
+
 ## 2026-10-16 CMS-004/005 PUBLISH/RESTORE REAUTHORIZATION HARDENING — CI PENDING
 - Based on live VERIFIED HEAD 96efe4d3d15abf779891896756e07143ad26c8ad, hosted CI 38915701161 SUCCESS. Rechecks active publisher authorization inside locked publication and restoration transactions, mirroring already existing unpublish lock-time authorization. Adds PostgreSQL regression showing revoked owner cannot publish/replay or restore a previously published page; page pointer and immutable event count unaffected. All real customer/payment/public deployment gates unchanged. Requirement register remains partial. Exact SHA four-job CI required.
 

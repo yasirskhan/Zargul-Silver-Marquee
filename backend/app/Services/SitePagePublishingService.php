@@ -36,6 +36,9 @@ final class SitePagePublishingService
 
         return DB::transaction(function () use ($actor, $companyId, $pageId, $content, $expectedRevision, $reason): int {
             $page = $this->pageForUpdate($companyId, $pageId);
+            // Permissions may be revoked while an editor awaits the row lock.
+            // Authorization before opening the transaction is not sufficient.
+            $this->authorize($actor, $companyId, false);
             if ((int) $page->draft_revision !== $expectedRevision) {
                 throw new ConflictHttpException('Stale website draft; reload before editing.');
             }
