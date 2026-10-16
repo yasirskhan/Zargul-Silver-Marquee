@@ -197,6 +197,34 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   await expect(page.getByText('Revision 1 is live')).toBeVisible();
   await expect(page.getByText('browser-e2e-private@example.test')).toHaveCount(0);
   await expect(page.getByText('Synthetic Browser Customer')).toHaveCount(0);
+
+  // CMS-005: perform actual owner mobile branding changes and separate
+  // publication. The test-only fixture has no external domain or live launch.
+  const branding = page.locator('section[aria-label="Website branding"]');
+  await expect(branding).toContainText('Branding draft revision: 0');
+  await branding.getByRole('textbox', { name: 'Public venue name' })
+    .fill('Synthetic Silver Marquee');
+  await branding.getByRole('textbox', { name: 'Public footer message (optional)' })
+    .fill('Synthetic approved venue footer');
+  await branding.getByRole('textbox', { name: 'Search description (optional)' })
+    .fill('Synthetic approved wedding and events marquee');
+  await branding.getByRole('button', { name: 'Hide /gallery from menu' }).click();
+  await expect(branding.getByRole('button', { name: 'Show /gallery' })).toBeVisible();
+  await branding.getByRole('button', { name: 'Move /about menu link earlier' }).click();
+  await branding.getByRole('textbox', { name: 'Reason for branding change or approval' })
+    .fill('Prepare safe mobile footer and menu draft');
+  await branding.getByRole('button', { name: 'Save branding draft' }).click();
+  await expect(branding).toContainText('Branding draft revision: 1', { timeout: 25_000 });
+  await expect(branding).toContainText('No published branding yet.');
+
+  await branding.getByRole('textbox', { name: 'Reason for branding change or approval' })
+    .fill('Owner approves synthetic branding for website preview');
+  page.once('dialog', dialog => dialog.accept());
+  await branding.getByRole('button', { name: 'Publish branding' }).click();
+  await expect(branding).toContainText('An approved branding snapshot exists.', { timeout: 25_000 });
+  await expect(branding.getByRole('button', { name: 'Show /gallery' })).toBeVisible();
+  await expect(page.getByText('browser-e2e-private@example.test')).toHaveCount(0);
+  await expect(page.getByText('Synthetic Browser Customer')).toHaveCount(0);
 });
 
 test('real operations MFA grants only assigned-hall search and planning on mobile', async ({ page }) => {
