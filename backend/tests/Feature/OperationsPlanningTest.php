@@ -249,6 +249,67 @@ SQL);
         $this->assertSame(2, DB::table('operations_plan_events')->where('task_id', $taskId)->count());
     }
 
+    public function test_revoked_hall_assignment_blocks_planning_review_and_prior_livewire_session(): void
+    {
+        [$company, , , , $actors, $booking] = $this->fixture();
+        $service = app(OperationsPlanningService::class);
+        $id = (string) Str::uuid();
+        $service->create($actors['owner'][0], $company->id, $id,
+            $booking, 'Recheck stage lighting permissions', 'Internal assigned hall planning');
+        $this->be($actors['manager'][0]);
+        $this->assertCount(1, $service->tasks($actors['manager'][0], $company->id));
+        DB::table('hall_assignments')->where('membership_id', $actors['manager'][1]->id)->delete();
+        $this->assertSame([], $service->tasks($actors['manager'][0], $company->id));
+        try {
+            $service->setReviewed($actors['manager'][0], $company->id,
+                $id, 1, true, 'Former assignment is no longer valid');
+            $this->fail('Revoked manager assignment reviewed a planning task.');
+        } catch (AuthorizationException) {
+            $this->assertTrue(true);
+        }
+        $this->be($actors['owner'][0]);
+        $mounted = Livewire::test(OperationsPlanning::class);
+        $actors['owner'][1]->update(['is_active' => false]);
+        $mounted->call('refresh')->assertForbidden();
+        $this->assertSame(1, DB::table('operations_plan_events')->where('task_id', $id)->count());
+    }
+
+    public function test_failed_review_audit_write_rolls_back_task_revision_and_event(): void
+    {
+        [$company, , , , $actors, $booking] = $this->fixture();
+        $service = app(OperationsPlanningService::class);
+        $id = (string) Str::uuid();
+        $service->create($actors['owner'][0], $company->id, $id,
+            $booking, 'Check pre-event lighting layout', 'Synthetic operational planning only');
+        DB::unprepared(<<<'SQL'
+CREATE OR REPLACE FUNCTION fail_ops_review_audit_test() RETURNS trigger
+LANGUAGE plpgsql AS $ops_review$
+BEGIN
+    IF NEW.action = 'operations.plan_reviewed' THEN
+        RAISE EXCEPTION 'Injected operations review audit failure';
+    END IF;
+    RETURN NEW;
+END;
+$ops_review$;
+SQL);
+        DB::statement('CREATE TRIGGER fail_ops_review_audit_test_trigger BEFORE INSERT ON audit_events FOR EACH ROW EXECUTE FUNCTION fail_ops_review_audit_test()');
+        try {
+            $service->setReviewed($actors['owner'][0], $company->id,
+                $id, 1, true, 'Review must not survive audit failure');
+            $this->fail('Task review succeeded despite failed required audit.');
+        } catch (QueryException $error) {
+            $this->assertStringContainsString('Injected operations review audit failure', $error->getMessage());
+        } finally {
+            DB::statement('DROP TRIGGER IF EXISTS fail_ops_review_audit_test_trigger ON audit_events');
+            DB::statement('DROP FUNCTION IF EXISTS fail_ops_review_audit_test()');
+        }
+        $saved = DB::table('operations_plan_tasks')->where('id', $id)->first();
+        $this->assertSame('planned', $saved->status);
+        $this->assertSame(1, (int) $saved->revision);
+        $this->assertSame(1, DB::table('operations_plan_events')->where('task_id', $id)->count());
+        $this->assertSame(1, DB::table('audit_events')->where('entity_id', $id)->count());
+    }
+
     public function test_filament_planning_page_follows_role_and_company_scoping(): void
     {
         [$company, $other, , , $actors, $booking] = $this->fixture();
