@@ -7,6 +7,8 @@ use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\User;
 use App\Services\SiteWorkspaceService;
+use App\Services\TenantAccess;
+use Illuminate\Auth\Access\AuthorizationException;
 use Filament\Panel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -71,6 +73,68 @@ class SiteWorkspaceServiceTest extends TestCase
         $this->assertSame([$company->id => 'Silver'], $workspace->companyOptions($staff));
         $membership->update(['is_active' => false]);
         $this->assertSame([], $workspace->companyOptions($staff));
+    }
+
+    public function test_stale_owner_database_account_shutdown_removes_workspace_and_create_authority(): void
+    {
+        $company = Company::create(['name' => 'Private Marquee', 'slug' => 'private-marquee']);
+        $owner = User::create(['name' => 'Owner', 'email' => 'stale-creator@example.test', 'password' => 'testing-only']);
+        $owner->markEmailAsVerified();
+        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $owner->id, 'role' => 'owner']);
+        $page = $this->site($company, 'Private home');
+        $websiteId = DB::table('site_pages')->where('id', $page)->value('website_id');
+        $this->be($owner);
+        $workspace = app(SiteWorkspaceService::class);
+        $this->assertArrayHasKey($company->id, $workspace->companyOptions($owner));
+
+        DB::table('users')->where('id', $owner->id)->update(['is_active' => false]);
+        $this->assertTrue($owner->is_active, 'Hydrated owner is intentionally stale.');
+        $this->assertSame([], $workspace->companyOptions($owner));
+        try {
+            $workspace->createPage($owner, $company->id, $websiteId, (string) Str::uuid(),
+                '/about', 'A private page', 'Must reject disabled editor');
+            $this->fail('Disabled account created a new unpublished site page.');
+        } catch (AuthorizationException) {
+            $this->assertSame(1, DB::table('site_pages')->where('website_id', $websiteId)->count());
+            $this->assertSame(0, DB::table('audit_events')->where('action', 'website.page_created')->count());
+        }
+    }
+
+    public function test_account_revoked_after_first_edit_check_cannot_create_page_after_website_lock(): void
+    {
+        $company = Company::create(['name' => 'Lock Marquee', 'slug' => 'lock-marquee']);
+        $owner = User::create(['name' => 'Owner', 'email' => 'lock-creator@example.test', 'password' => 'testing-only']);
+        $owner->markEmailAsVerified();
+        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $owner->id, 'role' => 'owner']);
+        $page = $this->site($company, 'Lock home');
+        $websiteId = DB::table('site_pages')->where('id', $page)->value('website_id');
+        $this->be($owner);
+
+        $access = new class extends TenantAccess {
+            public int $checks = 0;
+
+            public function canEditWebsite(User $user, string $companyId): bool
+            {
+                $allowed = parent::canEditWebsite($user, $companyId);
+                if (++$this->checks === 1) {
+                    DB::table('users')->where('id', $user->getKey())
+                        ->update(['is_active' => false]);
+                }
+                return (bool) $allowed;
+            }
+        };
+        $this->app->instance(TenantAccess::class, $access);
+        try {
+            app(SiteWorkspaceService::class)->createPage($owner, $company->id, $websiteId,
+                (string) Str::uuid(), '/halls', 'Unpublished new halls', 'Permission revoked during write lock');
+            $this->fail('New page created using only stale pre-lock account authorization.');
+        } catch (AuthorizationException) {
+            $this->assertSame(1, $access->checks);
+        } finally {
+            $this->app->forgetInstance(TenantAccess::class);
+        }
+        $this->assertSame(1, DB::table('site_pages')->where('website_id', $websiteId)->count());
+        $this->assertSame(0, DB::table('audit_events')->where('action', 'website.page_created')->count());
     }
 
     public function test_filament_workspace_is_registered_only_under_admin_panel(): void

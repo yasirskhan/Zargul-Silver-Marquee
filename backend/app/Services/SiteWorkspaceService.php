@@ -31,7 +31,9 @@ final class SiteWorkspaceService
     /** Companies listed here are the only companies a verified site editor may inspect. */
     public function companyOptions(User $actor): array
     {
-        if (! $actor->is_active || ! $actor->hasVerifiedEmail()) {
+        if (! $actor->is_active || ! $actor->hasVerifiedEmail()
+            || ! DB::table('users')->where('id', $actor->getKey())
+                ->where('is_active', true)->whereNotNull('email_verified_at')->exists()) {
             return [];
         }
 
@@ -98,6 +100,8 @@ final class SiteWorkspaceService
     ): string {
         if (! Auth::check() || (int) Auth::id() !== (int) $actor->getKey()
             || ! $actor->is_active || ! $actor->hasVerifiedEmail()
+            || ! DB::table('users')->where('id', $actor->getKey())
+                ->where('is_active', true)->whereNotNull('email_verified_at')->exists()
             || ! $this->access->canEditWebsite($actor, $companyId)) {
             throw new AuthorizationException('Verified website editor access is required.');
         }
@@ -119,6 +123,10 @@ final class SiteWorkspaceService
                 ->lockForUpdate()->first(['id']);
             if (! $site || ! Auth::check() || (int) Auth::id() !== (int) $actor->getKey()
                 || ! $actor->hasVerifiedEmail()
+                // A hydrated editor may be disabled while waiting for the
+                // tenant website lock. Query CURRENT account state here.
+                || ! DB::table('users')->where('id', $actor->getKey())
+                    ->where('is_active', true)->whereNotNull('email_verified_at')->exists()
                 || ! $this->access->canEditWebsite($actor, $companyId)) {
                 throw new AuthorizationException('Website is not accessible.');
             }
