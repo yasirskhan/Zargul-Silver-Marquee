@@ -36,6 +36,22 @@ final class OperationsPlanningService
         }
     }
 
+    /** Recheck source data before planning can be created or reviewed. */
+    private function assertCurrentProposalReady(string $companyId, object $booking): void
+    {
+        $hall = DB::table('halls')->where('company_id', $companyId)
+            ->where('id', $booking->hall_id)->where('is_active', true)->first();
+        if (! $hall || (int) $hall->program_rules_revision < 1
+            || (int) $booking->requested_guests > (int) $hall->capacity
+            || ! DB::table('hall_program_rule_revisions')
+                ->where('company_id', $companyId)->where('hall_id', $booking->hall_id)
+                ->where('revision_number', $hall->program_rules_revision)->exists()
+            || ! DB::table('customer_profiles')->where('company_id', $companyId)
+                ->where('id', $booking->customer_id)->where('is_active', true)->exists()) {
+            throw new ConflictHttpException('Planning requires a valid active proposal, hall capacity, approved program rules and customer.');
+        }
+    }
+
     private function snapshot(object $row): array
     {
         return ['id' => $row->id, 'bookingId' => $row->booking_id,
@@ -98,6 +114,7 @@ final class OperationsPlanningService
             if (! in_array($booking->status, ['draft', 'under_review'], true)) {
                 throw new ConflictHttpException('Planning for a withdrawn proposal is prohibited.');
             }
+            $this->assertCurrentProposalReady($companyId, $booking);
             DB::table('operations_plan_tasks')->insert([
                 'id' => $taskId, 'company_id' => $companyId,
                 'booking_id' => $bookingId, 'hall_id' => $booking->hall_id,
@@ -146,6 +163,7 @@ final class OperationsPlanningService
             if (! $booking || ! in_array($booking->status, ['draft', 'under_review'], true)) {
                 throw new ConflictHttpException('Withdrawn proposal cannot progress planning.');
             }
+            $this->assertCurrentProposalReady($companyId, $booking);
             $newStatus = $reviewed ? 'reviewed' : 'planned';
             if ((int) $saved->revision !== $expectedRevision
                 || $saved->status === $newStatus) {

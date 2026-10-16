@@ -339,6 +339,38 @@ SQL);
         $service->tasks($actors['owner'][0], $company->id, 30, 'forged');
     }
 
+    public function test_planning_blocks_invalid_capacity_and_inactive_customer_before_mutation(): void
+    {
+        [$company, , $hall, , $actors, $booking] = $this->fixture();
+        $service = app(OperationsPlanningService::class);
+        DB::table('halls')->where('id', $hall->id)->update(['capacity' => 50]);
+        try {
+            $service->create($actors['owner'][0], $company->id, (string) Str::uuid(),
+                $booking, 'Unsafe overloaded setup plan', 'Capacity has become invalid');
+            $this->fail('Invalid current hall capacity allowed planning.');
+        } catch (ConflictHttpException) {
+            $this->assertTrue(true);
+        }
+        $this->assertSame(0, DB::table('operations_plan_tasks')->count());
+
+        DB::table('halls')->where('id', $hall->id)->update(['capacity' => 250]);
+        $id = (string) Str::uuid();
+        $service->create($actors['owner'][0], $company->id, $id,
+            $booking, 'Internal stage layout draft', 'Valid test-only setup planning');
+        $customer = DB::table('booking_drafts')->where('id', $booking)->value('customer_id');
+        DB::table('customer_profiles')->where('id', $customer)->update(['is_active' => false]);
+        try {
+            $service->setReviewed($actors['owner'][0], $company->id,
+                $id, 1, true, 'Invalid inactive customer cannot progress');
+            $this->fail('Inactive customer proposal advanced its planning review.');
+        } catch (ConflictHttpException) {
+            $this->assertTrue(true);
+        }
+        $this->assertSame(1, (int) DB::table('operations_plan_tasks')
+            ->where('id', $id)->value('revision'));
+        $this->assertSame(1, DB::table('operations_plan_events')->where('task_id', $id)->count());
+    }
+
     public function test_filament_planning_page_follows_role_and_company_scoping(): void
     {
         [$company, $other, , , $actors, $booking] = $this->fixture();

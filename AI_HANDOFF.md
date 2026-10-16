@@ -1,3 +1,6 @@
+## 2026-10-16 OPS-001 CURRENT PROPOSAL READINESS RECHECK — EXACT SHA CI PENDING
+- OperationsPlanningService now refuses task creation and review progression if the internal draft's current hall is inactive/unconfigured or under capacity, required approved program revision missing, or linked internal customer deactivated. Tests exercise reduction of capacity and subsequent deactivation of customer after planning creation; task/event revisions remain unchanged on refusal. The batch does not create physical events, authorize booking, issue bills or allow real cash. Baseline 4aaa95260237309b952f90607deae1da9901b0e4; hosted all-four exact-SHA CI required. Feature register updated in same commit.
+
 ## 2026-10-16 OPS-001 ROLE-SCOPED MOBILE CHECKLIST FILTER — EXACT SHA CI PENDING
 - On baseline 040244003558459c480fcbc868ca44022942e23a, added server-side reviewed/planned status filter with strict enum validation, company/hall-scoped task queries and Livewire UI reset on tenant changes. PostgreSQL service and Filament tests prove server-filtering and invalid status refusal. No data moved to client without active company membership and no claims of actual event setup, invoicing or booking confirmation. Feature register updated in same commit. Verify all four CI jobs at exact new SHA, fix reds before marking verified.
 
