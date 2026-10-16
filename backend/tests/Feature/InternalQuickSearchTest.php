@@ -280,6 +280,39 @@ class InternalQuickSearchTest extends TestCase
         $service->search($members['manager'][0], $company->id, 'expense', 20, 'audit');
     }
 
+    public function test_manager_sees_only_own_approval_requests_not_other_staff_requests(): void
+    {
+        [$company, , $members, $booking] = $this->fixture();
+        $this->be($members['manager'][0]);
+        $mine = (string) Str::uuid();
+        app(ApprovalWorkflowService::class)->request(
+            $members['manager'][0], $company->id, $mine,
+            'discount', 150, 'PKR', $booking,
+            'Own synthetic additional discount request'
+        );
+        $service = app(InternalQuickSearchService::class);
+        $ownResults = $service->search($members['manager'][0],
+            $company->id, 'discount', 20, 'approval');
+        $this->assertContains($mine, array_column($ownResults, 'id'));
+        $this->assertSame(['approval'], array_values(array_unique(array_column($ownResults, 'kind'))));
+        $this->assertSame('/admin/approval-center?company='.$company->id, $ownResults[0]['path']);
+        $this->assertSame([], $service->search($members['manager'][0],
+            $company->id, 'expense', 20, 'approval'));
+        Livewire::test(InternalQuickSearch::class)
+            ->assertSee('My approval requests')
+            ->set('searchTerm', 'discount')->set('searchKind', 'approval')
+            ->call('runSearch')->assertHasNoErrors()
+            ->assertSee('Reference '.$mine)
+            ->assertDontSee('Synthetic expense consideration');
+
+        $this->be($members['operations'][0]);
+        $this->assertSame([], $service->search($members['operations'][0],
+            $company->id, 'discount'));
+        Livewire::test(InternalQuickSearch::class)->assertDontSee('My approval requests');
+        $this->expectException(AuthorizationException::class);
+        $service->search($members['operations'][0], $company->id, 'discount', 20, 'approval');
+    }
+
     public function test_term_and_result_bounds_reject_contact_and_large_queries(): void
     {
         [$company, , $members] = $this->fixture();

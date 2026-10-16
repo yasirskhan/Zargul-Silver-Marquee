@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
-/** Least-privilege staff search: hall-scoped planning for assigned staff; private sources only for owner/admin. */
+/** Staff search: assigned-hall planning and manager's own approvals; owner/admin private sources. */
 final class InternalQuickSearchService
 {
     private const SOURCES = [
@@ -50,7 +50,9 @@ final class InternalQuickSearchService
         if (! in_array($kind, ['all', 'proposal', 'planning', 'approval', 'finance', 'audit'], true)) {
             throw new InvalidArgumentException('Unknown internal record type.');
         }
-        if ($restricted && ! in_array($kind, ['all', 'planning'], true)) {
+        $allowedKinds = $membership->role === 'manager'
+            ? ['all', 'planning', 'approval'] : ['all', 'planning'];
+        if ($restricted && ! in_array($kind, $allowedKinds, true)) {
             throw new AuthorizationException('This record category is not permitted for assigned staff.');
         }
         $term = trim($term);
@@ -65,9 +67,11 @@ final class InternalQuickSearchService
             if ($kind !== 'all' && $source['kind'] !== $kind) {
                 continue;
             }
-            // BookingProposals, finance, approval and audit workspaces have
-            // independent policies; assigned staff can ONLY search planning.
-            if ($restricted && $source['kind'] !== 'planning') {
+            // Match destination policies exactly: operations may only find
+            // assigned planning; managers may also find THEIR OWN approvals.
+            // No staff proposal, finance or audit record is searchable.
+            if ($restricted && ! in_array($source['kind'], $membership->role === 'manager'
+                ? ['planning', 'approval'] : ['planning'], true)) {
                 continue;
             }
             $query = DB::table($source['table'])->where('company_id', $companyId)
@@ -77,7 +81,12 @@ final class InternalQuickSearchService
                         $query->orWhereRaw("strpos(lower($field), lower(?)) > 0", [$term]);
                     }
                 });
-            if ($restricted) {
+            if ($restricted && $source['kind'] === 'approval') {
+                // ApprovalWorkflowService::inbox grants managers only their
+                // own request history, regardless of approval outcome.
+                $query->where('requested_by', $actor->getKey());
+            }
+            if ($restricted && $source['kind'] === 'planning') {
                 // Enforce hall assignment in PostgreSQL, never in a client filter.
                 // Removing the assignment immediately removes its search results.
                 $query->whereExists(function ($scope) use ($companyId, $membership): void {

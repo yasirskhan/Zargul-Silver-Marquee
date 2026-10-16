@@ -86,8 +86,14 @@ final class InternalQuickSearch extends Page
         if (! $membership) {
             abort(403);
         }
-        if (in_array($membership->role, ['manager', 'operations'], true)) {
+        if ($membership->role === 'operations') {
             return ['all' => 'All permitted records', 'planning' => 'Planning tasks'];
+        }
+        if ($membership->role === 'manager') {
+            return [
+                'all' => 'All permitted records', 'planning' => 'Planning tasks',
+                'approval' => 'My approval requests',
+            ];
         }
         return [
             'all' => 'All permitted records', 'proposal' => 'Booking proposals',
