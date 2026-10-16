@@ -8,7 +8,7 @@ AUTH-001,Owner/Admin MFA and all staff roles,1,MFA and shared session infrastruc
 TEN-001,Company and hall access isolation,1,Initial backend test verified,PostgreSQL composite FKs and owner manager access checks PASS in run 38805803519; complete policy coverage pending
 AUD-001,Append-only searchable audit,1,Schema and immutability tests verified,Audit events table and PostgreSQL update/delete trigger tested; audit writer export and reporting not implemented
 HALL-001,Capacity and included seating plus priced additions,2,Prototype only,Backend pricing and capacity enforcement
-SLOT-001,Three owner-configurable programs daily,2,Authorized versioned hall program service verified,Owner admin-only audited three daily time rate grace setup cleaning and overtime rules with optimistic concurrency and hall-scoped staff read verified SHA f19d6254be54f52eac236ceb6286c097ea9033b3 CI 38828095492 backend 91 tests 413 assertions; responsive owner settings UI and active reservations pending
+SLOT-001,Three owner-configurable programs daily,2,Owner settings and audited service verified,Responsive Filament owner admin three-session schedule pricing and buffer controls with manager read-only and stale-conflict protection verified SHA 9c0331c353e6783d61a29ce0d0671db9298748b7 CI 38829911961 backend 96 tests 446 assertions; production reservations and authenticated browser E2E pending
 SLOT-002,Grace/overtime/turnover/hard stop,2,Prototype only,Policy and operations integration tests
 ADD-001,Music/lighting/bridal entry and configurable addons,2,Prototype only,Admin catalog and itemized pricing
 BOOK-001,Availability calendar day/week/month/mobile,3,Partial prototype,Daily slot preview only; week/month views and DB protection pending

@@ -11,9 +11,9 @@ GitHub connector: repository read and write successful.
 Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; docs/ROADMAP.md; docs/WEBSITE_CMS_DESIGN.md; docs/DEVELOPMENT_PROTOCOL.md; docs/decisions/ADR-0001-platform-and-cms.md. Then read relevant source and tests. Verify LIVE development branch HEAD + exact SHA CI/jobs before writing. Actual repo/CI takes precedence over old handoff state.
 
 ## Last fully VERIFIED PRODUCT checkpoint
-- **Source commit:** `f19d6254be54f52eac236ceb6286c097ea9033b3`
-- **Hosted CI:** `38828095492`, SUCCESS.
-- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38828095492
+- **Source commit:** `9c0331c353e6783d61a29ce0d0671db9298748b7`
+- **Hosted CI:** `38829911961`, SUCCESS.
+- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38829911961
 - All three jobs SUCCESS: `prototype-checks`, `laravel-postgres`, `editor-browser-e2e`.
 - PHP 8.3 clean Composer package resolution of Laravel 13 + Filament 5 succeeded.
 - PostgreSQL 16 migrations succeeded, including versioned website and tenant identity tables.
@@ -232,3 +232,10 @@ If current doc-only commit is verified, record that exact SHA and CI run only af
 - PostgreSQL tests confirm owner configuration, history, revisions, manager read-only permission, buffer overlap, malformed times, cross-tenant denial, stale overwrite prevention and audit-failure rollback.
 - No user-facing hall rule editor yet, no per-date special/holiday schedules, date-specific booking holds, availability ledger or actual overtime billing. Currency input currently explicit ISO-style three-uppercase-letter code; require genuine currency catalog/owner signoff before production billing.
 - **NEXT BOUNDED TASK:** add a responsive role-checked Filament Hall Programs settings page with company/hall selector, accessible three session controls, safe price input and clear saved state, reload/stale conflict checks, Livewire PostgreSQL tests. Do not assume venue currency, actual prices or booking live capability. Keep public CMS hardening/authenticated Filament browser acceptance and all bookings/finance/approval/Telegram tasks in scope.
+
+## 2026-10-16 responsive Filament Hall Programs UI VERIFIED
+- Product SOURCE `9c0331c353e6783d61a29ce0d0671db9298748b7`, hosted CI `38829911961` SUCCESS for exact SHA. `laravel-postgres`, `prototype-checks`, `editor-browser-e2e` all green. PostgreSQL backend 96 passed / 446 assertions, PHP syntax, migration replay and static prototype Chromium checks passed.
+- New `backend/app/Filament/Pages/HallPrograms.php` and associated responsive Blade: company and hall selectors filtered through active memberships/assigned halls, owner/admin-only three-program time/grace/setup/cleaning/overtime/rate editing and manager read-only view. No assumed/default live rates or currency; explicit integer minor units and reason. Saved state includes locked company/hall/revision token; conflict rejects stale saves, suggests reload; existing HallProgramRulesService does locked transactional revision and audit.
+- `backend/tests/Feature/HallProgramsLivewireTest.php` verifies owner save, stale conflict and reload, assigned-manager cannot edit, foreign tenant denial, revoked membership denial and incomplete form denial. Filament panel registers HallPrograms beside WebsiteWorkspace, and enforces mandatory app MFA in panel config.
+- Browser tests are STATIC editor prototype only, NOT real authenticated Filament end-to-end. No venue pricing approved for live use, no reservations, invoicing, public CMS route or Telegram.
+- **NEXT BOUNDED TASK:** Phase 2 HALL-001: tenant-scoped, versioned hall capacity/included chairs/tables + additional seating unit-price configuration, strict limits, owner-only audited service, role-scoped read, stale concurrency guards and PostgreSQL tests. Then connect responsive owner settings and approved catalog/add-ons. Preserve previously completed work. Do not touch main or property-platform.
