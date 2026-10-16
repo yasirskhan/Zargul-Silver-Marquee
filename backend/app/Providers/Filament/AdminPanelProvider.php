@@ -4,6 +4,7 @@ namespace App\Providers\Filament;
 
 use App\Filament\Pages\ApprovalCenter;
 use App\Filament\Pages\OperationsPlanning;
+use App\Filament\Pages\InternalQuickSearch;
 use App\Filament\Pages\FinanceDesk;
 use App\Filament\Pages\AuditHistory;
 use App\Filament\Pages\BookingProposals;
@@ -42,7 +43,7 @@ class AdminPanelProvider extends PanelProvider
             ->multiFactorAuthentication([
                 AppAuthentication::make()->recoverable(),
             ], isRequired: true)
-            ->pages([OperationsPlanning::class, ApprovalCenter::class, FinanceDesk::class, AuditHistory::class, BookingProposals::class, HallCalendar::class, HallPrograms::class, WebsiteWorkspace::class])
+            ->pages([InternalQuickSearch::class, OperationsPlanning::class, ApprovalCenter::class, FinanceDesk::class, AuditHistory::class, BookingProposals::class, HallCalendar::class, HallPrograms::class, WebsiteWorkspace::class])
             ->renderHook(
                 PanelsRenderHook::PAGE_START,
                 fn (): \Illuminate\Contracts\View\View => view('filament.hooks.owner-approval-attention'),

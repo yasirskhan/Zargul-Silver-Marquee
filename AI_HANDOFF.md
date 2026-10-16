@@ -1,3 +1,6 @@
+## 2026-10-16 SRCH-001 INTERNAL VERIFIED OWNER SEARCH — EXACT SHA CI PENDING
+- Added private InternalQuickSearchService/Filament workspace with active verified owner/admin company policy, immutable server-side source whitelist, bounded literal PostgreSQL search on proposal, planning, approval, nonbinding finance preview and redacted audit labels. Real PostgreSQL tests cover company boundary, manager/foreign/revoked denial, Livewire and contact redaction. This is a partial owner/admin reference discovery feature, NOT full customer/search permissions or real booking/finance release. Prior source f56bf5300015a894b8820ee61e39aff70c2017c7 CI 38855312185 SUCCESS all four. New exact-SHA CI required. Do not touch main/property-platform.
+
 ## 2026-10-16 OPS-001 FILTER INPUT VALIDATION — EXACT SHA CI PENDING
 - Follow-up to a0249872b5e5053531143d0d1dd28b20118b40ab: the Filament planning status control now validates the precise allowed enum and active loaded company on Livewire update, yielding a normal field error for forged input rather than an unhandled service exception. Added Livewire regression. No new roles, no changes to server-side tenant checks, no booking/finance permissions. Feature register and handoff same commit. Latest exact-SHA hosted CI required.
 
