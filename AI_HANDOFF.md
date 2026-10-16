@@ -1,3 +1,6 @@
+## 2026-10-16 OPS-001 AUDIT TEST SQL QUOTE REPAIR — CI PENDING
+- On live HEAD 7a6665cc15b9ed2df155d042ba0db08e28962769, exact GitHub Actions 38853914985: browser authenticated, editor browser, and prototype green; PostgreSQL 242 passed, one failed in OperationsPlanningTest audit rejection function definition. The test's SQL contained invalid single-dollar delimiters even after earlier attempted repair. Replace opening/closing delimiter with PostgreSQL tagged $tag$ delimiters; retain real trigger injection, rollback expectation and assertions without skips. New exact-SHA all-job CI required. No live business permission changed.
+
 ## 2026-10-16 OPS-001 DETERMINISTIC LOCK ORDER — EXACT SHA CI PENDING
 - Follow-up to OPS Filament class collision and real audit fixture corrections: OperationsPlanningService::setReviewed now discovers task linkage, locks immutable booking proposal BEFORE locking task, and reauthorizes under lock. This matches create() and serializes with withdrawal without introducing task/booking reversed lock acquisition. Added PostgreSQL stale revision after reopen regression. No physical booking/finance release, main or property-platform changes. Verify new exact SHA hosted CI.
 

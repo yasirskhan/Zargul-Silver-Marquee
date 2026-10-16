@@ -169,14 +169,14 @@ class OperationsPlanningTest extends TestCase
         [$company, , , , $actors, $booking] = $this->fixture();
         DB::unprepared(<<<'SQL'
 CREATE OR REPLACE FUNCTION fail_ops_audit_test() RETURNS trigger
-LANGUAGE plpgsql AS $
+LANGUAGE plpgsql AS $tag$
 BEGIN
     IF NEW.action = 'operations.plan_created' THEN
         RAISE EXCEPTION 'Injected operations audit failure';
     END IF;
     RETURN NEW;
 END;
-$;
+$tag$;
 SQL);
         DB::statement('CREATE TRIGGER fail_ops_audit_test_trigger BEFORE INSERT ON audit_events FOR EACH ROW EXECUTE FUNCTION fail_ops_audit_test()');
         try {
