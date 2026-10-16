@@ -11,13 +11,13 @@ GitHub connector: repository read and write successful.
 Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; docs/ROADMAP.md; docs/WEBSITE_CMS_DESIGN.md; docs/DEVELOPMENT_PROTOCOL.md; docs/decisions/ADR-0001-platform-and-cms.md. Then read relevant source and tests. Verify LIVE development branch HEAD + exact SHA CI/jobs before writing. Actual repo/CI takes precedence over old handoff state.
 
 ## Last fully VERIFIED PRODUCT checkpoint
-- **Source commit:** `974b9c03b4b20347da7d425cc66437979a3374c3`
-- **Hosted CI:** `38827775344`, SUCCESS.
-- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38827775344
+- **Source commit:** `f19d6254be54f52eac236ceb6286c097ea9033b3`
+- **Hosted CI:** `38828095492`, SUCCESS.
+- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38828095492
 - All three jobs SUCCESS: `prototype-checks`, `laravel-postgres`, `editor-browser-e2e`.
 - PHP 8.3 clean Composer package resolution of Laravel 13 + Filament 5 succeeded.
 - PostgreSQL 16 migrations succeeded, including versioned website and tenant identity tables.
-- Backend `86 passed (392 assertions)` at latest CI, covering previous security/CMS tests and new private branding preview checks. Earlier tests include: tenant/hall access, delegated website edit vs publish checks, cross-tenant composite FK rejection, invalid role rejection, isolation of draft/published revision, cross-page published revision rejection, immutable revisions/audit records.
+- Backend `91 passed (413 assertions)` at latest CI, covering previous security/CMS tests and new private branding preview checks. Earlier tests include: tenant/hall access, delegated website edit vs publish checks, cross-tenant composite FK rejection, invalid role rejection, isolation of draft/published revision, cross-page published revision rejection, immutable revisions/audit records.
 - Database **CMS migration rollback and replay** succeeded.
 - Node prototype logic and UI structure checks and JS syntax passed.
 - **Locked dependencies, CMS transactional foundation with audited restore and scoped authorization policy, Filament MFA and shared PostgreSQL cache/session infrastructure are verified** at the above SHA. Composer lock downloaded from the verified PHP 8.3 artifact, vetted (141 packages, content hash f199e7dfdf44e33a642f6ac51604217e), committed at 8c1e01e2; hosted CI now uses `composer install`. One-time lock-promotion workflow was removed. This documentation change must itself pass CI.
@@ -224,3 +224,11 @@ If current doc-only commit is verified, record that exact SHA and CI run only af
 - First run `38827588599` FAILED at migration: Laravel `DB::statement` interpreted PostgreSQL JSONB `?` as PDO placeholder. Fixed to `DB::unprepared` in `974b9c03`, exact SHA run passes.
 - **NEXT BOUNDED TASK prepared as UNCOMMITTED BLOBS (NOT verified):** TenantAccess.php `8e1d4e019093b930a912045bdb081beab064ae47`; HallProgramRulesService.php `035357cd423436bd0a20ab20509caa712cbeb60b`; HallProgramRulesServiceTest.php original `4785ade1e9df11d7aa3b4be90eb97cedb971df1d`, JSONB-order assertion fix `bed29fec09a325a15bf6610c05a6dc45a2bebb34`. REVIEW against live HEAD before committing. Implements owner/admin-only audited transactional three-program configuration with CAS, validates setup/clean buffers, time and rate limits, staff-scoped read and audit-failure rollback.
 - Phase 2 is NOT complete. No venue calendar, date-specific overrides, active holds, booking concurrency, hall pricing settings UI, actual overtime billing, functional public website or finance. Continue authenticated Filament browser acceptance and secure public asset delivery as separate bounded release-gated work.
+
+## 2026-10-16 authorized, versioned hall program business service VERIFIED
+- SOURCE `f19d6254be54f52eac236ceb6286c097ea9033b3`, hosted CI `38828095492` SUCCESS exact SHA, all three jobs green, 91 backend tests / 413 assertions and PostgreSQL migration rollback/replay green.
+- `TenantAccess::canConfigureHall` now restricts sensitive hall schedule/price changes to verified authenticated active-company owner/admin; previously authorized assigned managers may read their active hall rules via `canViewHall`, not write.
+- `HallProgramRulesService::configure` requires exactly three same-day local morning/noon/evening time rules with setup, clean buffers, free grace, overtime interval/rate and base rent in currency minor units. Rejects overlapping setup/clean intervals, invalid time/rate/extra fields, midnight overrun, foreign hall IDs, invalid roles, stale revision expected-version CAS. All writes happen under locked hall revision and append immutable history + audit with before/after/reason in the same transaction. `current` reads role-scoped effective rules, null if unconfigured.
+- PostgreSQL tests confirm owner configuration, history, revisions, manager read-only permission, buffer overlap, malformed times, cross-tenant denial, stale overwrite prevention and audit-failure rollback.
+- No user-facing hall rule editor yet, no per-date special/holiday schedules, date-specific booking holds, availability ledger or actual overtime billing. Currency input currently explicit ISO-style three-uppercase-letter code; require genuine currency catalog/owner signoff before production billing.
+- **NEXT BOUNDED TASK:** add a responsive role-checked Filament Hall Programs settings page with company/hall selector, accessible three session controls, safe price input and clear saved state, reload/stale conflict checks, Livewire PostgreSQL tests. Do not assume venue currency, actual prices or booking live capability. Keep public CMS hardening/authenticated Filament browser acceptance and all bookings/finance/approval/Telegram tasks in scope.
