@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Url;
 use InvalidArgumentException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
@@ -26,6 +27,7 @@ final class ApprovalCenter extends Page
 
     protected static ?string $slug = 'approval-center';
 
+    #[Url(as: 'company')]
     public ?string $companyId = null;
 
     #[Locked]
@@ -202,7 +204,7 @@ final class ApprovalCenter extends Page
     {
         abort_unless(static::canAccess(), 403);
         $options = $this->companyOptions();
-        $requested = request()->query('company');
+        $requested = $this->companyId ?? request()->query('company');
         // A deep link from the authenticated owner notice may select only an
         // active member company, never an arbitrary UUID supplied by a client.
         abort_unless($requested === null || (is_string($requested)
