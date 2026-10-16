@@ -11,13 +11,13 @@ GitHub connector: repository read and write successful.
 Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; docs/ROADMAP.md; docs/WEBSITE_CMS_DESIGN.md; docs/DEVELOPMENT_PROTOCOL.md; docs/decisions/ADR-0001-platform-and-cms.md. Then read relevant source and tests. Verify LIVE development branch HEAD + exact SHA CI/jobs before writing. Actual repo/CI takes precedence over old handoff state.
 
 ## Last fully VERIFIED PRODUCT checkpoint
-- **Source commit:** `a8f962f936aab34d24455969571650920db822ce`
-- **Hosted CI:** `38832236012`, SUCCESS.
-- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38832236012
+- **Source commit:** `b88549415adc6bec4912f6dd7db793cfb8ec6d6a`
+- **Hosted CI:** `38833888032`, SUCCESS.
+- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38833888032
 - All three jobs SUCCESS: `prototype-checks`, `laravel-postgres`, `editor-browser-e2e`.
 - PHP 8.3 clean Composer package resolution of Laravel 13 + Filament 5 succeeded.
 - PostgreSQL 16 migrations succeeded, including versioned website and tenant identity tables.
-- Backend `91 passed (413 assertions)` at latest CI, covering previous security/CMS tests and new private branding preview checks. Earlier tests include: tenant/hall access, delegated website edit vs publish checks, cross-tenant composite FK rejection, invalid role rejection, isolation of draft/published revision, cross-page published revision rejection, immutable revisions/audit records.
+- Backend `132 passed (595 assertions)` at latest CI, covering previous security/CMS tests and new private branding preview checks. Earlier tests include: tenant/hall access, delegated website edit vs publish checks, cross-tenant composite FK rejection, invalid role rejection, isolation of draft/published revision, cross-page published revision rejection, immutable revisions/audit records.
 - Database **CMS migration rollback and replay** succeeded.
 - Node prototype logic and UI structure checks and JS syntax passed.
 - **Locked dependencies, CMS transactional foundation with audited restore and scoped authorization policy, Filament MFA and shared PostgreSQL cache/session infrastructure are verified** at the above SHA. Composer lock downloaded from the verified PHP 8.3 artifact, vetted (141 packages, content hash f199e7dfdf44e33a642f6ac51604217e), committed at 8c1e01e2; hosted CI now uses `composer install`. One-time lock-promotion workflow was removed. This documentation change must itself pass CI.
@@ -279,3 +279,10 @@ If current doc-only commit is verified, record that exact SHA and CI run only af
 - Seven new PostgreSQL tests include same-claim deduplication, conflicts, expiry replace preserving history, release preserving history, unconfigured and foreign company denial, unassigned manager denial, date/program/TTL input validation and full transaction rollback on injected audit failure.
 - IMPORTANT: No real parallel PostgreSQL connection test yet, no signed-off venue timezone/expiry policy, customer consent/contact/quotes, customer booking record, pricing snapshot, confirmation approval or invoice. An internal hold is NOT a customer booking. No public website or real booking enabled.
 - **NEXT BOUNDED TASK:** tenant/hall-scoped read-only day/week/month occupancy calendar projection without customer information. Expired but uncleared holds must be reported as requiring cleanup, never falsely free. PostgreSQL tests across owner/assigned staff, cross-tenant scope and dates. Then two-connection PostgreSQL concurrency tests and authenticated Filament calendar UI. Never skip overall CMS, finance, approvals, Telegram, role and audit scope.
+
+## 2026-10-16 Phase 3 read-only hall occupancy projection VERIFIED
+- Product source `b88549415adc6bec4912f6dd7db793cfb8ec6d6a`, exact-SHA hosted CI `38833888032` SUCCESS: all three jobs; 132 PostgreSQL backend tests, 595 assertions, PHP syntax, migration rollback/replay, Node and static prototype Chromium checks.
+- `HallOccupancyCalendarService::forHall` reads a 1-42 day inclusive hall calendar, with three fixed program statuses per day. Requires current signed-in verified actor and active company/hall visibility via TenantAccess. No customer, staff/creator, claim key, financial or audit details are returned. No public endpoint.
+- Safe slot states: `available` only for configured program without a claim; `unconfigured` for unconfigured hall; `hold` for active hold; `confirmed` for an existing confirmed row; `cleanup_required` for expired/invalid active hold rows that still block unique occupancy. Projection never deletes stale holds or pretends expiry frees a physical claim. Claim/locking service remains authoritative.
+- `HallOccupancyCalendarServiceTest` covers 3-program day spans, unconfigured, active/confirmed/expired claims, no mutation, assigned manager and foreign hall/tenant denials, revoked membership, authenticated actor and invalid range. This does NOT prove real concurrent booking safety, booking confirmation, public availability or complete UI.
+- **NEXT BOUNDED TASK:** two independent PostgreSQL connection lock-contention regression against internal HallSlotHoldService, then add authenticated responsive Filament calendar. A prepared UNCOMMITTED test blob `3feceb2e7ab3fa0007943490ba3841e260bc007a` exists for `backend/tests/Feature/HallSlotHoldConcurrencyTest.php`; review against live HEAD before commit; not verified. Then customer/booking domain and policy approval, with finance, CMS/public website, owner page builder, Telegram, audits and operations still required.
