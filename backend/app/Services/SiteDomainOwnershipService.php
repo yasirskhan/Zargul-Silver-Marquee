@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -77,7 +78,8 @@ final class SiteDomainOwnershipService
         $this->reason($reason);
         $claim = DB::table('site_domain_claims')->where('company_id', $companyId)
             ->where('website_id', $websiteId)->where('domain', $domain)->first();
-        if (! $claim || $claim->status !== 'pending' || $claim->expires_at <= now()) {
+        if (! $claim || $claim->status !== 'pending'
+            || Carbon::parse($claim->expires_at)->lessThanOrEqualTo(now())) {
             throw new ConflictHttpException('A current pending domain challenge is required.');
         }
 
@@ -103,7 +105,8 @@ final class SiteDomainOwnershipService
                 ->lockForUpdate()->first();
             $this->authorize($actor, $companyId);
             if (! $locked || $locked->status !== 'pending'
-                || $locked->token_hash !== $claim->token_hash || $locked->expires_at <= now()) {
+                || $locked->token_hash !== $claim->token_hash
+                || Carbon::parse($locked->expires_at)->lessThanOrEqualTo(now())) {
                 throw new ConflictHttpException('DNS ownership challenge changed or expired.');
             }
             DB::table('site_domain_claims')->where('id', $claim->id)->update([

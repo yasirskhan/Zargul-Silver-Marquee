@@ -132,6 +132,30 @@ class SiteDomainOwnershipServiceTest extends TestCase
         $this->assertSame($company->id, DB::table('site_domain_claims')->value('company_id'));
     }
 
+    public function test_publisher_revoked_after_request_cannot_verify_even_with_correct_dns_txt(): void
+    {
+        [$company, $owner, $site] = $this->fixture('dns-revocation');
+        $resolver = $this->resolver();
+        $service = app(SiteDomainOwnershipService::class);
+        $challenge = $service->request($owner, $company->id, $site,
+            'verify.marquee.org', 'Request DNS ownership proof');
+        $resolver->answers[$challenge['txtName']] = [$challenge['txtValue']];
+        DB::table('users')->where('id', $owner->id)->update(['is_active' => false]);
+
+        // Auth still holds an old hydrated owner object; live database
+        // authorization must reject even matching DNS proof.
+        try {
+            $service->verify($owner, $company->id, $site, 'verify.marquee.org',
+                'Reject disabled publisher');
+            $this->fail('Disabled publisher verified a DNS domain.');
+        } catch (AuthorizationException) {
+            $this->assertSame('pending',
+                DB::table('site_domain_claims')->where('website_id', $site)->value('status'));
+            $this->assertSame(0,
+                DB::table('audit_events')->where('action', 'website.domain_ownership_verified')->count());
+        }
+    }
+
     public function test_expired_and_rotated_dns_tokens_cannot_be_verified(): void
     {
         [$company, $owner, $site] = $this->fixture('rotate-domain');
