@@ -11,13 +11,13 @@ GitHub connector: repository read and write successful.
 Read this ENTIRE file; docs/PROJECT_MASTER_SPEC.md; docs/FEATURE_REGISTER.csv; docs/ROADMAP.md; docs/WEBSITE_CMS_DESIGN.md; docs/DEVELOPMENT_PROTOCOL.md; docs/decisions/ADR-0001-platform-and-cms.md. Then read relevant source and tests. Verify LIVE development branch HEAD + exact SHA CI/jobs before writing. Actual repo/CI takes precedence over old handoff state.
 
 ## Last fully VERIFIED PRODUCT checkpoint
-- **Source commit:** `f57d45c213766ed3d5664e74e75782105cb75895`
-- **Hosted CI:** `38826473584`, SUCCESS.
-- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38826473584
+- **Source commit:** `72bb9dc8d31db3634fe1c87bc25bb37865f417ea`
+- **Hosted CI:** `38826775925`, SUCCESS.
+- Exact GitHub Actions: https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/38826775925
 - All three jobs SUCCESS: `prototype-checks`, `laravel-postgres`, `editor-browser-e2e`.
 - PHP 8.3 clean Composer package resolution of Laravel 13 + Filament 5 succeeded.
 - PostgreSQL 16 migrations succeeded, including versioned website and tenant identity tables.
-- Backend `77 passed (347 assertions)` at latest CI, covering previous security/CMS tests and new private branding preview checks. Earlier tests include: tenant/hall access, delegated website edit vs publish checks, cross-tenant composite FK rejection, invalid role rejection, isolation of draft/published revision, cross-page published revision rejection, immutable revisions/audit records.
+- Backend `81 passed (366 assertions)` at latest CI, covering previous security/CMS tests and new private branding preview checks. Earlier tests include: tenant/hall access, delegated website edit vs publish checks, cross-tenant composite FK rejection, invalid role rejection, isolation of draft/published revision, cross-page published revision rejection, immutable revisions/audit records.
 - Database **CMS migration rollback and replay** succeeded.
 - Node prototype logic and UI structure checks and JS syntax passed.
 - **Locked dependencies, CMS transactional foundation with audited restore and scoped authorization policy, Filament MFA and shared PostgreSQL cache/session infrastructure are verified** at the above SHA. Composer lock downloaded from the verified PHP 8.3 artifact, vetted (141 packages, content hash f199e7dfdf44e33a642f6ac51604217e), committed at 8c1e01e2; hosted CI now uses `composer install`. One-time lock-promotion workflow was removed. This documentation change must itself pass CI.
@@ -202,3 +202,10 @@ If current doc-only commit is verified, record that exact SHA and CI run only af
 - New PostgreSQL tests verify draft/published isolation, company/site/slug isolation, inactive site filtering, one approved WebP serving descriptor, no private path leakage, modified optimized variant rejection and approval revocation denial.
 - **NOT public serving:** The projection is an internal service with no public route or actual asset materialization. Filament authenticated browser E2E and secure publication endpoint are still NOT done.
 - **NEXT BOUNDED TASK:** implement a server-only variant delivery service that resolves a referenced image from a verified published page projection, rechecks the current private optimized WebP immediately before reading, and returns sanitized bytes + correct mime/cache digest without exposing originals. Add PostgreSQL tests for cross-tenant requests, unpublished media exclusion, tamper and image swaps. No external route until full security review. Then build guarded public delivery/rendering and real authenticated Filament browser E2E.
+
+## 2026-10-15 server-only optimized published WebP read VERIFIED
+- SOURCE `72bb9dc8d31db3634fe1c87bc25bb37865f417ea`, hosted CI `38826775925` SUCCESS at exact SHA, 81 backend tests / 366 assertions plus prototype and Chromium jobs SUCCESS.
+- New `SitePublishedWebpService::read(company, website, slug, imageId)` uses verified approved published snapshot projection and an approved company-scoped shared-locked media row, rechecks private variant path, checksum, actual WebP MIME/dimensions and bytes before returning safe in-memory WebP bytes, content type, ETag and length. It never returns original upload contents or private key and never writes to public storage.
+- PostgreSQL tests cover optimized bytes, digest/cache metadata, tenant/site/slug exclusion, unrelated approved assets, pending assets and newer unpublished draft media, tampered bytes, and foreign-company private key swaps.
+- **No public HTTP endpoint** exists yet; this is a server component and must not be called website delivery or release. No browser acceptance against authenticated Filament, SEO/domain, media cache/operational review or customer enquiry backend.
+- **NEXT BOUNDED TASK:** add an internal strict typed HTML renderer from the published-only snapshot and whitelisted theme templates (escaping names, text, CTA URLs, accessibility fallbacks, no raw media URLs or arbitrary HTML). Add real PostgreSQL/Blade tests demonstrating draft isolation and safe rendering. DO NOT expose route until publication and asset delivery gates pass. Then work on authenticated Filament browser acceptance/security and Phase 2 hall business rules.
