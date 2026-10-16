@@ -90,6 +90,46 @@ class SitePublishedSnapshotTest extends TestCase
         $this->assertNull($projector->project($company->id, $site, '/'));
     }
 
+    public function test_menu_order_and_hidden_links_change_only_after_branding_publication(): void
+    {
+        [$company, $owner, $site, $home] = $this->fixture();
+        $branding = app(SiteBrandingService::class);
+        $pages = app(SitePagePublishingService::class);
+        $base = $this->branding('Approved Marquee');
+        $branding->saveDraft($owner, $company->id, $site, $base, 0, 'Branding draft');
+        $oldBrandId = $branding->publish($owner, $company->id, $site, 1, 'Approve brand');
+        $pages->saveDraft($owner, $company->id, $home, $this->content('Home'), 0, 'Homepage draft');
+        $pages->publish($owner, $company->id, $home, 1, 'Publish home');
+
+        foreach (['/halls', '/about'] as $path) {
+            $pageId = (string) Str::uuid();
+            DB::table('site_pages')->insert([
+                'id' => $pageId, 'company_id' => $company->id, 'website_id' => $site,
+                'slug' => $path, 'title' => ucfirst(trim($path, '/')),
+            ]);
+            $pages->saveDraft($owner, $company->id, $pageId,
+                $this->content('Approved '.trim($path, '/')), 0, 'Create secondary page');
+            $pages->publish($owner, $company->id, $pageId, 1, 'Approve secondary page');
+        }
+        $projector = app(SitePublishedSnapshotService::class);
+        $original = array_column($projector->project($company->id, $site, '/')['navigation'], 'href');
+        $this->assertSame(['/', '/halls', '/about'], $original);
+
+        $reordered = $base;
+        $reordered['navigationOrder'] = ['/about', '/'];
+        $branding->saveDraft($owner, $company->id, $site, $reordered, 1, 'Prepare new menu');
+        $this->assertSame($original, array_column($projector->project($company->id, $site, '/')['navigation'], 'href'));
+        $currentBrandId = $branding->publish($owner, $company->id, $site, 2, 'Approve reordered menu');
+        $this->assertSame(['/about', '/'],
+            array_column($projector->project($company->id, $site, '/')['navigation'], 'href'));
+        $this->assertNotSame($oldBrandId, $currentBrandId);
+
+        $branding->restorePublishedBranding($owner, $company->id, $site,
+            $oldBrandId, $currentBrandId, 'Restore earlier website menu');
+        $this->assertSame($original,
+            array_column($projector->project($company->id, $site, '/')['navigation'], 'href'));
+    }
+
     public function test_only_intact_approved_webp_metadata_is_projected_without_storage_paths_or_original_bytes(): void
     {
         [$company, $owner, $site, $page] = $this->fixture();

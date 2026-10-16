@@ -170,6 +170,34 @@ class SiteBrandingServiceTest extends TestCase
         }
     }
 
+    public function test_menu_rejects_unsafe_duplicate_missing_home_and_foreign_paths_without_writes(): void
+    {
+        [$company, $owner, $site] = $this->fixture('bad-menu');
+        foreach ([
+            ['/'],
+            ['/about', '/about'],
+            ['/about'],
+            ['/', '/admin'],
+            ['/', 'https://evil.example'],
+            ['/', []],
+        ] as $menu) {
+            if ($menu === ['/']) {
+                // Single Home entry is valid; other cases below are rejected.
+                continue;
+            }
+            $brand = $this->branding('Approved brand');
+            $brand['navigationOrder'] = $menu;
+            try {
+                app(SiteBrandingService::class)->saveDraft($owner, $company->id, $site,
+                    $brand, 0, 'Reject unsupported menu paths');
+                $this->fail('Unsafe or unsupported menu was persisted.');
+            } catch (InvalidArgumentException) {
+                $this->assertSame(0, DB::table('site_branding_revisions')->where('website_id', $site)->count());
+                $this->assertSame(0, DB::table('audit_events')->where('entity_id', $site)->count());
+            }
+        }
+    }
+
     public function test_invalid_theme_does_not_write_history_or_audit(): void
     {
         [$company, $owner, $site] = $this->fixture('unsafe');

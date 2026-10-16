@@ -14,12 +14,19 @@ final class SiteBrandingValidator
     private const PRESETS = ['silver', 'ivory', 'midnight', 'sage'];
     private const FONTS = ['classic', 'modern'];
 
+    // Only fixed, operator-routed website pages can be menu entries.
+    // No arbitrary URL or cross-tenant links may be saved by editors.
+    public const NAVIGATION_PATHS = [
+        '/', '/halls', '/packages', '/services', '/gallery',
+        '/about', '/contact', '/privacy', '/terms',
+    ];
+
     public function validate(array $branding): void
     {
         $required = ['siteName', 'tagline', 'themePreset', 'fontPreset', 'logoMediaId', 'faviconMediaId'];
         // Older immutable branding revisions have no footerText field.
         // An optional, strictly plain-text addition preserves their validity.
-        $allowed = [...$required, 'footerText'];
+        $allowed = [...$required, 'footerText', 'navigationOrder'];
         if (array_is_list($branding) || array_diff(array_keys($branding), $allowed)
             || array_diff($required, array_keys($branding))) {
             throw new InvalidArgumentException('Unsupported or missing site branding properties.');
@@ -28,6 +35,22 @@ final class SiteBrandingValidator
         $this->text($branding['tagline'], 0, 240, 'Venue tagline');
         if (array_key_exists('footerText', $branding)) {
             $this->text($branding['footerText'], 0, 240, 'Footer message');
+        }
+        if (array_key_exists('navigationOrder', $branding)) {
+            $paths = $branding['navigationOrder'];
+            if (! is_array($paths) || ! array_is_list($paths)
+                || count($paths) < 1 || count($paths) > count(self::NAVIGATION_PATHS)
+                || ! in_array('/', $paths, true)) {
+                throw new InvalidArgumentException('Choose an approved website menu including Home.');
+            }
+            foreach ($paths as $path) {
+                if (! is_string($path) || ! in_array($path, self::NAVIGATION_PATHS, true)) {
+                    throw new InvalidArgumentException('Only approved venue paths can be in the menu.');
+                }
+            }
+            if (count($paths) !== count(array_unique($paths))) {
+                throw new InvalidArgumentException('Website menu paths must be unique.');
+            }
         }
 
         if (! is_string($branding['themePreset']) || ! in_array($branding['themePreset'], self::PRESETS, true)

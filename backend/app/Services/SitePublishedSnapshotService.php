@@ -82,7 +82,8 @@ final class SitePublishedSnapshotService
             ->whereNotNull('published_revision_id')->whereIn('slug', $publicSlugs)
             ->get(['slug', 'title'])->keyBy('slug');
         $links = [];
-        foreach ($publicSlugs as $path) {
+        $approvedMenuOrder = $branding['navigationOrder'] ?? $publicSlugs;
+        foreach ($approvedMenuOrder as $path) {
             if (isset($navigation[$path])) {
                 $links[] = ['href' => $path, 'label' => $navigation[$path]->title];
             }

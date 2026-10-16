@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\SitePage;
 use App\Models\User;
 use App\Services\SiteBrandingService;
+use App\Services\SiteBrandingValidator;
 use App\Services\SiteMediaService;
 use App\Services\SitePagePublishingService;
 use App\Services\SiteWorkspaceService;
@@ -252,6 +253,7 @@ final class WebsiteWorkspace extends Page
             'siteName' => $site->name,
             'tagline' => '',
             'footerText' => '',
+            'navigationOrder' => SiteBrandingValidator::NAVIGATION_PATHS,
             'themePreset' => 'silver',
             'fontPreset' => 'classic',
             'logoMediaId' => null,
@@ -288,6 +290,38 @@ final class WebsiteWorkspace extends Page
         }
     }
 
+    /** Only authorized editors can reorder approved same-site menu paths. */
+    public function moveNavigationPath(string $path, string $direction): void
+    {
+        $this->authorizeBranding('update');
+        $paths = $this->branding['navigationOrder'] ?? [];
+        abort_unless(is_array($paths) && in_array($path, SiteBrandingValidator::NAVIGATION_PATHS, true)
+            && in_array($direction, ['up', 'down'], true), 422);
+        $index = array_search($path, $paths, true);
+        abort_unless($index !== false, 422);
+        $target = $direction === 'up' ? $index - 1 : $index + 1;
+        if ($target < 0 || $target >= count($paths)) {
+            return;
+        }
+        [$paths[$index], $paths[$target]] = [$paths[$target], $paths[$index]];
+        $this->branding['navigationOrder'] = array_values($paths);
+    }
+
+    /** Home must remain present; other paths may be hidden until reenabled. */
+    public function toggleNavigationPath(string $path): void
+    {
+        $this->authorizeBranding('update');
+        abort_unless($path !== '/' && in_array($path, SiteBrandingValidator::NAVIGATION_PATHS, true), 422);
+        $paths = $this->branding['navigationOrder'] ?? [];
+        abort_unless(is_array($paths), 422);
+        if (in_array($path, $paths, true)) {
+            $paths = array_values(array_filter($paths, fn ($existing) => $existing !== $path));
+        } else {
+            $paths[] = $path;
+        }
+        $this->branding['navigationOrder'] = $paths;
+    }
+
     public function saveBrandingDraft(): void
     {
         [$actor, $page] = $this->authorizeBranding('update');
@@ -297,6 +331,7 @@ final class WebsiteWorkspace extends Page
             'branding.siteName' => ['required', 'string', 'max:120'],
             'branding.tagline' => ['present', 'string', 'max:240'],
             'branding.footerText' => ['present', 'string', 'max:240'],
+            'branding.navigationOrder' => ['required', 'array', 'min:1', 'max:9'],
             'branding.themePreset' => ['required', 'string'],
             'branding.fontPreset' => ['required', 'string'],
             'branding.logoMediaId' => ['nullable', 'uuid'],
@@ -325,7 +360,10 @@ final class WebsiteWorkspace extends Page
         if (! is_string($saved)) {
             throw new ConflictHttpException('Branding draft changed; reload before publishing.');
         }
-        if (array_replace(['footerText' => ''], json_decode($saved, true, 512, JSON_THROW_ON_ERROR)) != $this->branding) {
+        if (array_replace([
+            'footerText' => '',
+            'navigationOrder' => SiteBrandingValidator::NAVIGATION_PATHS,
+        ], json_decode($saved, true, 512, JSON_THROW_ON_ERROR)) != $this->branding) {
             throw ValidationException::withMessages([
                 'branding' => 'Save the changes on this screen before publishing branding.',
             ]);

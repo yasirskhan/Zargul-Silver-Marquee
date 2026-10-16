@@ -114,6 +114,40 @@
                         class="w-full rounded border p-2 text-gray-900"
                         placeholder="A short approved venue message, not private contact details"></textarea>
                 </label>
+                <section class="space-y-3 rounded-lg border p-3" aria-label="Draft website navigation">
+                    <h3 class="font-semibold">Website menu</h3>
+                    <p class="text-sm">Reorder or hide approved website paths. Unpublished pages stay hidden even when selected here. Save and publish branding separately to update the public menu.</p>
+                    <div class="space-y-2">
+                        @foreach (($branding['navigationOrder'] ?? []) as $menuIndex => $path)
+                            <div wire:key="menu-{{ trim($path, '/') ?: 'home' }}" class="flex flex-wrap items-center justify-between gap-2 rounded border p-2">
+                                <span class="text-sm font-medium">{{ $path === '/' ? 'Home' : ucfirst(ltrim($path, '/')) }} ({{ $path }})</span>
+                                <div class="flex gap-2">
+                                    <button type="button" wire:click="moveNavigationPath('{{ $path }}', 'up')"
+                                        @disabled($menuIndex === 0) class="rounded border px-2 py-1 text-sm"
+                                        aria-label="Move {{ $path }} menu link earlier">Earlier</button>
+                                    <button type="button" wire:click="moveNavigationPath('{{ $path }}', 'down')"
+                                        @disabled($menuIndex === count($branding['navigationOrder']) - 1)
+                                        class="rounded border px-2 py-1 text-sm"
+                                        aria-label="Move {{ $path }} menu link later">Later</button>
+                                    @if ($path !== '/')
+                                        <button type="button" wire:click="toggleNavigationPath('{{ $path }}')"
+                                            class="rounded border px-2 py-1 text-sm"
+                                            aria-label="Hide {{ $path }} from menu">Hide</button>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        @foreach (\App\Services\SiteBrandingValidator::NAVIGATION_PATHS as $path)
+                            @if ($path !== '/' && ! in_array($path, $branding['navigationOrder'] ?? [], true))
+                                <button type="button" wire:click="toggleNavigationPath('{{ $path }}')"
+                                    class="rounded border px-2 py-1 text-sm">Show {{ $path }}</button>
+                            @endif
+                        @endforeach
+                    </div>
+                    @error('branding.navigationOrder') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                </section>
                 <div class="space-y-3" role="region" aria-label="Branding draft appearance">
                     <div role="group" aria-label="Branding preview screen size" class="flex flex-wrap gap-2">
                         <button type="button" wire:click="setPreviewMode('desktop')" class="rounded border px-3 py-2" aria-pressed="{{ $previewMode === 'desktop' ? 'true' : 'false' }}">Desktop branding</button>

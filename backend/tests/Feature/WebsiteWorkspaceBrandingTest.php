@@ -71,6 +71,27 @@ class WebsiteWorkspaceBrandingTest extends TestCase
         $this->assertSame(2, DB::table('audit_events')->count());
     }
 
+    public function test_authorized_owner_can_hide_and_reorder_draft_menu_without_publishing_it(): void
+    {
+        [, , $site] = $this->fixture();
+        $editor = Livewire::test(WebsiteWorkspace::class)
+            ->assertSee('Website menu')
+            ->call('toggleNavigationPath', '/gallery')
+            ->call('moveNavigationPath', '/about', 'up')
+            ->set('brandingReason', 'Owner proposes shorter venue navigation')
+            ->call('saveBrandingDraft')->assertHasNoErrors();
+
+        $revision = DB::table('site_branding_revisions')->where('website_id', $site)
+            ->where('revision_number', 1)->value('content');
+        $paths = json_decode($revision, true, 512, JSON_THROW_ON_ERROR)['navigationOrder'];
+        $this->assertNotContains('/gallery', $paths);
+        $this->assertContains('/', $paths);
+        $this->assertLessThan(array_search('/services', $paths, true),
+            array_search('/about', $paths, true));
+        $this->assertNull(DB::table('websites')->where('id', $site)->value('branding_published_revision_id'));
+        $editor->assertSet('expectedBrandingRevision', 1);
+    }
+
     public function test_owner_cannot_publish_unsaved_branding_form_changes(): void
     {
         [, , $site] = $this->fixture();
