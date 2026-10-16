@@ -98,6 +98,7 @@ final class SitePagePublishingService
 
             DB::table('site_pages')->where('id', $pageId)->where('company_id', $companyId)->update([
                 'published_revision_id' => $revision->id,
+                'offline_request_id' => null,
                 'updated_at' => now(),
             ]);
             DB::table('site_publishing_events')->insert([
@@ -143,27 +144,26 @@ final class SitePagePublishingService
             $this->authorize($actor, $companyId, true);
             $existingEvent = DB::table('site_publishing_events')->where('id', $requestId)->first();
             if ($existingEvent) {
-                $latest = DB::table('site_publishing_events')
-                    ->where('company_id', $companyId)->where('page_id', $pageId)
-                    ->orderByDesc('created_at')->orderByDesc('id')->first();
-                $audit = DB::table('audit_events')->where('company_id', $companyId)
+                // PostgreSQL transaction timestamps may tie; random UUIDs
+                // are NOT a valid way to sort publishing events. The page's
+                // current offline request marker is the atomic CAS lease.
+                // It is cleared on publish/restore and replaced on each
+                // subsequent unpublish, so old requests cannot replay.
+                $matchingAudit = DB::table('audit_events')->where('company_id', $companyId)
                     ->where('entity_type', 'site_page')->where('entity_id', $pageId)
                     ->where('action', 'website.unpublished')
                     ->where('actor_id', $actor->getKey())
-                    ->orderByDesc('created_at')->first(['context']);
-                $context = $audit
-                    ? json_decode($audit->context, true, 512, JSON_THROW_ON_ERROR)
-                    : null;
+                    ->whereRaw("context->>'requestId' = ?", [$requestId])
+                    ->whereRaw("context->>'reason' = ?", [$reason])->exists();
                 if ($page->published_revision_id === null
-                    && $latest?->id === $requestId
+                    && $page->offline_request_id === $requestId
                     && $existingEvent->company_id === $companyId
                     && $existingEvent->page_id === $pageId
                     && $existingEvent->action === 'unpublish'
                     && $existingEvent->revision_id === $expectedPublishedRevisionId
                     && $existingEvent->previous_revision_id === $expectedPublishedRevisionId
                     && (int) $existingEvent->actor_id === (int) $actor->getKey()
-                    && ($context['requestId'] ?? null) === $requestId
-                    && ($context['reason'] ?? null) === $reason) {
+                    && $matchingAudit) {
                     return; // Exact same authorized request, no duplicate event or audit.
                 }
                 throw new ConflictHttpException('Publication request key is already used.');
@@ -175,7 +175,9 @@ final class SitePagePublishingService
 
             DB::table('site_pages')->where('company_id', $companyId)
                 ->where('id', $pageId)->update([
-                    'published_revision_id' => null, 'updated_at' => now(),
+                    'published_revision_id' => null,
+                    'offline_request_id' => $requestId,
+                    'updated_at' => now(),
                 ]);
             // Revision_id is non-null and FK-proven in the existing event table.
             DB::table('site_publishing_events')->insert([
@@ -241,6 +243,7 @@ final class SitePagePublishingService
 
             DB::table('site_pages')->where('id', $pageId)->where('company_id', $companyId)->update([
                 'published_revision_id' => $targetRevisionId,
+                'offline_request_id' => null,
                 'updated_at' => now(),
             ]);
             DB::table('site_publishing_events')->insert([

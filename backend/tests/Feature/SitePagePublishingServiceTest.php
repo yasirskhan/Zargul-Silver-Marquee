@@ -436,6 +436,42 @@ class SitePagePublishingServiceTest extends TestCase
             $first, 'Temporarily take published page offline');
     }
 
+    public function test_prior_offline_request_cannot_replay_after_restoration_and_second_offline(): void
+    {
+        [$company, $owner, $pageId] = $this->setupWebsite('offline-request-lease');
+        $this->be($owner);
+        $service = $this->service();
+        $service->saveDraft($owner, $company->id, $pageId, $this->content('Approved'), 0, 'Draft');
+        $revision = $service->publish($owner, $company->id, $pageId, 1, 'Initial approval');
+        $firstKey = (string) Str::uuid();
+        $secondKey = (string) Str::uuid();
+        $reason = 'Temporary venue page maintenance';
+
+        $service->unpublish($owner, $company->id, $pageId, $firstKey, $revision, $reason);
+        $service->unpublish($owner, $company->id, $pageId, $firstKey, $revision, $reason);
+        $this->assertSame($firstKey, DB::table('site_pages')->where('id', $pageId)->value('offline_request_id'));
+        $this->assertSame(1, DB::table('site_publishing_events')->where('action', 'unpublish')->count());
+
+        $service->restorePublishedRevision($owner, $company->id, $pageId, $revision, null, 'Restore previous approved page');
+        $this->assertNull(DB::table('site_pages')->where('id', $pageId)->value('offline_request_id'));
+        $service->unpublish($owner, $company->id, $pageId, $secondKey, $revision, $reason);
+        $this->assertSame($secondKey, DB::table('site_pages')->where('id', $pageId)->value('offline_request_id'));
+
+        // The OLD key has the same page, actor, revision and reason, but
+        // must never replay the NEW offline transition.
+        try {
+            $service->unpublish($owner, $company->id, $pageId, $firstKey, $revision, $reason);
+            $this->fail('Earlier offline key was replayed after a new transition.');
+        } catch (ConflictHttpException) {
+            $this->assertTrue(true);
+        }
+
+        $service->unpublish($owner, $company->id, $pageId, $secondKey, $revision, $reason);
+        $this->assertSame(2, DB::table('site_publishing_events')->where('action', 'unpublish')->count());
+        $this->assertSame(2, DB::table('audit_events')->where('action', 'website.unpublished')->count());
+        $this->assertNull(DB::table('site_pages')->where('id', $pageId)->value('published_revision_id'));
+    }
+
     public function test_unpublish_audit_rejection_rolls_back_pointer_and_event(): void
     {
         [$company, $owner, $pageId] = $this->setupWebsite('unpublish-audit');
