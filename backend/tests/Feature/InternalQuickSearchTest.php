@@ -157,6 +157,19 @@ class InternalQuickSearchTest extends TestCase
         $service->search($members['admin'][0], $foreign->id, 'operations');
     }
 
+    public function test_owner_can_locate_pending_exceptions_and_planned_tasks_by_state(): void
+    {
+        [$company, , $members, , $task] = $this->fixture();
+        $service = app(InternalQuickSearchService::class);
+        $pending = $service->search($members['owner'][0], $company->id, 'pending');
+        $this->assertContains('approval', array_column($pending, 'kind'));
+        $planned = $service->search($members['owner'][0], $company->id, 'planned');
+        $this->assertContains($task, array_column($planned, 'id'));
+        $this->assertSame('planned', collect($planned)->firstWhere('id', $task)['status']);
+        $this->assertStringNotContainsString('contact-hidden@example.test',
+            json_encode(array_merge($pending, $planned), JSON_THROW_ON_ERROR));
+    }
+
     public function test_term_and_result_bounds_reject_contact_and_large_queries(): void
     {
         [$company, , $members] = $this->fixture();

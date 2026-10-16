@@ -1,3 +1,6 @@
+## 2026-10-16 SRCH-001 / APR-001 / OPS-001 STATUS LOOKUP — EXACT CI PENDING
+- Server-owned search whitelist now includes non-sensitive status fields for booking proposals, operations planning and approval requests. Allows searching 'planned', 'pending' and draft/review state while keeping tenant, active verified membership, parameterized search, result caps and manager/reception denial unchanged. Adds real PostgreSQL regression verifying pending approval and planned task discovery with no contact leakage. Updates feature register and handoff same commit. Real bookings/finance remain gated. Exact SHA all-four CI still required.
+
 ## 2026-10-16 SRCH-001 PERMISSION RECONCILIATION — EXACT CI PENDING
 - Audited actual AuditHistory page and AuditHistoryService visibility: active verified owners AND administrators can read company-scoped audit metadata. Corrected previous narrow search change so it matches existing authorized roles, not a mistaken owner-only restriction. Added PostgreSQL and Livewire admin audit read, company isolation assertions; existing manager denial remains. Finance/release gates untouched. Verify exact CI before declaring green.
 
