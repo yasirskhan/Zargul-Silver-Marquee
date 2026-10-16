@@ -40,7 +40,7 @@ final class InternalQuickSearch extends Page
     {
         return CompanyMembership::query()->with('company')
             ->where('user_id', $actor->getKey())->where('is_active', true)
-            ->whereIn('role', ['owner', 'admin'])
+            ->whereIn('role', ['owner', 'admin', 'manager', 'operations'])
             ->whereHas('company', fn ($q) => $q->where('is_active', true))
             ->orderBy('company_id')->get()
             ->mapWithKeys(fn ($m) => [$m->company_id => $m->company->name])->all();

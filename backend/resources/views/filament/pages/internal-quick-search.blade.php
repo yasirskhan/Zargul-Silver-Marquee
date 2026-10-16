@@ -1,6 +1,6 @@
 <x-filament-panels::page>
     <div class="space-y-6">
-        <p class="text-sm">Private owner/admin reference search. Results show internal metadata only;
+        <p class="text-sm">Private role-scoped reference search. Staff see assigned-hall planning only;
             customer contacts and financial transactions are never exposed or performed here.</p>
         <label class="block space-y-1">
             <span class="text-sm font-medium">Company</span>
@@ -12,7 +12,7 @@
         </label>
         <form wire:submit="runSearch" class="space-y-3 rounded-xl border p-4">
             <label class="block space-y-1">
-                <span class="text-sm font-medium">Search internal proposals, tasks, approvals, previews or audit actions</span>
+                <span class="text-sm font-medium">Search permitted planning tasks or owner/admin internal records</span>
                 <input type="search" wire:model="searchTerm" minlength="3" maxlength="80"
                     class="w-full rounded-lg border p-3 text-gray-900"
                     placeholder="Reference, date, program or task">

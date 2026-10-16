@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
-/** Private owner/admin search: no contacts, financial postings or free-form audit payloads. */
+/** Least-privilege staff search: hall-scoped planning for assigned staff; private sources only for owner/admin. */
 final class InternalQuickSearchService
 {
     private const SOURCES = [
@@ -37,13 +37,14 @@ final class InternalQuickSearchService
 
     public function search(User $actor, string $companyId, string $term, int $limit = 20): array
     {
+        $membership = CompanyMembership::query()->where('company_id', $companyId)
+            ->where('user_id', $actor->getKey())->where('is_active', true)
+            ->whereIn('role', ['owner', 'admin', 'manager', 'operations'])
+            ->whereHas('company', fn ($q) => $q->where('is_active', true))->first();
         if (! Auth::check() || (int) Auth::id() !== (int) $actor->getKey()
             || ! $actor->is_active || ! $actor->hasVerifiedEmail()
-            || ! CompanyMembership::query()->where('company_id', $companyId)
-                ->where('user_id', $actor->getKey())->where('is_active', true)
-                ->whereIn('role', ['owner', 'admin'])
-                ->whereHas('company', fn ($q) => $q->where('is_active', true))->exists()) {
-            throw new AuthorizationException('An active verified owner/admin session is required.');
+            || ! $membership) {
+            throw new AuthorizationException('An active verified company staff session is required.');
         }
         $term = trim($term);
         if (mb_strlen($term) < 3 || mb_strlen($term) > 80 || $limit < 1 || $limit > 40
@@ -54,6 +55,12 @@ final class InternalQuickSearchService
         // the same active company membership boundary as that page.
         $matches = [];
         foreach (self::SOURCES as $source) {
+            $restricted = in_array($membership->role, ['manager', 'operations'], true);
+            // BookingProposals, finance, approval and audit workspaces have
+            // independent policies; assigned staff can ONLY search planning.
+            if ($restricted && $source['kind'] !== 'planning') {
+                continue;
+            }
             $query = DB::table($source['table'])->where('company_id', $companyId)
                 ->where(function ($query) use ($source, $term): void {
                     foreach ($source['fields'] as $field) {
@@ -61,6 +68,16 @@ final class InternalQuickSearchService
                         $query->orWhereRaw("strpos(lower($field), lower(?)) > 0", [$term]);
                     }
                 });
+            if ($restricted) {
+                // Enforce hall assignment in PostgreSQL, never in a client filter.
+                // Removing the assignment immediately removes its search results.
+                $query->whereExists(function ($scope) use ($companyId, $membership): void {
+                    $scope->selectRaw('1')->from('hall_assignments')
+                        ->where('hall_assignments.company_id', $companyId)
+                        ->where('hall_assignments.membership_id', $membership->getKey())
+                        ->whereColumn('hall_assignments.hall_id', 'operations_plan_tasks.hall_id');
+                });
+            }
             $columns = ['id', $source['label'].' as result_label'];
             if ($source['status']) {
                 $columns[] = 'status';

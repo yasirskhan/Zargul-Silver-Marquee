@@ -6,6 +6,7 @@ use App\Filament\Pages\InternalQuickSearch;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\Hall;
+use App\Models\HallAssignment;
 use App\Models\User;
 use App\Services\ApprovalWorkflowService;
 use App\Services\BookingDraftReviewService;
@@ -32,7 +33,7 @@ class InternalQuickSearchTest extends TestCase
         $company = Company::create(['name' => 'Internal Search Venue', 'slug' => 'internal-search-venue']);
         $foreign = Company::create(['name' => 'Other Internal Venue', 'slug' => 'other-internal-search']);
         $members = [];
-        foreach (['owner', 'admin', 'manager'] as $role) {
+        foreach (['owner', 'admin', 'manager', 'operations'] as $role) {
             $user = User::create(['name' => ucfirst($role),
                 'email' => 'search-'.$role.'@example.test', 'password' => 'synthetic']);
             $user->markEmailAsVerified();
@@ -46,6 +47,13 @@ class InternalQuickSearchTest extends TestCase
 
         $hall = Hall::create(['company_id' => $company->id,
             'name' => 'Private Hall', 'slug' => 'private-hall', 'capacity' => 220]);
+        foreach (['manager', 'operations'] as $role) {
+            HallAssignment::create([
+                'company_id' => $company->id,
+                'hall_id' => $hall->id,
+                'membership_id' => $members[$role][1]->id,
+            ]);
+        }
         $rule = static fn (string $start, string $end): array => [
             'start' => $start, 'end' => $end, 'setupMinutes' => 10, 'cleaningMinutes' => 10,
             'graceMinutes' => 10, 'overtimeIntervalMinutes' => 30,
@@ -113,7 +121,7 @@ class InternalQuickSearchTest extends TestCase
         $this->assertStringNotContainsString('contact-hidden@example.test', $results);
         $this->assertStringNotContainsString('Private Synthetic Guest', $results);
         Livewire::test(InternalQuickSearch::class)
-            ->assertSee('Private owner/admin reference search')
+            ->assertSee('Private role-scoped reference search')
             ->set('searchTerm', 'stage')->call('runSearch')->assertHasNoErrors()
             ->assertSee('Arrange stage light cables')
             ->assertDontSee('contact-hidden@example.test');
@@ -124,13 +132,12 @@ class InternalQuickSearchTest extends TestCase
         [$company, $foreign, $members] = $this->fixture();
         $service = app(InternalQuickSearchService::class);
         $this->be($members['manager'][0]);
-        Livewire::test(InternalQuickSearch::class)->assertForbidden();
-        try {
-            $service->search($members['manager'][0], $company->id, 'stage');
-            $this->fail('Manager accessed owner-only internal search.');
-        } catch (AuthorizationException) {
-            $this->assertTrue(true);
-        }
+        Livewire::test(InternalQuickSearch::class)
+            ->assertSee('Private role-scoped reference search')
+            ->set('searchTerm', 'stage')->call('runSearch')->assertHasNoErrors()
+            ->assertSee('Arrange stage light cables');
+        $managerMatches = $service->search($members['manager'][0], $company->id, 'stage');
+        $this->assertSame(['planning'], array_values(array_unique(array_column($managerMatches, 'kind'))));
         $this->be($members['owner'][0]);
         try {
             $service->search($members['owner'][0], $foreign->id, 'stage');
@@ -168,6 +175,64 @@ class InternalQuickSearchTest extends TestCase
         $this->assertSame('planned', collect($planned)->firstWhere('id', $task)['status']);
         $this->assertStringNotContainsString('contact-hidden@example.test',
             json_encode(array_merge($pending, $planned), JSON_THROW_ON_ERROR));
+    }
+
+    public function test_manager_and_operations_staff_see_only_current_assigned_hall_plans(): void
+    {
+        [$company, $foreign, $members, $booking, $assignedTask] = $this->fixture();
+        $service = app(InternalQuickSearchService::class);
+        $this->be($members['owner'][0]);
+        $hall = Hall::create(['company_id' => $company->id,
+            'name' => 'Unassigned Second Hall', 'slug' => 'unassigned-second-hall', 'capacity' => 100]);
+        $program = static fn (string $start, string $end): array => [
+            'start' => $start, 'end' => $end, 'setupMinutes' => 10, 'cleaningMinutes' => 10,
+            'graceMinutes' => 10, 'overtimeIntervalMinutes' => 30,
+            'overtimeRateMinor' => 0, 'rentalRateMinor' => 0,
+        ];
+        app(HallProgramRulesService::class)->configure(
+            $members['owner'][0], $company->id, $hall->id, [
+                'morning' => $program('08:00', '11:00'),
+                'noon' => $program('12:00', '15:00'),
+                'evening' => $program('17:00', '22:00'),
+            ], 'PKR', 0, 'Unassigned synthetic hall rules'
+        );
+        $customerId = \Illuminate\Support\Facades\DB::table('booking_drafts')
+            ->where('id', $booking)->value('customer_id');
+        $otherBooking = (string) Str::uuid();
+        app(BookingDraftService::class)->create(
+            $members['owner'][0], $company->id, $otherBooking, $hall->id, $customerId,
+            '2027-05-21', 'noon', 50, 'Unassigned hall proposal'
+        );
+        $unassignedTask = (string) Str::uuid();
+        app(OperationsPlanningService::class)->create(
+            $members['owner'][0], $company->id, $unassignedTask, $otherBooking,
+            'Arrange stage lighting in other hall', 'Unassigned private planning'
+        );
+        foreach (['manager', 'operations'] as $role) {
+            $this->be($members[$role][0]);
+            $matches = $service->search($members[$role][0], $company->id, 'stage');
+            $this->assertContains($assignedTask, array_column($matches, 'id'));
+            $this->assertNotContains($unassignedTask, array_column($matches, 'id'));
+            $this->assertSame(['planning'], array_values(array_unique(array_column($matches, 'kind'))));
+            $this->assertSame([], $service->search($members[$role][0], $company->id, 'expense'));
+            $this->assertSame([], $service->search($members[$role][0], $company->id, '2027-05-20'));
+            try {
+                $service->search($members[$role][0], $foreign->id, 'stage');
+                $this->fail('Foreign tenant search permitted.');
+            } catch (AuthorizationException) {
+                $this->assertTrue(true);
+            }
+            Livewire::test(InternalQuickSearch::class)
+                ->set('searchTerm', 'stage')->call('runSearch')->assertHasNoErrors()
+                ->assertSee('Arrange stage light cables')
+                ->assertDontSee('Arrange stage lighting in other hall');
+        }
+        $members['operations'][1]->hallAssignments()->delete();
+        $this->be($members['operations'][0]);
+        $this->assertSame([], $service->search($members['operations'][0], $company->id, 'stage'));
+        Livewire::test(InternalQuickSearch::class)
+            ->set('searchTerm', 'stage')->call('runSearch')->assertHasNoErrors()
+            ->assertDontSee('Arrange stage light cables');
     }
 
     public function test_term_and_result_bounds_reject_contact_and_large_queries(): void
