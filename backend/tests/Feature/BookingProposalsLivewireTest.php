@@ -1,0 +1,167 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Filament\Pages\BookingProposals;
+use App\Models\Company;
+use App\Models\CompanyMembership;
+use App\Models\Hall;
+use App\Models\User;
+use Filament\Facades\Filament;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Livewire\Livewire;
+use Tests\TestCase;
+
+class BookingProposalsLivewireTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private function fixture(): array
+    {
+        $company = Company::create(['name' => 'Silver Venue', 'slug' => 'proposal-ui-main']);
+        $foreign = Company::create(['name' => 'Other Venue', 'slug' => 'proposal-ui-foreign']);
+        $hall = Hall::create([
+            'company_id' => $company->id, 'slug' => 'main-hall',
+            'name' => 'Hall for Proposals', 'capacity' => 400,
+        ]);
+        $foreignHall = Hall::create([
+            'company_id' => $foreign->id, 'slug' => 'foreign-hall',
+            'name' => 'Hidden Private Hall', 'capacity' => 250,
+        ]);
+        $owner = User::create([
+            'name' => 'Owner', 'email' => 'proposal-ui-owner@example.test', 'password' => 'test-only',
+        ]);
+        $owner->markEmailAsVerified();
+        $membership = CompanyMembership::create([
+            'company_id' => $company->id, 'user_id' => $owner->id, 'role' => 'owner',
+        ]);
+        $customer = (string) Str::uuid();
+        DB::table('customer_profiles')->insert([
+            'id' => $customer, 'company_id' => $company->id,
+            'created_by' => $owner->id,
+            'name_ciphertext' => Crypt::encryptString('Secret Customer Name'),
+            'email_ciphertext' => Crypt::encryptString('private@example.test'),
+        ]);
+        $otherCustomer = (string) Str::uuid();
+        DB::table('customer_profiles')->insert([
+            'id' => $otherCustomer, 'company_id' => $foreign->id,
+            'created_by' => $owner->id,
+            'name_ciphertext' => Crypt::encryptString('Foreign Secret Contact'),
+        ]);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->be($owner);
+
+        return [$company, $foreign, $hall, $foreignHall, $owner, $membership, $customer, $otherCustomer];
+    }
+
+    private function proposal(
+        string $companyId, string $hallId, string $customerId,
+        int $actorId, string $date = '2026-12-15', string $status = 'draft',
+    ): void {
+        DB::table('booking_drafts')->insert([
+            'id' => (string) Str::uuid(), 'company_id' => $companyId,
+            'hall_id' => $hallId, 'customer_id' => $customerId,
+            'event_date' => $date, 'program' => 'evening',
+            'requested_guests' => 180, 'status' => $status,
+            'created_by' => $actorId, 'revision' => 1,
+        ]);
+    }
+
+    public function test_owner_sees_only_company_proposal_metadata_without_contact_or_claims(): void
+    {
+        [$company, $foreign, $hall, $foreignHall, $owner, , $customer, $otherCustomer] = $this->fixture();
+        $this->proposal($company->id, $hall->id, $customer, $owner->id);
+        $this->proposal($foreign->id, $foreignHall->id, $otherCustomer, $owner->id);
+
+        $component = Livewire::test(BookingProposals::class)
+            ->assertSet('companyId', $company->id)
+            ->assertSet('loadedCompanyId', $company->id)
+            ->assertSee('Hall for Proposals')
+            ->assertDontSee('Hidden Private Hall')
+            ->assertSee('NOT confirmed bookings or holds')
+            ->assertDontSee('Secret Customer Name')
+            ->assertDontSee('private@example.test')
+            ->assertDontSee('Foreign Secret Contact');
+        $this->assertCount(1, $component->get('entries'));
+        $this->assertSame('2026-12-15', $component->get('entries')[0]['eventDate']);
+        $this->assertArrayNotHasKey('customerId', $component->get('entries')[0]);
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, DB::table('audit_events')->count());
+    }
+
+    public function test_filters_and_pagination_do_not_mutate_proposal_records(): void
+    {
+        [$company, , $hall, , $owner, , $customer] = $this->fixture();
+        for ($i = 0; $i < 27; $i++) {
+            $this->proposal($company->id, $hall->id, $customer, $owner->id);
+        }
+        $component = Livewire::test(BookingProposals::class);
+        $this->assertCount(25, $component->get('entries'));
+        $component->assertSet('hasMore', true)->call('nextPage')->assertSet('offset', 25);
+        $this->assertCount(2, $component->get('entries'));
+        $component->call('previousPage')->assertSet('offset', 0)
+            ->set('fromDate', '2026-12-16')
+            ->call('refreshResults')->assertSet('entries', []);
+        $this->assertSame(27, DB::table('booking_drafts')->count());
+        $this->assertSame(0, DB::table('booking_draft_events')->count());
+    }
+
+    public function test_manager_unverified_owner_and_revoked_membership_are_forbidden(): void
+    {
+        [$company, , $hall, , $owner, $membership, $customer] = $this->fixture();
+        $this->proposal($company->id, $hall->id, $customer, $owner->id);
+        $component = Livewire::test(BookingProposals::class);
+        $manager = User::create([
+            'name' => 'Manager', 'email' => 'proposal-ui-manager@example.test', 'password' => 'test-only',
+        ]);
+        $manager->markEmailAsVerified();
+        CompanyMembership::create([
+            'company_id' => $company->id, 'user_id' => $manager->id, 'role' => 'manager',
+        ]);
+        $this->be($manager);
+        Livewire::test(BookingProposals::class)->assertForbidden();
+        $this->be($owner);
+        $membership->update(['is_active' => false]);
+        $component->call('refreshResults')->assertForbidden();
+        Livewire::test(BookingProposals::class)->assertForbidden();
+        $membership->update(['is_active' => true]);
+        $owner->forceFill(['email_verified_at' => null])->save();
+        Livewire::test(BookingProposals::class)->assertForbidden();
+    }
+
+    public function test_forged_company_hall_and_invalid_filters_are_rejected(): void
+    {
+        [$company, $foreign, $hall, $foreignHall, $owner, , $customer] = $this->fixture();
+        $this->proposal($company->id, $hall->id, $customer, $owner->id);
+        Livewire::test(BookingProposals::class)
+            ->set('companyId', $foreign->id)->assertForbidden();
+        Livewire::test(BookingProposals::class)
+            ->set('hallId', $foreignHall->id)
+            ->call('refreshResults')->assertForbidden();
+        Livewire::test(BookingProposals::class)
+            ->set('statusFilter', 'confirmed')
+            ->call('refreshResults')->assertHasErrors(['statusFilter']);
+        Livewire::test(BookingProposals::class)
+            ->set('fromDate', '2026-02-30')
+            ->call('refreshResults')->assertHasErrors(['fromDate']);
+    }
+
+    public function test_owner_authorized_for_two_companies_can_switch_without_cross_tenant_cache(): void
+    {
+        [$company, $foreign, $hall, $foreignHall, $owner, , $customer, $foreignCustomer] = $this->fixture();
+        CompanyMembership::create([
+            'company_id' => $foreign->id, 'user_id' => $owner->id, 'role' => 'admin',
+        ]);
+        $this->proposal($company->id, $hall->id, $customer, $owner->id);
+        $this->proposal($foreign->id, $foreignHall->id, $foreignCustomer, $owner->id);
+        $component = Livewire::test(BookingProposals::class)
+            ->set('companyId', $foreign->id)
+            ->assertSet('loadedCompanyId', $foreign->id)
+            ->assertSee('Hidden Private Hall')
+            ->assertDontSee('Hall for Proposals');
+        $this->assertCount(1, $component->get('entries'));
+    }
+}
