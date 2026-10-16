@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Pages\ApprovalCenter;
+use App\Filament\Pages\FinanceDesk;
 use App\Filament\Pages\AuditHistory;
 use App\Filament\Pages\BookingProposals;
 use App\Filament\Pages\HallCalendar;
@@ -39,7 +40,7 @@ class AdminPanelProvider extends PanelProvider
             ->multiFactorAuthentication([
                 AppAuthentication::make()->recoverable(),
             ], isRequired: true)
-            ->pages([ApprovalCenter::class, AuditHistory::class, BookingProposals::class, HallCalendar::class, HallPrograms::class, WebsiteWorkspace::class])
+            ->pages([ApprovalCenter::class, FinanceDesk::class, AuditHistory::class, BookingProposals::class, HallCalendar::class, HallPrograms::class, WebsiteWorkspace::class])
             ->brandName('VenueDesk')
             ->colors(['primary' => Color::Emerald])
             ->middleware([
