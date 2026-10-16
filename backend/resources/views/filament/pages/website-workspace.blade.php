@@ -22,6 +22,35 @@
             </label>
         </div>
         @if ($page = $this->currentPage())
+            <section class="space-y-3 rounded-xl border p-4" aria-label="Create an unpublished website page">
+                <h2 class="text-lg font-semibold">Create a new website page</h2>
+                <p class="text-sm">New pages stay private until an authorized publisher approves the saved draft. Only pre-approved public paths can be created.</p>
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <label class="block space-y-1">
+                        <span class="text-sm">Page path</span>
+                        <select wire:model="newPageSlug" class="w-full rounded-lg border p-3 text-gray-900">
+                            @foreach (\App\Services\SiteWorkspaceService::NEW_PAGE_PATHS as $path => $label)
+                                <option value="{{ ltrim($path, '/') }}">{{ $label }} ({{ $path }})</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label class="block space-y-1">
+                        <span class="text-sm">Page title</span>
+                        <input type="text" maxlength="120" wire:model="newPageTitle"
+                            class="w-full rounded-lg border p-3 text-gray-900">
+                    </label>
+                </div>
+                <label class="block space-y-1">
+                    <span class="text-sm">Creation reason (no contact information)</span>
+                    <textarea wire:model="newPageReason" maxlength="500" rows="2"
+                        class="w-full rounded-lg border p-3 text-gray-900"></textarea>
+                </label>
+                @error('newPageSlug') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                @error('newPageTitle') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                @error('newPageReason') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                <button type="button" wire:click="createNewPage" wire:loading.attr="disabled"
+                    class="rounded-lg border px-4 py-2 font-semibold">Create unpublished page</button>
+            </section>
             <section class="space-y-2 rounded-xl border p-5" aria-label="Website page status">
                 <h2 class="text-lg font-semibold">{{ $page->title }}</h2>
                 <p class="text-sm">Path: {{ $page->slug }}</p>

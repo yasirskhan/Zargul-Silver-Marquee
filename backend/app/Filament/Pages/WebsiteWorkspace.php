@@ -43,6 +43,14 @@ final class WebsiteWorkspace extends Page
 
     public string $reason = '';
 
+    /** New pages remain unpublished until a separate authorized publish. */
+    public string $newPageSlug = 'halls';
+    public string $newPageTitle = '';
+    public string $newPageReason = '';
+
+    #[Locked]
+    public string $createPageKey = '';
+
     /** Livewire temporary uploads are not publicly attached until privately staged. */
     public $pendingImage = null;
 
@@ -91,6 +99,7 @@ final class WebsiteWorkspace extends Page
     public function mount(): void
     {
         abort_unless(static::canAccess(), 403);
+        $this->createPageKey = (string) Str::uuid();
         $this->companyId = array_key_first($this->companyOptions());
         $this->pageId = array_key_first($this->pageOptions());
         $this->reloadDraft();
@@ -105,6 +114,9 @@ final class WebsiteWorkspace extends Page
     public function updatedCompanyId(): void
     {
         $this->pageId = array_key_first($this->pageOptions());
+        $this->createPageKey = (string) Str::uuid();
+        $this->newPageTitle = '';
+        $this->newPageReason = '';
         $this->reloadDraft();
     }
 
@@ -146,6 +158,34 @@ final class WebsiteWorkspace extends Page
         $page = $this->currentPage();
 
         return $actor instanceof User && $page && Gate::forUser($actor)->allows('publish', $page);
+    }
+
+    public function createNewPage(): void
+    {
+        [$actor, $page] = $this->authorizeSelectedPage('update');
+        $this->checkEditorSnapshot($page);
+        $this->validate([
+            'newPageSlug' => ['required', 'in:halls,packages,services,gallery,about,contact,privacy,terms'],
+            'newPageTitle' => ['required', 'string', 'min:3', 'max:120'],
+            'newPageReason' => ['required', 'string', 'min:3', 'max:500'],
+        ]);
+
+        try {
+            $created = app(SiteWorkspaceService::class)->createPage(
+                $actor, $page->company_id, $page->website_id,
+                $this->createPageKey, '/'.$this->newPageSlug,
+                $this->newPageTitle, $this->newPageReason,
+            );
+        } catch (\InvalidArgumentException | ConflictHttpException $error) {
+            throw ValidationException::withMessages(['newPageSlug' => $error->getMessage()]);
+        }
+        // Rotate the retry token only after a committed, audited successful write.
+        $this->createPageKey = (string) Str::uuid();
+        $this->newPageTitle = '';
+        $this->newPageReason = '';
+        $this->pageId = $created;
+        $this->reloadDraft();
+        Notification::make()->title('New unpublished website page created')->success()->send();
     }
 
     /** Reload only an authorized page's latest draft. This also abandons unsaved changes. */

@@ -3,6 +3,11 @@
 namespace Tests\Feature;
 
 use App\Filament\Pages\WebsiteWorkspace;
+use App\Services\SiteWorkspaceService;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\QueryException;
+use InvalidArgumentException;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\User;
@@ -102,4 +107,112 @@ class WebsiteWorkspaceLivewireTest extends TestCase
 
         $this->assertNull(DB::table('site_pages')->where('id', $pageId)->value('published_revision_id'));
     }
+    public function test_owner_creates_unpublished_page_then_saves_and_publishes(): void
+    {
+        [$company, , $homeId] = $this->fixture(true);
+        $component = Livewire::test(WebsiteWorkspace::class)
+            ->assertSee('Create a new website page')
+            ->set('newPageSlug', 'halls')->set('newPageTitle', 'Halls and packages')
+            ->set('newPageReason', 'Prepare private venue page')
+            ->call('createNewPage')->assertHasNoErrors()->assertSee('Halls and packages');
+        $created = DB::table('site_pages')->where('company_id', $company->id)
+            ->where('slug', '/halls')->first();
+        $this->assertNotNull($created);
+        $this->assertNotSame($homeId, $created->id);
+        $this->assertNull($created->published_revision_id);
+        $this->assertSame(0, (int) $created->draft_revision);
+        $this->assertSame(1, DB::table('audit_events')->where('action', 'website.page_created')->count());
+        $component->assertSet('pageId', $created->id)->call('addSection', 'text')
+            ->set('sections.0.data.title', 'Our hall')
+            ->set('reason', 'Prepare hall information')->call('saveDraft')->assertHasNoErrors();
+        $this->assertNull(DB::table('site_pages')->where('id', $created->id)->value('published_revision_id'));
+        $component->set('reason', 'Approve new hall page')
+            ->call('publishDraft')->assertHasNoErrors();
+        $this->assertNotNull(DB::table('site_pages')->where('id', $created->id)->value('published_revision_id'));
+    }
+
+    public function test_page_creation_retry_and_path_conflicts_are_enforced(): void
+    {
+        [$company, $actor, $homeId] = $this->fixture(true);
+        $site = (string) DB::table('site_pages')->where('id', $homeId)->value('website_id');
+        $service = app(SiteWorkspaceService::class);
+        $id = (string) Str::uuid();
+        $this->assertSame($id, $service->createPage($actor, $company->id, $site,
+            $id, '/gallery', 'Verified gallery', 'Private draft first'));
+        $this->assertSame($id, $service->createPage($actor, $company->id, $site,
+            $id, '/gallery', 'Verified gallery', 'Private draft first'));
+        $this->assertSame(1, DB::table('audit_events')->where('action', 'website.page_created')->count());
+        foreach ([
+            [$id, 'Different gallery', 'Private draft first'],
+            [$id, 'Verified gallery', 'Different reason'],
+            [(string) Str::uuid(), 'Another gallery', 'Fresh request'],
+        ] as [$key, $title, $reason]) {
+            try {
+                $service->createPage($actor, $company->id, $site, $key,
+                    '/gallery', $title, $reason);
+                $this->fail('Conflicting page creation was accepted.');
+            } catch (ConflictHttpException) {
+                $this->assertTrue(true);
+            }
+        }
+        $this->assertSame(2, DB::table('site_pages')->where('website_id', $site)->count());
+        $this->expectException(InvalidArgumentException::class);
+        $service->createPage($actor, $company->id, $site, (string) Str::uuid(),
+            '/admin', 'Forbidden page', 'No management paths on public site');
+    }
+
+    public function test_site_editor_can_create_but_revoked_or_cross_company_cannot(): void
+    {
+        [$company, $actor, $homeId] = $this->fixture(false);
+        $site = (string) DB::table('site_pages')->where('id', $homeId)->value('website_id');
+        Livewire::test(WebsiteWorkspace::class)->assertDontSee('Publish saved draft')
+            ->set('newPageSlug', 'about')->set('newPageTitle', 'About this venue')
+            ->set('newPageReason', 'Draft private introduction')
+            ->call('createNewPage')->assertHasNoErrors();
+        $foreign = Company::create(['name' => 'Other Venue', 'slug' => 'other-venue']);
+        try {
+            app(SiteWorkspaceService::class)->createPage($actor, $foreign->id, $site,
+                (string) Str::uuid(), '/contact', 'Foreign contact page', 'Unauthorized company');
+            $this->fail('Foreign company creation was accepted.');
+        } catch (AuthorizationException) {
+            $this->assertTrue(true);
+        }
+        DB::table('company_memberships')->where('company_id', $company->id)
+            ->where('user_id', $actor->id)->update(['is_active' => false]);
+        Livewire::test(WebsiteWorkspace::class)->assertForbidden();
+        $this->expectException(AuthorizationException::class);
+        app(SiteWorkspaceService::class)->createPage($actor, $company->id, $site,
+            (string) Str::uuid(), '/contact', 'Revoked page', 'Revoked editor blocked');
+    }
+
+    public function test_failed_audit_insert_rolls_back_created_page(): void
+    {
+        [$company, $actor, $homeId] = $this->fixture(true);
+        $site = (string) DB::table('site_pages')->where('id', $homeId)->value('website_id');
+        DB::unprepared(<<<'SQL'
+CREATE OR REPLACE FUNCTION reject_new_site_page_audit_test() RETURNS trigger
+LANGUAGE plpgsql AS $blocked$
+BEGIN
+    IF NEW.action = 'website.page_created' THEN
+        RAISE EXCEPTION 'Injected page creation audit failure';
+    END IF;
+    RETURN NEW;
+END;
+$blocked$;
+SQL);
+        DB::statement('CREATE TRIGGER reject_new_site_page_audit_trigger BEFORE INSERT ON audit_events FOR EACH ROW EXECUTE FUNCTION reject_new_site_page_audit_test()');
+        try {
+            app(SiteWorkspaceService::class)->createPage($actor, $company->id, $site,
+                (string) Str::uuid(), '/terms', 'Terms draft', 'Require audited page create');
+            $this->fail('Page persisted despite audit rejection.');
+        } catch (QueryException $error) {
+            $this->assertStringContainsString('Injected page creation audit failure', $error->getMessage());
+        } finally {
+            DB::statement('DROP TRIGGER IF EXISTS reject_new_site_page_audit_trigger ON audit_events');
+            DB::statement('DROP FUNCTION IF EXISTS reject_new_site_page_audit_test()');
+        }
+        $this->assertSame(1, DB::table('site_pages')->where('website_id', $site)->count());
+        $this->assertSame(0, DB::table('audit_events')->where('action', 'website.page_created')->count());
+    }
+
 }
