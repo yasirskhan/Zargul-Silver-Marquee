@@ -112,8 +112,16 @@ class PublishedVenueRouteTest extends TestCase
         ]]], 0, 'Create hall information page');
         $this->enable($company->id, $site);
         $this->get('http://venue.example.test/halls')->assertNotFound();
+        $this->get('http://venue.example.test/')->assertOk()
+            ->assertDontSee('Published venue pages')
+            ->assertDontSee('href="/halls"', false);
         $pages->publish($owner, $company->id, $hallsPage, 1, 'Approve hall page');
+        $this->get('http://venue.example.test/')->assertOk()
+            ->assertSee('Published venue pages')
+            ->assertSee('href="/halls"', false)
+            ->assertSee('Official Hall Details');
         $this->get('http://venue.example.test/halls')->assertOk()
+            ->assertSee('aria-current="page"', false)
             ->assertSee('Approved hall catalogue')
             ->assertSee('https://venue.example.test/halls')
             ->assertDontSee('site-media/private/');

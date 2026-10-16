@@ -31,6 +31,8 @@
         .site-footer { border-top: 1px solid {{ $palette['accent'] }}; border-bottom: 0; }
         .site-title { font-size: clamp(1.6rem, 4vw, 2.8rem); margin: 0; }
         .site-tagline { margin: 5px 0 0; }
+        .site-navigation { display: flex; flex-wrap: wrap; gap: 12px 20px; margin-top: 20px; }
+        .site-navigation a { color: inherit; font-weight: 600; text-underline-offset: 4px; }
         .site-section { margin: 24px 0; padding: 22px; border: 1px solid {{ $palette['accent'] }}; border-radius: 12px; }
         .site-section h2, .site-section h3 { margin: 0 0 10px; }
         .site-section p { overflow-wrap: anywhere; white-space: pre-line; }
@@ -56,6 +58,13 @@
             @endif
             @if ($branding['logoMediaId'] !== null)
                 <p class="media-placeholder" aria-label="Venue logo pending public asset release">Approved logo placeholder</p>
+            @endif
+            @if (count($snapshot['navigation']) > 1)
+                <nav class="site-navigation" aria-label="Published venue pages">
+                    @foreach ($snapshot['navigation'] as $item)
+                        <a href="{{ $item['href'] }}" @if ($snapshot['page']['slug'] === $item['href']) aria-current="page" @endif>{{ $item['label'] }}</a>
+                    @endforeach
+                </nav>
             @endif
         </header>
         <main id="main-content">

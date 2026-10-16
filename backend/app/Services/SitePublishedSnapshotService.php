@@ -73,10 +73,26 @@ final class SitePublishedSnapshotService
         $this->collectMedia($content['sections'], $mediaIds);
         $media = $this->approvedMediaManifest($companyId, array_keys($mediaIds));
 
+        // Publish-only navigation: links can never expose drafts, other
+        // websites or unpublished pages. No arbitrary CMS URL is accepted.
+        $publicSlugs = ['/', '/halls', '/packages', '/services', '/gallery',
+            '/about', '/contact', '/privacy', '/terms'];
+        $navigation = DB::table('site_pages')
+            ->where('company_id', $companyId)->where('website_id', $websiteId)
+            ->whereNotNull('published_revision_id')->whereIn('slug', $publicSlugs)
+            ->get(['slug', 'title'])->keyBy('slug');
+        $links = [];
+        foreach ($publicSlugs as $path) {
+            if (isset($navigation[$path])) {
+                $links[] = ['href' => $path, 'label' => $navigation[$path]->title];
+            }
+        }
+
         return [
             'branding' => $branding,
             'page' => ['slug' => $page->slug, 'title' => $page->title, 'sections' => $content['sections']],
             'media' => $media,
+            'navigation' => $links,
         ];
     }
 
