@@ -93,6 +93,100 @@ class SiteDomainOwnershipServiceTest extends TestCase
         $this->assertNull(DB::table('websites')->where('id', $site)->value('branding_published_revision_id'));
     }
 
+    public function test_domain_request_and_verification_roll_back_if_immutable_audit_cannot_be_written(): void
+    {
+        [$company, $owner, $site] = $this->fixture('domain-atomic-audit');
+        $resolver = $this->resolver();
+        $service = app(SiteDomainOwnershipService::class);
+        $this->rejectAuditWrites();
+        try {
+            $service->request($owner, $company->id, $site, 'atomic.marquee.org',
+                'Prepare audited domain claim');
+            $this->fail('A domain claim survived an audit write failure.');
+        } catch (\Illuminate\Database\QueryException $exception) {
+            $this->assertStringContainsString('Injected domain audit rejection', $exception->getMessage());
+        } finally {
+            $this->allowAuditWrites();
+        }
+        $this->assertSame(0, DB::table('site_domain_claims')->count());
+        $this->assertSame(0, DB::table('audit_events')->count());
+
+        $claim = $service->request($owner, $company->id, $site,
+            'atomic.marquee.org', 'Create a valid audited claim');
+        $resolver->answers[$claim['txtName']] = [$claim['txtValue']];
+        $this->rejectAuditWrites();
+        try {
+            $service->verify($owner, $company->id, $site, $claim['domain'],
+                'Audit must precede verified status');
+            $this->fail('DNS verification survived an audit write failure.');
+        } catch (\Illuminate\Database\QueryException $exception) {
+            $this->assertStringContainsString('Injected domain audit rejection', $exception->getMessage());
+        } finally {
+            $this->allowAuditWrites();
+        }
+        $this->assertSame('pending', DB::table('site_domain_claims')->value('status'));
+        $this->assertNull(DB::table('site_domain_claims')->value('verified_at'));
+        $this->assertSame(1, DB::table('audit_events')->count());
+        $this->assertSame(0, DB::table('audit_events')
+            ->where('action', 'website.domain_ownership_verified')->count());
+    }
+
+    public function test_challenge_rotated_during_dns_lookup_cannot_verify_an_outdated_snapshot(): void
+    {
+        [$company, $owner, $site] = $this->fixture('rotate-while-resolving');
+        $service = app(SiteDomainOwnershipService::class);
+        $claim = $service->request($owner, $company->id, $site,
+            'rotation.marquee.org', 'Issue first DNS proof');
+
+        $resolver = new class extends SiteDomainTxtResolver {
+            public string $oldProof = '';
+
+            public function lookupTxt(string $name): array
+            {
+                // Race injected after untrusted DNS lookup has started but
+                // before the service locks/rechecks the current claim hash.
+                DB::table('site_domain_claims')->update([
+                    'token_hash' => hash('sha256', 'a-new-challenge-not-in-dns'),
+                ]);
+                return [$this->oldProof];
+            }
+        };
+        $resolver->oldProof = $claim['txtValue'];
+        $this->app->instance(SiteDomainTxtResolver::class, $resolver);
+
+        try {
+            $service->verify($owner, $company->id, $site, $claim['domain'],
+                'Reject old proof after concurrent token rotation');
+            $this->fail('Old proof was accepted after challenge rotation.');
+        } catch (ConflictHttpException) {
+            $this->assertSame('pending', DB::table('site_domain_claims')->value('status'));
+            $this->assertSame(0, DB::table('audit_events')
+                ->where('action', 'website.domain_ownership_verified')->count());
+        }
+    }
+
+    private function rejectAuditWrites(): void
+    {
+        DB::unprepared(<<<'SQL'
+CREATE OR REPLACE FUNCTION fail_test_domain_audit_insert() RETURNS trigger
+LANGUAGE plpgsql AS $
+BEGIN
+    IF NEW.action IN ('website.domain_claim_requested', 'website.domain_ownership_verified') THEN
+        RAISE EXCEPTION 'Injected domain audit rejection';
+    END IF;
+    RETURN NEW;
+END;
+$;
+SQL);
+        DB::statement('CREATE TRIGGER fail_test_domain_audit_insert_trigger BEFORE INSERT ON audit_events FOR EACH ROW EXECUTE FUNCTION fail_test_domain_audit_insert()');
+    }
+
+    private function allowAuditWrites(): void
+    {
+        DB::statement('DROP TRIGGER IF EXISTS fail_test_domain_audit_insert_trigger ON audit_events');
+        DB::statement('DROP FUNCTION IF EXISTS fail_test_domain_audit_insert()');
+    }
+
     public function test_unverified_and_reserved_domain_claims_fail_without_persisting(): void
     {
         [$company, $owner, $site] = $this->fixture('invalid-dns');
