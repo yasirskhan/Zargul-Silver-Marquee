@@ -8,6 +8,14 @@ Route::get('/', \App\Http\Controllers\PublishedVenuePageController::class);
 Route::get('/{pageSlug}', \App\Http\Controllers\PublishedVenuePageController::class)
     ->whereIn('pageSlug', ['halls', 'packages', 'services', 'gallery', 'about', 'contact', 'privacy', 'terms']);
 
+// Serve approved, optimized WebP bytes only when referenced by the CURRENT
+// published site page. No direct private disk or unapproved upload route.
+Route::get('/_venue-media/{pageSlug}/{mediaId}.webp',
+    \App\Http\Controllers\PublishedVenueMediaController::class)
+    ->whereIn('pageSlug', ['home', 'halls', 'packages', 'services', 'gallery', 'about',
+        'contact', 'privacy', 'terms'])
+    ->whereUuid('mediaId');
+
 /**
  * Only Telegram itself may call this endpoint. In production, reject plain
  * HTTP even behind an accidentally misconfigured reverse proxy.

@@ -6,7 +6,6 @@ use App\Services\SitePublishedHtmlService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Str;
 use InvalidArgumentException;
 use JsonException;
 
@@ -17,7 +16,7 @@ use JsonException;
  */
 final class PublishedVenuePageController
 {
-    public function __invoke(Request $request, SitePublishedHtmlService $renderer, ?string $pageSlug = null): Response|JsonResponse
+    public function __invoke(Request $request, SitePublishedHtmlService $renderer, PublicSiteRequestGate $gate, ?string $pageSlug = null): Response|JsonResponse
     {
         if (config('public_site.enabled') !== true) {
             abort_if($pageSlug !== null, 404);
@@ -28,22 +27,10 @@ final class PublishedVenuePageController
             ]);
         }
 
-        $host = config('public_site.host');
-        $companyId = config('public_site.company_id');
-        $websiteId = config('public_site.website_id');
-        if (! is_string($host) || strlen($host) > 253
-            || ! preg_match('/\A[a-z0-9][a-z0-9.-]*[a-z0-9]\z/D', $host)
-            || str_contains($host, '..') || ! str_contains($host, '.')
-            || ! is_string($companyId) || ! Str::isUuid($companyId)
-            || ! is_string($websiteId) || ! Str::isUuid($websiteId)) {
-            abort(503, 'The approved public website is unavailable.');
-        }
-        // Never select a company/site from a user-controlled query string,
-        // path, wildcard hostname or forwarded header.
-        abort_unless(hash_equals($host, $request->getHost()), 404);
-        if (app()->environment('production')) {
-            abort_unless($request->isSecure(), 403);
-        }
+        $context = $gate->authorize($request);
+        $host = $context['host'];
+        $companyId = $context['companyId'];
+        $websiteId = $context['websiteId'];
 
         try {
             $page = $pageSlug === null ? '/' : '/'.$pageSlug;

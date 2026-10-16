@@ -121,6 +121,49 @@ class SitePublishedWebpTest extends TestCase
         $this->assertSame('image/webp', $reader->read($company->id, $site, '/', $published)['content_type']);
     }
 
+    public function test_public_media_http_requires_exact_host_and_published_page_reference(): void
+    {
+        [$company, $owner, $site, $page] = $this->fixture();
+        $published = $this->uploadApproved($owner, $company->id);
+        $notReferenced = $this->uploadApproved($owner, $company->id);
+        $url = 'http://venue.example.test/_venue-media/home/'.$published.'.webp';
+        config()->set('public_site.enabled', true);
+        config()->set('public_site.host', 'venue.example.test');
+        config()->set('public_site.company_id', $company->id);
+        config()->set('public_site.website_id', $site);
+        $this->get($url)->assertNotFound(); // Not published yet.
+        $this->publish($owner, $company->id, $site, $page, $published);
+        $expected = app(SitePublishedWebpService::class)
+            ->read($company->id, $site, '/', $published);
+        $http = $this->get($url)->assertOk()
+            ->assertHeader('Content-Type', 'image/webp')
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('ETag', $expected['etag']);
+        $this->assertSame($expected['bytes'], $http->getContent());
+        $this->assertSame([], Storage::disk('public')->allFiles());
+        $this->get('http://wrong.example.test/_venue-media/home/'.$published.'.webp')->assertNotFound();
+        $this->get('http://venue.example.test/_venue-media/halls/'.$published.'.webp')->assertNotFound();
+        $this->get('http://venue.example.test/_venue-media/home/'.$notReferenced.'.webp')->assertNotFound();
+        $this->get('http://venue.example.test/_venue-media/home/not-a-uuid.webp')->assertNotFound();
+        config()->set('public_site.enabled', false);
+        $this->get($url)->assertNotFound();
+    }
+
+    public function test_public_media_http_refuses_tampered_current_published_webp(): void
+    {
+        [$company, $owner, $site, $page] = $this->fixture();
+        $media = $this->uploadApproved($owner, $company->id);
+        $this->publish($owner, $company->id, $site, $page, $media);
+        config()->set('public_site.enabled', true);
+        config()->set('public_site.host', 'venue.example.test');
+        config()->set('public_site.company_id', $company->id);
+        config()->set('public_site.website_id', $site);
+        $metadata = json_decode(DB::table('site_media')->where('id', $media)->value('metadata'), true);
+        Storage::disk('local')->put($metadata['variants']['webp1200']['object_key'], 'invalid variant');
+        $this->get('http://venue.example.test/_venue-media/home/'.$media.'.webp')
+            ->assertStatus(503);
+    }
+
     public function test_tampered_or_cross_company_variant_references_fail_closed(): void
     {
         [$company, $owner, $site, $page] = $this->fixture();
