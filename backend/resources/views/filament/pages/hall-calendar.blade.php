@@ -73,7 +73,7 @@
                                         <span class="block">{{ $day['date'] }}</span>
                                         @if ($this->canOpenDraftProposals())
                                             <a class="mt-1 block text-xs underline"
-                                                href="{{ AppFilamentPagesBookingProposals::getUrl(['company' => $companyId, 'hall' => $hallId, 'from' => $day['date'], 'to' => $day['date']]) }}">
+                                                href="{{ \App\Filament\Pages\BookingProposals::getUrl(['company' => $companyId, 'hall' => $hallId, 'from' => $day['date'], 'to' => $day['date']]) }}">
                                                 View draft proposals
                                             </a>
                                         @endif
