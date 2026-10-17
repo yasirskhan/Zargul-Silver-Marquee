@@ -324,16 +324,6 @@ final class ApprovalCenter extends Page
         $this->refreshInbox();
     }
 
-    public function updatedNewCategory(): void
-    {
-        $this->authorizeLoaded();
-        abort_unless(in_array($this->newCategory, $this->requestCategoryOptions(), true), 403);
-        $this->newBookingId = '';
-        $this->newAmount = '';
-        $this->newReason = '';
-        $this->newRequestKey = (string) Str::uuid();
-    }
-
     public function updatedStatusFilter(): void
     {
         $this->refreshInbox();
