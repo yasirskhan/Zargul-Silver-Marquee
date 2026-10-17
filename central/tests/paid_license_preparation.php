@@ -188,5 +188,29 @@ denyIssue(fn()=>$finalizer->finalize($r['revision_id'],$officer,true,true,$envel
     'revision_not_pending');
 putenv('CENTRAL_SIGNER_FINALIZATION_ENABLED=false');
 echo "PASS: protected worker and release gate, atomic signed revision finalization, sealed storage and audit\n";
+// Database immutability is enforced even if application code attempts to
+// alter an approved settlement or suppress the license audit trail.
+$settlementId=$db->query('SELECT id FROM central_vendor_verified_settlements ORDER BY id LIMIT 1')
+    ->fetchColumn();
+try {
+    $db->prepare('UPDATE central_vendor_verified_settlements
+        SET amount_minor=amount_minor+1 WHERE id=:id')
+        ->execute(['id'=>$settlementId]);
+    throw new RuntimeException('FAIL verified central settlement was mutable');
+} catch (PDOException $expected) {}
+try {
+    $db->prepare('DELETE FROM central_license_issuance_audit WHERE revision_id=:id')
+        ->execute(['id'=>$r['revision_id']]);
+    throw new RuntimeException('FAIL preparation audit was deleted');
+} catch (PDOException $expected) {}
+try {
+    $db->prepare('DELETE FROM central_license_signature_events WHERE revision_id=:id')
+        ->execute(['id'=>$r['revision_id']]);
+    throw new RuntimeException('FAIL signature audit was deleted');
+} catch (PDOException $expected) {}
+verifyIssue((int)$db->query('SELECT count(*) FROM central_license_signature_events')->fetchColumn()===1,
+    'signature audit event remained after malicious deletes');
+echo "PASS: PostgreSQL blocks edits and deletes to verified settlements and paid-license audit records\n";
+
 
 

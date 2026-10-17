@@ -183,6 +183,12 @@
 - Previous `e3bb0d5` company binding passed all focused licensing, central, browser and owner tests; full six-job CI completion to confirm. New Filament page needs exact hosted full CI before VERIFIED.
 - Next: actual signed central grant retrieval plus authorized, rate-limited Verify and 15-day background scheduled delivery; preserve tenant isolation, signed status and no five-minute polling.
 
+## HAFZATECH VERIFIED FINANCE AND LICENSING AUDIT IMMUTABILITY — PENDING HOSTED CI
+- Additive `central/schema/009_financial_audit_immutability.sql` installs PostgreSQL BEFORE UPDATE/DELETE fail-closed triggers for independently verified vendor settlements, prepared paid-license audit events, and sealed license-signature finalization audit events. Regression deliberately attempts to inflate a verified settlement and delete issuance/signature evidence; PostgreSQL must reject each operation. Correcting payments requires a future separate audited reversal/chargeback, NOT silent mutation.
+- This changes no money amounts, public enrollment, production deployment, or release gates. All central signing/payment processing remains OFF by default; protected KMS keys and actual banking settlement verification remain operator dependencies. Exact hosted central-postgres and full six-job CI pending.
+- Previous owner-scoped read-only Licensing page `ba7c7ca` completed central, licensing, editor and authenticated browser suites successfully; full Laravel CI conclusion still to verify.
+- Next: authenticated sealed-grant readback and signed license delivery to owner Verify/15-day checker, then release gates following operator provisioning.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`
