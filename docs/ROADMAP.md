@@ -12,8 +12,9 @@ Laravel/Filament/PostgreSQL versions verified; migration foundation, operating c
 ## Phase 2 — Owner configuration
 Sessions morning/noon/evening, times, grace, overtime, buffer, capacity, seating pricing, catering and add-ons; snapshot/versioned pricing.
 
-## Phase 3 — Bookings and universal search
+## Phase 3 — Bookings and universal search (core internal confirmation implementation pending hosted CI)
 Color-coded multi-hall calendar, temporary holds, concurrency constraints, customer profiles, enquiries and mobile wizard.
+A new PostgreSQL backed INTERNAL owner/admin/assigned-manager/reception confirmation flow consumes a reviewed proposal into a separate confirmed reservation, locks an exclusive hall/date/program claim, and supports same-hall rescheduling and audited cancellation. The calendar projects confirmed occupancy. Release gate VENUE_BOOKING_CONFIRMATION_ENABLED defaults OFF until operator readiness signoff. This is NOT a public intake, full booking management milestone or ready-to-charge booking: new customer onboarding for manager/reception, cross-hall transfers, operator timezone, expiry/holds UX, consent/privacy signoff, production race acceptance, invoice/payment and mobile browser UAT remain open.
 
 ## Phase 4 — Finance
 Quote, invoice, receipt, deposit, ledger, correction, refund, cash reconciliation, PDFs.

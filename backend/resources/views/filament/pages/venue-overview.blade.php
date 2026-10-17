@@ -148,6 +148,12 @@
                     </div>
                 </section>
             @endif
+            @if ($summary['visibleHalls'] > 0 && in_array($summary['role'], ['owner', 'admin', 'manager', 'reception'], true))
+                <a class="inline-flex rounded-lg border px-4 py-3 font-semibold underline"
+                    href="{{ \App\Filament\Pages\VenueReservations::getUrl(['company' => $companyId]) }}">
+                    Manage confirmed reservations
+                </a>
+            @endif
             <section class="space-y-3" aria-label="Daily staff quick navigation">
                 <h2 class="font-semibold">Go directly to your work</h2>
                 <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
