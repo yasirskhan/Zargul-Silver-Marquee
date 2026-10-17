@@ -222,6 +222,18 @@ SQL);
         $this->assertNotSame($originalHash, $claim->token_hash);
         $this->assertSame(1, DB::table('audit_events')
             ->where('action', 'website.domain_ownership_revoked')->count());
+        $audit = DB::table('audit_events')->where('action', 'website.domain_ownership_revoked')->first();
+        $before = json_decode($audit->before_values, true, 512, JSON_THROW_ON_ERROR);
+        $after = json_decode($audit->after_values, true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame('verified', $before['status']);
+        $this->assertSame('pending', $after['status']);
+        $this->assertSame($company->id, $audit->company_id);
+        $this->assertSame($owner->id, (int) $audit->actor_id);
+        $this->assertSame($claim->id, $audit->entity_id);
+        $this->assertStringNotContainsString($challenge['txtValue'],
+            json_encode([$before, $after], JSON_THROW_ON_ERROR));
+        $this->assertArrayNotHasKey('token_hash', $before);
+        $this->assertArrayNotHasKey('token_hash', $after);
         try {
             $gate->authorize($request);
             $this->fail('Revoked website domain passed the release gate.');

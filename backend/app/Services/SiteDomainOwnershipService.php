@@ -153,7 +153,9 @@ final class SiteDomainOwnershipService
             $this->audit($actor, $companyId, $claim->id, 'website.domain_ownership_revoked',
                 ['websiteId' => $websiteId, 'domain' => $domain,
                     'status' => 'pending', 'verified' => false, 'requiresNewProof' => true],
-                $reason);
+                $reason,
+                ['websiteId' => $websiteId, 'domain' => $domain, 'status' => 'verified',
+                    'verifiedAt' => $claim->verified_at]);
         }, 3);
     }
 
@@ -200,13 +202,15 @@ final class SiteDomainOwnershipService
     }
 
     private function audit(
-        User $actor, string $companyId, string $claimId, string $action, array $after, string $reason
+        User $actor, string $companyId, string $claimId, string $action,
+        array $after, string $reason, ?array $before = null
     ): void {
         DB::table('audit_events')->insert([
             'id' => (string) Str::uuid(), 'company_id' => $companyId,
             'actor_id' => $actor->getKey(), 'action' => $action,
             'entity_type' => 'site_domain_claim', 'entity_id' => $claimId,
-            'before_values' => null, 'after_values' => json_encode($after, JSON_THROW_ON_ERROR),
+            'before_values' => $before === null ? null : json_encode($before, JSON_THROW_ON_ERROR),
+            'after_values' => json_encode($after, JSON_THROW_ON_ERROR),
             'context' => json_encode(['reason' => $reason], JSON_THROW_ON_ERROR),
         ]);
     }
