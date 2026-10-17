@@ -19,6 +19,8 @@ require dirname(__DIR__).'/src/LicenseTermCalendar.php';
 require dirname(__DIR__).'/src/PaidLicensePreparation.php';
 require dirname(__DIR__).'/src/PreparedSignedGrantValidator.php';
 require dirname(__DIR__).'/src/SignedGrantFinalization.php';
+require dirname(__DIR__).'/src/InstallationStatusService.php';
+require dirname(__DIR__).'/src/SignedGrantDeliveryService.php';
 require dirname(__DIR__).'/signing/Ed25519GrantCodec.php';
 
 function issueUuid(): string {
@@ -51,11 +53,12 @@ $db->prepare("INSERT INTO installation_enrollments
     (id,customer_id,token_sha256,approved_domain,domain_verified_at,expires_at,claimed_at)
     VALUES(:id,:customer,:hash,'signed.example.test',now(),now()+interval '1 day',now())")
     ->execute(['id'=>$enrollment,'customer'=>$customer,'hash'=>hash('sha256',random_bytes(32))]);
+$installationPair=sodium_crypto_sign_keypair();
 $db->prepare("INSERT INTO registered_installations
     (id,customer_id,enrollment_id,approved_domain,ed25519_public_key)
     VALUES(:id,:customer,:enrollment,'signed.example.test',:public)")
     ->execute(['id'=>$installation,'customer'=>$customer,'enrollment'=>$enrollment,
-        'public'=>InstallationRegistry::base64Url(sodium_crypto_sign_publickey(sodium_crypto_sign_keypair()))]);
+        'public'=>InstallationRegistry::base64Url(sodium_crypto_sign_publickey($installationPair))]);
 $s=$db->prepare("INSERT INTO central_staff_users
     (id,email,display_name,password_hash,mfa_enrolled_at,status)
     VALUES(:id,:email,:display,:hash,now(),'active')");
@@ -211,6 +214,40 @@ try {
 verifyIssue((int)$db->query('SELECT count(*) FROM central_license_signature_events')->fetchColumn()===1,
     'signature audit event remained after malicious deletes');
 echo "PASS: PostgreSQL blocks edits and deletes to verified settlements and paid-license audit records\n";
+$unseal=static function(string $sealed)use($sealKey):string{
+    $nonce=substr($sealed,0,SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+    $clear=sodium_crypto_secretbox_open(
+        substr($sealed,SODIUM_CRYPTO_SECRETBOX_NONCEBYTES),$nonce,$sealKey);
+    if($clear===false)throw new RuntimeException('Cannot recover synthetic sealed grant');
+    return $clear;
+};
+$fetcher=new \Hafzatech\Central\SignedGrantDeliveryService(
+    $db,new \Hafzatech\Central\InstallationStatusService($db),
+    $unseal,['test-key'=>$keyPub]);
+$signFetch=static function(string $who,int $known)use($installation,$installationPair):array{
+    $nonce=InstallationRegistry::base64Url(random_bytes(32));
+    $when=gmdate('Y-m-d\TH:i:s\Z');
+    $message=implode("\n",['HAFZATECH-INSTALL-CHECK-V1',$installation,$who,
+        $when,$nonce,(string)$known]);
+    return [
+        'installation_id'=>$installation,'customer_id'=>$who,
+        'request_time'=>$when,'nonce'=>$nonce,'known_revision'=>$known,
+        'signature'=>InstallationRegistry::base64Url(sodium_crypto_sign_detached(
+            $message,sodium_crypto_sign_secretkey($installationPair))),
+    ];
+};
+denyIssue(fn()=>$fetcher->fetch($signFetch($customer,0)),'grant_delivery_not_enabled');
+putenv('CENTRAL_GRANT_DELIVERY_ENABLED=true');
+$delivered=$fetcher->fetch($signFetch($customer,0));
+verifyIssue($delivered['status']==='signed_revision_pending_delivery' &&
+    $delivered['revision']===1 && $delivered['signed_grant']===$envelope,
+    'only signed stored grant is delivered after authenticated one-use proof');
+$again=$fetcher->fetch($signFetch($customer,1));
+verifyIssue($again['signed_grant']===null,'up-to-date installation requires no duplicate grant');
+denyIssue(fn()=>$fetcher->fetch($signFetch($other,0)),'unauthorized_installation');
+putenv('CENTRAL_GRANT_DELIVERY_ENABLED=false');
+echo "PASS: protected signed grant readback enforces install signature, customer binding and up-to-date revision\n";
+
 
 
 
