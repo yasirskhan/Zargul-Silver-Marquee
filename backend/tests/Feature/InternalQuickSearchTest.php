@@ -325,8 +325,26 @@ class InternalQuickSearchTest extends TestCase
             $row = collect($service->search($members['owner'][0], $company->id, $item['term']))
                 ->firstWhere('kind', $item['kind']);
             $this->assertNotNull($row);
-            $this->assertSame($item['path'].'?company='.$company->id, $row['path']);
+            $expected = $item['path'].'?company='.$company->id
+                .($item['kind'] === 'proposal' ? '&proposal='.$booking : '');
+            $this->assertSame($expected, $row['path']);
         }
+    }
+
+    public function test_owner_search_opens_exact_company_scoped_proposal_reference(): void
+    {
+        [$company, , $members, $booking] = $this->fixture();
+        $service = app(InternalQuickSearchService::class);
+        $row = collect($service->search(
+            $members['owner'][0], $company->id, substr($booking, 0, 8), 20, 'proposal'
+        ))->firstWhere('id', $booking);
+        $this->assertNotNull($row);
+        $this->assertSame('/admin/booking-proposals?company='.$company->id
+            .'&proposal='.$booking, $row['path']);
+        $this->assertStringNotContainsString('contact-hidden@example.test',
+            json_encode($row, JSON_THROW_ON_ERROR));
+        $this->assertStringNotContainsString('Private Synthetic Guest',
+            json_encode($row, JSON_THROW_ON_ERROR));
     }
 
     public function test_term_and_result_bounds_reject_contact_and_large_queries(): void

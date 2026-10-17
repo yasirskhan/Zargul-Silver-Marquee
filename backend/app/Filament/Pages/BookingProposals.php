@@ -40,7 +40,8 @@ final class BookingProposals extends Page
 
     public string $statusFilter = '';
 
-    /** Exact opaque proposal reference, never a customer name or contact search. */
+    /** Only an exact, tenant-scoped opaque proposal reference is accepted. */
+    #[Url(as: 'proposal')]
     public string $referenceSearch = '';
 
     public string $fromDate = '';

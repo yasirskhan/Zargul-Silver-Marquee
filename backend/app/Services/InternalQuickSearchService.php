@@ -105,7 +105,9 @@ final class InternalQuickSearchService
                     'kind' => $source['kind'], 'id' => $row->id,
                     'label' => $row->result_label,
                     'status' => $source['status'] ? $row->status : 'internal',
-                    'path' => $source['path'].'?company='.rawurlencode($companyId),
+                    'path' => $source['path'].'?company='.rawurlencode($companyId)
+                        .($source['kind'] === 'proposal'
+                            ? '&proposal='.rawurlencode($row->id) : ''),
                 ];
             }
         }
