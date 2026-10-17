@@ -43,7 +43,7 @@
                 <h2 class="font-semibold">Go directly to your work</h2>
                 <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     @if ($summary['visibleHalls'] > 0)
-                        <a class="rounded-xl border p-4 underline" href="{{ \App\Filament\Pages\HallCalendar::getUrl() }}">
+                        <a class="rounded-xl border p-4 underline" href="{{ \App\Filament\Pages\HallCalendar::getUrl(['company' => $companyId]) }}">
                             Hall calendar · morning, noon and evening
                         </a>
                     @endif

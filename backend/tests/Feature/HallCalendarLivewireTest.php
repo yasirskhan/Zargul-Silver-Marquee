@@ -178,6 +178,31 @@ class HallCalendarLivewireTest extends TestCase
         $this->assertSame(0, DB::table('hall_slot_claims')->count());
     }
 
+    public function test_company_scoped_calendar_navigation_respects_owned_hall_and_rejects_foreign_switch(): void
+    {
+        [$company, $hall, $owner] = $this->fixture();
+        $second = Company::create(['name' => 'Another Owned Venue', 'slug' => 'calendar-second-owned']);
+        $secondHall = Hall::create([
+            'company_id' => $second->id, 'name' => 'Second Hall',
+            'slug' => 'second-calendar-hall', 'capacity' => 120,
+        ]);
+        CompanyMembership::create([
+            'company_id' => $second->id, 'user_id' => $owner->id, 'role' => 'owner',
+        ]);
+        $panel = Livewire::test(HallCalendar::class)
+            ->set('companyId', $second->id)
+            ->assertSet('companyId', $second->id)
+            ->assertSet('hallId', $secondHall->id)
+            ->assertSee('Second Hall')
+            ->assertDontSee('Grand Hall');
+        $this->assertSame($second->id, $panel->get('projection')['companyId']);
+        $this->assertSame($secondHall->id, $panel->get('projection')['hallId']);
+
+        $foreign = Company::create(['name' => 'Unowned Venue', 'slug' => 'calendar-unowned']);
+        $panel->set('companyId', $foreign->id)->assertForbidden();
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+    }
+
     public function test_owner_can_switch_day_week_month_and_navigate_without_mutation(): void
     {
         [$company, $hall] = $this->fixture();

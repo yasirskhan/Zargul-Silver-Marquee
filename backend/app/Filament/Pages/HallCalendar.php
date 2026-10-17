@@ -15,6 +15,7 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Url;
 
 final class HallCalendar extends Page
 {
@@ -26,6 +27,7 @@ final class HallCalendar extends Page
 
     protected static ?string $slug = 'hall-calendar';
 
+    #[Url(as: 'company')]
     public ?string $companyId = null;
 
     public ?string $hallId = null;
@@ -85,7 +87,11 @@ final class HallCalendar extends Page
     {
         abort_unless(static::canAccess(), 403);
         $this->anchorDate = now()->toDateString();
-        $this->companyId = array_key_first($this->companyOptions());
+        $options = $this->companyOptions();
+        $requested = $this->companyId ?? request()->query('company');
+        abort_unless($requested === null || (is_string($requested)
+            && array_key_exists($requested, $options)), 403);
+        $this->companyId = $requested ?? array_key_first($options);
         $this->hallId = array_key_first($this->hallOptions());
         $this->reloadCalendar();
     }
