@@ -191,7 +191,7 @@ class ApprovalCenterLivewireTest extends TestCase
             ->set('newCategory', 'expense')
             ->set('newAmount', '900')
             ->set('newCurrency', 'USD')
-            ->set('newBookingId', (string) \\Illuminate\\Support\\Str::uuid())
+            ->set('newBookingId', (string) \Illuminate\Support\Str::uuid())
             ->set('newReason', 'Unsent Company A expense')
             ->set('grantCategories', ['expense']);
         $oldRequestKey = $component->get('newRequestKey');
