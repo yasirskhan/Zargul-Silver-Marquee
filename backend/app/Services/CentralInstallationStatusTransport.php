@@ -1,0 +1,85 @@
+<?php
+
+namespace App\Services;
+
+use DateTimeImmutable;
+use DateTimeZone;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use InvalidArgumentException;
+
+/**
+ * Authentication-only check-in, NOT online entitlement verification.
+ * The central status reply is protected by fixed-host TLS and nonce matching,
+ * but it is NOT a signed grant. Never advance last_online_verified_at, accept
+ * revisions, renew, or mark a revoked/suspended license valid from this reply.
+ */
+final class CentralInstallationStatusTransport
+{
+    public function check(DateTimeImmutable $now): array
+    {
+        if (config('central_control.activation_enabled') !== true) {
+            throw new AuthorizationException('Central connectivity is not released.');
+        }
+        $binding = DB::table('central_installation_activation')->where('singleton_id', 1)->first();
+        $identity = DB::table('central_installation_identity')->where('singleton_id', 1)->first();
+        if (! $binding || ! $identity || $binding->installation_id !== $identity->installation_id ||
+            $binding->status !== 'registered_pending_license') {
+            throw new InvalidArgumentException('Trusted central installation binding is required.');
+        }
+        $revision = (int) (DB::table('central_signed_license_cache')->where('singleton_id', 1)->value('revision') ?? 0);
+        $nonce = self::b64(random_bytes(32));
+        $stamp = $now->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s\Z');
+        $message = implode("\n", [
+            'HAFZATECH-INSTALL-CHECK-V1', $identity->installation_id,
+            $binding->customer_id, $stamp, $nonce, (string) $revision,
+        ]);
+        $raw = Crypt::decryptString($identity->encrypted_private_key);
+        $private = base64_decode(strtr($raw, '-_', '+/'), true);
+        if (! is_string($private) || strlen($private) !== SODIUM_CRYPTO_SIGN_SECRETKEYBYTES ||
+            self::b64($private) !== $raw) {
+            throw new InvalidArgumentException('Local installation key has invalid format.');
+        }
+        $request = [
+            'installation_id' => $identity->installation_id,
+            'customer_id' => $binding->customer_id,
+            'request_time' => $stamp,
+            'nonce' => $nonce,
+            'known_revision' => $revision,
+            'signature' => self::b64(sodium_crypto_sign_detached($message, $private)),
+        ];
+        $response = Http::acceptJson()->asJson()
+            ->withOptions(['allow_redirects' => false])
+            ->connectTimeout(3)->timeout(8)
+            ->post('https://lichall.hafzatech.com/api/v1/installations/status', $request);
+
+        if ($response->status() !== 200) {
+            throw new InvalidArgumentException('Trusted central status check failed.');
+        }
+        $body = $response->json();
+        if (! is_array($body) || ($body['api_version'] ?? null) !== 'v1' ||
+            ($body['registered_installation_id'] ?? null) !== $identity->installation_id ||
+            ($body['nonce'] ?? null) !== $nonce ||
+            ! is_int($body['revision'] ?? null) || $body['revision'] < 0 ||
+            $body['revision'] > 2147483647 ||
+            ! in_array($body['status'] ?? null,
+                ['registered_pending_license', 'signed_revision_pending_delivery'], true) ||
+            ($body['status'] === 'registered_pending_license') !== ($body['revision'] === 0)) {
+            throw new InvalidArgumentException('Central status response failed nonce or identity validation.');
+        }
+        // Never claim this is a signed or renewed license, even if central
+        // reports an unsigned/deliverable revision number.
+        return [
+            'status' => $body['status'],
+            'revision_available' => $body['revision'],
+            'licensed' => false,
+        ];
+    }
+
+    private static function b64(string $bytes): string
+    {
+        return rtrim(strtr(base64_encode($bytes), '+/', '-_'), '=');
+    }
+}
