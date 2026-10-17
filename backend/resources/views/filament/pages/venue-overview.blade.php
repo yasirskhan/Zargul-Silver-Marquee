@@ -26,6 +26,12 @@
                             <p class="text-sm">Halls needing program setup</p>
                             <p class="text-3xl font-semibold">{{ $summary['hallsNeedingSetup'] }}</p>
                             <p class="text-xs">Configure morning, noon and evening before confirming any booking</p>
+                            @if ($summary['hallsNeedingSetup'] > 0)
+                                <a class="text-xs underline"
+                                    href="{{ \App\Filament\Pages\HallPrograms::getUrl(['company' => $companyId, 'setup' => 'needed']) }}">
+                                    Configure halls missing program rules
+                                </a>
+                            @endif
                         </div>
                         <div class="rounded-xl border p-4">
                             <p class="text-sm">Unconfirmed company proposals</p>

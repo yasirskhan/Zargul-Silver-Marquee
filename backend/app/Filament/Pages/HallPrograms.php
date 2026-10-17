@@ -35,6 +35,9 @@ final class HallPrograms extends Page
     #[Url(as: 'company')]
     public ?string $companyId = null;
 
+    #[Url(as: 'setup')]
+    public string $setupFilter = '';
+
     public ?string $hallId = null;
 
     public array $rules = [];
@@ -131,12 +134,14 @@ final class HallPrograms extends Page
         abort_unless($requested === null || (is_string($requested)
             && array_key_exists($requested, $options)), 403);
         $this->companyId = $requested ?? array_key_first($options);
+        abort_unless(in_array($this->setupFilter, ['', 'needed'], true), 422);
         $this->hallId = array_key_first($this->hallOptions());
         $this->reloadRules();
     }
 
     public function hydrate(): void
     {
+        abort_unless(in_array($this->setupFilter, ['', 'needed'], true), 422);
         abort_unless(static::canAccess() && $this->companyId !== null
             && array_key_exists($this->companyId, $this->companyOptions()), 403);
     }
@@ -159,7 +164,9 @@ final class HallPrograms extends Page
         $access = app(TenantAccess::class);
         $options = [];
         foreach (Hall::query()->where('company_id', $this->companyId)
-            ->where('is_active', true)->orderBy('name')->get() as $hall) {
+            ->where('is_active', true)
+            ->when($this->setupFilter === 'needed', fn ($q) => $q->where('program_rules_revision', '<', 1))
+            ->orderBy('name')->get() as $hall) {
             if ($access->canViewHall($actor, $hall)) {
                 $options[$hall->id] = $hall->name;
             }
@@ -179,6 +186,20 @@ final class HallPrograms extends Page
     public function updatedHallId(): void
     {
         $this->reloadRules();
+    }
+
+    public function updatedSetupFilter(): void
+    {
+        abort_unless(in_array($this->setupFilter, ['', 'needed'], true), 422);
+        abort_unless(static::canAccess(), 403);
+        $this->hallId = array_key_first($this->hallOptions());
+        $this->reloadRules();
+    }
+
+    public function showAllHalls(): void
+    {
+        $this->setupFilter = '';
+        $this->updatedSetupFilter();
     }
 
     private function selectedHall(): ?Hall
@@ -352,6 +373,9 @@ final class HallPrograms extends Page
         }
 
         $this->expectedRevision = $next;
+        if ($this->setupFilter === 'needed') {
+            $this->setupFilter = '';
+        }
         $this->overtimePreview = null;
         $this->reason = '';
         Notification::make()->title('Hall program rules saved with audit history')->success()->send();

@@ -24,6 +24,17 @@
             </label>
         </div>
 
+        @if ($setupFilter === 'needed')
+            <div class="rounded-lg border p-3 text-sm" aria-label="Unconfigured hall filter">
+                <p>Showing only accessible halls without saved morning, noon and evening program rules.</p>
+                @if ($this->hallOptions() === [])
+                    <p>No halls need program setup in this company.</p>
+                @endif
+                <button type="button" wire:click="showAllHalls" wire:confirm="Discard unsaved edits and show every accessible hall?"
+                    class="mt-2 rounded-lg border px-3 py-2 underline">Show all halls</button>
+            </div>
+        @endif
+
         @if ($loadedHallId && $loadedHallId === $hallId && $loadedCompanyId === $companyId)
             <section class="space-y-3 rounded-xl border p-4" aria-label="Hall program status">
                 <h2 class="text-lg font-semibold">Program schedule</h2>
