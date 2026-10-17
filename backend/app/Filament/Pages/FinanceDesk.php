@@ -171,9 +171,18 @@ final class FinanceDesk extends Page
 
     public function updatedCompanyId(): void
     {
+        // Never carry private preview instructions, cash values or audit
+        // justifications from a different authorized operating company.
         $this->draftBookingId = '';
-        $this->lastCloseResult = null;
+        $this->previewReason = '';
         $this->currency = '';
+        $this->openingMinor = '';
+        $this->journalReason = '';
+        $this->closeDate = now('UTC')->toDateString();
+        $this->countedMinor = '';
+        $this->closeReason = '';
+        $this->reversalReason = '';
+        $this->lastCloseResult = null;
         $this->initializeKeys();
         $this->refresh();
     }

@@ -88,6 +88,62 @@ class FinanceDeskLivewireTest extends TestCase
         $this->assertSame(0, DB::table('finance_journals')->count());
     }
 
+
+    public function test_company_switch_discards_unsent_private_finance_fields_and_rotates_keys(): void
+    {
+        [$company, , $people, $booking] = $this->fixture();
+        $second = Company::create(['name' => 'Second owned finance venue',
+            'slug' => 'finance-second-owned']);
+        CompanyMembership::create([
+            'company_id' => $second->id, 'user_id' => $people['owner'][0]->id,
+            'role' => 'owner',
+        ]);
+
+        $component = Livewire::test(FinanceDesk::class)
+            ->assertSet('companyId', $company->id)
+            ->set('draftBookingId', $booking)
+            ->set('previewReason', 'Private Company A rental review')
+            ->set('currency', 'PKR')
+            ->set('openingMinor', '4500')
+            ->set('journalReason', 'Company A opening only')
+            ->set('closeDate', '2027-01-11')
+            ->set('countedMinor', '4400')
+            ->set('closeReason', 'Company A cash handoff')
+            ->set('reversalReason', 'Company A historical correction');
+        $keys = [
+            'previewRequestKey', 'openingRequestKey',
+            'reversalRequestKey', 'closeoutRequestKey',
+        ];
+        $before = [];
+        foreach ($keys as $key) {
+            $before[$key] = $component->get($key);
+        }
+
+        $component->set('companyId', $second->id)
+            ->assertSet('loadedCompanyId', $second->id)
+            ->assertSet('draftBookingId', '')
+            ->assertSet('previewReason', '')
+            ->assertSet('currency', '')
+            ->assertSet('openingMinor', '')
+            ->assertSet('journalReason', '')
+            ->assertSet('closeDate', now('UTC')->toDateString())
+            ->assertSet('countedMinor', '')
+            ->assertSet('closeReason', '')
+            ->assertSet('reversalReason', '')
+            ->assertSet('lastCloseResult', null)
+            ->assertSet('previews', [])
+            ->assertSet('journals', [])
+            ->assertSet('closeouts', []);
+        foreach ($before as $key => $old) {
+            $this->assertNotSame($old, $component->get($key));
+            $this->assertTrue(Str::isUuid($component->get($key)));
+        }
+        $this->assertSame(0, DB::table('finance_quote_previews')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+        $this->assertSame(0, DB::table('finance_cash_closeouts')->count());
+        $this->assertSame(0, DB::table('finance_journal_entries')->count());
+    }
+
     public function test_finance_livewire_keys_are_stable_until_success_and_then_rotated(): void
     {
         [$company, , , $booking] = $this->fixture();
