@@ -56,7 +56,9 @@
                     <span class="rounded-lg bg-orange-100 px-3 py-2 text-orange-900">Cleanup required</span>
                     <span class="rounded-lg bg-gray-200 px-3 py-2 text-gray-900">Unconfigured</span>
                 </div>
-                @php($canViewDrafts = $this->canOpenDraftProposals())
+                @php
+                    $canViewDrafts = $this->canOpenDraftProposals();
+                @endphp
                 <div class="overflow-x-auto rounded-xl border">
                     <table class="w-full min-w-[480px] border-collapse text-left text-sm">
                         <caption class="sr-only">Read-only morning, noon and evening occupancy status for each date</caption>
