@@ -27,6 +27,12 @@ class CentralSignedLicenseCacheTest extends TestCase
         ]);
         $customer = (string) Str::uuid();
         $license = (string) Str::uuid();
+        DB::table('central_installation_activation')->insert([
+            'singleton_id'=>1, 'installation_id'=>$identity['installation_id'],
+            'customer_id'=>$customer, 'approved_domain'=>'testvenue.example.test',
+            'status'=>'registered_pending_license', 'central_registered_at'=>now(),
+            'created_at'=>now(), 'updated_at'=>now(),
+        ]);
         return [$pair, [
             'api_version'=>'v1', 'issuer'=>'HAFZATECH', 'product'=>'VenueDesk',
             'license_id'=>$license, 'customer_id'=>$customer,
@@ -92,6 +98,45 @@ class CentralSignedLicenseCacheTest extends TestCase
             $this->fail('Signed rollback was accepted.');
         } catch (InvalidArgumentException) {}
         $this->assertSame(2, (int) DB::table('central_signed_license_cache')->value('revision'));
+        $this->assertDatabaseCount('central_signed_license_cache', 1);
+    }
+
+    public function test_signed_grant_requires_immutable_enrollment_customer_and_domain(): void
+    {
+        [$pair, $grant, $customer] = $this->fixture();
+        $now = new DateTimeImmutable('2026-11-01T00:00:00Z');
+        $service = app(CentralSignedLicenseCache::class);
+        $foreignCustomer = (string) Str::uuid();
+        $foreignGrant = $grant;
+        $foreignGrant['customer_id'] = $foreignCustomer;
+        try {
+            $service->accept($this->envelope($foreignGrant, $pair),
+                $foreignCustomer, 'testvenue.example.test', $now);
+            $this->fail('A signed foreign-customer license bypassed enrollment.');
+        } catch (InvalidArgumentException) {}
+        $otherDomain = $grant;
+        $otherDomain['approved_domains'] = ['attacker.example.test'];
+        try {
+            $service->accept($this->envelope($otherDomain, $pair),
+                $customer, 'attacker.example.test', $now);
+            $this->fail('A signed foreign-domain license bypassed enrollment.');
+        } catch (InvalidArgumentException) {}
+        $this->assertDatabaseCount('central_signed_license_cache', 0);
+        $good = $this->envelope($grant, $pair);
+        $service->accept($good, $customer, 'testvenue.example.test', $now);
+        try {
+            $service->locallyVerified($foreignCustomer, 'testvenue.example.test', $now);
+            $this->fail('Offline foreign-customer license accepted.');
+        } catch (InvalidArgumentException) {}
+        try {
+            $service->locallyVerified($customer, 'attacker.example.test', $now);
+            $this->fail('Offline foreign-domain license accepted.');
+        } catch (InvalidArgumentException) {}
+        DB::table('central_installation_activation')->where('singleton_id', 1)->delete();
+        try {
+            $service->locallyVerified($customer, 'testvenue.example.test', $now);
+            $this->fail('A missing enrollment binding was ignored.');
+        } catch (InvalidArgumentException) {}
         $this->assertDatabaseCount('central_signed_license_cache', 1);
     }
 

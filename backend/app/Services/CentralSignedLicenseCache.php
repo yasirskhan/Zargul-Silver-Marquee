@@ -34,6 +34,7 @@ final class CentralSignedLicenseCache
             if (! $identity) {
                 throw new InvalidArgumentException('Installation identity has not been initialized.');
             }
+            $this->assertEnrollmentBinding($identity->installation_id, $customerId, $domain);
             $existing = DB::table('central_signed_license_cache')
                 ->where('singleton_id', 1)->lockForUpdate()->first();
 
@@ -85,6 +86,10 @@ final class CentralSignedLicenseCache
     {
         $identity = DB::table('central_installation_identity')
             ->where('singleton_id', 1)->first();
+        if (! $identity) {
+            throw new InvalidArgumentException('Installation identity is missing.');
+        }
+        $this->assertEnrollmentBinding($identity->installation_id, $customerId, $domain);
         $record = DB::table('central_signed_license_cache')
             ->where('singleton_id', 1)->first();
         if (! $identity || ! $record || $identity->installation_id !== $record->installation_id) {
@@ -103,5 +108,20 @@ final class CentralSignedLicenseCache
         }
 
         return $verified;
+    }
+
+    private function assertEnrollmentBinding(string $installationId, string $customerId, string $domain): void
+    {
+        // Never trust caller-provided customer/domain even if a grant is
+        // correctly signed for another central installation/customer.
+        $binding = DB::table('central_installation_activation')
+            ->where('singleton_id', 1)->first();
+        if (! $binding ||
+            $binding->installation_id !== $installationId ||
+            $binding->customer_id !== $customerId ||
+            $binding->approved_domain !== $domain ||
+            $binding->status !== 'registered_pending_license') {
+            throw new InvalidArgumentException('Signed grant does not match the enrolled business and domain.');
+        }
     }
 }
