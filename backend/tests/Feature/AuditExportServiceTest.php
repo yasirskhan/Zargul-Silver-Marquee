@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\User;
 use App\Services\AuditExportService;
+use App\Services\AuditHistoryService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -53,6 +54,39 @@ class AuditExportServiceTest extends TestCase
         $day = now()->toDateString();
 
         return ['fromDate' => $day, 'toDate' => $day];
+    }
+
+    public function test_stale_owner_account_revocation_blocks_audit_search_and_encrypted_export(): void
+    {
+        [$company, , $owner] = $this->fixture();
+        $this->event($company->id, $owner->id, 'hall.internal_change');
+        $this->assertCount(1, app(AuditHistoryService::class)->search(
+            $owner, $company->id
+        )['entries']);
+        $this->assertSame(0, DB::table('audit_export_requests')->count());
+
+        foreach ([
+            ['is_active' => false],
+            ['is_active' => true, 'email_verified_at' => null],
+        ] as $state) {
+            DB::table('users')->where('id', $owner->id)->update($state);
+            foreach ([
+                fn () => app(AuditHistoryService::class)->search($owner, $company->id),
+                fn () => app(AuditExportService::class)->prepare(
+                    $owner, $company->id, $this->dates(), 'Denied stale export'
+                ),
+            ] as $action) {
+                try {
+                    $action();
+                    $this->fail('Revoked cached owner accessed private audit records.');
+                } catch (AuthorizationException) {
+                    $this->assertTrue(true);
+                }
+            }
+        }
+        $this->assertSame(0, DB::table('audit_export_requests')->count());
+        $this->assertSame(0, DB::table('audit_events')
+            ->where('action', 'audit.export_prepared')->count());
     }
 
     public function test_owner_gets_only_encrypted_own_company_bundle_and_redacted_export_audit(): void

@@ -132,6 +132,8 @@ final class AuditExportService
     {
         if (! Auth::check() || (int) Auth::id() !== (int) $actor->getKey()
             || ! $actor->hasVerifiedEmail()
+            || ! User::query()->whereKey($actor->getKey())
+                ->where('is_active', true)->whereNotNull('email_verified_at')->exists()
             || ! $this->access->canReadAuditHistory($actor, $companyId)) {
             throw new AuthorizationException('You cannot prepare an audit export for this company.');
         }
