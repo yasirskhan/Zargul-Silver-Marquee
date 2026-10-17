@@ -609,4 +609,36 @@ SQL);
             json_encode($service->inbox($manager, $company->id, 30, $id), JSON_THROW_ON_ERROR));
     }
 
+    public function test_live_approval_totals_obey_company_and_manager_own_request_scope(): void
+    {
+        [$company, $foreign, , $people] = $this->fixture();
+        $service = app(ApprovalWorkflowService::class);
+        $admin = $people['admin'][0];
+        $owner = $people['owner'][0];
+        $manager = $people['manager'][0];
+        $this->be($admin);
+        $pending = (string) Str::uuid();
+        $rejected = (string) Str::uuid();
+        $service->request($admin, $company->id, $pending,
+            'expense', 100, 'PKR', null, 'Synthetic pending for owner');
+        $service->request($admin, $company->id, $rejected,
+            'expense', 200, 'PKR', null, 'Synthetic rejected for owner');
+        $this->be($owner);
+        $service->decide($owner, $company->id, $rejected, 1, 'rejected',
+            'Synthetic owner reason for rejection');
+        $this->assertSame(['pending' => 1, 'approved' => 0, 'rejected' => 1],
+            $service->inboxCounts($owner, $company->id));
+        $this->be($manager);
+        $this->assertSame(['pending' => 0, 'approved' => 0, 'rejected' => 0],
+            $service->inboxCounts($manager, $company->id));
+        $this->be($owner);
+        try {
+            $service->inboxCounts($owner, $foreign->id);
+            $this->fail('Owner read foreign company approval totals.');
+        } catch (AuthorizationException) {
+            $this->assertTrue(true);
+        }
+        $this->assertSame(1, DB::table('approval_decisions')->count());
+    }
+
 }

@@ -339,6 +339,24 @@ final class ApprovalWorkflowService
     }
 
     /** Tenant-authorized inbox: company-scoped staff names and non-PII proposal metadata; no customer data. */
+    /** Live totals for the same currently authorized company/role as the private inbox. */
+    public function inboxCounts(User $actor, string $companyId): array
+    {
+        $membership = $this->member($actor, $companyId);
+        if (! in_array($membership->role, ['owner', 'admin', 'manager'], true)) {
+            throw new AuthorizationException('Approval totals are not accessible.');
+        }
+        $query = DB::table('approval_requests')->where('company_id', $companyId);
+        if ($membership->role === 'manager') {
+            $query->where('requested_by', $actor->getKey());
+        }
+        $counts = ['pending' => 0, 'approved' => 0, 'rejected' => 0];
+        foreach ($query->selectRaw('status, COUNT(*) AS total')->groupBy('status')->get() as $row) {
+            $counts[$row->status] = (int) $row->total;
+        }
+        return $counts;
+    }
+
     public function inbox(
         User $actor, string $companyId, int $limit = 30, ?string $referenceId = null,
         string $status = 'all', int $offset = 0, string $category = 'all',

@@ -44,6 +44,9 @@ final class ApprovalCenter extends Page
     public array $entries = [];
 
     #[Locked]
+    public array $statusCounts = ['pending' => 0, 'approved' => 0, 'rejected' => 0];
+
+    #[Locked]
     public int $inboxOffset = 0;
 
     #[Locked]
@@ -363,6 +366,9 @@ final class ApprovalCenter extends Page
         );
         $this->inboxHasMore = count($rows) > self::INBOX_PAGE_SIZE;
         $this->entries = array_slice($rows, 0, self::INBOX_PAGE_SIZE);
+        $this->statusCounts = app(ApprovalWorkflowService::class)->inboxCounts(
+            $actor, $this->companyId,
+        );
         $this->loadedCompanyId = $this->companyId;
         $this->selectedId = null;
         $this->selectedRevision = 0;

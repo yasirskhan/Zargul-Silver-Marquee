@@ -86,6 +86,11 @@
 
         @if ($loadedCompanyId === $companyId)
             <section class="space-y-3" aria-label="Private approval inbox">
+                <div class="rounded-lg border p-3 text-sm" aria-label="Approval status totals">
+                    <p class="font-medium">Company approvals visible to your role</p>
+                    <p>Pending: {{ $statusCounts['pending'] ?? 0 }} · Approved: {{ $statusCounts['approved'] ?? 0 }}
+                        · Rejected: {{ $statusCounts['rejected'] ?? 0 }}</p>
+                </div>
                 <div class="flex items-center justify-between gap-3">
                     <h2 class="font-semibold">Approval inbox</h2>
                     <button type="button" wire:click="refreshInbox" class="rounded-lg border px-3 py-2">Refresh</button>

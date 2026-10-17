@@ -592,4 +592,30 @@ class ApprovalCenterLivewireTest extends TestCase
         $this->assertSame(0, DB::table('finance_journals')->count());
     }
 
+    public function test_owner_approval_totals_recalculate_when_status_changes_without_new_writes(): void
+    {
+        [$company, , $members] = $this->fixture();
+        $admin = $members['admin'][0];
+        $owner = $members['owner'][0];
+        $this->be($admin);
+        $key = (string) \Illuminate\Support\Str::uuid();
+        $service = app(\App\Services\ApprovalWorkflowService::class);
+        $service->request($admin, $company->id, $key, 'expense', 100,
+            'PKR', null, 'Synthetic pending tally');
+        $this->be($owner);
+        $panel = Livewire::test(ApprovalCenter::class)
+            ->assertSet('statusCounts.pending', 1)
+            ->assertSee('Company approvals visible to your role');
+        $service->decide($owner, $company->id, $key, 1, 'approved',
+            'Synthetic approving owner reason');
+        $panel->call('refreshInbox')
+            ->assertSet('statusCounts.pending', 0)
+            ->assertSet('statusCounts.approved', 1)
+            ->set('statusFilter', 'pending')
+            ->assertSet('entries', [])
+            ->assertSet('statusCounts.approved', 1);
+        $this->assertSame(1, DB::table('approval_decisions')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
 }
