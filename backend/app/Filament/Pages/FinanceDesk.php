@@ -83,10 +83,18 @@ final class FinanceDesk extends Page
 
     public string $reversalReason = '';
 
+    private static function currentAccountAllowed(User $actor): bool
+    {
+        // A cached authenticated model is not proof the persisted account
+        // is still active and email verified for private finance access.
+        return DB::table('users')->where('id', $actor->getKey())
+            ->where('is_active', true)->whereNotNull('email_verified_at')->exists();
+    }
+
     public static function canAccess(): bool
     {
         $actor = Filament::auth()->user();
-        return $actor instanceof User && $actor->is_active && $actor->hasVerifiedEmail()
+        return $actor instanceof User && self::currentAccountAllowed($actor)
             && self::companiesFor($actor) !== [];
     }
 
@@ -103,14 +111,15 @@ final class FinanceDesk extends Page
     public function companyOptions(): array
     {
         $actor = Filament::auth()->user();
-        return $actor instanceof User && $actor->is_active && $actor->hasVerifiedEmail()
+        return $actor instanceof User && self::currentAccountAllowed($actor)
             ? self::companiesFor($actor) : [];
     }
 
     public function role(): string
     {
         $actor = Filament::auth()->user();
-        if (! $actor instanceof User || $this->companyId === null) {
+        if (! $actor instanceof User || ! self::currentAccountAllowed($actor)
+            || $this->companyId === null) {
             return '';
         }
         return (string) CompanyMembership::query()->where('company_id', $this->companyId)

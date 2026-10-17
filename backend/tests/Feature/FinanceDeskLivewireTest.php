@@ -73,6 +73,29 @@ class FinanceDeskLivewireTest extends TestCase
         return [$company, $other, $people, $booking];
     }
 
+
+    public function test_stale_authenticated_owner_cannot_open_finance_after_persisted_account_revocation(): void
+    {
+        [$company, , $people] = $this->fixture();
+        $owner = $people['owner'][0];
+        $this->assertTrue(FinanceDesk::canAccess());
+
+        // Simulate account revocation after login without refreshing auth model.
+        DB::table('users')->where('id', $owner->id)->update(['is_active' => false]);
+        $this->assertTrue($owner->is_active);
+        $this->assertFalse(FinanceDesk::canAccess());
+        Livewire::test(FinanceDesk::class)->assertForbidden();
+
+        DB::table('users')->where('id', $owner->id)
+            ->update(['is_active' => true, 'email_verified_at' => null]);
+        $this->assertNotNull($owner->email_verified_at);
+        $this->assertFalse(FinanceDesk::canAccess());
+        Livewire::test(FinanceDesk::class)->assertForbidden();
+        $this->assertSame(0, DB::table('finance_quote_previews')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+        $this->assertSame(0, DB::table('finance_cash_closeouts')->count());
+    }
+
     public function test_owner_creates_a_private_nonbinding_preview_without_client_contact(): void
     {
         [$company, , , $booking] = $this->fixture();
