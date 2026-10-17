@@ -283,11 +283,20 @@ final class ApprovalCenter extends Page
         $this->decisionReason = '';
     }
 
+    public function canReviewRequest(array $entry): bool
+    {
+        $actor = Filament::auth()->user();
+        return $actor instanceof User
+            && in_array($this->role(), ['owner', 'admin'], true)
+            && (int) ($entry['requestedBy'] ?? 0) !== (int) $actor->getKey();
+    }
+
     public function selectRequest(string $id): void
     {
         $this->authorizeLoaded();
         $entry = collect($this->entries)->firstWhere('id', $id);
         abort_unless(Str::isUuid($id) && $entry !== null, 404);
+        abort_unless($this->canReviewRequest($entry), 403);
         // Caller cannot choose a stale/foreign revision merely by mutating state.
         $this->selectedId = $id;
         $this->selectedRevision = $entry['revision'];

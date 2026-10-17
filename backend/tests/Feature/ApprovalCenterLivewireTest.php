@@ -113,6 +113,23 @@ class ApprovalCenterLivewireTest extends TestCase
         $this->assertSame('pending', DB::table('approval_requests')->where('id', $id)->value('status'));
     }
 
+    public function test_requester_cannot_select_their_own_pending_decision_in_panel(): void
+    {
+        [$company, , $members] = $this->fixture();
+        $owner = $members['owner'][0];
+        $key = (string) \Illuminate\Support\Str::uuid();
+        app(\App\Services\ApprovalWorkflowService::class)->request(
+            $owner, $company->id, $key, 'expense', 125, 'PKR', null,
+            'Synthetic owner-requested supplies'
+        );
+        Livewire::test(ApprovalCenter::class)
+            ->assertSee('Synthetic owner-requested supplies')
+            ->assertDontSee('Review decision')
+            ->call('selectRequest', $key)->assertForbidden();
+        $this->assertSame(0, DB::table('approval_decisions')->count());
+        $this->assertSame('pending', DB::table('approval_requests')->where('id', $key)->value('status'));
+    }
+
     public function test_approval_livewire_request_key_rotates_only_after_server_success(): void
     {
         [$company, , $members] = $this->fixture();

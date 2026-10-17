@@ -78,7 +78,7 @@
                         <p>Requested by staff ID {{ $entry['requestedBy'] }} | revision {{ $entry['revision'] }}</p>
                         <p class="break-words">{{ $entry['reason'] }}</p>
                         <p class="break-all text-xs">ID: {{ $entry['id'] }} | proposal: {{ $entry['bookingId'] ?? 'none' }}</p>
-                        @if ($entry['status'] === 'pending')
+                        @if ($entry['status'] === 'pending' && $this->canReviewRequest($entry))
                             <button type="button" wire:click="selectRequest('{{ $entry['id'] }}')" class="rounded-lg border px-3 py-2">Review decision</button>
                         @endif
                     </article>
