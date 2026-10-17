@@ -1,0 +1,29 @@
+# VenueDesk / HAFZATECH — Fast Safe Delivery Plan (2026-10-17)
+
+**Why this exists:** Start coding immediately in next session without re-design interviews, repeat repo walkthroughs or misleading claims. Read [CENTRAL_CONTROL_CENTER_V1.md](CENTRAL_CONTROL_CENTER_V1.md) for approved product contract and unresolved operator-only setup. Follow [COMMERCIAL_PRODUCT_EXPANSION.md](COMMERCIAL_PRODUCT_EXPANSION.md) for complete VenueDesk commercial scope.
+
+## Exact current starting checkpoint when written
+- Repository `yasirskhan/Zargul-Silver-Marquee`, only authorized branch `chatgpt/phase0-foundation`; live HEAD on 2026-10-17 `38835f5e6fbe788861f5ca55f0503efd735ff9ae`, CI `39064949357` **SUCCESS all four jobs**. **Recheck current live state before any source modification**, never assume this SHA is still HEAD.
+- Laravel 13 / Filament 5 / PostgreSQL 16. Existing VenueDesk business logic, security, booking, event operations, CMS, approval, finance, stocktake, inventory catalog and **draft-only** multi-item internal/external loan are present; inventory flags default OFF.
+- The **central HAFZATECH staff portal, signing service, vendor billing directory, 15-day signed entitlement checks and bidirectional support APIs are NOT IMPLEMENTED**. Do not claim they are or launch payments.
+
+## Speed without sacrificing correctness
+1. **Contract first, not giant rewrite:** agree/encode two trust boundaries, API version + signed grant schema + typed request/response/error codes; add fixtures contract-tested by both central and client. Initial scope small; no duplicate finance or customer auth.
+2. **One repository, one branch; separately deployable central service** inside this repository, with separately protected database, central staff auth/MFA and signing process; reuse framework conventions but not customer secrets. Controlled feature flags OFF, additive migrations only.
+3. **Vertical batch A: central identity + API** — central customer, installation, cryptographic enrollment/verification, installed-domain proof, API versioning and idempotent registration. Test positive/negative and cross-customer in PG CI.
+4. **Vertical batch B: central staff roles + plans + payment sources** — staff seeded permission templates, MFA, provider directory, per-client provider assignments, subscription, typed invoice/verified settlement and authorization. Manual bank/Easypaisa/SWIFT/WU first; eligible PayPal/provider API only after official merchant connectivity exists. Staff cannot self-approve.
+5. **Vertical batch C: signed license issue + client local verification** — signing service protected private key, entitlements, vendor verified payments, same license ID renewed 6/12 months, early renewal from existing expiry, client bootstrap with trusted central host, manual Verify and 15-day check scheduler, expired public maintenance and seven-day backend grace; tests for signatures/tampering/replay/domain binding/outages.
+6. **Vertical batch D: support** — local reliable outbox, central ticket inbox, agent permissioned replies, independent more-frequent support sync, unread until read, tickets accessible post-expiry; knowledge suggestions async and agent curated.
+7. **Vertical batch E: currency/timezone wizard** — company/hall IANA timezones, ISO currency precision, zero/three-decimal tests, formatting/report periods and existing client migration; no financial rescaling of issued history.
+8. **Vertical batch F: finish currently open hall inventory** — immutable stock receipts/position, loan handover independent counts, partial returns, exception reconciliation, auto-close ONLY after all rows good & independently acknowledged, numbered receipt PDF. Avoid duplicate pool finance.
+9. Add customer site/branding/credit, vendor announcements, help library and signed software upgrade pipeline in dependency order using exact contracts; don't stop at first green CI.
+
+## Working rhythm
+`Read repo-root AI_HANDOFF.md ENTIRELY → exact live HEAD + latest CI → reconcile requirement docs, previous work and current source → choose smallest safe missing vertical slice → implement PostgreSQL tests + code → commit using expected branch SHA (never force) → hosted CI four jobs → fix red → verify exact SHA → update AI_HANDOFF.md with status, tests, SHA, run ID, next item → immediately next batch within active session.`
+Avoid wasteful CI polling; during CI inspect/review/prep the next independent batch, but **don't publish on unverified broken migrations**. Group file fetches/edits by purpose; cache unmodified file contents locally within tool session; avoid asking permission after every bounded test batch. No Work mode; do not alter main or property-platform.
+
+## Non-negotiable guardrails
+Signed grants not encryption alone; cryptographic identity per install; never central private signing key in customer code. Payment screenshot not proof of settlement. Staff permissions server-side, self-approval forbidden. 15-day license check and on-demand manual verification, NOT five-minute poll. Support reply sync may run independently. No new unapproved 72-hour offline shutdown. No real external fund collection/production secrets until operator validates receiving accounts, legal terms, KMS/hosting, backup recovery and go-live. Preserve audited booking/payment history and tenant/hall isolation.
+
+## Next session user command
+"Continue VenueDesk development in GitHub repository `yasirskhan/Zargul-Silver-Marquee` ONLY branch `chatgpt/phase0-foundation`, no Work mode. Read complete AI_HANDOFF.md, docs/CENTRAL_CONTROL_CENTER_V1.md, docs/FAST_DELIVERY_PLAN.md and commercial specification; check live HEAD/CI. Start the first unfinished central connection/security vertical batch, implement, test, commit, verify exact SHA, update handoff, and continue successive bounded batches. Never touch main or property-platform."

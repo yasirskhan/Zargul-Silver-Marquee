@@ -72,3 +72,6 @@ Measure owner/manager/mobile booking/report latencies, indexes/queues/caching, t
 
 ## Deferred beyond approved commercial scope
 Nonessential extensions only; inventory, wages, vendor finance and reporting are now approved product work, not a generic later bucket.
+
+## Phase 9.1 — HAFZATECH central control contracts (2026-10-17 approved; not implemented)
+Implement `docs/CENTRAL_CONTROL_CENTER_V1.md` and `docs/FAST_DELIVERY_PLAN.md`: `lichall.hafzatech.com` trusted client bootstrap, customer/install identity, signed license 6m/12m, automatic 15-day status verification plus owner manual Verify, early paid renewal same license ID, 15-day warning, public maintenance on expiry, seven-day backend grace, audited grace/revocation. Central HAFZATECH staff roles with least privilege, per-customer vendor bank/Easypaisa/international/WU/eligible future PayPal receiving accounts, verified invoice payment before license signing, encrypted optional issuance, separate client operating ISO currency/IANA timezone per hall and support sync. Keep existing VenueDesk functionality untouched and license release OFF until CI and operator release gates.
