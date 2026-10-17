@@ -108,6 +108,17 @@
                 @empty
                     <p class="rounded-lg border p-4 text-sm">No approval requests visible to your role.</p>
                 @endforelse
+                <div class="flex flex-wrap items-center gap-3" aria-label="Approval inbox pagination">
+                    <button type="button" wire:click="previousInboxPage"
+                        @disabled($inboxOffset === 0)
+                        class="rounded-lg border px-3 py-2 disabled:opacity-50">Previous 30</button>
+                    @if (count($entries) > 0)
+                        <p class="text-sm">Results {{ $inboxOffset + 1 }} to {{ $inboxOffset + count($entries) }}</p>
+                    @endif
+                    <button type="button" wire:click="nextInboxPage"
+                        @disabled(! $inboxHasMore || $inboxOffset >= 3000)
+                        class="rounded-lg border px-3 py-2 disabled:opacity-50">Next 30</button>
+                </div>
             </section>
         @endif
 

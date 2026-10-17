@@ -67,6 +67,41 @@ class ApprovalCenterLivewireTest extends TestCase
     }
 
 
+
+    public function test_owner_pages_old_approval_requests_without_losing_tenant_or_decision_scope(): void
+    {
+        [$company, , $members] = $this->fixture();
+        $service = app(\App\Services\ApprovalWorkflowService::class);
+        $admin = $members['admin'][0];
+        $this->be($admin);
+        for ($i = 0; $i < 32; $i++) {
+            $service->request($admin, $company->id, (string) \Illuminate\Support\Str::uuid(),
+                'expense', 100 + $i, 'PKR', null, 'Paged synthetic approval '.($i + 1));
+        }
+        $this->be($members['owner'][0]);
+        $page = Livewire::test(ApprovalCenter::class)
+            ->assertSee('Next 30')
+            ->assertSet('inboxOffset', 0)
+            ->assertSet('inboxHasMore', true);
+        $firstIds = array_column($page->get('entries'), 'id');
+        $this->assertCount(30, $firstIds);
+        $page->call('nextInboxPage')
+            ->assertSet('inboxOffset', 30)
+            ->assertSet('inboxHasMore', false);
+        $olderIds = array_column($page->get('entries'), 'id');
+        $this->assertCount(2, $olderIds);
+        $this->assertSame([], array_values(array_intersect($firstIds, $olderIds)));
+        $page->call('nextInboxPage')->assertSet('inboxOffset', 30);
+        $page->call('previousInboxPage')->assertSet('inboxOffset', 0);
+        $this->assertSame($firstIds, array_column($page->get('entries'), 'id'));
+        $page->set('statusFilter', 'approved')
+            ->assertSet('inboxOffset', 0)->assertSet('entries', []);
+        $page->call('nextInboxPage')->assertSet('inboxOffset', 0);
+        $this->assertSame(32, DB::table('approval_requests')->where('company_id', $company->id)->count());
+        $this->assertSame(0, DB::table('approval_decisions')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
     public function test_owner_can_filter_scoped_approval_inbox_and_never_review_hidden_selection(): void
     {
         [$company, , $members] = $this->fixture();

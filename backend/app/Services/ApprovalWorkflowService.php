@@ -341,7 +341,7 @@ final class ApprovalWorkflowService
     /** Tenant-authorized inbox: company-scoped staff names and non-PII proposal metadata; no customer data. */
     public function inbox(
         User $actor, string $companyId, int $limit = 30, ?string $referenceId = null,
-        string $status = 'all',
+        string $status = 'all', int $offset = 0,
     ): array
     {
         $membership = $this->member($actor, $companyId);
@@ -354,6 +354,9 @@ final class ApprovalWorkflowService
         }
         if (! in_array($status, ['all', 'pending', 'approved', 'rejected'], true)) {
             throw new InvalidArgumentException('Invalid approval inbox status filter.');
+        }
+        if ($offset < 0 || $offset > 3000) {
+            throw new InvalidArgumentException('Invalid approval inbox pagination offset.');
         }
         $q = DB::table('approval_requests as req')
             ->leftJoin('users as requester', 'requester.id', '=', 'req.requested_by')
@@ -380,7 +383,8 @@ final class ApprovalWorkflowService
         if ($status === 'all' && $referenceId === null) {
             $q->orderByRaw("CASE WHEN req.status = 'pending' THEN 0 ELSE 1 END");
         }
-        return $q->orderByDesc('req.created_at')->orderByDesc('req.id')->limit($limit)
+        return $q->orderByDesc('req.created_at')->orderByDesc('req.id')
+            ->offset($offset)->limit($limit)
             ->get(['req.id', 'req.category', 'req.status', 'req.revision', 'req.amount_minor',
                 'req.currency', 'req.reason', 'req.booking_id', 'req.requested_by', 'req.created_at',
                 'requester.name as requester_name', 'booking.event_date as proposed_date', 'booking.program as proposed_program',

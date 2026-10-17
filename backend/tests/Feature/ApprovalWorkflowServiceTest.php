@@ -392,6 +392,24 @@ class ApprovalWorkflowServiceTest extends TestCase
     }
 
 
+
+    public function test_approval_inbox_rejects_negative_and_unbounded_page_offsets(): void
+    {
+        [$company, , , $people] = $this->fixture();
+        $service = app(ApprovalWorkflowService::class);
+        foreach ([-1, 3001] as $offset) {
+            try {
+                $service->inbox($people['owner'][0], $company->id, 30, null, 'all', $offset);
+                $this->fail('Negative or unbounded approval inbox offset was accepted.');
+            } catch (InvalidArgumentException) {
+                $this->assertTrue(true);
+            }
+        }
+        $this->assertSame([], $service->inbox($people['owner'][0], $company->id,
+            30, null, 'all', 3000));
+        $this->assertSame(0, DB::table('approval_decisions')->count());
+    }
+
     public function test_inbox_status_filter_is_bounded_and_pending_requests_sort_first(): void
     {
         [$company, , , $people] = $this->fixture();

@@ -28,6 +28,8 @@ final class ApprovalCenter extends Page
 
     protected static ?string $slug = 'approval-center';
 
+    private const INBOX_PAGE_SIZE = 30;
+
     #[Url(as: 'company')]
     public ?string $companyId = null;
 
@@ -40,6 +42,12 @@ final class ApprovalCenter extends Page
 
     #[Locked]
     public array $entries = [];
+
+    #[Locked]
+    public int $inboxOffset = 0;
+
+    #[Locked]
+    public bool $inboxHasMore = false;
 
     #[Locked]
     public ?string $selectedId = null;
@@ -307,6 +315,29 @@ final class ApprovalCenter extends Page
 
     public function refreshInbox(): void
     {
+        $this->inboxOffset = 0;
+        $this->loadInboxPage();
+    }
+
+    public function nextInboxPage(): void
+    {
+        $this->authorizeLoaded();
+        if (! $this->inboxHasMore || $this->inboxOffset >= 3000) {
+            return;
+        }
+        $this->inboxOffset += self::INBOX_PAGE_SIZE;
+        $this->loadInboxPage();
+    }
+
+    public function previousInboxPage(): void
+    {
+        $this->authorizeLoaded();
+        $this->inboxOffset = max(0, $this->inboxOffset - self::INBOX_PAGE_SIZE);
+        $this->loadInboxPage();
+    }
+
+    private function loadInboxPage(): void
+    {
         $actor = $this->authorizeCompany();
         $this->validate(['statusFilter' => ['required', Rule::in(['all', 'pending', 'approved', 'rejected'])]]);
         if ($this->requestReference !== '' && ! Str::isUuid($this->requestReference)) {
@@ -314,11 +345,13 @@ final class ApprovalCenter extends Page
                 'requestReference' => 'Enter a valid full approval request reference.',
             ]);
         }
-        $this->entries = app(ApprovalWorkflowService::class)->inbox(
-            $actor, $this->companyId, 30,
+        $rows = app(ApprovalWorkflowService::class)->inbox(
+            $actor, $this->companyId, self::INBOX_PAGE_SIZE + 1,
             $this->requestReference === '' ? null : $this->requestReference,
-            $this->statusFilter,
+            $this->statusFilter, $this->inboxOffset,
         );
+        $this->inboxHasMore = count($rows) > self::INBOX_PAGE_SIZE;
+        $this->entries = array_slice($rows, 0, self::INBOX_PAGE_SIZE);
         $this->loadedCompanyId = $this->companyId;
         $this->selectedId = null;
         $this->selectedRevision = 0;
