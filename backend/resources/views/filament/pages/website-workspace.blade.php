@@ -205,6 +205,10 @@
                             </div>
                         @endif
                         @if (count($this->verifiedDomainClaims()))
+                            <p class="text-sm">To disconnect a verified domain, enter that exact domain and a reason above; confirm revocation. Public requests will be denied until a new DNS proof is completed.</p>
+                            <button type="button" wire:click="revokeDomainOwnership"
+                                wire:confirm="Revoke this verified domain? Public website requests on this hostname will stop until a new DNS proof is verified."
+                                wire:loading.attr="disabled" class="rounded border px-3 py-2">Revoke verified DNS ownership</button>
                             <p class="text-sm">Verified DNS ownership only: {{ implode(', ', $this->verifiedDomainClaims()) }}. Public release is still disabled until separately approved.</p>
                         @endif
                     </section>

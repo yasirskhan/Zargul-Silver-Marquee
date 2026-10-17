@@ -386,6 +386,25 @@ final class WebsiteWorkspace extends Page
         Notification::make()->title('DNS ownership verified; operator approval is still required for public release')->success()->send();
     }
 
+    /** Owner-driven emergency deactivation; a new challenge is required to reconnect. */
+    public function revokeDomainOwnership(): void
+    {
+        [$actor, $page] = $this->authorizeBranding('publish');
+        $this->validate([
+            'domainCandidate' => ['required', 'string', 'max:253'],
+            'domainReason' => ['required', 'string', 'min:3', 'max:500'],
+        ]);
+        app(SiteDomainOwnershipService::class)->revoke(
+            $actor, $page->company_id, $page->website_id,
+            $this->domainCandidate, $this->domainReason
+        );
+        $this->domainChallengeName = null;
+        $this->domainChallengeValue = null;
+        $this->domainChallengeExpiresAt = null;
+        $this->domainReason = '';
+        Notification::make()->title('Verified DNS ownership revoked; public host is now blocked until new proof')->success()->send();
+    }
+
     public function verifiedDomainClaims(): array
     {
         if (! $this->canPublishCurrentPage()) {

@@ -137,6 +137,54 @@ class WebsiteWorkspaceBrandingTest extends TestCase
             ->where('action', 'website.domain_ownership_verified')->count());
     }
 
+    public function test_owner_can_revoke_verified_domain_in_livewire_and_revoked_editor_cannot(): void
+    {
+        [$company, $actor, $site] = $this->fixture();
+        $resolver = new class extends \App\Services\SiteDomainTxtResolver {
+            public array $records = [];
+            public function lookupTxt(string $name): array
+            {
+                return $this->records[$name] ?? [];
+            }
+        };
+        $this->app->instance(\App\Services\SiteDomainTxtResolver::class, $resolver);
+        $service = app(\App\Services\SiteDomainOwnershipService::class);
+        $challenge = $service->request($actor, $company->id, $site,
+            'disconnect.marquee.org', 'Prepare owner domain proof');
+        $resolver->records[$challenge['txtName']] = [$challenge['txtValue']];
+        $service->verify($actor, $company->id, $site,
+            $challenge['domain'], 'Verify original owner proof');
+
+        $component = Livewire::test(WebsiteWorkspace::class)
+            ->assertSee('disconnect.marquee.org')
+            ->assertSee('Revoke verified DNS ownership')
+            ->set('domainCandidate', 'disconnect.marquee.org')
+            ->set('domainReason', 'Owner disconnects verified host')
+            ->call('revokeDomainOwnership')->assertHasNoErrors()
+            ->assertDontSee('Revoke verified DNS ownership');
+        $this->assertSame('pending', DB::table('site_domain_claims')->value('status'));
+        $this->assertNull(DB::table('site_domain_claims')->value('verified_at'));
+        $this->assertSame(1, DB::table('audit_events')
+            ->where('action', 'website.domain_ownership_revoked')->count());
+        $this->assertFalse((bool) config('public_site.enabled'));
+
+        $freshChallenge = $service->request($actor, $company->id, $site,
+            'disconnect.marquee.org', 'Issue fresh owner challenge');
+        $resolver->records[$freshChallenge['txtName']] = [$freshChallenge['txtValue']];
+        $service->verify($actor, $company->id, $site,
+            $freshChallenge['domain'], 'Restore verified owner domain');
+
+        DB::table('company_memberships')->where('company_id', $company->id)
+            ->where('user_id', $actor->id)->update([
+                'role' => 'manager', 'can_edit_site' => true, 'can_publish_site' => false,
+            ]);
+        $component->set('domainReason', 'Editor cannot disable publisher domain')
+            ->call('revokeDomainOwnership')->assertNotFound();
+        $this->assertSame('verified', DB::table('site_domain_claims')->value('status'));
+        $this->assertSame(1, DB::table('audit_events')
+            ->where('action', 'website.domain_ownership_revoked')->count());
+    }
+
     public function test_owner_cannot_publish_unsaved_branding_form_changes(): void
     {
         [, , $site] = $this->fixture();
