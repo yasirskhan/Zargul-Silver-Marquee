@@ -48,6 +48,7 @@
                             <option value="{{ $id }}">{{ $label }}</option>
                         @endforeach
                     </select>
+                    @error('newBookingId') <span role="alert" class="text-sm text-red-600">{{ $message }}</span> @enderror
                 </label>
                 <label class="block space-y-1"><span class="text-sm">Proposed amount in minor currency units</span>
                     <input type="number" min="1" step="1" wire:model="newAmount" class="w-full rounded-lg border p-3 text-gray-900">
@@ -60,7 +61,6 @@
                 <textarea wire:model="newReason" rows="2" maxlength="500" class="w-full rounded-lg border p-3 text-gray-900"></textarea>
             </label>
             @error('newReason') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
-            @error('newBookingId') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
             <button type="button" wire:click="submitRequest" wire:loading.attr="disabled" class="rounded-lg border px-4 py-2 font-semibold">Submit non-applying approval request</button>
         </section>
 

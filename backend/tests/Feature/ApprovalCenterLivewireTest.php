@@ -157,6 +157,29 @@ class ApprovalCenterLivewireTest extends TestCase
         $this->assertSame(0, DB::table('approval_delegations')->count());
     }
 
+
+    public function test_form_rejects_missing_proposal_and_linked_expense_before_write(): void
+    {
+        [$company, , $members] = $this->fixture();
+        $component = Livewire::test(ApprovalCenter::class)
+            ->set('newCategory', 'discount')
+            ->set('newAmount', '250')->set('newCurrency', 'PKR')
+            ->set('newBookingId', '')
+            ->set('newReason', 'Synthetic discount without required proposal');
+        $requestKey = $component->get('newRequestKey');
+        $component->call('submitRequest')->assertHasErrors(['newBookingId']);
+        $this->assertSame($requestKey, $component->get('newRequestKey'));
+
+        $component->set('newCategory', 'expense')
+            ->set('newBookingId', (string) \Illuminate\Support\Str::uuid())
+            ->set('newReason', 'Synthetic linked expense must be refused')
+            ->call('submitRequest')->assertHasErrors(['newBookingId']);
+        $this->assertSame($requestKey, $component->get('newRequestKey'));
+        $this->assertSame(0, DB::table('approval_requests')->where('company_id', $company->id)->count());
+        $this->assertSame(0, DB::table('approval_decisions')->count());
+        $this->assertSame(0, DB::table('approval_alert_outbox')->count());
+    }
+
     public function test_approval_livewire_request_key_rotates_only_after_server_success(): void
     {
         [$company, , $members] = $this->fixture();

@@ -343,7 +343,8 @@ final class ApprovalCenter extends Page
             'newAmount' => ['required', 'integer', 'min:1', 'max:100000000000'],
             'newCurrency' => ['required', 'regex:/^[A-Z]{3}$/'],
             'newReason' => ['required', 'string', 'min:3', 'max:500'],
-            'newBookingId' => ['nullable', 'uuid'],
+            'newBookingId' => [Rule::requiredIf($this->newCategory !== 'expense'),
+                Rule::prohibitedIf($this->newCategory === 'expense'), 'nullable', 'uuid'],
         ]);
         try {
             app(ApprovalWorkflowService::class)->request(
