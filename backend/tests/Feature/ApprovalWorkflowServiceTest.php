@@ -105,6 +105,44 @@ class ApprovalWorkflowServiceTest extends TestCase
         $this->assertSame(0, DB::table('approval_decisions')->count());
     }
 
+    public function test_cached_revoked_owner_cannot_request_or_decide_approval(): void
+    {
+        [$company, , , $people] = $this->fixture();
+        $service = app(ApprovalWorkflowService::class);
+        $admin = $people['admin'][0];
+        $owner = $people['owner'][0];
+        $this->be($admin);
+        $pending = (string) Str::uuid();
+        $service->request($admin, $company->id, $pending, 'expense',
+            175, 'PKR', null, 'Synthetic maintenance approval');
+        $this->be($owner);
+
+        foreach ([
+            ['is_active' => false],
+            ['is_active' => true, 'email_verified_at' => null],
+        ] as $state) {
+            DB::table('users')->where('id', $owner->id)->update($state);
+            foreach ([
+                fn () => $service->request($owner, $company->id, (string) Str::uuid(),
+                    'expense', 100, 'PKR', null, 'Disallowed owner expense'),
+                fn () => $service->decide($owner, $company->id, $pending, 1,
+                    'approved', 'Disallowed decision'),
+                fn () => $service->activeDelegations($owner, $company->id),
+            ] as $action) {
+                try {
+                    $action();
+                    $this->fail('Revoked account completed an approval operation.');
+                } catch (AuthorizationException) {
+                    $this->assertTrue(true);
+                }
+            }
+        }
+
+        $this->assertSame(1, DB::table('approval_requests')->count());
+        $this->assertSame('pending', DB::table('approval_requests')->where('id', $pending)->value('status'));
+        $this->assertSame(0, DB::table('approval_decisions')->count());
+    }
+
     public function test_manager_requests_owner_decides_once_and_no_business_money_changes(): void
     {
         [$company, , , $people, $booking] = $this->fixture();
