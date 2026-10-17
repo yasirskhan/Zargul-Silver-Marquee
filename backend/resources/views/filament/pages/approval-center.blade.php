@@ -25,6 +25,16 @@
             </label>
             @error('statusFilter') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
             <label class="block space-y-1">
+                <span class="text-sm font-medium">Exception category filter</span>
+                <select wire:model.live="categoryFilter" class="w-full rounded-lg border p-3 text-gray-900">
+                    <option value="all">All categories</option>
+                    @foreach ($this->requestCategoryOptions() as $category)
+                        <option value="{{ $category }}">{{ str_replace('_', ' ', ucfirst($category)) }}</option>
+                    @endforeach
+                </select>
+            </label>
+            @error('categoryFilter') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+            <label class="block space-y-1">
                 <span class="text-sm font-medium">Approval request reference (optional exact UUID)</span>
                 <input type="text" wire:model="requestReference" maxlength="36" autocomplete="off"
                     class="w-full rounded-lg border p-3 font-mono text-sm text-gray-900"

@@ -117,6 +117,32 @@ class ApprovalCenterLivewireTest extends TestCase
         $this->assertSame('approved', DB::table('approval_requests')->where('id', $id)->value('status'));
     }
 
+
+    public function test_owner_category_filter_clears_selected_decision_without_mutation(): void
+    {
+        [$company, , $members] = $this->fixture();
+        $admin = $members['admin'][0];
+        $this->be($admin);
+        $id = (string) \Illuminate\Support\Str::uuid();
+        app(\App\Services\ApprovalWorkflowService::class)->request(
+            $admin, $company->id, $id, 'expense', 500, 'PKR', null,
+            'Synthetic supply category review');
+        $this->be($members['owner'][0]);
+        Livewire::test(ApprovalCenter::class)
+            ->assertSee('Exception category filter')
+            ->call('selectRequest', $id)->assertSet('selectedId', $id)
+            ->set('categoryFilter', 'discount')
+            ->assertSet('inboxOffset', 0)->assertSet('entries', [])
+            ->assertSet('selectedId', null)
+            ->assertDontSee('Selected exception details')
+            ->set('categoryFilter', 'expense')
+            ->assertSee('Synthetic supply category review')
+            ->set('categoryFilter', 'unknown')
+            ->assertHasErrors(['categoryFilter']);
+        $this->assertSame('pending', DB::table('approval_requests')->where('id', $id)->value('status'));
+        $this->assertSame(0, DB::table('approval_decisions')->count());
+    }
+
     public function test_owner_pages_old_approval_requests_without_losing_tenant_or_decision_scope(): void
     {
         [$company, , $members] = $this->fixture();

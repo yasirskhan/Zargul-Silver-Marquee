@@ -341,7 +341,7 @@ final class ApprovalWorkflowService
     /** Tenant-authorized inbox: company-scoped staff names and non-PII proposal metadata; no customer data. */
     public function inbox(
         User $actor, string $companyId, int $limit = 30, ?string $referenceId = null,
-        string $status = 'all', int $offset = 0,
+        string $status = 'all', int $offset = 0, string $category = 'all',
     ): array
     {
         $membership = $this->member($actor, $companyId);
@@ -358,6 +358,9 @@ final class ApprovalWorkflowService
         if ($offset < 0 || $offset > 3000) {
             throw new InvalidArgumentException('Invalid approval inbox pagination offset.');
         }
+        if ($category !== 'all' && ! in_array($category, self::CATEGORIES, true)) {
+            throw new InvalidArgumentException('Invalid approval inbox category filter.');
+        }
         $q = DB::table('approval_requests as req')
             ->leftJoin('users as requester', 'requester.id', '=', 'req.requested_by')
             ->leftJoin('booking_drafts as booking', function ($join): void {
@@ -373,6 +376,9 @@ final class ApprovalWorkflowService
         }
         if ($status !== 'all') {
             $q->where('req.status', $status);
+        }
+        if ($category !== 'all') {
+            $q->where('req.category', $category);
         }
         if ($membership->role === 'manager') {
             $q->where('req.requested_by', $actor->getKey());

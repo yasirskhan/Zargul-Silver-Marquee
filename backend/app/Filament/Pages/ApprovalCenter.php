@@ -57,6 +57,8 @@ final class ApprovalCenter extends Page
 
     public string $statusFilter = 'all';
 
+    public string $categoryFilter = 'all';
+
     public string $newCategory = 'discount';
 
     public string $newAmount = '';
@@ -287,6 +289,7 @@ final class ApprovalCenter extends Page
         $this->revokeReason = '';
         $this->requestReference = '';
         $this->statusFilter = 'all';
+        $this->categoryFilter = 'all';
         $this->selectedId = null;
         $this->selectedRevision = 0;
         $this->telegramPairingUrl = null;
@@ -295,6 +298,11 @@ final class ApprovalCenter extends Page
     }
 
     public function updatedStatusFilter(): void
+    {
+        $this->refreshInbox();
+    }
+
+    public function updatedCategoryFilter(): void
     {
         $this->refreshInbox();
     }
@@ -339,7 +347,10 @@ final class ApprovalCenter extends Page
     private function loadInboxPage(): void
     {
         $actor = $this->authorizeCompany();
-        $this->validate(['statusFilter' => ['required', Rule::in(['all', 'pending', 'approved', 'rejected'])]]);
+        $this->validate([
+            'statusFilter' => ['required', Rule::in(['all', 'pending', 'approved', 'rejected'])],
+            'categoryFilter' => ['required', Rule::in(array_merge(['all'], $this->requestCategoryOptions()))],
+        ]);
         if ($this->requestReference !== '' && ! Str::isUuid($this->requestReference)) {
             throw ValidationException::withMessages([
                 'requestReference' => 'Enter a valid full approval request reference.',
@@ -348,7 +359,7 @@ final class ApprovalCenter extends Page
         $rows = app(ApprovalWorkflowService::class)->inbox(
             $actor, $this->companyId, self::INBOX_PAGE_SIZE + 1,
             $this->requestReference === '' ? null : $this->requestReference,
-            $this->statusFilter, $this->inboxOffset,
+            $this->statusFilter, $this->inboxOffset, $this->categoryFilter,
         );
         $this->inboxHasMore = count($rows) > self::INBOX_PAGE_SIZE;
         $this->entries = array_slice($rows, 0, self::INBOX_PAGE_SIZE);

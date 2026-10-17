@@ -393,6 +393,41 @@ class ApprovalWorkflowServiceTest extends TestCase
 
 
 
+
+    public function test_category_filter_preserves_manager_and_owner_request_scope(): void
+    {
+        [$company, , , $people, $booking] = $this->fixture();
+        $service = app(ApprovalWorkflowService::class);
+        $manager = $people['manager'][0];
+        $admin = $people['admin'][0];
+        $owner = $people['owner'][0];
+        $discount = (string) Str::uuid();
+        $expense = (string) Str::uuid();
+        $this->be($manager);
+        $service->request($manager, $company->id, $discount, 'discount', 100,
+            'PKR', $booking, 'Manager requests internal hall discount');
+        $this->be($admin);
+        $service->request($admin, $company->id, $expense, 'expense', 200,
+            'PKR', null, 'Admin requests internal supplies expense');
+        $this->be($owner);
+        $this->assertSame([$discount], array_column($service->inbox(
+            $owner, $company->id, 30, null, 'all', 0, 'discount'), 'id'));
+        $this->assertSame([$expense], array_column($service->inbox(
+            $owner, $company->id, 30, null, 'all', 0, 'expense'), 'id'));
+        $this->be($manager);
+        $this->assertSame([], $service->inbox($manager, $company->id,
+            30, null, 'all', 0, 'expense'));
+        $this->be($owner);
+        try {
+            $service->inbox($owner, $company->id, 30, null, 'all', 0, 'forged');
+            $this->fail('Unknown category filter accepted.');
+        } catch (InvalidArgumentException) {
+            $this->assertTrue(true);
+        }
+        $this->assertSame(0, DB::table('approval_decisions')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
     public function test_approval_inbox_rejects_negative_and_unbounded_page_offsets(): void
     {
         [$company, , , $people] = $this->fixture();
