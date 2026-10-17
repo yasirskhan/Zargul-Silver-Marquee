@@ -144,6 +144,12 @@
 - No public signing API, secret key, live access cut-off or release-gate change. Require exact SHA six-job hosted CI; previous `835dd1e` had central/licensing/prototype/editor tests green while full suite still running when batch prepared.
 - Next: operator-controlled protected signer credentials, strongly authenticated license-grant retrieval and customer-facing Verify License with 15-day scheduled checks. Keep refunds, billing collection, issuance, and public-enforcement gates OFF.
 
+## LOCAL OWNER LICENSING OVERVIEW READ MODEL — PENDING HOSTED CI
+- **VERIFIED**: `4a0403cc650999e1ac9dceee88e1e457053bac6f`, hosted CI 39078914917 SUCCESS all six jobs: cached signed license now remains bound to immutable registered HAFZATECH customer and venue domain even for local offline reads.
+- New `CentralLicensingOverviewService` read-only owner-oriented projection combines verified signed grant, UTC expiry policy, 15-day due-check scheduler, 15-day warning and 7-day dashboard grace. Reports `feature_disabled` as unchanged public/dashboard behavior and never changes company bookings, revenue, finance or license cache. Tests check disabled gate, unpaid enrollment, valid signed grant, warning and grace boundaries.
+- **Not yet an owner-facing settings screen or public enforcement middleware**. Caller authorization, actual signed status delivery/paid grant verification and go-live host/key provisioning remain outstanding. Exact SHA hosted six-job CI required.
+- Prior `835dd1e` and `f69c68c` checked focused central/licensing/browser suites green but full-suite conclusions need confirming. Do not claim live portal or release readiness.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`
