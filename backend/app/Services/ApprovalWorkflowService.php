@@ -513,10 +513,17 @@ final class ApprovalWorkflowService
                 DB::raw('MAX(req.id::text) AS newest_id'),
             ]);
 
-        $items = $rows->map(fn ($row) => [
-            'companyId' => $row->company_id, 'company' => $row->name,
-            'pending' => (int) $row->pending_count,
-        ])->all();
+        $items = $rows->map(function ($row) use ($actor): array {
+            // Owner-only opaque deep-link target. Reuse identical current
+            // pending/non-self criteria; full authorization happens on open.
+            $latestId = DB::table('approval_requests')
+                ->where('company_id', $row->company_id)
+                ->where('status', 'pending')
+                ->where('requested_by', '<>', $actor->getKey())
+                ->orderByDesc('created_at')->orderByDesc('id')->value('id');
+            return ['companyId' => $row->company_id, 'company' => $row->name,
+                'pending' => (int) $row->pending_count, 'latestRequestId' => $latestId];
+        })->all();
         $fingerprint = $rows->isEmpty() ? '' : hash('sha256',
             $rows->map(fn ($row) => implode(':', [
                 $row->company_id, $row->pending_count, $row->newest_request, $row->newest_id,

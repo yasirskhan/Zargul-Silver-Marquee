@@ -19,10 +19,16 @@
                                 class="mt-2 block font-semibold underline">
                                 Review this company's requests
                             </a>
+                            @if ($item['latestRequestId'])
+                                <a href="{{ AppFilamentPagesApprovalCenter::getUrl(['company' => $item['companyId'], 'request' => $item['latestRequestId']]) }}"
+                                    class="mt-2 block font-semibold underline">
+                                    Review one pending request directly
+                                </a>
+                            @endif
                         </li>
                     @endforeach
                 </ul>
-                <p class="text-xs">Only company-level counts are shown here. Open the Approval Center for a fresh, authorized review.</p>
+                <p class="text-xs">Only company-level counts and private request references are shown here. Every link requires a fresh, authorized Approval Center review.</p>
                 <div class="flex flex-wrap gap-3">
                     <a x-ref="review" href="{{ \App\Filament\Pages\ApprovalCenter::getUrl() }}"
                         class="rounded-lg border px-4 py-2 font-semibold">Review in Approval Center</a>

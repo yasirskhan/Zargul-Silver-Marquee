@@ -54,18 +54,21 @@ class OwnerApprovalAttentionTest extends TestCase
     public function test_owner_modal_shows_only_other_staff_pending_company_counts_and_can_dismiss(): void
     {
         [$company, $foreign, $people] = $this->fixture();
-        $this->expense($people['admin'], $company->id, 'Internal supply request');
+        $adminRequestId = $this->expense($people['admin'], $company->id, 'Internal supply request');
         $this->expense($people['owner'], $company->id, 'Owners own proposed cost');
         $this->be($people['owner']);
         $pending = app(ApprovalWorkflowService::class)->ownerPendingAttention($people['owner']);
         $this->assertCount(1, $pending['items']);
         $this->assertSame(1, $pending['items'][0]['pending']);
         $this->assertSame('Visible Demo Hall', $pending['items'][0]['company']);
+        $this->assertSame($adminRequestId, $pending['items'][0]['latestRequestId']);
         $this->assertNotEmpty($pending['fingerprint']);
 
         Livewire::test(OwnerApprovalAttention::class)
             ->assertSee('Pending owner approval requests')
             ->assertSee('Visible Demo Hall')
+            ->assertSee('Review one pending request directly')
+            ->assertSee('request='.urlencode($adminRequestId), false)
             ->assertDontSee('Private Other Hall')
             ->assertDontSee('Internal supply request')
             ->assertDontSee('Owners own proposed cost')
