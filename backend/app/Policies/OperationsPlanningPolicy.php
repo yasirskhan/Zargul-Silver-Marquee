@@ -12,7 +12,11 @@ final class OperationsPlanningPolicy
     public function membership(User $actor, string $companyId): ?CompanyMembership
     {
         if (! Auth::check() || (int) Auth::id() !== (int) $actor->getKey()
-            || ! $actor->is_active || ! $actor->hasVerifiedEmail()) {
+            || ! $actor->is_active || ! $actor->hasVerifiedEmail()
+            // A suspended or unverified account can survive in a cached session.
+            // Direct service calls must check the current persisted user record.
+            || ! DB::table('users')->where('id', $actor->getKey())
+                ->where('is_active', true)->whereNotNull('email_verified_at')->exists()) {
             return null;
         }
         return CompanyMembership::query()->where('company_id', $companyId)

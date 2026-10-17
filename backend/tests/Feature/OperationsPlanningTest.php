@@ -238,6 +238,59 @@ class OperationsPlanningTest extends TestCase
         $this->assertSame(0, DB::table('hall_slot_claims')->count());
     }
 
+
+    public function test_direct_planning_service_denies_cached_revoke_and_email_verification_reset(): void
+    {
+        [$company, , , , $actors, $booking] = $this->fixture();
+        $owner = $actors['owner'][0];
+        $service = app(OperationsPlanningService::class);
+        $task = (string) Str::uuid();
+        $service->create($owner, $company->id, $task, $booking,
+            'Synthetic internal setup plan', 'Owner saved an internal task');
+        $this->assertSame(1, DB::table('operations_plan_events')->count());
+
+        DB::table('users')->where('id', $owner->id)->update(['is_active' => false]);
+        $this->assertTrue($owner->is_active);
+        try {
+            $service->tasks($owner, $company->id);
+            $this->fail('Cached suspended owner read restricted planning tasks.');
+        } catch (AuthorizationException) {
+            $this->assertTrue(true);
+        }
+        try {
+            $service->setReviewed($owner, $company->id, $task, 1, true,
+                'Revoked owner must not review');
+            $this->fail('Cached suspended owner reviewed a planning task.');
+        } catch (AuthorizationException) {
+            $this->assertTrue(true);
+        }
+
+        DB::table('users')->where('id', $owner->id)->update([
+            'is_active' => true, 'email_verified_at' => null,
+        ]);
+        $this->assertTrue($owner->hasVerifiedEmail());
+        try {
+            $service->tasks($owner, $company->id);
+            $this->fail('Cached verification survived a persisted revocation.');
+        } catch (AuthorizationException) {
+            $this->assertTrue(true);
+        }
+        try {
+            $service->create($owner, $company->id, (string) Str::uuid(), $booking,
+                'Improper second planning item', 'Unverified staff may not write');
+            $this->fail('Unverified cached staff created a planning task.');
+        } catch (AuthorizationException) {
+            $this->assertTrue(true);
+        }
+
+        $this->assertSame(1, DB::table('operations_plan_tasks')->count());
+        $this->assertSame('planned', DB::table('operations_plan_tasks')
+            ->where('id', $task)->value('status'));
+        $this->assertSame(1, DB::table('operations_plan_events')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
     public function test_persisted_account_revocation_blocks_private_planning_page_with_cached_auth(): void
     {
         [, , , , $actors] = $this->fixture();
