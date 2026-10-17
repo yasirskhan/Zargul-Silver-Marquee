@@ -231,4 +231,109 @@ final class VenueEventOperationsService
             return $after;
         }, 3);
     }
+    /** Reviewed, same-hall pre-event tasks and distinct actual fulfilment evidence. */
+    public function checklist(User $actor, string $companyId, string $reservationId): array
+    {
+        if (! Str::isUuid($reservationId)) {
+            throw new InvalidArgumentException('Valid confirmed reservation required.');
+        }
+        $reservation = DB::table('venue_reservations')->where('company_id', $companyId)
+            ->where('id', $reservationId)->first();
+        if (! $reservation || $reservation->status !== 'confirmed') {
+            throw new AuthorizationException('Confirmed reservation is not accessible.');
+        }
+        $this->authorizeHall($actor, $companyId, $reservation->hall_id);
+        return DB::table('operations_plan_tasks as t')
+            ->leftJoin('venue_event_task_fulfillments as f', fn ($join) => $join
+                ->on('f.company_id', '=', 't.company_id')
+                ->on('f.planning_task_id', '=', 't.id')
+                ->where('f.reservation_id', '=', $reservationId))
+            ->where('t.company_id', $companyId)
+            ->where('t.booking_id', $reservation->source_draft_id)
+            ->where('t.hall_id', $reservation->hall_id)
+            ->orderBy('t.created_at')->orderBy('t.id')->limit(50)
+            ->get(['t.id', 't.title', 't.status', 't.revision',
+                'f.id as fulfillment_id', 'f.completed_by', 'f.created_at as fulfilled_at'])
+            ->map(fn ($row) => [
+                'taskId' => $row->id, 'title' => $row->title,
+                'planningStatus' => $row->status,
+                'planningRevision' => (int) $row->revision,
+                'fulfilled' => $row->fulfillment_id !== null,
+                'fulfillmentId' => $row->fulfillment_id,
+                'fulfilledAt' => $row->fulfilled_at,
+                'completedBy' => $row->completed_by,
+            ])->all();
+    }
+
+    /** A witnessed service/equipment setup completion, never a paid add-on. */
+    public function fulfillTask(
+        User $actor, string $companyId, string $reservationId,
+        string $taskId, string $fulfillmentId, string $reason,
+    ): array {
+        $this->gate();
+        if (! Str::isUuid($reservationId) || ! Str::isUuid($taskId)
+            || ! Str::isUuid($fulfillmentId)) {
+            throw new InvalidArgumentException('Valid reservation, task and completion keys are required.');
+        }
+        $reason = $this->reason($reason);
+
+        return DB::transaction(function () use (
+            $actor, $companyId, $reservationId, $taskId, $fulfillmentId, $reason
+        ): array {
+            $this->gate();
+            $reservation = $this->lockedReservation($actor, $companyId, $reservationId);
+            $operation = DB::table('venue_event_operations')
+                ->where('company_id', $companyId)->where('reservation_id', $reservationId)
+                ->lockForUpdate()->first();
+            if (! $operation || $operation->status !== 'in_progress') {
+                throw new ConflictHttpException('Actual fulfilment can only be recorded while the event is in progress.');
+            }
+            $task = DB::table('operations_plan_tasks')->where('company_id', $companyId)
+                ->where('id', $taskId)->lockForUpdate()->first();
+            if (! $task || $task->booking_id !== $reservation->source_draft_id
+                || $task->hall_id !== $reservation->hall_id || $task->status !== 'reviewed') {
+                throw new AuthorizationException('Only reviewed tasks for this current booking and hall may be fulfilled.');
+            }
+            $existing = DB::table('venue_event_task_fulfillments')
+                ->where('company_id', $companyId)
+                ->where('reservation_id', $reservationId)
+                ->where('planning_task_id', $taskId)->lockForUpdate()->first();
+            if ($existing) {
+                if ($existing->id === $fulfillmentId
+                    && (int) $existing->completed_by === (int) $actor->getKey()
+                    && $existing->reason === $reason) {
+                    return ['id' => $existing->id, 'taskId' => $taskId,
+                        'reservationId' => $reservationId, 'status' => 'fulfilled'];
+                }
+                throw new ConflictHttpException('Task fulfilment already recorded; retain original audit.');
+            }
+
+            $snapshot = [
+                'id' => $fulfillmentId, 'taskId' => $taskId,
+                'reservationId' => $reservationId, 'eventOperationId' => $operation->id,
+                'title' => $task->title, 'planningRevision' => (int) $task->revision,
+                'status' => 'fulfilled',
+            ];
+            DB::table('venue_event_task_fulfillments')->insert([
+                'id' => $fulfillmentId, 'company_id' => $companyId,
+                'reservation_id' => $reservationId, 'operation_id' => $operation->id,
+                'planning_task_id' => $taskId,
+                'planning_revision' => $task->revision,
+                'title_snapshot' => $task->title, 'reason' => $reason,
+                'completed_by' => $actor->getKey(),
+            ]);
+            DB::table('audit_events')->insert([
+                'id' => (string) Str::uuid(), 'company_id' => $companyId,
+                'actor_id' => $actor->getKey(),
+                'action' => 'event_operation.task_fulfilled',
+                'entity_type' => 'venue_event_task_fulfillment',
+                'entity_id' => $fulfillmentId, 'before_values' => null,
+                'after_values' => json_encode($snapshot, JSON_THROW_ON_ERROR),
+                'context' => json_encode(['reason' => $reason], JSON_THROW_ON_ERROR),
+            ]);
+            return ['id' => $fulfillmentId, 'taskId' => $taskId,
+                'reservationId' => $reservationId, 'status' => 'fulfilled'];
+        }, 3);
+    }
+
 }

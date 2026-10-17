@@ -18,6 +18,7 @@ use App\Services\HallProgramRulesService;
 use App\Services\HallSlotHoldService;
 use App\Services\VenueReservationService;
 use App\Services\VenueEventOperationsService;
+use App\Services\OperationsPlanningService;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
@@ -753,6 +754,106 @@ class VenueReservationServiceTest extends TestCase
         $this->assertSame(2, DB::table('venue_event_operation_events')->count());
         $this->assertSame(1, DB::table('hall_slot_claims')
             ->where('id', $booking['claimId'])->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
+    public function test_reviewed_pre_event_task_is_recorded_once_as_actual_service_fulfilment(): void
+    {
+        [$company, , $hall, $people, $customer] = $this->fixture();
+        $draft = $this->review($company, $hall, $people['owner'], $customer, '2027-04-08', 'morning');
+        $planning = app(OperationsPlanningService::class);
+        $reviewed = (string) Str::uuid();
+        $unreviewed = (string) Str::uuid();
+        $planning->create($people['owner'], $company->id, $reviewed,
+            $draft, 'Set up extra entrance lighting', 'Private approved event setup task');
+        $planning->setReviewed($people['owner'], $company->id, $reviewed, 1, true,
+            'Owner authorized stage setup plan only');
+        $planning->create($people['owner'], $company->id, $unreviewed,
+            $draft, 'Unreviewed extra seating', 'Requires owner review before performing');
+
+        $this->be($people['manager']);
+        $booking = $this->confirm($people['manager'], $company, $draft);
+        config()->set('event_controls.recording_enabled', true);
+        $this->be($people['operations']);
+        $service = app(VenueEventOperationsService::class);
+        $before = $service->checklist($people['operations'], $company->id, $booking['id']);
+        $this->assertCount(2, $before);
+        $this->assertSame([false, false], array_column($before, 'fulfilled'));
+
+        $service->start($people['operations'], $company->id, $booking['id'],
+            (string) Str::uuid(), '08:06', 'Arrival observed by service team');
+        $key = (string) Str::uuid();
+        $done = $service->fulfillTask($people['operations'], $company->id,
+            $booking['id'], $reviewed, $key, 'Witnessed installed entrance lights');
+        $this->assertSame('fulfilled', $done['status']);
+        $this->assertSame($done, $service->fulfillTask($people['operations'], $company->id,
+            $booking['id'], $reviewed, $key, 'Witnessed installed entrance lights'));
+        $after = $service->checklist($people['operations'], $company->id, $booking['id']);
+        $this->assertCount(1, array_filter($after, fn (array $task) => $task['fulfilled']));
+        try {
+            $service->fulfillTask($people['operations'], $company->id,
+                $booking['id'], $unreviewed, (string) Str::uuid(),
+                'Unreviewed service must not be marked performed');
+            $this->fail('Unreviewed task was recorded as actual service.');
+        } catch (AuthorizationException) {
+            $this->assertSame(1, DB::table('venue_event_task_fulfillments')->count());
+        }
+
+        $panel = Livewire::withQueryParams(['company' => $company->id])
+            ->test(EventOperations::class)
+            ->call('selectReservation', $booking['id'])
+            ->assertSee('Set up extra entrance lighting')
+            ->assertSee('performed')
+            ->assertSee('Unreviewed extra seating')
+            ->assertDontSee('hidden-reservation@example.test');
+        $this->assertCount(2, $panel->get('checklist'));
+        $service->finish($people['operations'], $company->id, $booking['id'],
+            1, '11:09', 'Observed all guests departed at morning close');
+        try {
+            $service->fulfillTask($people['operations'], $company->id,
+                $booking['id'], $reviewed, (string) Str::uuid(),
+                'Too late to change completed event evidence');
+            $this->fail('Completed event accepted a new fulfilment.');
+        } catch (ConflictHttpException) {
+            $this->assertSame(1, DB::table('venue_event_task_fulfillments')->count());
+        }
+        $this->assertSame(1, DB::table('audit_events')
+            ->where('action', 'event_operation.task_fulfilled')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+        $this->expectException(QueryException::class);
+        DB::table('venue_event_task_fulfillments')->where('id', $key)
+            ->delete();
+    }
+
+    public function test_staff_can_witness_reviewed_task_through_livewire_but_not_twice(): void
+    {
+        [$company, , $hall, $people, $customer] = $this->fixture();
+        $draft = $this->review($company, $hall, $people['owner'], $customer, '2027-04-08', 'morning');
+        $id = (string) Str::uuid();
+        $planning = app(OperationsPlanningService::class);
+        $planning->create($people['owner'], $company->id, $id, $draft,
+            'Set welcome chairs at entrance', 'Approved pre-event welcome setup');
+        $planning->setReviewed($people['owner'], $company->id, $id, 1, true,
+            'Owner reviewed welcome chair preparation');
+        $this->be($people['manager']);
+        $reservation = $this->confirm($people['manager'], $company, $draft);
+        config()->set('event_controls.recording_enabled', true);
+        $this->be($people['operations']);
+        Livewire::withQueryParams(['company' => $company->id])
+            ->test(EventOperations::class)
+            ->call('selectReservation', $reservation['id'])
+            ->assertSee('Set welcome chairs at entrance')
+            ->assertDontSee('Record task performed')
+            ->set('startClock', '08:06')
+            ->set('reason', 'Actual arrival was witnessed')
+            ->call('startEvent')->assertHasNoErrors()
+            ->assertSee('Record task performed')
+            ->set('taskReason', 'Welcome chairs were placed as requested')
+            ->call('fulfillSelectedTask', $id)->assertHasNoErrors()
+            ->assertSee('performed')
+            ->assertDontSee('Record task performed');
+        $this->assertSame(1, DB::table('venue_event_task_fulfillments')->count());
+        $this->assertSame(0, DB::table('venue_invoice_payments')->count());
         $this->assertSame(0, DB::table('finance_journals')->count());
     }
 

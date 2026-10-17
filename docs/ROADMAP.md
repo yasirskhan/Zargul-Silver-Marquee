@@ -35,6 +35,13 @@ Actual extension remains unauthorized and no invoice or money changes are made a
 Operator release flag `VENUE_EVENT_RECORDING_ENABLED` remains OFF until separate venue signoff.
 Catering fulfilment, authorized overtime charge adjustments and event closeout reporting follow.
 
+## Phase 7.2 — Actual setup fulfilment and audit
+Bridge reviewed preparation tasks from the original confirmed reservation's proposal
+into witnessed physical setup only after actual check-in. Staff records a reason and
+immutable one-time fulfilment evidence under the current hall/company policy.
+A reviewed plan alone never proves service delivery. No automatic invoice,
+payment, hall extension, or added customer charge occurs.
+
 ## Phase 8 — Controlled pilot
 No real launch until finance, isolation, restores, booking concurrency and real user tests are accepted.
 

@@ -36,6 +36,14 @@ final class EventOperations extends Page
     public array $rows = [];
 
     #[Locked]
+    public array $checklist = [];
+
+    #[Locked]
+    public string $fulfillmentRequestKey = '';
+
+    public string $taskReason = '';
+
+    #[Locked]
     public ?string $selectedReservationId = null;
 
     #[Locked]
@@ -112,6 +120,7 @@ final class EventOperations extends Page
         abort_unless($requested === null || (is_string($requested)
             && array_key_exists($requested, $companies)), 403);
         $this->companyId = $requested ?? array_key_first($companies);
+        $this->fulfillmentRequestKey = (string) Str::uuid();
         $this->refresh();
     }
 
@@ -125,6 +134,9 @@ final class EventOperations extends Page
         $this->authorizeCompany();
         $this->selectedReservationId = null;
         $this->expectedRevision = 0;
+        $this->checklist = [];
+        $this->taskReason = '';
+        $this->fulfillmentRequestKey = (string) Str::uuid();
         $this->startClock = '';
         $this->endClock = '';
         $this->reason = '';
@@ -146,6 +158,9 @@ final class EventOperations extends Page
         $row = collect($this->rows)->firstWhere('reservationId', $reservationId);
         abort_unless(is_array($row), 403);
         $this->selectedReservationId = $reservationId;
+        $this->checklist = app(VenueEventOperationsService::class)
+            ->checklist($this->authorizeLoaded(), $this->companyId, $reservationId);
+        $this->taskReason = '';
         $this->expectedRevision = $row['revision'];
         $this->startClock = $row['start'] ?? '';
         $this->endClock = $row['end'] ?? '';
@@ -157,6 +172,31 @@ final class EventOperations extends Page
         $this->authorizeLoaded();
         return $this->selectedReservationId === null ? null
             : collect($this->rows)->firstWhere('reservationId', $this->selectedReservationId);
+    }
+
+    public function fulfillSelectedTask(string $taskId): void
+    {
+        $actor = $this->authorizeLoaded();
+        abort_unless($this->recordingEnabled()
+            && $this->selectedReservationId !== null && Str::isUuid($taskId), 403);
+        $selected = $this->selectedRow();
+        abort_unless(is_array($selected) && $selected['status'] === 'in_progress', 403);
+        $task = collect($this->checklist)->firstWhere('taskId', $taskId);
+        abort_unless(is_array($task) && $task['planningStatus'] === 'reviewed'
+            && ! $task['fulfilled'], 403);
+        $this->validate(['taskReason' => ['required', 'string', 'min:3', 'max:500']]);
+        try {
+            app(VenueEventOperationsService::class)->fulfillTask(
+                $actor, $this->companyId, $this->selectedReservationId,
+                $taskId, $this->fulfillmentRequestKey, $this->taskReason
+            );
+        } catch (ConflictHttpException | InvalidArgumentException $error) {
+            throw ValidationException::withMessages(['taskReason' => $error->getMessage()]);
+        }
+        $id = $this->selectedReservationId;
+        $this->fulfillmentRequestKey = (string) Str::uuid();
+        $this->refresh();
+        $this->selectReservation($id);
     }
 
     public function startEvent(): void

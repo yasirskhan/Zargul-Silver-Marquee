@@ -43,6 +43,31 @@
                     <h2 class="font-semibold">Actual event record</h2>
                     <p>{{ $selected['hallName'] }} · {{ $selected['date'] }} · {{ ucfirst($selected['program']) }}
                         · {{ str_replace('_', ' ', $selected['status']) }}</p>
+                    @if (count($checklist) > 0)
+                        <section aria-label="Actual service and setup fulfilment" class="space-y-2 rounded-lg border p-3">
+                            <h3 class="font-semibold">Reviewed setup tasks for this confirmed hall</h3>
+                            <p class="text-xs">A reviewed PLAN is not proof of service. Record witnessed actual fulfilment only while this event is in progress. Financial add-on charges require separate authorization.</p>
+                            <label class="block space-y-1">
+                                <span>Actual task completion reason / observation</span>
+                                <textarea wire:model="taskReason" maxlength="500" rows="2"
+                                    class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                            </label>
+                            @error('taskReason') <p role="alert">{{ $message }}</p> @enderror
+                            @foreach ($checklist as $task)
+                                <article wire:key="reviewed-task-{{ $task['taskId'] }}" class="rounded-lg border p-2 text-sm">
+                                    <strong>{{ $task['title'] }}</strong>
+                                    <p>Planning: {{ $task['planningStatus'] }} · actual: {{ $task['fulfilled'] ? 'performed' : 'not recorded' }}</p>
+                                    @if ($task['fulfilled'])
+                                        <p class="text-xs">Performed at {{ $task['fulfilledAt'] }} · staff #{{ $task['completedBy'] }}</p>
+                                    @elseif ($selected['status'] === 'in_progress' && $task['planningStatus'] === 'reviewed')
+                                        <button type="button" wire:click="fulfillSelectedTask('{{ $task['taskId'] }}')"
+                                            wire:loading.attr="disabled" @disabled(! $this->recordingEnabled())
+                                            class="rounded-lg border px-3 py-2 underline">Record task performed</button>
+                                    @endif
+                                </article>
+                            @endforeach
+                        </section>
+                    @endif
                     @if ($selected['status'] !== 'completed')
                         <label class="block space-y-1">
                             <span>{{ $selected['status'] === 'not_started' ? 'Observed event start' : 'Observed event finish' }} (24-hour HH:MM)</span>
