@@ -120,6 +120,43 @@ final class SiteDomainOwnershipService
         }, 3);
     }
 
+    /**
+     * Immediately invalidate an owner's current VERIFIED domain. A new DNS
+     * challenge is required before production requests can use it again.
+     * Preserve the exclusive tenant claim and immutable audit history.
+     */
+    public function revoke(
+        User $actor, string $companyId, string $websiteId, string $candidate, string $reason
+    ): void {
+        $this->authorize($actor, $companyId);
+        $domain = $this->domain($candidate);
+        $this->reason($reason);
+
+        DB::transaction(function () use ($actor, $companyId, $websiteId, $domain, $reason): void {
+            $this->lockWebsite($companyId, $websiteId);
+            $claim = DB::table('site_domain_claims')->where('company_id', $companyId)
+                ->where('website_id', $websiteId)->where('domain', $domain)
+                ->lockForUpdate()->first();
+            $this->authorize($actor, $companyId);
+            if (! $claim || $claim->status !== 'verified' || $claim->verified_at === null) {
+                throw new ConflictHttpException('Only a currently verified website domain can be revoked.');
+            }
+
+            // Return to an EXPIRED pending challenge, rotating away the old
+            // proof. A fresh request + DNS TXT verification is mandatory.
+            DB::table('site_domain_claims')->where('id', $claim->id)->update([
+                'status' => 'pending',
+                'token_hash' => hash('sha256', Str::random(40)),
+                'expires_at' => now()->subSecond(),
+                'verified_by' => null, 'verified_at' => null, 'updated_at' => now(),
+            ]);
+            $this->audit($actor, $companyId, $claim->id, 'website.domain_ownership_revoked',
+                ['websiteId' => $websiteId, 'domain' => $domain,
+                    'status' => 'pending', 'verified' => false, 'requiresNewProof' => true],
+                $reason);
+        }, 3);
+    }
+
     private function domain(string $input): string
     {
         $host = strtolower(trim($input));

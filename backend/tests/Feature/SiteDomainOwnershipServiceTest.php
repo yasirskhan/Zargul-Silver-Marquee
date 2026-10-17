@@ -177,7 +177,7 @@ class SiteDomainOwnershipServiceTest extends TestCase
 CREATE OR REPLACE FUNCTION fail_test_domain_audit_insert() RETURNS trigger
 LANGUAGE plpgsql AS $domain_audit_body$
 BEGIN
-    IF NEW.action IN ('website.domain_claim_requested', 'website.domain_ownership_verified') THEN
+    IF NEW.action IN ('website.domain_claim_requested', 'website.domain_ownership_verified', 'website.domain_ownership_revoked') THEN
         RAISE EXCEPTION 'Injected domain audit rejection';
     END IF;
     RETURN NEW;
@@ -191,6 +191,85 @@ SQL);
     {
         DB::statement('DROP TRIGGER IF EXISTS fail_test_domain_audit_insert_trigger ON audit_events');
         DB::statement('DROP FUNCTION IF EXISTS fail_test_domain_audit_insert()');
+    }
+
+    public function test_owner_revoke_immediately_disables_verified_host_and_requires_new_dns_proof(): void
+    {
+        [$company, $owner, $site] = $this->fixture('owner-revoke-domain');
+        $resolver = $this->resolver();
+        $service = app(SiteDomainOwnershipService::class);
+        $challenge = $service->request($owner, $company->id, $site,
+            'revoke.marquee.org', 'Issue owner-controlled DNS proof');
+        $resolver->answers[$challenge['txtName']] = [$challenge['txtValue']];
+        $service->verify($owner, $company->id, $site,
+            'revoke.marquee.org', 'Approve DNS ownership');
+
+        config([
+            'public_site.enabled' => true, 'public_site.host' => 'revoke.marquee.org',
+            'public_site.company_id' => $company->id, 'public_site.website_id' => $site,
+            'public_site.require_verified_domain' => true,
+        ]);
+        $request = \Illuminate\Http\Request::create('https://revoke.marquee.org/');
+        $gate = app(\App\Http\Controllers\PublicSiteRequestGate::class);
+        $this->assertSame('revoke.marquee.org', $gate->authorize($request)['host']);
+        $originalHash = DB::table('site_domain_claims')->value('token_hash');
+        $service->revoke($owner, $company->id, $site,
+            'revoke.marquee.org', 'Owner revokes active domain');
+        $claim = DB::table('site_domain_claims')->first();
+        $this->assertSame('pending', $claim->status);
+        $this->assertNull($claim->verified_at);
+        $this->assertNull($claim->verified_by);
+        $this->assertNotSame($originalHash, $claim->token_hash);
+        $this->assertSame(1, DB::table('audit_events')
+            ->where('action', 'website.domain_ownership_revoked')->count());
+        try {
+            $gate->authorize($request);
+            $this->fail('Revoked website domain passed the release gate.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            $this->assertSame(503, $e->getStatusCode());
+        }
+        try {
+            $service->verify($owner, $company->id, $site,
+                'revoke.marquee.org', 'Old TXT must never restore ownership');
+            $this->fail('Expired revoked DNS challenge verified.');
+        } catch (ConflictHttpException) {
+            $this->assertSame('pending', DB::table('site_domain_claims')->value('status'));
+        }
+        $new = $service->request($owner, $company->id, $site,
+            'revoke.marquee.org', 'Issue new verification challenge');
+        $resolver->answers[$new['txtName']] = [$new['txtValue']];
+        $service->verify($owner, $company->id, $site,
+            'revoke.marquee.org', 'Reverify owner-controlled DNS');
+        $this->assertSame('revoke.marquee.org', $gate->authorize($request)['host']);
+    }
+
+    public function test_revoking_verified_domain_rolls_back_if_audit_is_unavailable(): void
+    {
+        [$company, $owner, $site] = $this->fixture('revoke-audit-domain');
+        $resolver = $this->resolver();
+        $service = app(SiteDomainOwnershipService::class);
+        $challenge = $service->request($owner, $company->id, $site,
+            'audit-revoke.marquee.org', 'Issue audited domain proof');
+        $resolver->answers[$challenge['txtName']] = [$challenge['txtValue']];
+        $service->verify($owner, $company->id, $site,
+            'audit-revoke.marquee.org', 'Verify audited domain');
+        $before = DB::table('site_domain_claims')->first();
+        $this->rejectAuditWrites();
+        try {
+            $service->revoke($owner, $company->id, $site,
+                'audit-revoke.marquee.org', 'Audit failure must undo revocation');
+            $this->fail('Unaudited domain revocation succeeded.');
+        } catch (\Illuminate\Database\QueryException $e) {
+            $this->assertStringContainsString('Injected domain audit rejection', $e->getMessage());
+        } finally {
+            $this->allowAuditWrites();
+        }
+        $after = DB::table('site_domain_claims')->first();
+        $this->assertSame('verified', $after->status);
+        $this->assertSame($before->token_hash, $after->token_hash);
+        $this->assertSame($before->verified_at, $after->verified_at);
+        $this->assertSame(0, DB::table('audit_events')
+            ->where('action', 'website.domain_ownership_revoked')->count());
     }
 
     public function test_unverified_and_reserved_domain_claims_fail_without_persisting(): void

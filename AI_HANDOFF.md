@@ -1,3 +1,8 @@
+## 2026-10-16 CMS-005 VERIFIED DNS DOMAIN OWNER REVOCATION FOUNDATION — EXACT SHA CI PENDING
+- Base 4d2ecc4747de225ce00e6b2d24cf7ad661f67366; preceding image CSP source 1a3387d3 CI 38989191173 SUCCESS four jobs, other page metadata runs still in progress.
+- Add SiteDomainOwnershipService::revoke for current verified site only. Strict active verified publisher + exact tenant/site/domain reauthorization after website/claim row locks, bounded redacted reason, transactionally set status back to pending with new secret hash and EXPIRED challenge, clear verified actor/time, immutable website.domain_ownership_revoked audit. Verified host gate already denies pending immediately after commit, regardless of operator release flag. A fresh request and valid DNS proof are required for re-verification. Original unique tenant ownership claim remains retained; no silent transfer.
+- PostgreSQL regression tests verify real gate before/after revocation, old DNS TXT cannot reverify, new challenge required, and immutable audit injection rolls back revocation. Update audit fault fixture trigger for new action. Owner UI remains a separate next bounded batch. No domain/public release enabled. All four hosted jobs must pass at exact SHA.
+
 ## 2026-10-16 CMS SEARCH DESCRIPTION REGRESSION FIX — EXACT SHA CI PENDING
 - Correct the new page-description rejection fixture to use an actual newline via chr(10), not escaped backslash text. Existing validator remains unchanged. Parent source 653483ba732f31ac07780a869ffa4fd3809c8369; verify CI all four at exact SHA.
 
