@@ -39,6 +39,12 @@ final class VenueReservations extends Page
     public array $reservations = [];
 
     #[Locked]
+    public array $customerReservations = [];
+
+    #[Locked]
+    public string $selectedCustomerId = '';
+
+    #[Locked]
     public ?string $selectedReservationId = null;
 
     #[Locked]
@@ -53,6 +59,7 @@ final class VenueReservations extends Page
     public string $reason = '';
     public string $newDate = '';
     public string $newProgram = 'evening';
+    public string $newHallId = '';
 
     private static function currentUserAllowed(User $user): bool
     {
@@ -92,6 +99,12 @@ final class VenueReservations extends Page
         $actor = Filament::auth()->user();
         return $actor instanceof User && self::currentUserAllowed($actor)
             ? self::companiesFor($actor) : [];
+    }
+
+    public function mayViewCustomerHistory(): bool
+    {
+        $actor = $this->authorizeCompany();
+        return app(TenantAccess::class)->canManageCustomerProfiles($actor, $this->companyId);
     }
 
     public function hallOptions(): array
@@ -186,9 +199,12 @@ final class VenueReservations extends Page
         $this->draftId = '';
         $this->selectedReservationId = null;
         $this->selectedRevision = 0;
+        $this->selectedCustomerId = '';
+        $this->customerReservations = [];
         $this->reason = '';
         $this->newDate = '';
         $this->newProgram = 'evening';
+        $this->newHallId = '';
         $this->newKeys();
         $this->refresh();
     }
@@ -199,6 +215,22 @@ final class VenueReservations extends Page
         $this->reservations = app(VenueReservationService::class)
             ->list($actor, $this->companyId, 30);
         $this->loadedCompanyId = $this->companyId;
+    }
+
+    public function showCustomerHistory(string $customerId): void
+    {
+        $actor = $this->authorizeLoaded();
+        abort_unless($this->mayViewCustomerHistory() && Str::isUuid($customerId), 403);
+        $this->customerReservations = app(VenueReservationService::class)
+            ->customerHistory($actor, $this->companyId, $customerId);
+        $this->selectedCustomerId = $customerId;
+    }
+
+    public function clearCustomerHistory(): void
+    {
+        $this->authorizeLoaded();
+        $this->selectedCustomerId = '';
+        $this->customerReservations = [];
     }
 
     public function confirmSelected(): void
@@ -238,6 +270,7 @@ final class VenueReservations extends Page
         $this->selectedRevision = $selected['revision'];
         $this->newDate = $selected['date'];
         $this->newProgram = $selected['program'];
+        $this->newHallId = $selected['hallId'];
         $this->reason = '';
         $this->claimRequestKey = (string) Str::uuid();
     }
@@ -249,13 +282,16 @@ final class VenueReservations extends Page
         $this->validate([
             'newDate' => ['required', 'date_format:Y-m-d'],
             'newProgram' => ['required', 'in:morning,noon,evening'],
+            'newHallId' => ['required', 'uuid'],
             'reason' => ['required', 'string', 'min:3', 'max:500'],
         ]);
+        abort_unless(array_key_exists($this->newHallId, $this->hallOptions()), 403);
         try {
             app(VenueReservationService::class)->reschedule(
                 $actor, $this->companyId, $this->selectedReservationId,
                 $this->newDate, $this->newProgram,
-                $this->claimRequestKey, $this->selectedRevision, $this->reason
+                $this->claimRequestKey, $this->selectedRevision,
+                $this->reason, $this->newHallId
             );
         } catch (ConflictHttpException | InvalidArgumentException $e) {
             throw ValidationException::withMessages(['reason' => $e->getMessage()]);

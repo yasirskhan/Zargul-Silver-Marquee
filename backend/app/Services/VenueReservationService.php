@@ -272,10 +272,12 @@ final class VenueReservationService
     /** Initial rescheduling scope is the SAME hall, with date/program change. */
     public function reschedule(
         User $actor, string $companyId, string $reservationId,
-        string $date, string $program, string $newClaimId, int $revision, string $reason,
+        string $date, string $program, string $newClaimId, int $revision,
+        string $reason, ?string $destinationHallId = null,
     ): array {
         $this->gate();
         if (! Str::isUuid($reservationId) || ! Str::isUuid($newClaimId)
+            || ($destinationHallId !== null && ! Str::isUuid($destinationHallId))
             || ! in_array($program, ['morning', 'noon', 'evening'], true) || $revision < 1) {
             throw new InvalidArgumentException('Invalid reschedule request.');
         }
@@ -286,45 +288,58 @@ final class VenueReservationService
         if (! $initial) {
             throw new AuthorizationException('Reservation is not accessible.');
         }
+        $destinationHallId ??= $initial->hall_id;
         $this->authorizeHall($actor, $companyId, $initial->hall_id);
+        $this->authorizeHall($actor, $companyId, $destinationHallId);
         return DB::transaction(function () use ($actor, $companyId, $reservationId,
-            $date, $program, $newClaimId, $revision, $reason): array {
+            $date, $program, $newClaimId, $revision, $reason, $destinationHallId): array {
             $this->gate();
             $initial = DB::table('venue_reservations')->where('company_id', $companyId)
                 ->where('id', $reservationId)->first();
             if (! $initial) {
                 throw new AuthorizationException('Reservation is not accessible.');
             }
-            $hall = $this->authorizeHall($actor, $companyId, $initial->hall_id, true);
+            // Lock both source and target hall records in a stable global
+            // UUID order. Different concurrent transfers cannot invert locks.
+            $hallIds = array_values(array_unique([$initial->hall_id, $destinationHallId]));
+            sort($hallIds, SORT_STRING);
+            $lockedHalls = [];
+            foreach ($hallIds as $id) {
+                $lockedHalls[$id] = $this->authorizeHall($actor, $companyId, $id, true);
+            }
+            $sourceHall = $lockedHalls[$initial->hall_id];
+            $targetHall = $lockedHalls[$destinationHallId];
             $saved = DB::table('venue_reservations')->where('company_id', $companyId)
                 ->where('id', $reservationId)->lockForUpdate()->first();
-            if (! $saved || $saved->hall_id !== $hall->id || $saved->status !== 'confirmed'
+            if (! $saved || $saved->hall_id !== $sourceHall->id || $saved->status !== 'confirmed'
                 || (int) $saved->revision !== $revision
-                || ($saved->event_date === $date && $saved->program === $program)
+                || ($saved->hall_id === $destinationHallId
+                    && $saved->event_date === $date && $saved->program === $program)
                 || $saved->claim_id === $newClaimId) {
                 throw new ConflictHttpException('Reservation revision or destination is invalid.');
             }
-            if ((int) $hall->program_rules_revision < 1
-                || (int) $saved->guests > (int) $hall->capacity) {
-                throw new ConflictHttpException('Hall rules or capacity need review.');
+            if ((int) $targetHall->program_rules_revision < 1
+                || (int) $saved->guests > (int) $targetHall->capacity) {
+                throw new ConflictHttpException('Destination hall rules or capacity need review.');
             }
             $old = DB::table('hall_slot_claims')->where('company_id', $companyId)
                 ->where('id', $saved->claim_id)->lockForUpdate()->first();
             if (! $old || $old->status !== 'confirmed'
-                || $old->hall_id !== $hall->id || $old->event_date !== $saved->event_date
+                || $old->hall_id !== $sourceHall->id || $old->event_date !== $saved->event_date
                 || $old->program !== $saved->program) {
                 throw new ConflictHttpException('Physical source claim does not match reservation.');
             }
             $before = $this->bookingSnapshot($saved);
             // Occupy destination BEFORE releasing source, so a failed target
             // never leaves an existing reservation without its source slot.
-            $this->occupy($actor, $companyId, $hall->id, $date, $program, $newClaimId, $reason);
-            $this->claimEvent($actor, $companyId, $hall->id, $old->event_date,
+            $this->occupy($actor, $companyId, $targetHall->id, $date, $program, $newClaimId, $reason);
+            $this->claimEvent($actor, $companyId, $sourceHall->id, $old->event_date,
                 $old->program, $old->id, 'cancelled',
                 ['status' => 'confirmed'], null, 'Source slot released after audited reschedule');
             DB::table('hall_slot_claims')->where('id', $old->id)->delete();
             DB::table('venue_reservations')->where('id', $reservationId)->update([
-                'claim_id' => $newClaimId, 'event_date' => $date, 'program' => $program,
+                'hall_id' => $targetHall->id, 'claim_id' => $newClaimId,
+                'event_date' => $date, 'program' => $program,
                 'revision' => $revision + 1, 'updated_at' => now(),
             ]);
             $after = $this->bookingSnapshot(DB::table('venue_reservations')
@@ -383,6 +398,27 @@ final class VenueReservationService
                 'cancelled', $revision + 1, $before, $after, $reason);
             return $after;
         }, 3);
+    }
+
+    /** Owner/admin-only private booking history by opaque company customer ID. */
+    public function customerHistory(
+        User $actor, string $companyId, string $customerId, int $limit = 50,
+    ): array {
+        if (! Str::isUuid($customerId) || $limit < 1 || $limit > 50) {
+            throw new InvalidArgumentException('Invalid private customer booking history request.');
+        }
+        if (! Auth::check() || (int) Auth::id() !== (int) $actor->getKey()
+            || ! $this->access->canManageCustomerProfiles($actor, $companyId)) {
+            throw new AuthorizationException('Only authorized customer staff can read history.');
+        }
+        if (! DB::table('customer_profiles')->where('company_id', $companyId)
+            ->where('id', $customerId)->exists()) {
+            throw new AuthorizationException('Customer is not in this company.');
+        }
+        return DB::table('venue_reservations')
+            ->where('company_id', $companyId)->where('customer_id', $customerId)
+            ->orderByDesc('created_at')->orderByDesc('id')->limit($limit)->get()
+            ->map(fn ($row) => $this->bookingSnapshot($row))->all();
     }
 
     /** No names, email, phone or private financial amounts in staff projection. */

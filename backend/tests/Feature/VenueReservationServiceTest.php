@@ -176,6 +176,68 @@ class VenueReservationServiceTest extends TestCase
         $this->assertSame(0, DB::table('finance_journals')->count());
     }
 
+    public function test_manager_cross_hall_transfer_uses_exclusive_target_claim_and_denies_unassigned_hall(): void
+    {
+        [$company, , $source, $people, $customer] = $this->fixture();
+        $target = Hall::create(['company_id' => $company->id,
+            'name' => 'Second permitted hall', 'slug' => 'second-permitted',
+            'capacity' => 180]);
+        $unassigned = Hall::create(['company_id' => $company->id,
+            'name' => 'Unassigned hall', 'slug' => 'unassigned-transfer',
+            'capacity' => 200]);
+        $rules = static fn (string $start, string $end): array => [
+            'start' => $start, 'end' => $end, 'setupMinutes' => 10,
+            'cleaningMinutes' => 10, 'graceMinutes' => 10,
+            'overtimeIntervalMinutes' => 30, 'overtimeRateMinor' => 0,
+            'rentalRateMinor' => 500000,
+        ];
+        foreach ([$target, $unassigned] as $hall) {
+            app(HallProgramRulesService::class)->configure(
+                $people['owner'], $company->id, $hall->id, [
+                    'morning' => $rules('08:00', '11:00'),
+                    'noon' => $rules('12:00', '15:00'),
+                    'evening' => $rules('17:00', '22:00'),
+                ], 'PKR', 0, 'Synthetic destination hall rules'
+            );
+        }
+        $managerMembership = CompanyMembership::query()->where('company_id', $company->id)
+            ->where('user_id', $people['manager']->id)->firstOrFail();
+        HallAssignment::create([
+            'company_id' => $company->id, 'hall_id' => $target->id,
+            'membership_id' => $managerMembership->id,
+        ]);
+        $draft = $this->review($company, $source, $people['owner'], $customer);
+        $this->be($people['manager']);
+        $reservation = $this->confirm($people['manager'], $company, $draft);
+        $service = app(VenueReservationService::class);
+        try {
+            $service->reschedule($people['manager'], $company->id, $reservation['id'],
+                '2027-04-11', 'noon', (string) Str::uuid(), 1,
+                'Attempt to move into a hall not assigned to this manager', $unassigned->id);
+            $this->fail('Unassigned hall transfer was allowed.');
+        } catch (AuthorizationException) {
+            $this->assertSame(1, DB::table('hall_slot_claims')->count());
+        }
+
+        $moved = $service->reschedule($people['manager'], $company->id, $reservation['id'],
+            '2027-04-11', 'noon', (string) Str::uuid(), 1,
+            'Manager arranged an authorized alternative hall and program', $target->id);
+        $this->assertSame($target->id, $moved['hallId']);
+        $this->assertSame(2, $moved['revision']);
+        $this->assertSame($target->id, DB::table('hall_slot_claims')
+            ->where('status', 'confirmed')->value('hall_id'));
+        $sourceDay = app(HallOccupancyCalendarService::class)->forHall(
+            $people['manager'], $company->id, $source->id, '2027-04-08', '2027-04-08'
+        );
+        $targetDay = app(HallOccupancyCalendarService::class)->forHall(
+            $people['manager'], $company->id, $target->id, '2027-04-11', '2027-04-11'
+        );
+        $this->assertSame('available', $sourceDay['days'][0]['programs']['evening']['status']);
+        $this->assertSame('confirmed', $targetDay['days'][0]['programs']['noon']['status']);
+        $this->assertSame(2, DB::table('venue_reservation_events')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
     public function test_own_active_hold_converts_to_confirmation_and_other_staff_hold_blocks(): void
     {
         [$company, , $hall, $people, $customer] = $this->fixture();
@@ -226,6 +288,48 @@ class VenueReservationServiceTest extends TestCase
         }
         $this->assertSame(0, DB::table('venue_reservations')->count());
         $this->assertSame(0, DB::table('hall_slot_claims')->count());
+    }
+
+    public function test_owner_looks_up_two_customer_reservations_including_cancelled_event(): void
+    {
+        [$company, $foreign, $hall, $people, $customer] = $this->fixture();
+        $firstDraft = $this->review($company, $hall, $people['owner'], $customer);
+        $secondDraft = $this->review($company, $hall, $people['owner'], $customer,
+            '2027-04-09', 'noon');
+        $service = app(VenueReservationService::class);
+        $first = $this->confirm($people['owner'], $company, $firstDraft);
+        $second = $this->confirm($people['owner'], $company, $secondDraft);
+        $service->cancel($people['owner'], $company->id, $first['id'], 1,
+            'Historical customer cancellation retained');
+        $ownerPanel = Livewire::test(VenueReservations::class)
+            ->assertSee('Customer booking history')
+            ->call('showCustomerHistory', $customer)
+            ->assertSee('Customer booking history (internal reference only)')
+            ->assertSee($first['id'])->assertSee($second['id'])
+            ->assertSee('Cancelled')
+            ->assertDontSee('hidden-reservation@example.test');
+        $this->assertSame($customer, $ownerPanel->get('selectedCustomerId'));
+        $this->assertCount(2, $ownerPanel->get('customerReservations'));
+        $ownerPanel->call('clearCustomerHistory')
+            ->assertSet('selectedCustomerId', '')
+            ->assertSet('customerReservations', []);
+        $this->expectException(AuthorizationException::class);
+        $service->customerHistory($people['owner'], $foreign->id, $customer);
+    }
+
+    public function test_manager_cannot_open_owner_customer_history(): void
+    {
+        [$company, , $hall, $people, $customer] = $this->fixture();
+        $draft = $this->review($company, $hall, $people['owner'], $customer);
+        $this->confirm($people['owner'], $company, $draft);
+        $this->be($people['manager']);
+        Livewire::test(VenueReservations::class)
+            ->assertDontSee('Customer booking history');
+        Livewire::test(VenueReservations::class)
+            ->call('showCustomerHistory', $customer)->assertForbidden();
+        $this->expectException(AuthorizationException::class);
+        app(VenueReservationService::class)->customerHistory(
+            $people['manager'], $company->id, $customer);
     }
 
     public function test_append_only_reservation_history_rejects_mutation(): void
