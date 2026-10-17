@@ -10,6 +10,7 @@ use App\Services\VenueReservationService;
 use App\Services\HallSlotHoldService;
 use App\Services\CustomerProfileService;
 use App\Services\BookingDraftService;
+use App\Services\HallOccupancyCalendarService;
 use App\Services\VenueQuoteService;
 use App\Services\VenueQuoteIssueService;
 use App\Services\VenueInvoiceService;
@@ -107,6 +108,8 @@ final class VenueReservations extends Page
     #[Locked]
     public string $claimRequestKey = '';
 
+    /** Exact pre-existing company customer UUID, never a contact search. */
+    public string $intakeExistingCustomerId = '';
     public string $intakeName = '';
     public string $intakeEmail = '';
     public string $intakePhone = '';
@@ -127,6 +130,7 @@ final class VenueReservations extends Page
 
     private function resetStaffIntake(): void
     {
+        $this->intakeExistingCustomerId = '';
         $this->intakeName = '';
         $this->intakeEmail = '';
         $this->intakePhone = '';
@@ -321,11 +325,33 @@ final class VenueReservations extends Page
     }
 
     /** Staff creates encrypted contact and draft atomically; review is owner-only. */
+    /** Read-only availability glance, never a promise to reserve availability. */
+    public function intakeAvailability(): ?string
+    {
+        $actor = $this->authorizeLoaded();
+        if ($this->intakeHallId === '' || $this->intakeDate === '') {
+            return null;
+        }
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $this->intakeDate);
+        if (! $date || $date->format('Y-m-d') !== $this->intakeDate
+            || ! in_array($this->intakeProgram, ['morning', 'noon', 'evening'], true)) {
+            return null;
+        }
+        abort_unless(array_key_exists($this->intakeHallId, $this->hallOptions()), 403);
+        $projection = app(HallOccupancyCalendarService::class)->forHall(
+            $actor, $this->companyId, $this->intakeHallId,
+            $this->intakeDate, $this->intakeDate
+        );
+        return $projection['days'][0]['programs'][$this->intakeProgram]['status'];
+    }
+
     public function createStaffDraft(): void
     {
         $actor = $this->authorizeLoaded();
         $this->validate([
-            'intakeName' => ['required', 'string', 'min:2', 'max:120'],
+            'intakeExistingCustomerId' => ['nullable', 'uuid'],
+            'intakeName' => [\Illuminate\Validation\Rule::requiredIf(
+                $this->intakeExistingCustomerId === ''), 'nullable', 'string', 'min:2', 'max:120'],
             'intakeEmail' => ['nullable', 'email', 'max:254'],
             'intakePhone' => ['nullable', 'string', 'max:32'],
             'intakeHallId' => ['required', 'uuid'],
@@ -335,18 +361,30 @@ final class VenueReservations extends Page
             'intakeReason' => ['required', 'string', 'min:3', 'max:500'],
         ]);
         abort_unless(array_key_exists($this->intakeHallId, $this->hallOptions()), 403);
+        $customerId = $this->intakeExistingCustomerId !== ''
+            ? $this->intakeExistingCustomerId : $this->intakeCustomerKey;
+        if ($this->intakeExistingCustomerId !== '') {
+            // Staff can link a known opaque customer ID, never enumerate or
+            // decrypt another customer's personal information.
+            abort_unless(DB::table('customer_profiles')->where('company_id', $this->companyId)
+                ->where('id', $customerId)->where('is_active', true)->exists(), 403);
+            abort_unless($this->intakeName === '' && $this->intakeEmail === ''
+                && $this->intakePhone === '', 422);
+        }
         try {
-            DB::transaction(function () use ($actor): void {
-                app(CustomerProfileService::class)->create(
-                    $actor, $this->companyId, $this->intakeCustomerKey,
-                    $this->intakeName,
-                    $this->intakeEmail !== '' ? $this->intakeEmail : null,
-                    $this->intakePhone !== '' ? $this->intakePhone : null,
-                    $this->intakeReason, $this->intakeHallId
-                );
+            DB::transaction(function () use ($actor, $customerId): void {
+                if ($this->intakeExistingCustomerId === '') {
+                    app(CustomerProfileService::class)->create(
+                        $actor, $this->companyId, $customerId,
+                        $this->intakeName,
+                        $this->intakeEmail !== '' ? $this->intakeEmail : null,
+                        $this->intakePhone !== '' ? $this->intakePhone : null,
+                        $this->intakeReason, $this->intakeHallId
+                    );
+                }
                 app(BookingDraftService::class)->create(
                     $actor, $this->companyId, $this->intakeDraftKey,
-                    $this->intakeHallId, $this->intakeCustomerKey,
+                    $this->intakeHallId, $customerId,
                     $this->intakeDate, $this->intakeProgram,
                     (int) $this->intakeGuests, $this->intakeReason
                 );

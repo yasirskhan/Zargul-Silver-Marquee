@@ -100,6 +100,76 @@ class VenueReservationServiceTest extends TestCase
         );
     }
 
+    public function test_staff_intake_availability_glance_tracks_hold_without_creating_booking(): void
+    {
+        [$company, , $hall, $people] = $this->fixture();
+        $this->be($people['manager']);
+        $panel = Livewire::test(VenueReservations::class)
+            ->set('intakeHallId', $hall->id)
+            ->set('intakeDate', '2027-09-12')
+            ->set('intakeProgram', 'evening')
+            ->assertSee('Selected hall session availability: available');
+        $this->assertSame('available', $panel->instance()->intakeAvailability());
+        $id = (string) Str::uuid();
+        app(HallSlotHoldService::class)->placeHold(
+            $people['manager'], $company->id, $hall->id,
+            '2027-09-12', 'evening', $id, 20,
+            'Synthetic manager private availability check'
+        );
+        $panel->call('intakeAvailability')->assertSee('Selected hall session availability: hold');
+        $this->assertSame('hold', $panel->instance()->intakeAvailability());
+        app(HallSlotHoldService::class)->releaseOwnHold(
+            $people['manager'], $company->id, $hall->id, $id,
+            'Synthetic private hold released after venue check'
+        );
+        $panel->call('intakeAvailability')->assertSee('Selected hall session availability: available');
+        $this->assertSame(0, DB::table('venue_reservations')->count());
+        $this->assertSame(0, DB::table('booking_drafts')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+        $panel->set('intakeHallId', (string) Str::uuid())->assertForbidden();
+    }
+
+    public function test_assigned_staff_reuses_authorized_customer_id_without_decrypting_or_duplicating(): void
+    {
+        [$company, $foreign, $hall, $people, $customer] = $this->fixture();
+        $this->be($people['manager']);
+        $before = DB::table('customer_profiles')->where('company_id', $company->id)->count();
+        $panel = Livewire::test(VenueReservations::class)
+            ->set('intakeExistingCustomerId', $customer)
+            ->set('intakeHallId', $hall->id)
+            ->set('intakeDate', '2027-08-20')
+            ->set('intakeProgram', 'morning')
+            ->set('intakeGuests', '95')
+            ->set('intakeReason', 'Manager links approved existing customer reference')
+            ->call('createStaffDraft')->assertHasNoErrors()
+            ->assertSet('intakeExistingCustomerId', '')
+            ->assertDontSee('hidden-reservation@example.test');
+        $draft = $panel->get('lastIntakeDraftId');
+        $this->assertSame($customer, DB::table('booking_drafts')->where('id', $draft)->value('customer_id'));
+        $this->assertSame($before, DB::table('customer_profiles')->where('company_id', $company->id)->count());
+        $this->assertSame('draft', DB::table('booking_drafts')->where('id', $draft)->value('status'));
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
+    public function test_staff_cannot_attach_nonexistent_or_other_company_customer_to_booking_request(): void
+    {
+        [$company, , $hall, $people] = $this->fixture();
+        $this->be($people['reception']);
+        $forged = (string) Str::uuid();
+        Livewire::test(VenueReservations::class)
+            ->set('intakeExistingCustomerId', $forged)
+            ->set('intakeHallId', $hall->id)
+            ->set('intakeDate', '2027-08-21')
+            ->set('intakeProgram', 'evening')
+            ->set('intakeGuests', '75')
+            ->set('intakeReason', 'Reject forged customer linkage')
+            ->call('createStaffDraft')->assertForbidden();
+        $this->assertSame(0, DB::table('booking_drafts')->count());
+        $this->assertSame(0, DB::table('venue_reservations')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
     public function test_assigned_manager_intake_then_owner_review_then_confirmed_booking(): void
     {
         [$company, , $hall, $people] = $this->fixture();

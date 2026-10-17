@@ -19,23 +19,31 @@
         @if ($loadedCompanyId === $companyId)
             <section class="space-y-3 rounded-xl border p-4" aria-label="Assigned staff customer and booking request intake">
                 <h2 class="text-lg font-semibold">New customer and booking request</h2>
-                <p class="text-xs">Owner, manager and reception with assigned hall access can create a draft. An owner must review it before confirmation. No payment or hall claim is created.</p>
+                <p class="text-xs">Owner, manager and reception with assigned hall access can create a draft for a new customer or a known existing customer ID. Leave all new-contact fields blank when reusing a customer. Customer details are never shown here. An owner must review it before confirmation; no payment or hall claim is created.</p>
                 <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <label class="space-y-1"><span>Known existing customer ID (optional)</span>
+                        <input wire:model="intakeExistingCustomerId" maxlength="36" autocomplete="off"
+                            class="w-full rounded-lg border p-3 text-gray-900">
+                    </label>
                     <label class="space-y-1"><span>Customer name</span><input wire:model="intakeName" maxlength="120" autocomplete="off" class="w-full rounded-lg border p-3 text-gray-900"></label>
                     <label class="space-y-1"><span>Customer email (optional)</span><input type="email" wire:model="intakeEmail" maxlength="254" autocomplete="off" class="w-full rounded-lg border p-3 text-gray-900"></label>
                     <label class="space-y-1"><span>Customer phone (optional)</span><input wire:model="intakePhone" maxlength="32" autocomplete="off" class="w-full rounded-lg border p-3 text-gray-900"></label>
-                    <label class="space-y-1"><span>Hall</span><select wire:model="intakeHallId" class="w-full rounded-lg border p-3 text-gray-900">
+                    <label class="space-y-1"><span>Hall</span><select wire:model.live="intakeHallId" class="w-full rounded-lg border p-3 text-gray-900">
                         <option value="">Select assigned hall</option>
                         @foreach ($this->hallOptions() as $id => $name)<option value="{{ $id }}">{{ $name }}</option>@endforeach
                     </select></label>
-                    <label class="space-y-1"><span>Event date</span><input type="date" wire:model="intakeDate" class="w-full rounded-lg border p-3 text-gray-900"></label>
-                    <label class="space-y-1"><span>Event program</span><select wire:model="intakeProgram" class="w-full rounded-lg border p-3 text-gray-900">
+                    <label class="space-y-1"><span>Event date</span><input type="date" wire:model.live="intakeDate" class="w-full rounded-lg border p-3 text-gray-900"></label>
+                    <label class="space-y-1"><span>Event program</span><select wire:model.live="intakeProgram" class="w-full rounded-lg border p-3 text-gray-900">
                         <option value="morning">Morning</option><option value="noon">Noon</option><option value="evening">Evening</option>
                     </select></label>
                     <label class="space-y-1"><span>Guest count for new booking</span><input type="number" min="1" wire:model="intakeGuests" class="w-full rounded-lg border p-3 text-gray-900"></label>
                 </div>
+                @if (($availability = $this->intakeAvailability()) !== null)
+                    <p role="status" class="text-sm">Selected hall session availability: {{ str_replace('_', ' ', $availability) }}.
+                        This is a read-only snapshot. Only an exclusive confirmed hall claim reserves the program.</p>
+                @endif
                 <label class="block space-y-1"><span>Internal reason (exclude customer personal details)</span><textarea wire:model="intakeReason" maxlength="500" rows="2" class="w-full rounded-lg border p-3 text-gray-900"></textarea></label>
-                @foreach (['intakeName','intakeEmail','intakePhone','intakeHallId','intakeDate','intakeProgram','intakeGuests','intakeReason'] as $field)
+                @foreach (['intakeExistingCustomerId','intakeName','intakeEmail','intakePhone','intakeHallId','intakeDate','intakeProgram','intakeGuests','intakeReason'] as $field)
                     @error($field) <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
                 @endforeach
                 <button type="button" wire:click="createStaffDraft" wire:loading.attr="disabled" class="rounded-lg border px-4 py-2 font-semibold">Save customer and request owner review</button>
