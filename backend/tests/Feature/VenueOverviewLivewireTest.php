@@ -89,6 +89,29 @@ class VenueOverviewLivewireTest extends TestCase
             ->set('companyId', $other->id)->assertForbidden();
     }
 
+    public function test_existing_overview_session_loses_company_wide_counts_after_role_downgrade(): void
+    {
+        [$company, , , $people] = $this->fixture();
+        $actor = $people['owner'];
+        $component = Livewire::test(VenueOverview::class)
+            ->assertSet('summary.role', 'owner')
+            ->assertSet('summary.drafts', 0)
+            ->assertSee('Review booking proposals')
+            ->assertSee('Finance review · internal only');
+
+        CompanyMembership::query()->where('company_id', $company->id)
+            ->where('user_id', $actor->id)->update(['role' => 'manager']);
+        // No new login or explicit "Refresh overview" should be required:
+        // hydration must re-evaluate the stored membership before rendering.
+        $component->call('companyOptions')
+            ->assertSet('summary.role', 'manager')
+            ->assertSet('summary.drafts', null)
+            ->assertSet('summary.canReviewFinance', false)
+            ->assertDontSee('Review booking proposals')
+            ->assertDontSee('Finance review · internal only');
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
     public function test_current_persisted_account_revocation_blocks_overview_even_with_cached_login(): void
     {
         [, , , $people] = $this->fixture();

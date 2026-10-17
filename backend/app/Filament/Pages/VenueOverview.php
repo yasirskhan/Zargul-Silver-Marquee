@@ -88,6 +88,10 @@ final class VenueOverview extends Page
     {
         abort_unless(static::canAccess() && $this->companyId !== null
             && array_key_exists($this->companyId, $this->companyOptions()), 403);
+        // The private summary is a snapshot, not an authorization grant.
+        // Refresh it after every Livewire round trip in case a former owner
+        // has just been downgraded, or their company/hall role changed.
+        $this->refreshSummary();
     }
 
     public function updatedCompanyId(): void
