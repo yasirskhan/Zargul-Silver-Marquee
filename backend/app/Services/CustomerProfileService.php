@@ -33,9 +33,11 @@ final class CustomerProfileService
         return DB::transaction(function () use (
             $actor, $companyId, $customerId, $name, $email, $phone, $reason
         ): array {
-            $this->authorize($actor, $companyId);
             $existing = DB::table('customer_profiles')->where('id', $customerId)
                 ->lockForUpdate()->first();
+            // A profile request can wait on an existing row lock. Never
+            // accept a retry or new ciphertext based on a stale membership.
+            $this->authorize($actor, $companyId);
             if ($existing) {
                 if ($existing->company_id === $companyId
                     && (int) $existing->created_by === (int) $actor->getKey()
@@ -99,9 +101,11 @@ final class CustomerProfileService
         return DB::transaction(function () use (
             $actor, $companyId, $customerId, $name, $email, $phone, $expectedRevision, $reason
         ): int {
-            $this->authorize($actor, $companyId);
             $saved = DB::table('customer_profiles')->where('company_id', $companyId)
                 ->where('id', $customerId)->where('is_active', true)->lockForUpdate()->first();
+            // Recheck privilege AFTER the row is locked. Otherwise an owner
+            // whose membership was revoked while waiting could update PII.
+            $this->authorize($actor, $companyId);
             if (! $saved) {
                 throw new AuthorizationException('Customer record not available.');
             }
@@ -130,6 +134,10 @@ final class CustomerProfileService
     {
         if (! Auth::check() || (int) Auth::id() !== (int) $actor->getKey()
             || ! $actor->hasVerifiedEmail()
+            // Auth may still hold an old hydrated User object after an account
+            // was disabled or its email verification was revoked in SQL.
+            || ! DB::table('users')->where('id', $actor->getKey())
+                ->where('is_active', true)->whereNotNull('email_verified_at')->exists()
             || ! $this->access->canManageCustomerProfiles($actor, $companyId)) {
             throw new AuthorizationException('You cannot manage customer contact records.');
         }
