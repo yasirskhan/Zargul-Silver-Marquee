@@ -147,6 +147,40 @@ class PublishedVenueRouteTest extends TestCase
         $this->assertTrue((bool) config('public_site.indexing_enabled'));
     }
 
+    public function test_secondary_page_and_media_cannot_be_indexed_if_home_is_offline(): void
+    {
+        [$company, $owner, $site, $home] = $this->fixture();
+        $this->publish($company, $owner, $site, $home);
+        $halls = (string) Str::uuid();
+        DB::table('site_pages')->insert([
+            'id' => $halls, 'company_id' => $company->id,
+            'website_id' => $site, 'slug' => '/halls',
+            'title' => 'Public hall overview',
+        ]);
+        $pages = app(SitePagePublishingService::class);
+        $pages->saveDraft($owner, $company->id, $halls,
+            ['sections' => []], 0, 'Prepare synthetic hall information');
+        $pages->publish($owner, $company->id, $halls, 1, 'Publish synthetic hall information');
+        $this->enable($company->id, $site);
+        config()->set('public_site.indexing_enabled', true);
+        $this->get('http://venue.example.test/halls')->assertOk()
+            ->assertHeader('X-Robots-Tag', 'index, follow')
+            ->assertSee('content="index, follow"', false);
+
+        $revision = DB::table('site_pages')->where('id', $home)->value('published_revision_id');
+        $pages->unpublish($owner, $company->id, $home, (string) Str::uuid(),
+            $revision, 'Take synthetic homepage offline');
+        $this->get('http://venue.example.test/halls')->assertOk()
+            ->assertHeader('X-Robots-Tag', 'noindex, nofollow')
+            ->assertSee('content="noindex, nofollow"', false);
+        $this->get('http://venue.example.test/robots.txt')->assertOk()->assertSee('Disallow: /');
+        $this->get('http://venue.example.test/sitemap.xml')->assertNotFound();
+        $pages->restorePublishedRevision($owner, $company->id, $home,
+            $revision, null, 'Restore synthetic homepage');
+        $this->get('http://venue.example.test/halls')->assertOk()
+            ->assertHeader('X-Robots-Tag', 'index, follow');
+    }
+
     public function test_robots_and_indexing_require_separate_opt_in_and_approved_home(): void
     {
         [$company, $owner, $site, $page] = $this->fixture();

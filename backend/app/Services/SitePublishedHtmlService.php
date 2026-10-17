@@ -10,13 +10,17 @@ final class SitePublishedHtmlService
 {
     public function __construct(private readonly SitePublishedSnapshotService $snapshots) {}
 
-    public function render(string $companyId, string $websiteId, string $pageSlug, ?string $canonicalUrl = null): ?string
+    public function render(
+        string $companyId, string $websiteId, string $pageSlug,
+        ?string $canonicalUrl = null, bool $canIndex = false,
+    ): ?string
     {
         $snapshot = $this->snapshots->project($companyId, $websiteId, $pageSlug);
 
         return $snapshot === null ? null : view('site.published-page', [
             'snapshot' => $snapshot,
             'canonicalUrl' => $canonicalUrl,
+            'canIndex' => $canIndex,
         ])->render();
     }
 }

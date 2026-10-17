@@ -51,7 +51,7 @@
             <meta property="og:image:type" content="image/webp">
             <meta property="og:image:alt" content="{{ $snapshot['media'][$branding['logoMediaId']]['alt'] }}">
         @endif
-        <meta name="robots" content="{{ config('public_site.indexing_enabled') === true ? 'index, follow' : 'noindex, nofollow' }}">
+        <meta name="robots" content="{{ $canIndex ? 'index, follow' : 'noindex, nofollow' }}">
     @else
         <meta name="robots" content="noindex, nofollow">
     @endif

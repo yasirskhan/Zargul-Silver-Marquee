@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\SitePublishedHtmlService;
+use App\Services\SitePublicCrawlPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -16,7 +17,11 @@ use JsonException;
  */
 final class PublishedVenuePageController
 {
-    public function __invoke(Request $request, SitePublishedHtmlService $renderer, PublicSiteRequestGate $gate, ?string $pageSlug = null): Response|JsonResponse
+    public function __invoke(
+        Request $request, SitePublishedHtmlService $renderer,
+        PublicSiteRequestGate $gate, SitePublicCrawlPolicy $crawl,
+        ?string $pageSlug = null,
+    ): Response|JsonResponse
     {
         if (config('public_site.enabled') !== true) {
             abort_if($pageSlug !== null, 404);
@@ -36,10 +41,11 @@ final class PublishedVenuePageController
         $companyId = $context['companyId'];
         $websiteId = $context['websiteId'];
 
+        $canIndex = $crawl->canIndex($companyId, $websiteId);
         try {
             $page = $pageSlug === null ? '/' : '/'.$pageSlug;
             $canonical = 'https://'.$host.$page;
-            $html = $renderer->render($companyId, $websiteId, $page, $canonical);
+            $html = $renderer->render($companyId, $websiteId, $page, $canonical, $canIndex);
         } catch (InvalidArgumentException | JsonException) {
             abort(503, 'The approved public website is unavailable.');
         }
@@ -48,8 +54,7 @@ final class PublishedVenuePageController
         return response($html, 200, [
             'Content-Type' => 'text/html; charset=UTF-8',
             'Cache-Control' => 'no-store, private',
-            'X-Robots-Tag' => config('public_site.indexing_enabled') === true
-                ? 'index, follow' : 'noindex, nofollow',
+            'X-Robots-Tag' => $canIndex ? 'index, follow' : 'noindex, nofollow',
             'X-Content-Type-Options' => 'nosniff',
             'Referrer-Policy' => 'no-referrer',
             'X-Frame-Options' => 'DENY',
