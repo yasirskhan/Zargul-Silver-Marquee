@@ -91,6 +91,24 @@ class SiteContentValidatorTest extends TestCase
         }
     }
 
+    public function test_optional_page_search_description_is_safe_and_legacy_compatible(): void
+    {
+        $validator = app(SiteContentValidator::class);
+        $legacy = $this->valid();
+        $validator->validate($legacy);
+        $withDescription = $legacy;
+        $withDescription['seoDescription'] = 'Elegant marquee events & celebrations';
+        $validator->validate($withDescription);
+        $withDescription['seoDescription'] = '';
+        $validator->validate($withDescription);
+        foreach (['<b>Bad</b>', 'javascript:alert(1)',
+            "Not\\nplain", str_repeat('d', 161), ['invalid']] as $unsafe) {
+            $bad = $legacy;
+            $bad['seoDescription'] = $unsafe;
+            $this->expectValidationFailure($bad);
+        }
+    }
+
     public function test_limits_sections_columns_and_nested_content(): void
     {
         $content = $this->valid();

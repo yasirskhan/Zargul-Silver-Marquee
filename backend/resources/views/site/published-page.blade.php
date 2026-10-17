@@ -24,7 +24,7 @@
             ? '/_venue-media/'.$mediaPageSlug.'/' : null;
     @endphp
     <title>{{ ($snapshot['page']['seoTitle'] ?? '') !== '' ? $snapshot['page']['seoTitle'] : $snapshot['page']['title'].' | '.$branding['siteName'] }}</title>
-    <meta name="description" content="{{ ($branding['seoDescription'] ?? '') !== '' ? $branding['seoDescription'] : ($branding['tagline'] !== '' ? $branding['tagline'] : $branding['siteName']) }}">
+    <meta name="description" content="{{ ($snapshot['page']['seoDescription'] ?? '') !== '' ? $snapshot['page']['seoDescription'] : (($branding['seoDescription'] ?? '') !== '' ? $branding['seoDescription'] : ($branding['tagline'] !== '' ? $branding['tagline'] : $branding['siteName'])) }}">
     {{-- Only a published, integrity-checked venue favicon may be exposed. --}}
     @if ($mediaBase !== null && $branding['faviconMediaId'] !== null
         && isset($snapshot['media'][$branding['faviconMediaId']]))

@@ -171,6 +171,33 @@ class SitePublishedHtmlTest extends TestCase
         $this->assertStringNotContainsString('rel="canonical"', $published);
     }
 
+    public function test_per_page_search_description_only_overrides_branding_after_explicit_publish(): void
+    {
+        [$company, $owner, $site, $page] = $this->fixture();
+        $this->brand($owner, $company->id, $site);
+        $pages = app(SitePagePublishingService::class);
+        $content = ['sections' => []];
+        $pages->saveDraft($owner, $company->id, $page, $content, 0, 'Publish legacy content');
+        $pages->publish($owner, $company->id, $page, 1, 'Approve legacy content');
+        $reader = app(SitePublishedHtmlService::class);
+        $legacy = $reader->render($company->id, $site, '/');
+        $this->assertStringContainsString('content="Events &amp; celebrations"', $legacy);
+        $content['seoDescription'] = 'Weddings & receptions at the marquee';
+        $pages->saveDraft($owner, $company->id, $page, $content, 1, 'Stage SEO summary override');
+        $this->assertSame($legacy, $reader->render($company->id, $site, '/'));
+        $pages->publish($owner, $company->id, $page, 2, 'Approve this page search description');
+        $published = $reader->render($company->id, $site, '/');
+        $this->assertStringContainsString('content="Weddings &amp; receptions at the marquee"', $published);
+        $this->assertStringNotContainsString('content="Events &amp; celebrations"', $published);
+        $this->assertStringContainsString('content="noindex, nofollow"', $published);
+        $content['seoDescription'] = '';
+        $pages->saveDraft($owner, $company->id, $page, $content, 2, 'Remove page search override');
+        $this->assertSame($published, $reader->render($company->id, $site, '/'));
+        $pages->publish($owner, $company->id, $page, 3, 'Restore venue-level fallback');
+        $this->assertStringContainsString('content="Events &amp; celebrations"',
+            $reader->render($company->id, $site, '/'));
+    }
+
     public function test_responsive_mobile_order_and_approved_image_placeholder_do_not_expose_raw_media(): void
     {
         [$company, $owner, $site, $page] = $this->fixture();

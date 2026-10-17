@@ -95,6 +95,7 @@ final class SitePublishedSnapshotService
                 'slug' => $page->slug,
                 'title' => $page->title,
                 'seoTitle' => $content['seoTitle'] ?? '',
+                'seoDescription' => $content['seoDescription'] ?? '',
                 'sections' => $content['sections'],
             ],
             'media' => $media,

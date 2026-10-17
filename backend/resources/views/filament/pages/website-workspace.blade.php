@@ -70,6 +70,13 @@
                 </label>
                 <p class="text-xs">Only saved and separately published page revisions change public metadata. Search indexing requires independent operator approval.</p>
                 @error('pageSeoTitle') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                <label class="block space-y-1">
+                    <span class="text-sm font-medium">Page search description override (optional)</span>
+                    <textarea wire:model="pageSeoDescription" maxlength="160" rows="2"
+                        class="w-full rounded border p-2 text-gray-900"
+                        placeholder="Leave blank to use published venue-wide search description"></textarea>
+                </label>
+                @error('pageSeoDescription') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
             </section>
 
             <section class="space-y-4 rounded-xl border p-4" aria-label="Website branding">

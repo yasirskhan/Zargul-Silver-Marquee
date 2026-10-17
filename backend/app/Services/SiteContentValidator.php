@@ -28,12 +28,18 @@ final class SiteContentValidator
     {
         // Optional page-level SEO title is versioned with its actual page
         // content. Legacy immutable revisions with sections only stay valid.
-        $this->keys($content, ['sections', 'seoTitle']);
+        $this->keys($content, ['sections', 'seoTitle', 'seoDescription']);
         if (array_key_exists('seoTitle', $content)) {
             $title = $content['seoTitle'];
             $this->require(is_string($title) && mb_strlen($title) <= 120
                 && ! preg_match('/[<>\\x00-\\x1F\\x7F]|javascript\\s*:|\\bon\\w+\\s*=/i', $title),
                 'Unsafe or overlong page search title');
+        }
+        if (array_key_exists('seoDescription', $content)) {
+            $description = $content['seoDescription'];
+            $this->require(is_string($description) && mb_strlen($description) <= 160
+                && ! preg_match('/[<>\\x00-\\x1F\\x7F]|javascript\\s*:|\\bon\\w+\\s*=/i', $description),
+                'Unsafe or overlong page search description');
         }
         $sections = $content['sections'] ?? null;
         $this->require(is_array($sections) && array_is_list($sections) && count($sections) <= 60, 'Invalid page sections');

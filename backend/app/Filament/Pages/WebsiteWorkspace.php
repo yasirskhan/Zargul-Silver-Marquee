@@ -44,6 +44,9 @@ final class WebsiteWorkspace extends Page
     /** Unsaved owner page-level search title, never public until approved. */
     public string $pageSeoTitle = '';
 
+    /** Page-level search summary, saved in immutable page revisions only. */
+    public string $pageSeoDescription = '';
+
     public string $previewMode = 'desktop';
 
     public string $reason = '';
@@ -215,6 +218,7 @@ final class WebsiteWorkspace extends Page
         $this->unpublishRequestKey = (string) Str::uuid();
         $this->sections = [];
         $this->pageSeoTitle = '';
+        $this->pageSeoDescription = '';
         $this->expectedRevision = 0;
         $this->loadedPublishedRevisionId = null;
         $this->loadedPageId = null;
@@ -245,6 +249,7 @@ final class WebsiteWorkspace extends Page
             $content = json_decode($revision->content, true, 512, JSON_THROW_ON_ERROR);
             $this->sections = $content['sections'];
             $this->pageSeoTitle = $content['seoTitle'] ?? '';
+            $this->pageSeoDescription = $content['seoDescription'] ?? '';
         }
 
         $this->loadedPageId = (string) $page->getKey();
@@ -726,11 +731,15 @@ final class WebsiteWorkspace extends Page
             'reason' => ['required', 'string', 'min:3', 'max:500'],
             'sections' => ['array', 'max:60'],
             'pageSeoTitle' => ['string', 'max:120'],
+            'pageSeoDescription' => ['string', 'max:160'],
         ]);
 
         $content = ['sections' => $this->sections];
         if ($this->pageSeoTitle !== '') {
             $content['seoTitle'] = $this->pageSeoTitle;
+        }
+        if ($this->pageSeoDescription !== '') {
+            $content['seoDescription'] = $this->pageSeoDescription;
         }
         $this->expectedRevision = app(SitePagePublishingService::class)->saveDraft(
             $actor, $page->company_id, $page->getKey(),
@@ -769,6 +778,11 @@ final class WebsiteWorkspace extends Page
         if (($saved['seoTitle'] ?? '') !== $this->pageSeoTitle) {
             throw ValidationException::withMessages([
                 'pageSeoTitle' => 'Save the current search title before publishing.',
+            ]);
+        }
+        if (($saved['seoDescription'] ?? '') !== $this->pageSeoDescription) {
+            throw ValidationException::withMessages([
+                'pageSeoDescription' => 'Save the current search description before publishing.',
             ]);
         }
 
