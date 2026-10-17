@@ -138,7 +138,11 @@ class SitePublishedWebpTest extends TestCase
         $http = $this->get($url)->assertOk()
             ->assertHeader('Content-Type', 'image/webp')
             ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('X-Robots-Tag', 'noindex, nofollow')
             ->assertHeader('ETag', $expected['etag']);
+        config()->set('public_site.indexing_enabled', true);
+        $this->get($url)->assertOk()->assertHeader('X-Robots-Tag', 'index, follow');
+        config()->set('public_site.indexing_enabled', false);
         $this->assertSame($expected['bytes'], $http->getContent());
         $this->get('http://venue.example.test/')->assertOk()
             ->assertHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; script-src 'none'; object-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'")

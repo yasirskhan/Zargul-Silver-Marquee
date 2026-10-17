@@ -29,6 +29,8 @@ final class PublishedVenueMediaController
             'Content-Length' => (string) $result['length'],
             'ETag' => $result['etag'],
             'Cache-Control' => 'no-store, private',
+            'X-Robots-Tag' => config('public_site.indexing_enabled') === true
+                ? 'index, follow' : 'noindex, nofollow',
             'X-Content-Type-Options' => 'nosniff',
             'X-Frame-Options' => 'DENY',
         ]);

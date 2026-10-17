@@ -63,7 +63,9 @@ class PublishedVenueRouteTest extends TestCase
     {
         $this->get('http://venue.example.test/')->assertOk()
             ->assertJsonPath('application', 'VenueDesk')
-            ->assertJsonPath('state', 'foundation');
+            ->assertJsonPath('state', 'foundation')
+            ->assertHeader('X-Robots-Tag', 'noindex, nofollow')
+            ->assertHeader('Cache-Control', 'no-store, private');
     }
 
     public function test_only_approved_host_and_both_published_revisions_can_serve_safe_html(): void
@@ -76,7 +78,8 @@ class PublishedVenueRouteTest extends TestCase
         $response = $this->get('http://venue.example.test/')->assertOk()
             ->assertHeader('X-Content-Type-Options', 'nosniff')
             ->assertHeader('X-Frame-Options', 'DENY')
-            ->assertHeader('Cache-Control', 'no-store, private');
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->assertHeader('X-Robots-Tag', 'noindex, nofollow');
         $response->assertSee('Approved Hall Opening');
         $response->assertSee('https://venue.example.test/');
         $response->assertSee('property="og:title" content="Approved venue home | Zargul Approved Site"', false)
@@ -154,11 +157,13 @@ class PublishedVenueRouteTest extends TestCase
         $this->get('http://venue.example.test/robots.txt')->assertOk()
             ->assertSee('Allow: /');
         $this->get('http://venue.example.test/')->assertOk()
+            ->assertHeader('X-Robots-Tag', 'index, follow')
             ->assertSee('content="index, follow"', false);
         config()->set('public_site.indexing_enabled', false);
         $this->get('http://venue.example.test/robots.txt')->assertOk()
             ->assertSee('Disallow: /');
         $this->get('http://venue.example.test/')->assertOk()
+            ->assertHeader('X-Robots-Tag', 'noindex, nofollow')
             ->assertSee('content="noindex, nofollow"', false);
         $this->get('http://wrong.example.test/robots.txt')->assertNotFound();
         config()->set('public_site.enabled', false);

@@ -24,6 +24,10 @@ final class PublishedVenuePageController
                 'application' => 'VenueDesk',
                 'state' => 'foundation',
                 'notice' => 'The customer website and booking APIs are not yet connected.',
+            ], 200, [
+                'Cache-Control' => 'no-store, private',
+                'X-Robots-Tag' => 'noindex, nofollow',
+                'X-Content-Type-Options' => 'nosniff',
             ]);
         }
 
@@ -44,6 +48,8 @@ final class PublishedVenuePageController
         return response($html, 200, [
             'Content-Type' => 'text/html; charset=UTF-8',
             'Cache-Control' => 'no-store, private',
+            'X-Robots-Tag' => config('public_site.indexing_enabled') === true
+                ? 'index, follow' : 'noindex, nofollow',
             'X-Content-Type-Options' => 'nosniff',
             'Referrer-Policy' => 'no-referrer',
             'X-Frame-Options' => 'DENY',
