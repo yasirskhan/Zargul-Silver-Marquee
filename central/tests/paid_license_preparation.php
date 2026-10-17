@@ -21,6 +21,8 @@ require dirname(__DIR__).'/src/PreparedSignedGrantValidator.php';
 require dirname(__DIR__).'/src/SignedGrantFinalization.php';
 require dirname(__DIR__).'/src/InstallationStatusService.php';
 require dirname(__DIR__).'/src/SignedGrantDeliveryService.php';
+require dirname(__DIR__).'/signing/Ed25519StatusReceiptCodec.php';
+require dirname(__DIR__).'/signing/ProtectedSignedStatusDelivery.php';
 require dirname(__DIR__).'/signing/Ed25519GrantCodec.php';
 
 function issueUuid(): string {
@@ -247,6 +249,31 @@ verifyIssue($again['signed_grant']===null,'up-to-date installation requires no d
 denyIssue(fn()=>$fetcher->fetch($signFetch($other,0)),'unauthorized_installation');
 putenv('CENTRAL_GRANT_DELIVERY_ENABLED=false');
 echo "PASS: protected signed grant readback enforces install signature, customer binding and up-to-date revision\n";
+$assembler=new \Hafzatech\Signing\ProtectedSignedStatusDelivery($fetcher);
+denyIssue(fn()=>$assembler->build($signFetch($customer,0),'test-key',
+    sodium_crypto_sign_secretkey($keypair)),'signed_delivery_not_enabled');
+putenv('CENTRAL_GRANT_DELIVERY_ENABLED=true');
+putenv('CENTRAL_SIGNED_DELIVERY_ENABLED=true');
+$protectedResponse=$assembler->build($signFetch($customer,0),'test-key',
+    sodium_crypto_sign_secretkey($keypair));
+$receipt=$protectedResponse['signed_receipt'];
+$receiptBytes=base64_decode(strtr($receipt['payload'],'-_','+/'),true);
+$receiptSignature=base64_decode(strtr($receipt['signature'],'-_','+/'),true);
+verifyIssue(sodium_crypto_sign_verify_detached($receiptSignature,
+    'HAFZATECH-INSTALL-STATUS-RECEIPT-V1'."\n".$receiptBytes,
+    sodium_crypto_sign_publickey($keypair)),
+    'KMS-style protected signer receipt authentic');
+$receiptClaim=json_decode($receiptBytes,true,16,JSON_THROW_ON_ERROR);
+verifyIssue($receiptClaim['nonce']===$protectedResponse['nonce'] &&
+    $receiptClaim['installation_id']===$installation &&
+    $receiptClaim['customer_id']===$customer &&
+    $receiptClaim['revision']===$protectedResponse['revision'] &&
+    $protectedResponse['signed_grant']===$envelope,
+    'paired receipt and signed grant bind exactly to authenticated installation');
+putenv('CENTRAL_SIGNED_DELIVERY_ENABLED=false');
+putenv('CENTRAL_GRANT_DELIVERY_ENABLED=false');
+echo "PASS: isolated signed receipt and grant response bound to fresh authenticated installation nonce\n";
+
 
 
 
