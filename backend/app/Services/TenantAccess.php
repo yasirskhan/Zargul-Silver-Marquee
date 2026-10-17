@@ -5,12 +5,18 @@ namespace App\Services;
 use App\Models\CompanyMembership;
 use App\Models\Hall;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 class TenantAccess
 {
     private function membership(User $user, string $companyId): ?CompanyMembership
     {
-        if (! $user->is_active) {
+        // A cached authenticated User can outlive an administrator's
+        // account revocation or email-verification reset in another process.
+        // Read current persisted account state for every hall/tenant policy.
+        if (! $user->is_active || ! $user->hasVerifiedEmail()
+            || ! DB::table('users')->where('id', $user->getKey())
+                ->where('is_active', true)->whereNotNull('email_verified_at')->exists()) {
             return null;
         }
 

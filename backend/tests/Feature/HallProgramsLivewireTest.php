@@ -10,6 +10,7 @@ use App\Models\HallAssignment;
 use App\Models\User;
 use App\Services\HallProgramRulesService;
 use Filament\Facades\Filament;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
@@ -83,6 +84,58 @@ class HallProgramsLivewireTest extends TestCase
         $this->assertFalse(HallPrograms::canAccess());
         Livewire::test(HallPrograms::class)->assertForbidden();
         $this->assertSame(0, DB::table('hall_program_rule_revisions')->count());
+    }
+
+    public function test_cached_owner_account_revocation_blocks_core_hall_rule_and_price_services(): void
+    {
+        [$company, $hall, $owner] = $this->fixture();
+        $access = app(\App\Services\TenantAccess::class);
+        $this->assertTrue($access->canConfigureHall($owner, $hall));
+
+        // Persist revocation without refreshing the logged-in Eloquent User.
+        DB::table('users')->where('id', $owner->id)->update(['is_active' => false]);
+        $this->assertTrue($owner->is_active);
+        $this->assertFalse($access->canConfigureHall($owner, $hall));
+        $actions = [
+            fn () => app(HallProgramRulesService::class)->configure(
+                $owner, $company->id, $hall->id, $this->schedule(),
+                'PKR', 0, 'Synthetic blocked program change'
+            ),
+            fn () => app(\App\Services\HallSeatingPriceService::class)->configure(
+                $owner, $company->id, $hall->id, [], 'PKR', 0,
+                'Synthetic blocked seating price change'
+            ),
+            fn () => app(\App\Services\HallAddonCatalogService::class)->configure(
+                $owner, $company->id, $hall->id, [], 'PKR', 0,
+                'Synthetic blocked catalog change'
+            ),
+        ];
+        foreach ($actions as $change) {
+            try {
+                $change();
+                $this->fail('Stale revoked owner changed an approved hall configuration.');
+            } catch (AuthorizationException) {
+                $this->assertTrue(true);
+            }
+        }
+        DB::table('users')->where('id', $owner->id)->update([
+            'is_active' => true, 'email_verified_at' => null,
+        ]);
+        $this->assertNotNull($owner->email_verified_at);
+        $this->assertFalse($access->canConfigureHall($owner, $hall));
+        try {
+            app(HallProgramRulesService::class)->configure(
+                $owner, $company->id, $hall->id, $this->schedule(),
+                'PKR', 0, 'Synthetic unverified cached owner'
+            );
+            $this->fail('Cached verification granted a pricing change.');
+        } catch (AuthorizationException) {
+            $this->assertTrue(true);
+        }
+        $this->assertSame(0, DB::table('hall_program_rule_revisions')->count());
+        $this->assertSame(0, DB::table('hall_seating_price_revisions')->count());
+        $this->assertSame(0, DB::table('hall_addon_catalog_revisions')->count());
+        $this->assertSame(0, DB::table('audit_events')->count());
     }
 
     public function test_owner_sees_responsive_program_form_and_saves_audited_three_program_revision(): void
