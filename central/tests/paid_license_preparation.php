@@ -8,6 +8,8 @@ use Hafzatech\Central\PaidInvoiceEligibility;
 use Hafzatech\Central\PaidLicensePreparation;
 use Hafzatech\Central\RegistrationError;
 use Hafzatech\Central\StaffRolePermissions;
+use Hafzatech\Central\PreparedSignedGrantValidator;
+use Hafzatech\Signing\Ed25519GrantCodec;
 
 require dirname(__DIR__).'/src/InstallationRegistry.php';
 require dirname(__DIR__).'/src/StaffRolePermissions.php';
@@ -15,6 +17,8 @@ require dirname(__DIR__).'/src/CentralStaffAccess.php';
 require dirname(__DIR__).'/src/PaidInvoiceEligibility.php';
 require dirname(__DIR__).'/src/LicenseTermCalendar.php';
 require dirname(__DIR__).'/src/PaidLicensePreparation.php';
+require dirname(__DIR__).'/src/PreparedSignedGrantValidator.php';
+require dirname(__DIR__).'/signing/Ed25519GrantCodec.php';
 
 function issueUuid(): string {
     $b=random_bytes(16);$b[6]=chr((ord($b[6])&15)|64);$b[8]=chr((ord($b[8])&63)|128);
@@ -115,3 +119,34 @@ verifyIssue((int)$db->query('SELECT count(*) FROM central_license_issuance_audit
 verifyIssue((int)$db->query("SELECT count(*) FROM central_paid_license_revisions WHERE state='signed'")->fetchColumn()===0,
     'no signer or fabricated paid entitlement');
 echo "PASS: central paid license preparation requires verified independent settlement and MFA, is idempotent and leaves grant unsigned\n";
+$keypair=sodium_crypto_sign_keypair();
+$keyPub=InstallationRegistry::base64Url(sodium_crypto_sign_publickey($keypair));
+$validator=new PreparedSignedGrantValidator($db,new PaidInvoiceEligibility($db),
+    new CentralStaffAccess($db),['test-key'=>$keyPub]);
+$grantClaim=[
+    'api_version'=>'v1','issuer'=>'HAFZATECH','product'=>'VenueDesk',
+    'license_id'=>$r['license_id'],'installation_id'=>$installation,
+    'customer_id'=>$customer,'revision'=>$r['revision'],'term_months'=>12,
+    'edition'=>'synthetic_paid_prep','approved_domains'=>['signed.example.test'],
+    'not_before'=>$r['from'],'expires_at'=>$r['expiry'],
+    'limits'=>['max_halls'=>2,'max_staff'=>10],'features'=>['booking'=>true],
+];
+$envelope=Ed25519GrantCodec::sign($grantClaim,'test-key',
+    sodium_crypto_sign_secretkey($keypair));
+$passed=$validator->validate($r['revision_id'],$officer,true,$envelope);
+verifyIssue($passed['license_id']===$r['license_id'] && $passed['revision']===1,
+    'protected public-key grant envelope matches exact independently paid revision');
+denyIssue(fn()=>$validator->validate($r['revision_id'],$officer,false,$envelope),'mfa_required');
+$wrong=$grantClaim;
+$wrong['approved_domains']=['foreign.example.test'];
+$foreign=Ed25519GrantCodec::sign($wrong,'test-key',sodium_crypto_sign_secretkey($keypair));
+denyIssue(fn()=>$validator->validate($r['revision_id'],$officer,true,$foreign),
+    'grant_does_not_match_paid_revision');
+$altered=$envelope;
+$altered['payload']=InstallationRegistry::base64Url('{"fake":true}');
+denyIssue(fn()=>$validator->validate($r['revision_id'],$officer,true,$altered),
+    'invalid_grant_signature');
+verifyIssue((int)$db->query("SELECT count(*) FROM central_paid_license_revisions WHERE state='signed'")->fetchColumn()===0,
+    'validation never signs or activates the grant');
+echo "PASS: central protected signed-grant pre-finalization verifies invoice settlement, role, exact plan/date/domain/ID and signature\n";
+
