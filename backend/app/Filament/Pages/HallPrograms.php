@@ -11,6 +11,7 @@ use App\Services\HallAddonCatalogService;
 use App\Services\HallSeatingPriceService;
 use App\Services\TenantAccess;
 use BackedEnum;
+use Illuminate\Support\Facades\DB;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -18,6 +19,7 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Url;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class HallPrograms extends Page
@@ -30,6 +32,7 @@ final class HallPrograms extends Page
 
     protected static ?string $slug = 'hall-programs';
 
+    #[Url(as: 'company')]
     public ?string $companyId = null;
 
     public ?string $hallId = null;
@@ -77,11 +80,18 @@ final class HallPrograms extends Page
 
     private const PROGRAMS = ['morning', 'noon', 'evening'];
 
+    private static function currentAccountAllowed(User $actor): bool
+    {
+        // A valid cached login is not enough after an account is suspended.
+        return DB::table('users')->where('id', $actor->getKey())
+            ->where('is_active', true)->whereNotNull('email_verified_at')->exists();
+    }
+
     public static function canAccess(): bool
     {
         $actor = Filament::auth()->user();
 
-        return $actor instanceof User && $actor->is_active && $actor->hasVerifiedEmail()
+        return $actor instanceof User && self::currentAccountAllowed($actor)
             && static::availableCompaniesFor($actor) !== [];
     }
 
@@ -91,7 +101,7 @@ final class HallPrograms extends Page
      */
     private static function availableCompaniesFor(User $actor): array
     {
-        if (! $actor->is_active || ! $actor->hasVerifiedEmail()) {
+        if (! self::currentAccountAllowed($actor)) {
             return [];
         }
 
@@ -116,14 +126,19 @@ final class HallPrograms extends Page
     public function mount(): void
     {
         abort_unless(static::canAccess(), 403);
-        $this->companyId = array_key_first($this->companyOptions());
+        $options = $this->companyOptions();
+        $requested = $this->companyId ?? request()->query('company');
+        abort_unless($requested === null || (is_string($requested)
+            && array_key_exists($requested, $options)), 403);
+        $this->companyId = $requested ?? array_key_first($options);
         $this->hallId = array_key_first($this->hallOptions());
         $this->reloadRules();
     }
 
     public function hydrate(): void
     {
-        abort_unless(static::canAccess(), 403);
+        abort_unless(static::canAccess() && $this->companyId !== null
+            && array_key_exists($this->companyId, $this->companyOptions()), 403);
     }
 
     public function companyOptions(): array
@@ -155,6 +170,8 @@ final class HallPrograms extends Page
 
     public function updatedCompanyId(): void
     {
+        abort_unless($this->companyId !== null
+            && array_key_exists($this->companyId, $this->companyOptions()), 403);
         $this->hallId = array_key_first($this->hallOptions());
         $this->reloadRules();
     }

@@ -50,6 +50,41 @@ class HallProgramsLivewireTest extends TestCase
         ];
     }
 
+    public function test_hall_programs_company_navigation_uses_authorized_venue_and_revocation_closes_cached_login(): void
+    {
+        [$first, $firstHall, $owner] = $this->fixture();
+        $second = Company::create(['name' => 'Another owned hall', 'slug' => 'hall-ui-owned-second']);
+        $secondHall = Hall::create(['company_id' => $second->id,
+            'name' => 'Second configured hall', 'slug' => 'second-hall', 'capacity' => 180]);
+        CompanyMembership::create(['company_id' => $second->id,
+            'user_id' => $owner->id, 'role' => 'owner']);
+
+        $panel = Livewire::test(HallPrograms::class)
+            ->assertSet('companyId', $first->id)
+            ->set('companyId', $second->id)
+            ->assertSet('companyId', $second->id)
+            ->assertSet('hallId', $secondHall->id)
+            ->assertSee('Second configured hall');
+        $this->assertSame($second->id, $panel->get('loadedCompanyId'));
+        $this->assertNotSame($firstHall->id, $panel->get('loadedHallId'));
+
+        $private = Company::create(['name' => 'Unowned hall company', 'slug' => 'hall-ui-unowned']);
+        Livewire::test(HallPrograms::class)
+            ->set('companyId', $private->id)->assertForbidden();
+
+        // A different process may revoke the saved account while this PHP
+        // authenticated User object remains verified in the browser session.
+        DB::table('users')->where('id', $owner->id)->update(['is_active' => false]);
+        $this->assertTrue($owner->is_active);
+        $this->assertFalse(HallPrograms::canAccess());
+        Livewire::test(HallPrograms::class)->assertForbidden();
+        DB::table('users')->where('id', $owner->id)
+            ->update(['is_active' => true, 'email_verified_at' => null]);
+        $this->assertFalse(HallPrograms::canAccess());
+        Livewire::test(HallPrograms::class)->assertForbidden();
+        $this->assertSame(0, DB::table('hall_program_rule_revisions')->count());
+    }
+
     public function test_owner_sees_responsive_program_form_and_saves_audited_three_program_revision(): void
     {
         [$company, $hall] = $this->fixture();

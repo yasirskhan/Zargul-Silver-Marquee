@@ -96,7 +96,7 @@
                     @endif
                     @if ($summary['canManageHallRules'])
                         <a class="rounded-xl border p-4 underline"
-                            href="{{ \App\Filament\Pages\HallPrograms::getUrl() }}">
+                            href="{{ \App\Filament\Pages\HallPrograms::getUrl(['company' => $companyId]) }}">
                             Hall program rules
                         </a>
                     @endif
