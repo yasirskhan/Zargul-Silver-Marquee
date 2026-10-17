@@ -141,7 +141,7 @@ class FinanceDeskLivewireTest extends TestCase
         $this->assertSame(0, DB::table('finance_quote_previews')->count());
         $this->assertSame(0, DB::table('finance_journals')->count());
         $this->assertSame(0, DB::table('finance_cash_closeouts')->count());
-        $this->assertSame(0, DB::table('finance_journal_entries')->count());
+        $this->assertSame(0, DB::table('finance_journal_lines')->count());
     }
 
     public function test_finance_livewire_keys_are_stable_until_success_and_then_rotated(): void
