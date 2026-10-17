@@ -28,7 +28,7 @@ final class BookingDraftService
         string $customerId, string $eventDate, string $program,
         int $guests, string $reason,
     ): array {
-        $this->authorize($actor, $companyId);
+        $this->authorizeCreate($actor, $companyId, $hallId);
         $this->validate($bookingId, $customerId, $eventDate, $program, $guests);
         $reason = $this->reason($reason);
 
@@ -36,7 +36,7 @@ final class BookingDraftService
             $actor, $companyId, $bookingId, $hallId, $customerId,
             $eventDate, $program, $guests, $reason
         ): array {
-            $this->authorize($actor, $companyId);
+            $this->authorizeCreate($actor, $companyId, $hallId);
             $this->validateAssociations($actor, $companyId, $hallId, $customerId, $guests);
             $existing = DB::table('booking_drafts')->where('id', $bookingId)->lockForUpdate()->first();
             if ($existing) {
@@ -137,6 +137,19 @@ final class BookingDraftService
         ];
     }
 
+    private function authorizeCreate(User $actor, string $companyId, string $hallId): void
+    {
+        $hall = Hall::query()->where('company_id', $companyId)
+            ->where('id', $hallId)->where('is_active', true)->first();
+        if (! $hall || ! Auth::check() || (int) Auth::id() !== (int) $actor->getKey()
+            || ! $actor->hasVerifiedEmail()
+            || ! DB::table('users')->where('id', $actor->getKey())
+                ->where('is_active', true)->whereNotNull('email_verified_at')->exists()
+            || ! $this->access->canManageBookings($actor, $hall)) {
+            throw new AuthorizationException('Current assigned hall access is required to create booking drafts.');
+        }
+    }
+
     private function authorize(User $actor, string $companyId): void
     {
         if (! Auth::check() || (int) Auth::id() !== (int) $actor->getKey()
@@ -163,7 +176,7 @@ final class BookingDraftService
     ): void {
         $hall = Hall::query()->where('company_id', $companyId)->where('id', $hallId)
             ->where('is_active', true)->first();
-        if (! $hall || ! $this->access->canConfigureHall($actor, $hall)) {
+        if (! $hall || ! $this->access->canManageBookings($actor, $hall)) {
             throw new AuthorizationException('Booking draft hall is not accessible.');
         }
         if ((int) $hall->program_rules_revision < 1) {

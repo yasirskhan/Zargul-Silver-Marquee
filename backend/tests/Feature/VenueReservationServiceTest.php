@@ -100,6 +100,59 @@ class VenueReservationServiceTest extends TestCase
         );
     }
 
+    public function test_assigned_manager_intake_then_owner_review_then_confirmed_booking(): void
+    {
+        [$company, , $hall, $people] = $this->fixture();
+        $this->be($people['manager']);
+        $panel = Livewire::test(VenueReservations::class)
+            ->set('intakeName', 'Private Assisted Booking')
+            ->set('intakeEmail', 'assisted-private@example.test')
+            ->set('intakeHallId', $hall->id)
+            ->set('intakeDate', '2027-08-15')
+            ->set('intakeProgram', 'noon')
+            ->set('intakeGuests', '120')
+            ->set('intakeReason', 'Manager recorded a verified private customer request')
+            ->call('createStaffDraft')->assertHasNoErrors()
+            ->assertSet('intakeName', '')
+            ->assertSet('intakeEmail', '')
+            ->assertDontSee('assisted-private@example.test');
+        $draft = $panel->get('lastIntakeDraftId');
+        $this->assertTrue(Str::isUuid($draft));
+        $this->assertSame('draft', DB::table('booking_drafts')->where('id', $draft)->value('status'));
+        $this->assertSame(0, DB::table('venue_reservations')->count());
+        $this->be($people['owner']);
+        app(BookingDraftReviewService::class)->submit($people['owner'], $company->id,
+            $draft, 1, 'Owner reviewed synthetic staff-proposed date and hall');
+        $this->be($people['manager']);
+        Livewire::test(VenueReservations::class)
+            ->set('draftId', $draft)->set('reason', 'Manager confirms owner-reviewed booking')
+            ->call('confirmSelected')->assertHasNoErrors();
+        $this->assertSame(1, DB::table('venue_reservations')->where('source_draft_id', $draft)->count());
+        $this->assertSame(1, DB::table('hall_slot_claims')->where('status', 'confirmed')->count());
+        Livewire::test(HallCalendar::class)->set('anchorDate', '2027-08-15')
+            ->set('viewMode', 'day')->assertSet('projection.days.0.programs.noon.status', 'confirmed');
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
+    public function test_reception_invalid_capacity_rolls_back_new_customer_and_draft(): void
+    {
+        [$company, , $hall, $people] = $this->fixture();
+        $this->be($people['reception']);
+        $count = DB::table('customer_profiles')->where('company_id', $company->id)->count();
+        Livewire::test(VenueReservations::class)
+            ->set('intakeName', 'Bad Capacity Client')
+            ->set('intakeHallId', $hall->id)
+            ->set('intakeDate', '2027-08-17')
+            ->set('intakeProgram', 'evening')
+            ->set('intakeGuests', '99999')
+            ->set('intakeReason', 'Reject beyond permitted hall capacity')
+            ->call('createStaffDraft')->assertHasErrors(['intakeReason']);
+        $this->assertSame($count, DB::table('customer_profiles')->where('company_id', $company->id)->count());
+        $this->assertSame(0, DB::table('booking_drafts')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
     public function test_manager_panel_places_and_converts_own_hold_to_exclusive_confirmation(): void
     {
         [$company, , $hall, $people, $customer] = $this->fixture();

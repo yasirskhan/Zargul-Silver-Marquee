@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Models\Hall;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
@@ -22,8 +23,9 @@ final class CustomerProfileService
     public function create(
         User $actor, string $companyId, string $customerId,
         string $name, ?string $email, ?string $phone, string $reason,
+        ?string $assignedBookingHallId = null,
     ): array {
-        $this->authorize($actor, $companyId);
+        $this->authorizeCreate($actor, $companyId, $assignedBookingHallId);
         if (! Str::isUuid($customerId)) {
             throw new InvalidArgumentException('Customer request ID must be a UUID.');
         }
@@ -31,13 +33,14 @@ final class CustomerProfileService
         $reason = $this->reason($reason);
 
         return DB::transaction(function () use (
-            $actor, $companyId, $customerId, $name, $email, $phone, $reason
+            $actor, $companyId, $customerId, $name, $email, $phone, $reason,
+            $assignedBookingHallId
         ): array {
             $existing = DB::table('customer_profiles')->where('id', $customerId)
                 ->lockForUpdate()->first();
             // A profile request can wait on an existing row lock. Never
             // accept a retry or new ciphertext based on a stale membership.
-            $this->authorize($actor, $companyId);
+            $this->authorizeCreate($actor, $companyId, $assignedBookingHallId);
             if ($existing) {
                 if ($existing->company_id === $companyId
                     && (int) $existing->created_by === (int) $actor->getKey()
@@ -128,6 +131,23 @@ final class CustomerProfileService
 
             return $next;
         }, 3);
+    }
+
+    private function authorizeCreate(User $actor, string $companyId, ?string $hallId): void
+    {
+        if ($hallId === null) {
+            $this->authorize($actor, $companyId);
+            return;
+        }
+        $hall = Hall::query()->where('company_id', $companyId)
+            ->where('id', $hallId)->where('is_active', true)->first();
+        if (! $hall || ! Auth::check() || (int) Auth::id() !== (int) $actor->getKey()
+            || ! $actor->hasVerifiedEmail()
+            || ! DB::table('users')->where('id', $actor->getKey())
+                ->where('is_active', true)->whereNotNull('email_verified_at')->exists()
+            || ! $this->access->canManageBookings($actor, $hall)) {
+            throw new AuthorizationException('Current assigned-hall staff access is required to create booking contacts.');
+        }
     }
 
     private function authorize(User $actor, string $companyId): void

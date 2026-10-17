@@ -8,6 +8,8 @@ use App\Models\User;
 use App\Services\TenantAccess;
 use App\Services\VenueReservationService;
 use App\Services\HallSlotHoldService;
+use App\Services\CustomerProfileService;
+use App\Services\BookingDraftService;
 use App\Services\VenueQuoteService;
 use App\Services\VenueQuoteIssueService;
 use App\Services\VenueInvoiceService;
@@ -104,6 +106,39 @@ final class VenueReservations extends Page
 
     #[Locked]
     public string $claimRequestKey = '';
+
+    public string $intakeName = '';
+    public string $intakeEmail = '';
+    public string $intakePhone = '';
+    public string $intakeHallId = '';
+    public string $intakeDate = '';
+    public string $intakeProgram = 'evening';
+    public string $intakeGuests = '';
+    public string $intakeReason = '';
+
+    #[Locked]
+    public string $intakeCustomerKey = '';
+
+    #[Locked]
+    public string $intakeDraftKey = '';
+
+    #[Locked]
+    public string $lastIntakeDraftId = '';
+
+    private function resetStaffIntake(): void
+    {
+        $this->intakeName = '';
+        $this->intakeEmail = '';
+        $this->intakePhone = '';
+        $this->intakeHallId = '';
+        $this->intakeDate = '';
+        $this->intakeProgram = 'evening';
+        $this->intakeGuests = '';
+        $this->intakeReason = '';
+        $this->lastIntakeDraftId = '';
+        $this->intakeCustomerKey = (string) Str::uuid();
+        $this->intakeDraftKey = (string) Str::uuid();
+    }
 
     public string $holdDuration = '20';
 
@@ -239,6 +274,7 @@ final class VenueReservations extends Page
             && array_key_exists($requested, $companies)), 403);
         $this->companyId = $requested ?? array_key_first($companies);
         $this->newKeys();
+        $this->resetStaffIntake();
         $this->refresh();
         if ($this->draftId !== '') {
             abort_unless(Str::isUuid($this->draftId)
@@ -259,6 +295,7 @@ final class VenueReservations extends Page
     public function updatedCompanyId(): void
     {
         $this->authorizeCompany();
+        $this->resetStaffIntake();
         $this->draftId = '';
         $this->currentHold = null;
         $this->holdDuration = '20';
@@ -281,6 +318,46 @@ final class VenueReservations extends Page
         $this->reservations = app(VenueReservationService::class)
             ->list($actor, $this->companyId, 30);
         $this->loadedCompanyId = $this->companyId;
+    }
+
+    /** Staff creates encrypted contact and draft atomically; review is owner-only. */
+    public function createStaffDraft(): void
+    {
+        $actor = $this->authorizeLoaded();
+        $this->validate([
+            'intakeName' => ['required', 'string', 'min:2', 'max:120'],
+            'intakeEmail' => ['nullable', 'email', 'max:254'],
+            'intakePhone' => ['nullable', 'string', 'max:32'],
+            'intakeHallId' => ['required', 'uuid'],
+            'intakeDate' => ['required', 'date_format:Y-m-d'],
+            'intakeProgram' => ['required', 'in:morning,noon,evening'],
+            'intakeGuests' => ['required', 'integer', 'min:1', 'max:200000'],
+            'intakeReason' => ['required', 'string', 'min:3', 'max:500'],
+        ]);
+        abort_unless(array_key_exists($this->intakeHallId, $this->hallOptions()), 403);
+        try {
+            DB::transaction(function () use ($actor): void {
+                app(CustomerProfileService::class)->create(
+                    $actor, $this->companyId, $this->intakeCustomerKey,
+                    $this->intakeName,
+                    $this->intakeEmail !== '' ? $this->intakeEmail : null,
+                    $this->intakePhone !== '' ? $this->intakePhone : null,
+                    $this->intakeReason, $this->intakeHallId
+                );
+                app(BookingDraftService::class)->create(
+                    $actor, $this->companyId, $this->intakeDraftKey,
+                    $this->intakeHallId, $this->intakeCustomerKey,
+                    $this->intakeDate, $this->intakeProgram,
+                    (int) $this->intakeGuests, $this->intakeReason
+                );
+            }, 3);
+        } catch (ConflictHttpException | InvalidArgumentException $e) {
+            throw ValidationException::withMessages(['intakeReason' => $e->getMessage()]);
+        }
+        $created = $this->intakeDraftKey;
+        $this->resetStaffIntake();
+        $this->lastIntakeDraftId = $created;
+        $this->refresh();
     }
 
     public function showCustomerHistory(string $customerId): void

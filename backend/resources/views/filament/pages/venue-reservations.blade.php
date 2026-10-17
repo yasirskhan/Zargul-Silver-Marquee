@@ -17,6 +17,32 @@
             </p>
         @endif
         @if ($loadedCompanyId === $companyId)
+            <section class="space-y-3 rounded-xl border p-4" aria-label="Assigned staff customer and booking request intake">
+                <h2 class="text-lg font-semibold">New customer and booking request</h2>
+                <p class="text-xs">Owner, manager and reception with assigned hall access can create a draft. An owner must review it before confirmation. No payment or hall claim is created.</p>
+                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <label class="space-y-1"><span>Customer name</span><input wire:model="intakeName" maxlength="120" autocomplete="off" class="w-full rounded-lg border p-3 text-gray-900"></label>
+                    <label class="space-y-1"><span>Customer email (optional)</span><input type="email" wire:model="intakeEmail" maxlength="254" autocomplete="off" class="w-full rounded-lg border p-3 text-gray-900"></label>
+                    <label class="space-y-1"><span>Customer phone (optional)</span><input wire:model="intakePhone" maxlength="32" autocomplete="off" class="w-full rounded-lg border p-3 text-gray-900"></label>
+                    <label class="space-y-1"><span>Hall</span><select wire:model="intakeHallId" class="w-full rounded-lg border p-3 text-gray-900">
+                        <option value="">Select assigned hall</option>
+                        @foreach ($this->hallOptions() as $id => $name)<option value="{{ $id }}">{{ $name }}</option>@endforeach
+                    </select></label>
+                    <label class="space-y-1"><span>Event date</span><input type="date" wire:model="intakeDate" class="w-full rounded-lg border p-3 text-gray-900"></label>
+                    <label class="space-y-1"><span>Event program</span><select wire:model="intakeProgram" class="w-full rounded-lg border p-3 text-gray-900">
+                        <option value="morning">Morning</option><option value="noon">Noon</option><option value="evening">Evening</option>
+                    </select></label>
+                    <label class="space-y-1"><span>Guest count for new booking</span><input type="number" min="1" wire:model="intakeGuests" class="w-full rounded-lg border p-3 text-gray-900"></label>
+                </div>
+                <label class="block space-y-1"><span>Internal reason (exclude customer personal details)</span><textarea wire:model="intakeReason" maxlength="500" rows="2" class="w-full rounded-lg border p-3 text-gray-900"></textarea></label>
+                @foreach (['intakeName','intakeEmail','intakePhone','intakeHallId','intakeDate','intakeProgram','intakeGuests','intakeReason'] as $field)
+                    @error($field) <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                @endforeach
+                <button type="button" wire:click="createStaffDraft" wire:loading.attr="disabled" class="rounded-lg border px-4 py-2 font-semibold">Save customer and request owner review</button>
+                @if ($lastIntakeDraftId !== '')
+                    <p role="status" class="break-all text-xs">Unconfirmed proposal: {{ $lastIntakeDraftId }}. Owner review required.</p>
+                @endif
+            </section>
             <section class="space-y-3 rounded-xl border p-4" aria-label="Confirm reviewed internal proposal">
                 <h2 class="text-lg font-semibold">Confirm reviewed hall reservation</h2>
                 <p class="text-xs">Only under-review proposals for halls currently assigned to you appear here.
