@@ -177,6 +177,62 @@ class ApprovalCenterLivewireTest extends TestCase
         $this->assertSame(1, DB::table('approval_requests')->count());
     }
 
+
+    public function test_owner_expense_does_not_follow_operator_into_manager_company(): void
+    {
+        [$company, , $members] = $this->fixture();
+        $managed = Company::create(['name' => 'Manager operated venue', 'slug' => 'approval-switch-manager']);
+        CompanyMembership::create([
+            'company_id' => $managed->id, 'user_id' => $members['owner'][0]->id,
+            'role' => 'manager',
+        ]);
+        $component = Livewire::test(ApprovalCenter::class)
+            ->assertSet('companyId', $company->id)
+            ->set('newCategory', 'expense')
+            ->set('newAmount', '900')
+            ->set('newCurrency', 'USD')
+            ->set('newBookingId', (string) \\Illuminate\\Support\\Str::uuid())
+            ->set('newReason', 'Unsent Company A expense')
+            ->set('grantCategories', ['expense']);
+        $oldRequestKey = $component->get('newRequestKey');
+
+        $component->set('companyId', $managed->id)
+            ->assertSet('newCategory', 'discount')
+            ->assertSet('newAmount', '')
+            ->assertSet('newCurrency', '')
+            ->assertSet('newBookingId', '')
+            ->assertSet('newReason', '')
+            ->assertSet('grantCategories', [])
+            ->assertSet('loadedCompanyId', $managed->id);
+        $this->assertNotSame($oldRequestKey, $component->get('newRequestKey'));
+        $this->assertNotContains('expense', $component->instance()->requestCategoryOptions());
+
+        // A modified Livewire payload cannot submit a company-wide expense as Manager.
+        $component->set('newCategory', 'expense')
+            ->set('newAmount', '500')->set('newCurrency', 'PKR')
+            ->set('newReason', 'Unauthorized manager expense')
+            ->call('submitRequest')->assertHasErrors(['newCategory']);
+        $this->assertSame(0, DB::table('approval_requests')->count());
+        $this->assertSame(0, DB::table('approval_decisions')->count());
+        $this->assertSame(0, DB::table('approval_delegations')->count());
+        $this->assertSame(0, DB::table('approval_alert_outbox')->count());
+    }
+
+    public function test_same_company_role_downgrade_rejects_stale_owner_expense_submission(): void
+    {
+        [$company, , $members] = $this->fixture();
+        $component = Livewire::test(ApprovalCenter::class)
+            ->set('newCategory', 'expense')
+            ->set('newAmount', '500')->set('newCurrency', 'PKR')
+            ->set('newReason', 'Previously eligible company expense');
+        $members['owner'][1]->update(['role' => 'manager']);
+        $component->call('submitRequest')->assertHasErrors(['newCategory']);
+        $this->assertNotContains('expense', $component->instance()->requestCategoryOptions());
+        $this->assertSame(0, DB::table('approval_requests')->where('company_id', $company->id)->count());
+        $this->assertSame(0, DB::table('approval_decisions')->count());
+        $this->assertSame(0, DB::table('approval_alert_outbox')->count());
+    }
+
     public function test_manager_request_form_excludes_company_wide_expense_category(): void
     {
         [, , $members] = $this->fixture();

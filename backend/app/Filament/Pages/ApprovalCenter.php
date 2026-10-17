@@ -11,6 +11,7 @@ use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
@@ -254,9 +255,11 @@ final class ApprovalCenter extends Page
     public function updatedCompanyId(): void
     {
         // Never carry an unsent request or grant between operating companies.
+        $this->newCategory = 'discount';
         $this->newBookingId = '';
         $this->newReason = '';
         $this->newAmount = '';
+        $this->newCurrency = '';
         $this->decisionReason = '';
         $this->grantAdminId = '';
         $this->grantCategories = [];
@@ -329,7 +332,7 @@ final class ApprovalCenter extends Page
     {
         $actor = $this->authorizeLoaded();
         $this->validate([
-            'newCategory' => ['required', 'in:discount,refund,overtime_waiver,complimentary_service,price_override,expense'],
+            'newCategory' => ['required', Rule::in($this->requestCategoryOptions())],
             'newAmount' => ['required', 'integer', 'min:1', 'max:100000000000'],
             'newCurrency' => ['required', 'regex:/^[A-Z]{3}$/'],
             'newReason' => ['required', 'string', 'min:3', 'max:500'],

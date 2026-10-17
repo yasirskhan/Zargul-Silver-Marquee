@@ -39,10 +39,11 @@
                             <option value="{{ $category }}">{{ str_replace('_', ' ', ucfirst($category)) }}</option>
                         @endforeach
                     </select>
+                    @error('newCategory') <span role="alert" class="text-sm text-red-600">{{ $message }}</span> @enderror
                 </label>
                 <label class="block space-y-1"><span class="text-sm">Linked internal proposal (required except for expense)</span>
                     <select wire:model="newBookingId" class="w-full rounded-lg border p-3 text-gray-900">
-                        <option value="">No proposal (expense only)</option>
+                        <option value="">{{ in_array('expense', $this->requestCategoryOptions(), true) ? 'No proposal (expense only)' : 'Select a proposal' }}</option>
                         @foreach ($this->proposalOptions() as $id => $label)
                             <option value="{{ $id }}">{{ $label }}</option>
                         @endforeach
