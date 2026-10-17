@@ -93,21 +93,21 @@ class HallProgramSetupNavigationTest extends TestCase
 
     public function test_successful_program_configuration_clears_filter_without_losing_hall(): void
     {
-        [$company, $ready, $needed] = $this->ownerAndHalls();
+        [$company, , $needed] = $this->ownerAndHalls();
         Livewire::withQueryParams(['company' => $company->id, 'setup' => 'needed'])
             ->test(HallPrograms::class)
-            ->assertSet('hallId', $ready->id)
+            ->assertSet('hallId', $needed->id)
             ->set('rules', $this->rules())
             ->set('currencyCode', 'PKR')
             ->set('reason', 'Owner completed missing hall rules')
             ->call('saveRules')
             ->assertHasNoErrors()
             ->assertSet('setupFilter', '')
-            ->assertSet('hallId', $ready->id)
+            ->assertSet('hallId', $needed->id)
             ->assertSet('expectedRevision', 1);
 
         $this->assertSame(1, (int) DB::table('halls')
-            ->where('id', $ready->id)->value('program_rules_revision'));
+            ->where('id', $needed->id)->value('program_rules_revision'));
         $this->assertSame(0, DB::table('hall_slot_claims')->count());
         $this->assertSame(0, DB::table('finance_journals')->count());
     }
