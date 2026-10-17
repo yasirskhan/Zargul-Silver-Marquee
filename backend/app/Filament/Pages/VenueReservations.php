@@ -7,6 +7,7 @@ use App\Models\Hall;
 use App\Models\User;
 use App\Services\TenantAccess;
 use App\Services\VenueReservationService;
+use App\Services\HallSlotHoldService;
 use App\Services\VenueQuoteService;
 use App\Services\VenueQuoteIssueService;
 use App\Services\VenueInvoiceService;
@@ -103,6 +104,11 @@ final class VenueReservations extends Page
 
     #[Locked]
     public string $claimRequestKey = '';
+
+    public string $holdDuration = '20';
+
+    #[Locked]
+    public ?array $currentHold = null;
 
     public string $reason = '';
     public string $newDate = '';
@@ -254,6 +260,8 @@ final class VenueReservations extends Page
     {
         $this->authorizeCompany();
         $this->draftId = '';
+        $this->currentHold = null;
+        $this->holdDuration = '20';
         $this->selectedReservationId = null;
         $this->selectedRevision = 0;
         $this->selectedCustomerId = '';
@@ -509,9 +517,72 @@ final class VenueReservations extends Page
         );
     }
 
+    /** Reserve a temporary company-scoped slot for a reviewed proposal. */
+    public function holdSelected(): void
+    {
+        $actor = $this->authorizeLoaded();
+        abort_unless($this->enabled(), 403);
+        $this->validate([
+            'draftId' => ['required', 'uuid'],
+            'holdDuration' => ['required', 'integer', 'min:1', 'max:120'],
+            'reason' => ['required', 'string', 'min:3', 'max:500'],
+        ]);
+        abort_unless(array_key_exists($this->draftId, $this->proposalOptions()), 403);
+        if ($this->currentHold !== null
+            && $this->currentHold['proposalId'] !== $this->draftId) {
+            throw ValidationException::withMessages([
+                'draftId' => 'Release your existing temporary hold before selecting another proposal.',
+            ]);
+        }
+        $draft = DB::table('booking_drafts')->where('company_id', $this->companyId)
+            ->where('id', $this->draftId)->where('status', 'under_review')->first();
+        abort_unless($draft !== null, 403);
+        try {
+            $saved = app(HallSlotHoldService::class)->placeHold(
+                $actor, $this->companyId, $draft->hall_id,
+                $draft->event_date, $draft->program, $this->claimRequestKey,
+                (int) $this->holdDuration, $this->reason
+            );
+            $this->currentHold = array_merge($saved, [
+                'proposalId' => $draft->id, 'hallId' => $draft->hall_id,
+            ]);
+        } catch (ConflictHttpException | InvalidArgumentException $e) {
+            throw ValidationException::withMessages(['reason' => $e->getMessage()]);
+        }
+        $this->reason = '';
+    }
+
+    /** Only the staff member who created the temporary hold can release it. */
+    public function releaseSelectedHold(): void
+    {
+        $actor = $this->authorizeLoaded();
+        abort_unless($this->enabled() && $this->currentHold !== null, 403);
+        abort_unless($this->currentHold['claimId'] === $this->claimRequestKey
+            && Str::isUuid($this->currentHold['hallId'])
+            && Str::isUuid($this->currentHold['proposalId']), 403);
+        $this->validate(['reason' => ['required', 'string', 'min:3', 'max:500']]);
+        // The proposal may have been withdrawn while a timed hold remained.
+        // Hold ownership and exact hall are stored in LOCKED Livewire state;
+        // release against the hold itself, not mutable proposal status.
+        try {
+            app(HallSlotHoldService::class)->releaseOwnHold(
+                $actor, $this->companyId, $this->currentHold['hallId'],
+                $this->claimRequestKey, $this->reason
+            );
+        } catch (ConflictHttpException | InvalidArgumentException $e) {
+            throw ValidationException::withMessages(['reason' => $e->getMessage()]);
+        }
+        $this->reason = '';
+        $this->currentHold = null;
+        $this->claimRequestKey = (string) Str::uuid();
+        $this->refresh();
+    }
+
     public function confirmSelected(): void
     {
         $actor = $this->authorizeLoaded();
+        abort_unless($this->currentHold === null
+            || $this->currentHold['proposalId'] === $this->draftId, 403);
         abort_unless($this->enabled(), 403);
         $this->validate(['draftId' => ['required', 'uuid'],
             'reason' => ['required', 'string', 'min:3', 'max:500']]);
@@ -529,6 +600,7 @@ final class VenueReservations extends Page
             throw ValidationException::withMessages(['reason' => $e->getMessage()]);
         }
         $this->draftId = '';
+        $this->currentHold = null;
         $this->reason = '';
         $this->newKeys();
         $this->refresh();

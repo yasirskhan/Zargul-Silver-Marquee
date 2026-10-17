@@ -100,6 +100,92 @@ class VenueReservationServiceTest extends TestCase
         );
     }
 
+    public function test_manager_panel_places_and_converts_own_hold_to_exclusive_confirmation(): void
+    {
+        [$company, , $hall, $people, $customer] = $this->fixture();
+        $draft = $this->review($company, $hall, $people['owner'], $customer);
+        $this->be($people['manager']);
+        $page = Livewire::test(VenueReservations::class)
+            ->set('draftId', $draft)
+            ->set('holdDuration', '15')
+            ->set('reason', 'Owner approved temporary hall hold')
+            ->call('holdSelected')->assertHasNoErrors()
+            ->assertSee('Own temporary hold expires')
+            ->assertSee('Release my hold');
+        $id = $page->get('claimRequestKey');
+        $this->assertSame('hold', DB::table('hall_slot_claims')->where('id', $id)->value('status'));
+        $this->assertSame(0, DB::table('venue_reservations')->count());
+        Livewire::test(HallCalendar::class)
+            ->set('anchorDate', '2027-04-08')->set('viewMode', 'day')
+            ->assertSet('projection.days.0.programs.evening.status', 'hold');
+        $page->set('reason', 'Convert authorized held program to reservation')
+            ->call('confirmSelected')->assertHasNoErrors()
+            ->assertSet('currentHold', null);
+        $this->assertSame('confirmed', DB::table('hall_slot_claims')->where('id', $id)->value('status'));
+        $this->assertSame(1, DB::table('venue_reservations')->count());
+        $this->assertSame(2, DB::table('hall_slot_claim_events')->where('claim_id', $id)->count());
+    }
+
+    public function test_temporary_hold_release_and_foreign_staff_refusal_preserve_audit(): void
+    {
+        [$company, , $hall, $people, $customer] = $this->fixture();
+        $draft = $this->review($company, $hall, $people['owner'], $customer);
+        $this->be($people['manager']);
+        $page = Livewire::test(VenueReservations::class)
+            ->set('draftId', $draft)
+            ->set('reason', 'Manager places brief staff hold')
+            ->call('holdSelected')->assertHasNoErrors();
+        $id = $page->get('claimRequestKey');
+        $this->be($people['reception']);
+        $this->expectException(AuthorizationException::class);
+        app(HallSlotHoldService::class)->releaseOwnHold($people['reception'],
+            $company->id, $hall->id, $id, 'Cannot release another operator hold');
+    }
+
+    public function test_manager_can_release_own_hold_after_owner_withdraws_proposal(): void
+    {
+        [$company, , $hall, $people, $customer] = $this->fixture();
+        $draft = $this->review($company, $hall, $people['owner'], $customer);
+        $this->be($people['manager']);
+        $panel = Livewire::test(VenueReservations::class)
+            ->set('draftId', $draft)
+            ->set('reason', 'Manager holds proposed event while deciding')
+            ->call('holdSelected')->assertHasNoErrors();
+        $claim = $panel->get('claimRequestKey');
+        $this->be($people['owner']);
+        app(BookingDraftReviewService::class)->withdraw(
+            $people['owner'], $company->id, $draft, 2,
+            'Customer requested cancellation before confirmation');
+        $this->be($people['manager']);
+        $panel->set('reason', 'Release obsolete hold after proposal withdrawal')
+            ->call('releaseSelectedHold')->assertHasNoErrors()
+            ->assertSet('currentHold', null);
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(2, DB::table('hall_slot_claim_events')
+            ->where('claim_id', $claim)->count());
+        $this->assertSame(0, DB::table('venue_reservations')->count());
+    }
+
+    public function test_temporary_hold_release_exposes_calendar_availability_again(): void
+    {
+        [$company, , $hall, $people, $customer] = $this->fixture();
+        $draft = $this->review($company, $hall, $people['owner'], $customer);
+        $this->be($people['manager']);
+        $page = Livewire::test(VenueReservations::class)
+            ->set('draftId', $draft)
+            ->set('reason', 'Private pending customer scheduling')
+            ->call('holdSelected')->assertHasNoErrors();
+        $page->set('reason', 'Client postponed private hold')
+            ->call('releaseSelectedHold')->assertHasNoErrors()
+            ->assertSet('currentHold', null);
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(2, DB::table('hall_slot_claim_events')->count());
+        Livewire::test(HallCalendar::class)
+            ->set('anchorDate', '2027-04-08')->set('viewMode', 'day')
+            ->assertSet('projection.days.0.programs.evening.status', 'available');
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
     public function test_manager_confirms_reviewed_reservation_and_calendar_shows_exclusive_slot(): void
     {
         [$company, , $hall, $people, $customer] = $this->fixture();

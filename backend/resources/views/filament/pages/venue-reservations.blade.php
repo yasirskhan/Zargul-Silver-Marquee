@@ -36,6 +36,24 @@
                 </label>
                 @error('draftId') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
                 @error('reason') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                <div class="flex flex-wrap items-center gap-3">
+                    <label class="space-y-1 text-sm"><span>Hold minutes (1–120)</span>
+                        <input type="number" min="1" max="120" wire:model="holdDuration"
+                            class="w-28 rounded-lg border p-2 text-gray-900">
+                    </label>
+                    <button type="button" wire:click="holdSelected" wire:loading.attr="disabled"
+                        @disabled(! $this->enabled())
+                        class="rounded-lg border px-4 py-2 font-semibold disabled:opacity-50">
+                        Temporarily hold reviewed hall slot
+                    </button>
+                    @if ($currentHold !== null)
+                        <p role="status" class="text-sm">Own temporary hold expires {{ $currentHold['expiresAt'] }}.
+                            This is not a confirmed reservation.</p>
+                        <button type="button" wire:click="releaseSelectedHold"
+                            class="rounded-lg border px-3 py-2">Release my hold</button>
+                    @endif
+                </div>
+                @error('holdDuration') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
                 <button type="button" wire:click="confirmSelected" wire:loading.attr="disabled" @disabled(! $this->enabled())
                     class="rounded-lg border px-4 py-2 font-semibold disabled:opacity-50">
                     Confirm hall/date/program reservation
