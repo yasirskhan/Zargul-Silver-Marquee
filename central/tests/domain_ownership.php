@@ -26,7 +26,7 @@ $db->prepare("INSERT INTO vendor_customers(id,legal_name) VALUES(:id,'DNS proof 
 $db->prepare("INSERT INTO installation_enrollments
     (id,customer_id,token_sha256,approved_domain,expires_at)
     VALUES(:id,:customer,:token,'approved.example.test',now()+interval '1 hour')")
-    ->execute(['id'=>$enrollment,'customer'=>$customer,'token'=>hash('sha256',$secretEnrollment)]);
+    ->execute(['id'=>$enrollment,'customer'=>$customer,'token'=>hash('sha256',InstallationRegistry::base64Url($secretEnrollment))]);
 $db->prepare("INSERT INTO central_installation_domain_proofs
     (enrollment_id,proof_sha256,expires_at)
     VALUES(:id,:hash,now()+interval '1 hour')")
