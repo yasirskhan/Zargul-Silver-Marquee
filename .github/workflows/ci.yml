@@ -85,6 +85,8 @@ jobs:
         run: |
           find app bootstrap database routes tests public -name '*.php' -print0 | xargs -0 -n1 php -l
           php -l artisan
+      - name: Compile all Blade templates before database tests
+        run: php artisan view:cache --no-interaction
       - name: Run PostgreSQL migrations
         env:
           DB_CONNECTION: pgsql
