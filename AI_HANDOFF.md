@@ -1,3 +1,8 @@
+## 2026-10-16 CMS-005/009 AUTHENTICATED OWNER MOBILE SEO TITLE PERSISTENCE ACCEPTANCE — EXACT SHA CI PENDING
+- Base b9be918e4d3e0882b0bea72662f6b383d059bdf3 published-only favicon batch (hosted CI 38989249753 in progress at preparation). Previous CSP image batch 1a3387d386475f278482da4a6e4b187d70729824 CI 38989191173 running (two frontend jobs passed at last inspection). Green baseline ab3aef9... run 38988732518 all four successful.
+- Extend real Filament owner 360px password+mandatory MFA browser journey: set a safe page-level search title; save draft revision, separately publish page, take it offline, restore published revision and reload current draft; assert intended saved title still visible through those authenticated actions. Synthetic data only, no real media/hostname, public deployment, indexing, PII, payments or bookings enabled.
+- CMS-009 and handoff revised same commit. Verify exact hosted SHA in all four jobs, fix genuine failure before calling verified; continue following CMS/WEB tasks.
+
 ## 2026-10-16 CMS-006 OWNER-APPROVED WEBP FAVICON PUBLIC RENDERING — EXACT SHA CI PENDING
 - Base 1a3387d386475f278482da4a6e4b187d70729824, public image CSP consistency commit, hosted CI 38989191173 was running at preparation (no green claim).
 - Published-page Blade now emits a same-origin WebP favicon link ONLY for published branding faviconMediaId in the integrity-checked current approved snapshot, and ONLY when the request is for operator-authorized public canonical rendering. Internal preview remains non-network placeholder with no favicon URL.
