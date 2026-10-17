@@ -105,11 +105,14 @@ class BookingProposalsLivewireTest extends TestCase
             ->assertSet('intakeEmail', '')
             ->assertDontSee('Private New Customer')
             ->assertDontSee('new-private@example.test');
-        $this->assertSame(1, DB::table('customer_profiles')->where('company_id', $company->id)->count());
+        $this->assertSame(2, DB::table('customer_profiles')->where('company_id', $company->id)->count());
         $this->assertSame(1, DB::table('booking_drafts')->where('company_id', $company->id)
             ->where('status', 'under_review')->count());
-        $saved = DB::table('customer_profiles')->first();
-        $this->assertNotSame('Private New Customer', $saved->name_ciphertext);
+        $newCustomerId = DB::table('booking_drafts')->where('company_id', $company->id)
+            ->where('status', 'under_review')->value('customer_id');
+        $saved = DB::table('customer_profiles')->where('id', $newCustomerId)->first();
+        $this->assertNotNull($saved);
+        $this->assertSame('Private New Customer', Crypt::decryptString($saved->name_ciphertext));
         $this->assertSame(2, DB::table('booking_draft_events')->count());
         $this->assertSame(0, DB::table('venue_reservations')->count());
         $this->assertSame(0, DB::table('hall_slot_claims')->count());
@@ -127,7 +130,7 @@ class BookingProposalsLivewireTest extends TestCase
             ->set('intakeGuests', '9999')
             ->set('intakeReason', 'Invalid capacity must rollback')
             ->call('createIntake')->assertHasErrors(['intakeReason']);
-        $this->assertSame(0, DB::table('customer_profiles')->where('company_id', $company->id)->count());
+        $this->assertSame(1, DB::table('customer_profiles')->where('company_id', $company->id)->count());
         $this->assertSame(0, DB::table('booking_drafts')->where('company_id', $company->id)->count());
         $this->assertSame(0, DB::table('customer_profile_events')->count());
         $this->assertSame(0, DB::table('hall_slot_claims')->count());
