@@ -86,7 +86,7 @@
                                         <div class="flex flex-wrap gap-2">
                                             <button type="button" wire:click="selectDraft('{{ $item['id'] }}')" class="rounded-lg border px-3 py-2 font-semibold">Review/edit</button>
                                             <a class="rounded-lg border px-3 py-2 underline"
-                                                href="{{ AppFilamentPagesApprovalCenter::getUrl(['company' => $companyId, 'booking' => $item['id']]) }}">
+                                                href="{{ \App\Filament\Pages\ApprovalCenter::getUrl(['company' => $companyId, 'booking' => $item['id']]) }}">
                                                 Linked approvals
                                             </a>
                                         </div>
