@@ -146,6 +146,12 @@ $altered=$envelope;
 $altered['payload']=InstallationRegistry::base64Url('{"fake":true}');
 denyIssue(fn()=>$validator->validate($r['revision_id'],$officer,true,$altered),
     'invalid_grant_signature');
+$db->prepare("UPDATE central_licenses SET current_revision=2 WHERE id=:id")
+    ->execute(['id'=>$r['license_id']]);
+denyIssue(fn()=>$validator->validate($r['revision_id'],$officer,true,$envelope),
+    'signed_grant_not_eligible');
+$db->prepare("UPDATE central_licenses SET current_revision=1 WHERE id=:id")
+    ->execute(['id'=>$r['license_id']]);
 verifyIssue((int)$db->query("SELECT count(*) FROM central_paid_license_revisions WHERE state='signed'")->fetchColumn()===0,
     'validation never signs or activates the grant');
 echo "PASS: central protected signed-grant pre-finalization verifies invoice settlement, role, exact plan/date/domain/ID and signature\n";

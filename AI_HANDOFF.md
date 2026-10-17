@@ -161,6 +161,11 @@
 - Previous `b1e2f54` atomic client signed grant/receipt coordinator had focused licensing/central/browser/owner acceptance tests passing, full backend CI completion to be checked.
 - Continue with properly protected signer-worker output finalization and customer-signed grant retrieval; preserve default OFF production gates.
 
+## CENTRAL SIGNED GRANT REVISION AND PLAN SAFETY — PENDING CI
+- Tightened `PreparedSignedGrantValidator`: central license must still point at the exact pending paid revision (prevents a stale prepared revision being signed after a newer revision is created). Verified plan snapshot requires bounded positive hall/staff limits and strictly boolean, valid module entitlement keys; no implicit approval of unknown feature values. Regression changes the current central revision to simulate stale grant and requires fail-closed. This remains a read-only pre-finalization validator, never a live sign or issuance operation.
+- Previous `60314f2` central-postgres, focused licensing, prototype and editor browser checks passed; full hosted six-job CI conclusion must still be confirmed. No private key or production billing provider credentials added; release defaults OFF.
+- Next: implement protected signer-worker sealed grant finalization and mutually authenticated retrieval after operator provisioned keys, then wire authorized owner Verify License and automatic 15-day check.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`

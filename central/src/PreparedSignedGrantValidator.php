@@ -36,7 +36,7 @@ final class PreparedSignedGrantValidator
             "SELECT r.id,r.license_id,r.revision,r.invoice_id,r.state,
                 r.term_months,r.begins_at,r.expires_at,r.plan_snapshot,
                 r.authorized_officer_id,
-                l.customer_id,l.installation_id,l.approved_domain,
+                l.customer_id,l.installation_id,l.approved_domain,l.current_revision,
                 i.status AS invoice_status,
                 p.plan_code
              FROM central_paid_license_revisions r
@@ -50,7 +50,8 @@ final class PreparedSignedGrantValidator
         );
         $stmt->execute(['revision'=>$revisionId]);
         $row=$stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$row || $row['state']!=='awaiting_isolated_signer' ||
+        if (!$row || (int)$row['current_revision'] !== (int)$row['revision'] ||
+            $row['state']!=='awaiting_isolated_signer' ||
             $row['invoice_status']!=='issued' ||
             $row['authorized_officer_id']!==$officerId ||
             !$this->access->permits($officerId,'license.issue_paid',$row['customer_id'],true) ||
@@ -72,8 +73,22 @@ final class PreparedSignedGrantValidator
         }
         $claim=json_decode($raw,true,16,JSON_THROW_ON_ERROR);
         $snapshot=json_decode($row['plan_snapshot'],true,16,JSON_THROW_ON_ERROR);
-        if (!is_array($claim)||array_is_list($claim)||!is_array($snapshot)) {
+        if (!is_array($claim)||array_is_list($claim)||!is_array($snapshot) ||
+            !is_int($snapshot['max_halls']??null) ||
+            $snapshot['max_halls'] < 1 || $snapshot['max_halls'] > 10000 ||
+            !is_int($snapshot['max_staff']??null) ||
+            $snapshot['max_staff'] < 1 || $snapshot['max_staff'] > 100000 ||
+            !is_array($snapshot['features']??null) ||
+            array_is_list($snapshot['features']) ||
+            count($snapshot['features']) > 150) {
             throw new RegistrationError('invalid_grant_claim');
+        }
+        foreach ($snapshot['features'] as $name=>$enabled) {
+            if (!is_string($name) ||
+                !preg_match('/^[a-z][a-z0-9_.-]{0,79}$/D',$name) ||
+                !is_bool($enabled)) {
+                throw new RegistrationError('invalid_plan_feature_snapshot');
+            }
         }
         $keys=array_keys($claim);sort($keys);
         if($keys!==['api_version','approved_domains','customer_id','edition',
