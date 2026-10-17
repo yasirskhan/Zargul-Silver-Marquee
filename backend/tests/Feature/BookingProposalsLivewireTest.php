@@ -123,6 +123,22 @@ class BookingProposalsLivewireTest extends TestCase
         $this->assertSame(0, DB::table('audit_events')->count());
     }
 
+    public function test_global_search_query_prefilters_the_authorized_company_proposal(): void
+    {
+        [$company, , $hall, , $owner, , $customer] = $this->fixture();
+        $first = $this->proposal($company->id, $hall->id, $customer, $owner->id, '2026-12-15');
+        $second = $this->proposal($company->id, $hall->id, $customer, $owner->id, '2026-12-16');
+        $component = Livewire::withQueryParams(['company' => $company->id, 'proposal' => $second])
+            ->test(BookingProposals::class)
+            ->assertSet('companyId', $company->id)
+            ->assertSet('referenceSearch', $second)
+            ->assertSee($second)
+            ->assertDontSee($first)
+            ->assertDontSee('private@example.test');
+        $this->assertCount(1, $component->get('entries'));
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+    }
+
     public function test_filters_and_pagination_do_not_mutate_proposal_records(): void
     {
         [$company, , $hall, , $owner, , $customer] = $this->fixture();
