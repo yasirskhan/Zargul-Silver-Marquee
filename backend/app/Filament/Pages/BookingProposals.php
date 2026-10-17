@@ -82,11 +82,19 @@ final class BookingProposals extends Page
 
     public string $editReason = '';
 
+    private static function currentAccountAllowed(User $actor): bool
+    {
+        // Do not trust old authenticated User flags after a persisted account
+        // suspension or email verification revocation.
+        return DB::table('users')->where('id', $actor->getKey())
+            ->where('is_active', true)->whereNotNull('email_verified_at')->exists();
+    }
+
     public static function canAccess(): bool
     {
         $actor = Filament::auth()->user();
 
-        return $actor instanceof User && $actor->is_active && $actor->hasVerifiedEmail()
+        return $actor instanceof User && self::currentAccountAllowed($actor)
             && static::visibleCompanies($actor) !== [];
     }
 
@@ -108,7 +116,7 @@ final class BookingProposals extends Page
     {
         $actor = Filament::auth()->user();
 
-        return $actor instanceof User && $actor->is_active && $actor->hasVerifiedEmail()
+        return $actor instanceof User && self::currentAccountAllowed($actor)
             ? static::visibleCompanies($actor) : [];
     }
 

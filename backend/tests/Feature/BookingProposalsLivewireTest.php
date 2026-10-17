@@ -95,6 +95,30 @@ class BookingProposalsLivewireTest extends TestCase
         $this->assertSame(0, DB::table('audit_events')->count());
     }
 
+
+    public function test_stale_owner_session_cannot_read_proposal_screen_after_account_revocation(): void
+    {
+        [$company, , $hall, , $owner, , $customer] = $this->fixture();
+        $this->proposal($company->id, $hall->id, $customer, $owner->id);
+        $this->assertTrue(BookingProposals::canAccess());
+
+        // Revoke persisted account without refreshing the authenticated model.
+        DB::table('users')->where('id', $owner->id)->update(['is_active' => false]);
+        $this->assertTrue($owner->is_active);
+        $this->assertFalse(BookingProposals::canAccess());
+        Livewire::test(BookingProposals::class)->assertForbidden();
+
+        DB::table('users')->where('id', $owner->id)
+            ->update(['is_active' => true, 'email_verified_at' => null]);
+        $this->assertNotNull($owner->email_verified_at);
+        $this->assertFalse(BookingProposals::canAccess());
+        Livewire::test(BookingProposals::class)->assertForbidden();
+
+        $this->assertSame(1, DB::table('booking_drafts')->count());
+        $this->assertSame(0, DB::table('booking_draft_events')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+    }
+
     public function test_reference_lookup_is_exact_company_scoped_and_never_returns_customer_contact(): void
     {
         [$company, $foreign, $hall, $foreignHall, $owner, , $customer, $otherCustomer] = $this->fixture();
