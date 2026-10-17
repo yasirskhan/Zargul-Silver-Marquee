@@ -10,6 +10,7 @@ use App\Services\VenueReservationService;
 use App\Services\VenueQuoteService;
 use App\Services\VenueQuoteIssueService;
 use App\Services\VenueInvoiceService;
+use App\Services\VenueInvoicePaymentService;
 use BackedEnum;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
@@ -52,6 +53,17 @@ final class VenueReservations extends Page
 
     #[Locked]
     public array $issuedInvoices = [];
+
+    #[Locked]
+    public array $paymentBalances = [];
+
+    #[Locked]
+    public string $paymentRequestKey = '';
+
+    public string $paymentAmountMinor = '';
+    public string $paymentMethod = 'cash';
+    public string $paymentReference = '';
+    public string $paymentReason = '';
 
     #[Locked]
     public string $invoiceRequestKey = '';
@@ -270,6 +282,12 @@ final class VenueReservations extends Page
         $this->quoteSnapshots = [];
         $this->quoteIssues = [];
         $this->issuedInvoices = [];
+        $this->paymentBalances = [];
+        $this->paymentAmountMinor = '';
+        $this->paymentMethod = 'cash';
+        $this->paymentReference = '';
+        $this->paymentReason = '';
+        $this->paymentRequestKey = (string) Str::uuid();
         $this->invoiceIssueReason = '';
         $this->invoiceRequestKey = (string) Str::uuid();
         $this->quoteIssuePurpose = '';
@@ -304,6 +322,52 @@ final class VenueReservations extends Page
             fn (array $item): bool => $item['enabled'] === true));
     }
 
+    public function paymentPostingEnabled(): bool
+    {
+        return config('payment_controls.enabled') === true
+            && config('finance_controls.posting_enabled') === true;
+    }
+
+    private function refreshPaymentBalances(User $actor): void
+    {
+        $this->paymentBalances = [];
+        foreach ($this->issuedInvoices as $invoice) {
+            $this->paymentBalances[$invoice['id']] =
+                app(VenueInvoicePaymentService::class)->history(
+                    $actor, $this->companyId, $invoice['id']);
+        }
+    }
+
+    /** Explicit authorized receipt/deposit; never simulate external settlement. */
+    public function recordInvoicePayment(string $invoiceId): void
+    {
+        $actor = $this->authorizeLoaded();
+        abort_unless($this->paymentPostingEnabled() && $this->mayViewCustomerHistory()
+            && $this->selectedReservationId !== null && Str::isUuid($invoiceId), 403);
+        abort_unless(collect($this->issuedInvoices)->contains('id', $invoiceId), 403);
+        $this->validate([
+            'paymentAmountMinor' => ['required','integer','min:1','max:100000000000'],
+            'paymentMethod' => ['required','in:cash,bank'],
+            'paymentReference' => ['nullable','string','max:120'],
+            'paymentReason' => ['required','string','min:3','max:500'],
+        ]);
+        try {
+            app(VenueInvoicePaymentService::class)->record(
+                $actor, $this->companyId, $invoiceId,
+                $this->paymentRequestKey, $this->paymentMethod,
+                (int) $this->paymentAmountMinor,
+                $this->paymentMethod === 'cash' ? null : $this->paymentReference,
+                $this->paymentReason);
+        } catch (InvalidArgumentException | ConflictHttpException $e) {
+            throw ValidationException::withMessages(['paymentReason' => $e->getMessage()]);
+        }
+        $this->paymentRequestKey = (string) Str::uuid();
+        $this->paymentAmountMinor = '';
+        $this->paymentReference = '';
+        $this->paymentReason = '';
+        $this->refreshPaymentBalances($actor);
+    }
+
     public function invoiceIssuanceEnabled(): bool
     {
         return config('invoice_controls.issuance_enabled') === true
@@ -330,6 +394,7 @@ final class VenueReservations extends Page
         $this->invoiceRequestKey = (string) Str::uuid();
         $this->issuedInvoices = app(VenueInvoiceService::class)->list(
             $actor, $this->companyId, $this->selectedReservationId);
+        $this->refreshPaymentBalances($actor);
     }
 
     public function quoteIssuanceEnabled(): bool
@@ -448,6 +513,7 @@ final class VenueReservations extends Page
             $this->issuedInvoices = app(VenueInvoiceService::class)->list(
                 $this->authorizeLoaded(), $this->companyId, $reservationId,
             );
+            $this->refreshPaymentBalances($this->authorizeLoaded());
         }
     }
 

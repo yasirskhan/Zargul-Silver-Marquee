@@ -157,6 +157,31 @@
                             @endif
                         </article>
                     @endforeach
+                    @if ($this->paymentPostingEnabled())
+                        <section class="space-y-2 rounded-lg border p-3" aria-label="Controlled invoice deposit form">
+                            <h3 class="font-semibold">Record controlled invoice deposit</h3>
+                            <p class="text-xs">Only manually verified test payments after separate release. Cash or bank reference; NOT connected to payment processors.</p>
+                            <label class="block space-y-1"><span>Deposit amount (minor units)</span>
+                                <input type="number" min="1" wire:model="paymentAmountMinor" class="w-full rounded-lg border p-2 text-gray-900">
+                            </label>
+                            <label class="block space-y-1"><span>Method</span>
+                                <select wire:model.live="paymentMethod" class="w-full rounded-lg border p-2 text-gray-900">
+                                    <option value="cash">Cash received</option>
+                                    <option value="bank">Bank transfer reference</option>
+                                </select>
+                            </label>
+                            @if ($paymentMethod === 'bank')
+                                <label class="block space-y-1"><span>Verified external transfer reference</span>
+                                    <input wire:model="paymentReference" maxlength="120" class="w-full rounded-lg border p-2 text-gray-900">
+                                </label>
+                            @endif
+                            <label class="block space-y-1"><span>Collection reason and custody evidence</span>
+                                <textarea wire:model="paymentReason" rows="2" maxlength="500" class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                            </label>
+                            @error('paymentReason') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                            @error('paymentAmountMinor') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                        </section>
+                    @endif
                     @foreach ($issuedInvoices as $invoice)
                         <article wire:key="issued-invoice-{{ $invoice['id'] }}" class="space-y-1 rounded-lg border p-3 text-sm"
                             aria-label="Immutable numbered invoice record">
@@ -166,7 +191,19 @@
                             @foreach ($invoice['lines'] as $line)
                                 <p>{{ $line['code'] }}: {{ $line['quantity'] }} × {{ $line['rateMinor'] }} = {{ $line['amountMinor'] }}</p>
                             @endforeach
-                            <p class="break-all text-xs">Immutable invoice reference {{ $invoice['id'] }} · customer delivery and payment collection are not enabled.</p>
+                            <p class="break-all text-xs">Immutable invoice reference {{ $invoice['id'] }} · customer delivery is not enabled.</p>
+                            @if (isset($paymentBalances[$invoice['id']]))
+                                <p>Received {{ $paymentBalances[$invoice['id']]['paidMinor'] }}; remaining balance {{ $paymentBalances[$invoice['id']]['dueMinor'] }} minor units</p>
+                                @foreach ($paymentBalances[$invoice['id']]['payments'] as $paid)
+                                    <p>Immutable receipt {{ $paid['receiptNumber'] }} · {{ $paid['method'] }} · {{ $paid['amountMinor'] }} minor units</p>
+                                @endforeach
+                                @if ($this->paymentPostingEnabled() && $paymentBalances[$invoice['id']]['dueMinor'] > 0)
+                                    <button type="button" wire:click="recordInvoicePayment('{{ $invoice['id'] }}')"
+                                        wire:loading.attr="disabled" class="rounded-lg border px-3 py-2 underline">
+                                        Record deposit for invoice {{ $invoice['invoiceNumber'] }}
+                                    </button>
+                                @endif
+                            @endif
                         </article>
                     @endforeach
                 </section>

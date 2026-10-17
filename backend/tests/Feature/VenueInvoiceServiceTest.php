@@ -7,6 +7,7 @@ use App\Models\CompanyMembership;
 use App\Models\Hall;
 use App\Models\User;
 use App\Services\VenueInvoiceService;
+use App\Services\VenueInvoicePaymentService;
 use App\Filament\Pages\VenueReservations;
 use Livewire\Livewire;
 use Filament\Facades\Filament;
@@ -154,6 +155,115 @@ class VenueInvoiceServiceTest extends TestCase
         $this->be($manager);
         Livewire::test(VenueReservations::class)
             ->call('selectReservation', $reservation)->assertDontSee('Invoice INV-000000001');
+    }
+
+    public function test_two_gated_partial_deposits_update_balance_and_exact_receipts_in_shared_ledger(): void
+    {
+        [$company, $owner, , $reservation, $quote] = $this->fixture();
+        config()->set('invoice_controls.issuance_enabled', true);
+        config()->set('invoice_controls.tax_rate_bps', 1000);
+        $invoiceId = (string) Str::uuid();
+        app(VenueInvoiceService::class)->issue($owner, $company->id,
+            $quote, $invoiceId, 'Synthetic source invoice for deposit trial');
+
+        $payments = app(VenueInvoicePaymentService::class);
+        $one = (string) Str::uuid();
+        try {
+            $payments->record($owner, $company->id, $invoiceId, $one,
+                'cash', 60000, null, 'First synthetic cash deposit');
+            $this->fail('Finance gates unexpectedly enabled.');
+        } catch (ConflictHttpException) {
+            $this->assertSame(0, DB::table('finance_journals')->count());
+        }
+        config()->set('payment_controls.enabled', true);
+        config()->set('finance_controls.posting_enabled', true);
+        $receipt = $payments->record($owner, $company->id, $invoiceId, $one,
+            'cash', 60000, null, 'First synthetic cash deposit');
+        $this->assertSame('RCT-000000001', $receipt['receiptNumber']);
+        $this->assertSame($receipt, $payments->record($owner, $company->id, $invoiceId, $one,
+            'cash', 60000, null, 'First synthetic cash deposit'));
+        $this->assertSame(['totalMinor' => 165000, 'paidMinor' => 60000, 'dueMinor' => 105000],
+            array_intersect_key($payments->history($owner, $company->id, $invoiceId),
+                array_flip(['totalMinor', 'paidMinor', 'dueMinor'])));
+        $second = (string) Str::uuid();
+        $bank = $payments->record($owner, $company->id, $invoiceId, $second,
+            'bank', 105000, 'BANK-TEST-0001', 'Second synthetic clearing transfer');
+        $this->assertSame('RCT-000000002', $bank['receiptNumber']);
+        $balance = $payments->history($owner, $company->id, $invoiceId);
+        $this->assertSame(0, $balance['dueMinor']);
+        $this->assertSame(165000, $balance['paidMinor']);
+        $this->assertSame(2, DB::table('finance_journals')->count());
+        $this->assertSame(4, DB::table('finance_journal_lines')->count());
+        $this->assertSame(1, DB::table('finance_journal_lines')
+            ->where('account_code', 'cash_on_hand')->where('side', 'debit')->count());
+        $this->assertSame(1, DB::table('finance_journal_lines')
+            ->where('account_code', 'bank_clearing')->where('side', 'debit')->count());
+        $this->assertSame(2, DB::table('finance_journal_lines')
+            ->where('account_code', 'customer_deposit_liability')->where('side', 'credit')->count());
+        $this->assertSame(2, DB::table('audit_events')
+            ->where('action', 'venue_payment.deposit_recorded')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->where('status', 'held')->count());
+    }
+
+    public function test_owner_record_deposit_from_invoice_panel_updates_due_and_receipt_without_overpayment(): void
+    {
+        [$company, $owner, , $reservation, $quote] = $this->fixture();
+        config()->set('invoice_controls.issuance_enabled', true);
+        config()->set('invoice_controls.tax_rate_bps', 0);
+        $invoice = (string) Str::uuid();
+        app(VenueInvoiceService::class)->issue($owner, $company->id, $quote,
+            $invoice, 'Synthetic controlled invoice before deposit');
+
+        Livewire::test(VenueReservations::class)
+            ->call('selectReservation', $reservation)
+            ->assertSee('remaining balance 150000')
+            ->assertDontSee('Record controlled invoice deposit');
+        config()->set('payment_controls.enabled', true);
+        config()->set('finance_controls.posting_enabled', true);
+        Livewire::test(VenueReservations::class)
+            ->call('selectReservation', $reservation)
+            ->assertSee('Record controlled invoice deposit')
+            ->set('paymentAmountMinor', '50000')
+            ->set('paymentMethod', 'cash')
+            ->set('paymentReason', 'Synthetic collected and counted deposit')
+            ->call('recordInvoicePayment', $invoice)->assertHasNoErrors()
+            ->assertSee('RCT-000000001')
+            ->assertSee('remaining balance 100000');
+        $this->assertSame(1, DB::table('venue_invoice_payments')->count());
+        $this->assertSame(2, DB::table('finance_journal_lines')->count());
+        $this->assertSame(0, DB::table('finance_cash_closeouts')->count());
+    }
+
+    public function test_overpayment_duplicate_payment_key_and_unauthorized_manager_are_denied(): void
+    {
+        [$company, $owner, $manager, , $quote] = $this->fixture();
+        config()->set('invoice_controls.issuance_enabled', true);
+        config()->set('invoice_controls.tax_rate_bps', 0);
+        $invoice = (string) Str::uuid();
+        app(VenueInvoiceService::class)->issue($owner, $company->id,
+            $quote, $invoice, 'Synthetic limited invoice');
+        config()->set('payment_controls.enabled', true);
+        config()->set('finance_controls.posting_enabled', true);
+        $service = app(VenueInvoicePaymentService::class);
+        $key = (string) Str::uuid();
+        $service->record($owner, $company->id, $invoice, $key,
+            'cash', 100000, null, 'Synthetic first collection');
+        foreach ([
+            [$key, 90000, null],
+            [(string) Str::uuid(), 60000, null],
+        ] as [$attempt, $amount, $reference]) {
+            try {
+                $service->record($owner, $company->id, $invoice, $attempt,
+                    'cash', $amount, $reference, 'Synthetic invalid retry');
+                $this->fail('Conflicting key or overpayment was accepted.');
+            } catch (ConflictHttpException) {
+                $this->assertSame(1, DB::table('venue_invoice_payments')->count());
+            }
+        }
+        $this->be($manager);
+        $this->expectException(AuthorizationException::class);
+        $service->record($manager, $company->id, $invoice, (string) Str::uuid(),
+            'cash', 100, null, 'Manager cannot post customer money');
     }
 
     public function test_manager_denied_and_stale_reservation_prevents_invoice(): void
