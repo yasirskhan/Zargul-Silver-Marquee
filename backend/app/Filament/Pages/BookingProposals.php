@@ -41,6 +41,10 @@ final class BookingProposals extends Page
 
     public string $statusFilter = '';
 
+    /** Three configured programs per hall/date; read-only table filter only. */
+    #[Url(as: 'program')]
+    public string $programFilter = '';
+
     /** Only an exact, tenant-scoped opaque proposal reference is accepted. */
     #[Url(as: 'proposal')]
     public string $referenceSearch = '';
@@ -161,6 +165,7 @@ final class BookingProposals extends Page
         $this->hallId = null;
         $this->fromDate = '';
         $this->toDate = '';
+        $this->programFilter = '';
         $this->refreshResults();
     }
 
@@ -344,6 +349,9 @@ final class BookingProposals extends Page
         if (! in_array($this->statusFilter, ['', 'draft', 'under_review', 'withdrawn'], true)) {
             throw ValidationException::withMessages(['statusFilter' => 'Choose a valid proposal status.']);
         }
+        if (! in_array($this->programFilter, ['', 'morning', 'noon', 'evening'], true)) {
+            throw ValidationException::withMessages(['programFilter' => 'Choose a valid hall program.']);
+        }
         if ($this->referenceSearch !== '' && ! Str::isUuid($this->referenceSearch)) {
             throw ValidationException::withMessages([
                 'referenceSearch' => 'Enter the complete valid proposal reference (UUID).',
@@ -367,6 +375,9 @@ final class BookingProposals extends Page
         }
         if ($this->statusFilter !== '') {
             $query->where('booking_drafts.status', $this->statusFilter);
+        }
+        if ($this->programFilter !== '') {
+            $query->where('booking_drafts.program', $this->programFilter);
         }
         if ($this->referenceSearch !== '') {
             $query->where('booking_drafts.id', $this->referenceSearch);

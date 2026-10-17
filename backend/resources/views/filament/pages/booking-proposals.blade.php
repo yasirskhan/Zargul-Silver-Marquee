@@ -33,6 +33,16 @@
                 @error('statusFilter') <span role="alert" class="text-sm text-red-600">{{ $message }}</span> @enderror
             </label>
             <label class="block space-y-2">
+                <span class="text-sm font-medium">Hall program</span>
+                <select wire:model="programFilter" class="w-full rounded-lg border p-3 text-gray-900">
+                    <option value="">All programs</option>
+                    <option value="morning">Morning</option>
+                    <option value="noon">Noon</option>
+                    <option value="evening">Evening</option>
+                </select>
+                @error('programFilter') <span role="alert" class="text-sm text-red-600">{{ $message }}</span> @enderror
+            </label>
+            <label class="block space-y-2">
                 <span class="text-sm font-medium">Proposal reference (exact UUID)</span>
                 <input type="text" wire:model="referenceSearch" maxlength="36" autocomplete="off"
                     placeholder="Paste full internal proposal reference"

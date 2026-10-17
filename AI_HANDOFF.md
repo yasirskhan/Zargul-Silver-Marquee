@@ -1,3 +1,7 @@
+## 2026-10-16 BOOK-003 THREE-PROGRAM PRIVATE PROPOSAL FILTER — EXACT SHA CI PENDING
+- Parent `09e93b95171e8e0fea78211ec71f00c6c36750b9`, recent calendar/day and proposal link UI under hosted CI. Owner/admin BookingProposals now filters saved internal proposals by exact morning/noon/evening program, optionally combined with authorized company/hall/date/status/reference. The program filter is safely URL-hydrated for future scoped navigation, validated by strict allowlist, reset on company changes, and applied to PostgreSQL before bounded 25-item results. No physical slot claims or booking confirmation result from changing the filter.
+- Real PostgreSQL test creates separate morning and evening same-hall/same-date synthetic drafts; verifies filtered result IDs, forged program rejection and zero hold/decision writes. Feature register and handoff updated. All four CI jobs required on exact SHA before VERIFIED, fix failures then continue next bounded task.
+
 ## 2026-10-16 BOOK-001 DAY LINK BLADE CLASS NAMESPACE FOLLOW-UP — EXACT SHA CI PENDING
 - Parent `9f8e168bb95054c68333e0dd67f2230d2eb7ad31`, source review caught malformed Blade class FQCN on newly added HallCalendar date-specific private proposal link. Corrected to proper literal `\App\Filament\Pages\BookingProposals::getUrl()` so compiled Blade resolves the page class. All tenant/hall/role constraints and date filters from parent remain; no permissions weakened, no new records or public route. Exact-SHA hosted CI mandatory before VERIFIED.
 

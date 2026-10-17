@@ -60,12 +60,13 @@ class BookingProposalsLivewireTest extends TestCase
     private function proposal(
         string $companyId, string $hallId, string $customerId,
         int $actorId, string $date = '2026-12-15', string $status = 'draft',
+        string $program = 'evening',
     ): string {
         $id = (string) Str::uuid();
         DB::table('booking_drafts')->insert([
             'id' => $id, 'company_id' => $companyId,
             'hall_id' => $hallId, 'customer_id' => $customerId,
-            'event_date' => $date, 'program' => 'evening',
+            'event_date' => $date, 'program' => $program,
             'requested_guests' => 180, 'status' => $status,
             'created_by' => $actorId, 'revision' => 1,
         ]);
@@ -161,6 +162,32 @@ class BookingProposalsLivewireTest extends TestCase
             ->assertDontSee('private@example.test');
         $this->assertCount(1, $component->get('entries'));
         $this->assertSame(0, DB::table('hall_slot_claims')->count());
+    }
+
+    public function test_owner_filters_same_day_hall_proposals_by_morning_noon_evening_program(): void
+    {
+        [$company, , $hall, , $owner, , $customer] = $this->fixture();
+        $morning = $this->proposal($company->id, $hall->id, $customer,
+            $owner->id, '2026-12-15', 'draft', 'morning');
+        $evening = $this->proposal($company->id, $hall->id, $customer,
+            $owner->id, '2026-12-15', 'draft', 'evening');
+
+        $panel = Livewire::test(BookingProposals::class)
+            ->assertSee('Hall program')
+            ->set('hallId', $hall->id)
+            ->set('fromDate', '2026-12-15')
+            ->set('toDate', '2026-12-15')
+            ->set('programFilter', 'morning')->call('refreshResults')
+            ->assertHasNoErrors()->assertSee($morning)->assertDontSee($evening);
+        $this->assertSame([$morning], array_column($panel->get('entries'), 'id'));
+        $panel->set('programFilter', 'evening')->call('refreshResults')
+            ->assertHasNoErrors()->assertSee($evening)->assertDontSee($morning);
+        $this->assertSame([$evening], array_column($panel->get('entries'), 'id'));
+        $panel->set('programFilter', 'forged')->call('refreshResults')
+            ->assertHasErrors(['programFilter']);
+        $this->assertSame(2, DB::table('booking_drafts')->where('company_id', $company->id)->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, DB::table('approval_decisions')->count());
     }
 
     public function test_calendar_filters_scope_existing_drafts_to_exact_hall_and_day(): void
