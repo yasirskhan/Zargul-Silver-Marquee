@@ -46,6 +46,50 @@ jobs:
           node --check assets/cms-schema.mjs
           node --check assets/website-editor.mjs
 
+  central-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: venue
+          POSTGRES_PASSWORD: venue
+          POSTGRES_DB: venue_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U venue -d venue_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CENTRAL_DB_DSN: "pgsql:host=127.0.0.1;port=5432;dbname=hafzatech_central_test"
+      CENTRAL_DB_USERNAME: venue
+      CENTRAL_DB_PASSWORD: venue
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_pgsql, pgsql, bcmath, sodium
+          coverage: none
+      - name: Provision isolated HAFZATECH PostgreSQL test database
+        run: |
+          php -r '$db = new PDO("pgsql:host=127.0.0.1;port=5432;dbname=postgres", "venue", "venue", [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]); $db->exec("CREATE DATABASE hafzatech_central_test");'
+      - name: Validate central PHP and isolated migrations
+        run: |
+          find central -name '*.php' -print0 | xargs -0 -n1 php -l
+          php central/bin/migrate.php
+      - name: Verify central cross-customer and licensing tests
+        run: |
+          php central/tests/installation_identity.php
+          php central/tests/staff_permissions.php
+          php central/tests/staff_access.php
+          php central/tests/vendor_receiving_directory.php
+          php central/tests/payment_eligibility.php
+          php central/tests/domain_ownership.php
+          php central/tests/license_term_calendar.php
+
   laravel-postgres:
     runs-on: ubuntu-latest
     services:
@@ -104,20 +148,6 @@ jobs:
         run: php artisan migrate --force --no-interaction
       - name: Run tenant-isolation backend tests
         run: php artisan test --no-ansi
-      - name: Verify separately isolated HAFZATECH central identity API and PostgreSQL tests
-        env:
-          CENTRAL_DB_DSN: "pgsql:host=127.0.0.1;port=5432;dbname=hafzatech_central_test"
-          CENTRAL_DB_USERNAME: venue
-          CENTRAL_DB_PASSWORD: venue
-        run: |
-          php -r '$db = new PDO("pgsql:host=127.0.0.1;port=5432;dbname=postgres", "venue", "venue", [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]); $db->exec("CREATE DATABASE hafzatech_central_test");'
-          find ../central -name '*.php' -print0 | xargs -0 -n1 php -l
-          php ../central/bin/migrate.php
-          php ../central/tests/installation_identity.php
-          php ../central/tests/staff_permissions.php
-          php ../central/tests/staff_access.php
-          php ../central/tests/vendor_receiving_directory.php
-          php ../central/tests/payment_eligibility.php
       - name: Verify CMS, MFA and shared cache/session migration rollback and replay
         env:
           DB_CONNECTION: pgsql
