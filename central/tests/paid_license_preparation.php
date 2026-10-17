@@ -73,7 +73,7 @@ $db->prepare("INSERT INTO central_customer_provider_assignments
     ->execute(['id'=>issueUuid(),'customer'=>$customer,'provider'=>$provider]);
 $db->prepare("INSERT INTO central_vendor_plan_versions
     (id,plan_code,version,term_months,currency,price_minor,entitlements_snapshot)
-    VALUES(:id,'standard',1,12,'PKR',10000,:snapshot)")
+    VALUES(:id,'synthetic_paid_prep',1,12,'PKR',10000,:snapshot)")
     ->execute(['id'=>$plan,'snapshot'=>json_encode(['max_halls'=>2,'max_staff'=>10,
         'features'=>['booking'=>true]],JSON_THROW_ON_ERROR)]);
 $db->prepare("INSERT INTO central_vendor_invoices
