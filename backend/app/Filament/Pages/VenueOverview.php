@@ -114,13 +114,16 @@ final class VenueOverview extends Page
         abort_unless($member !== null, 403);
 
         $access = app(TenantAccess::class);
-        $halls = Hall::query()->where('company_id', $this->companyId)
+        $visibleHallIds = Hall::query()->where('company_id', $this->companyId)
             ->where('is_active', true)->get()
-            ->filter(fn (Hall $hall) => $access->canViewHall($actor, $hall))->count();
+            ->filter(fn (Hall $hall) => $access->canViewHall($actor, $hall))
+            ->pluck('id')->all();
+        $halls = count($visibleHallIds);
         $role = $member->role;
         $canSeeCompanyProposals = in_array($role, ['owner', 'admin'], true);
         $canReadApprovals = in_array($role, ['owner', 'admin', 'manager'], true);
         $canSearch = in_array($role, ['owner', 'admin', 'manager', 'operations'], true);
+        $canPlan = $halls > 0 && in_array($role, ['owner', 'admin', 'manager', 'operations'], true);
         $weekFrom = now()->toDateString();
         $weekThrough = now()->addDays(6)->toDateString();
 
@@ -142,7 +145,11 @@ final class VenueOverview extends Page
             'canReadApprovals' => $canReadApprovals,
             'canReviewFinance' => $canSeeCompanyProposals,
             'canSearch' => $canSearch,
-            'canPlan' => $halls > 0 && in_array($role, ['owner', 'admin', 'manager', 'operations'], true),
+            'canPlan' => $canPlan,
+            'plannedTasks' => $canPlan
+                ? DB::table('operations_plan_tasks')->where('company_id', $this->companyId)
+                    ->where('status', 'planned')
+                    ->whereIn('hall_id', $visibleHallIds)->count() : null,
             'canManageHallRules' => $halls > 0 && in_array($role, ['owner', 'admin'], true),
             'canEditWebsite' => (bool) $access->canEditWebsite($actor, $this->companyId),
             'canReadAudit' => (bool) $access->canReadAuditHistory($actor, $this->companyId),

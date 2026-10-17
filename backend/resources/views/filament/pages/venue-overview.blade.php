@@ -38,6 +38,13 @@
                             </a>
                         </div>
                     @endif
+                    @if ($summary['canPlan'])
+                        <div class="rounded-xl border p-4">
+                            <p class="text-sm">Setup planning tasks to review</p>
+                            <p class="text-3xl font-semibold">{{ $summary['plannedTasks'] }}</p>
+                            <p class="text-xs">Only your accessible halls · planning, not actual event readiness</p>
+                        </div>
+                    @endif
                     @if ($summary['canReadApprovals'])
                         <div class="rounded-xl border p-4">
                             <p class="text-sm">Pending approval requests in your view</p>

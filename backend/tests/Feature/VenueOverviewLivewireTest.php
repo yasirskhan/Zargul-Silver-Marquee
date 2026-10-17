@@ -68,6 +68,61 @@ class VenueOverviewLivewireTest extends TestCase
         $this->assertSame(0, DB::table('finance_journals')->count());
     }
 
+    public function test_manager_planning_count_only_includes_assigned_active_halls(): void
+    {
+        [$company, , $assignedHall, $people] = $this->fixture();
+        $unassigned = Hall::create(['company_id' => $company->id,
+            'name' => 'Owner only hall', 'slug' => 'private-overview',
+            'capacity' => 200]);
+        $customer = (string) Str::uuid();
+        DB::table('customer_profiles')->insert([
+            'id' => $customer, 'company_id' => $company->id,
+            'created_by' => $people['owner']->id,
+            'name_ciphertext' => \Illuminate\Support\Facades\Crypt::encryptString('Hidden customer'),
+        ]);
+        foreach ([
+            [$assignedHall, 'planned'], [$assignedHall, 'reviewed'],
+            [$unassigned, 'planned'],
+        ] as [$hall, $status]) {
+            $booking = (string) Str::uuid();
+            DB::table('booking_drafts')->insert([
+                'id' => $booking, 'company_id' => $company->id,
+                'hall_id' => $hall->id, 'customer_id' => $customer,
+                'event_date' => '2027-03-05', 'program' => 'morning',
+                'requested_guests' => 50, 'status' => 'draft',
+                'created_by' => $people['owner']->id, 'revision' => 1,
+            ]);
+            DB::table('operations_plan_tasks')->insert([
+                'id' => (string) Str::uuid(), 'company_id' => $company->id,
+                'booking_id' => $booking, 'hall_id' => $hall->id,
+                'title' => 'Synthetic venue setup', 'status' => $status,
+                'revision' => 1, 'creation_reason' => 'Private setup planning test',
+                'created_by' => $people['owner']->id,
+                'updated_by' => $people['owner']->id,
+            ]);
+        }
+
+        Livewire::test(VenueOverview::class)
+            ->assertSet('summary.role', 'owner')
+            ->assertSet('summary.plannedTasks', 2)
+            ->assertSee('Setup planning tasks to review')
+            ->assertDontSee('Hidden customer');
+        $this->be($people['manager']);
+        Livewire::test(VenueOverview::class)
+            ->assertSet('summary.visibleHalls', 1)
+            ->assertSet('summary.plannedTasks', 1)
+            ->assertSee('Setup planning tasks to review')
+            ->assertDontSee('Owner only hall')
+            ->assertDontSee('Hidden customer');
+
+        $this->be($people['operations']);
+        Livewire::test(VenueOverview::class)
+            ->assertSet('summary.visibleHalls', 1)
+            ->assertSet('summary.plannedTasks', 1);
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
     public function test_owner_upcoming_week_counts_only_current_company_active_drafts_not_holds(): void
     {
         [$company, $foreign, $hall, $people] = $this->fixture();
