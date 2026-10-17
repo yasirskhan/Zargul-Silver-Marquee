@@ -9,6 +9,7 @@ use App\Services\TenantAccess;
 use App\Services\VenueReservationService;
 use App\Services\VenueQuoteService;
 use App\Services\VenueQuoteIssueService;
+use App\Services\VenueInvoiceService;
 use BackedEnum;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
@@ -48,6 +49,14 @@ final class VenueReservations extends Page
 
     #[Locked]
     public array $quoteIssues = [];
+
+    #[Locked]
+    public array $issuedInvoices = [];
+
+    #[Locked]
+    public string $invoiceRequestKey = '';
+
+    public string $invoiceIssueReason = '';
 
     #[Locked]
     public string $quoteIssueRequestKey = '';
@@ -260,6 +269,9 @@ final class VenueReservations extends Page
     {
         $this->quoteSnapshots = [];
         $this->quoteIssues = [];
+        $this->issuedInvoices = [];
+        $this->invoiceIssueReason = '';
+        $this->invoiceRequestKey = (string) Str::uuid();
         $this->quoteIssuePurpose = '';
         $this->quoteIssueRequestKey = (string) Str::uuid();
         $this->quoteExtraChairs = '0';
@@ -290,6 +302,34 @@ final class VenueReservations extends Page
         abort_unless($catalog !== null, 409);
         return array_values(array_filter(json_decode($catalog->items, true, 512, JSON_THROW_ON_ERROR),
             fn (array $item): bool => $item['enabled'] === true));
+    }
+
+    public function invoiceIssuanceEnabled(): bool
+    {
+        return config('invoice_controls.issuance_enabled') === true
+            && is_int(config('invoice_controls.tax_rate_bps'))
+            && config('invoice_controls.tax_rate_bps') >= 0
+            && config('invoice_controls.tax_rate_bps') <= 10000;
+    }
+
+    /** Create an audited numbered invoice ONLY from a currently listed immutable quote. */
+    public function issueInvoice(string $numberedQuoteId): void
+    {
+        $actor = $this->authorizeLoaded();
+        abort_unless($this->invoiceIssuanceEnabled() && $this->mayViewCustomerHistory()
+            && $this->selectedReservationId !== null && Str::isUuid($numberedQuoteId), 403);
+        abort_unless(collect($this->quoteIssues)->contains('id', $numberedQuoteId), 403);
+        $this->validate(['invoiceIssueReason' => ['required', 'string', 'min:3', 'max:500']]);
+        try {
+            app(VenueInvoiceService::class)->issue($actor, $this->companyId,
+                $numberedQuoteId, $this->invoiceRequestKey, $this->invoiceIssueReason);
+        } catch (ConflictHttpException | InvalidArgumentException $e) {
+            throw ValidationException::withMessages(['invoiceIssueReason' => $e->getMessage()]);
+        }
+        $this->invoiceIssueReason = '';
+        $this->invoiceRequestKey = (string) Str::uuid();
+        $this->issuedInvoices = app(VenueInvoiceService::class)->list(
+            $actor, $this->companyId, $this->selectedReservationId);
     }
 
     public function quoteIssuanceEnabled(): bool
@@ -403,6 +443,9 @@ final class VenueReservations extends Page
                 $this->authorizeLoaded(), $this->companyId, $reservationId,
             );
             $this->quoteIssues = app(VenueQuoteIssueService::class)->list(
+                $this->authorizeLoaded(), $this->companyId, $reservationId,
+            );
+            $this->issuedInvoices = app(VenueInvoiceService::class)->list(
                 $this->authorizeLoaded(), $this->companyId, $reservationId,
             );
         }

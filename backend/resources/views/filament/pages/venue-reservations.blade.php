@@ -135,6 +135,13 @@
                     @empty
                         <p class="text-xs">No price snapshots yet for this reservation.</p>
                     @endforelse
+                    @if ($this->invoiceIssuanceEnabled())
+                        <label class="block space-y-1">
+                            <span>Reason for explicitly issuing an invoice (not payment authorization)</span>
+                            <textarea wire:model="invoiceIssueReason" rows="2" maxlength="500" class="w-full rounded-lg border p-3 text-gray-900"></textarea>
+                        </label>
+                        @error('invoiceIssueReason') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                    @endif
                     @foreach ($quoteIssues as $document)
                         <article wire:key="quote-issued-{{ $document['id'] }}" class="space-y-1 rounded-lg border p-3 text-sm">
                             <strong>Internal quote {{ $document['number'] }} · {{ $document['currency'] }} {{ $document['subtotalMinor'] }} minor units</strong>
@@ -142,6 +149,24 @@
                             @foreach ($document['lines'] as $line)
                                 <p>{{ $line['code'] }}: {{ $line['quantity'] }} × {{ $line['rateMinor'] }} = {{ $line['amountMinor'] }}</p>
                             @endforeach
+                            @if ($this->invoiceIssuanceEnabled())
+                                <button type="button" wire:click="issueInvoice('{{ $document['id'] }}')"
+                                    wire:loading.attr="disabled" class="rounded-lg border px-3 py-2 underline">
+                                    Issue numbered invoice from this quote
+                                </button>
+                            @endif
+                        </article>
+                    @endforeach
+                    @foreach ($issuedInvoices as $invoice)
+                        <article wire:key="issued-invoice-{{ $invoice['id'] }}" class="space-y-1 rounded-lg border p-3 text-sm"
+                            aria-label="Immutable numbered invoice record">
+                            <strong>Invoice {{ $invoice['invoiceNumber'] }}</strong>
+                            <p>{{ $invoice['currency'] }} subtotal {{ $invoice['subtotalMinor'] }} +
+                                frozen tax {{ $invoice['taxMinor'] }} = total {{ $invoice['totalMinor'] }} minor units</p>
+                            @foreach ($invoice['lines'] as $line)
+                                <p>{{ $line['code'] }}: {{ $line['quantity'] }} × {{ $line['rateMinor'] }} = {{ $line['amountMinor'] }}</p>
+                            @endforeach
+                            <p class="break-all text-xs">Immutable invoice reference {{ $invoice['id'] }} · customer delivery and payment collection are not enabled.</p>
                         </article>
                     @endforeach
                 </section>
