@@ -78,6 +78,54 @@ class HallCalendarLivewireTest extends TestCase
         $this->assertSame(0, DB::table('hall_slot_claim_events')->count());
     }
 
+    public function test_owner_sees_active_draft_counts_by_program_without_treating_drafts_as_holds(): void
+    {
+        [$company, $hall, $owner] = $this->fixture();
+        $customer = (string) Str::uuid();
+        app(\App\Services\CustomerProfileService::class)->create(
+            $owner, $company->id, $customer,
+            'Private test customer', 'draft-counter@example.test', null, 'Synthetic calendar test only'
+        );
+        $morningId = (string) Str::uuid();
+        $noonId = (string) Str::uuid();
+        app(\App\Services\BookingDraftService::class)->create(
+            $owner, $company->id, $morningId, $hall->id, $customer,
+            '2026-12-15', 'morning', 120, 'Unconfirmed morning booking proposal'
+        );
+        app(\App\Services\BookingDraftService::class)->create(
+            $owner, $company->id, $noonId, $hall->id, $customer,
+            '2026-12-15', 'noon', 90, 'Unconfirmed noon booking proposal'
+        );
+
+        $view = Livewire::test(HallCalendar::class)
+            ->set('anchorDate', '2026-12-15')->set('viewMode', 'day')
+            ->assertSee('1 unconfirmed')
+            ->assertSee('(not reserved)')
+            ->assertSet('projection.days.0.programs.morning.status', 'available')
+            ->assertSet('projection.days.0.programs.noon.status', 'available');
+        $this->assertSame(1, $view->get('proposalCounts')['2026-12-15']['morning']);
+        $this->assertSame(1, $view->get('proposalCounts')['2026-12-15']['noon']);
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+
+        $manager = User::create(['name' => 'Staff manager',
+            'email' => 'draft-counter-manager@example.test', 'password' => 'synthetic']);
+        $manager->markEmailAsVerified();
+        $membership = CompanyMembership::create([
+            'company_id' => $company->id, 'user_id' => $manager->id, 'role' => 'manager',
+        ]);
+        HallAssignment::create([
+            'company_id' => $company->id, 'hall_id' => $hall->id,
+            'membership_id' => $membership->id,
+        ]);
+        $this->be($manager);
+        Livewire::test(HallCalendar::class)
+            ->set('anchorDate', '2026-12-15')->set('viewMode', 'day')
+            ->assertSet('proposalCounts', [])
+            ->assertDontSee('(not reserved)')
+            ->assertDontSee('View draft proposals');
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+    }
+
     public function test_owner_calendar_links_day_to_private_proposals_but_manager_cannot_open_drafts(): void
     {
         [$company, $hall, $owner] = $this->fixture();

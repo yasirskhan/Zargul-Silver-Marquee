@@ -55,6 +55,7 @@
                     <span class="rounded-lg bg-orange-100 px-3 py-2 text-orange-900">Cleanup required</span>
                     <span class="rounded-lg bg-gray-200 px-3 py-2 text-gray-900">Unconfigured</span>
                 </div>
+                @php($canViewDrafts = $this->canOpenDraftProposals())
                 <div class="overflow-x-auto rounded-xl border">
                     <table class="w-full min-w-[480px] border-collapse text-left text-sm">
                         <caption class="sr-only">Read-only morning, noon and evening occupancy status for each date</caption>
@@ -71,7 +72,7 @@
                                 <tr class="border-t" wire:key="hall-day-{{ $day['date'] }}">
                                     <th scope="row" class="p-3 font-medium">
                                         <span class="block">{{ $day['date'] }}</span>
-                                        @if ($this->canOpenDraftProposals())
+                                        @if ($canViewDrafts)
                                             <a class="mt-1 block text-xs underline"
                                                 href="{{ \App\Filament\Pages\BookingProposals::getUrl(['company' => $companyId, 'hall' => $hallId, 'from' => $day['date'], 'to' => $day['date']]) }}">
                                                 View draft proposals
@@ -103,6 +104,13 @@
                                             </span>
                                             @if ($status === 'hold')
                                                 <span class="mt-1 block text-xs">Expires: {{ $slot['expiresAt'] }}</span>
+                                            @endif
+                                            @if ($canViewDrafts && ($proposalCounts[$day['date']][$program] ?? 0) > 0)
+                                                <span class="mt-1 block text-xs">
+                                                    {{ $proposalCounts[$day['date']][$program] }} unconfirmed
+                                                    {{ ($proposalCounts[$day['date']][$program] === 1) ? 'draft' : 'drafts' }}
+                                                    (not reserved)
+                                                </span>
                                             @endif
                                         </td>
                                     @endforeach

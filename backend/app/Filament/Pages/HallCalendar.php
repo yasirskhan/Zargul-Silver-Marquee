@@ -37,6 +37,10 @@ final class HallCalendar extends Page
     #[Locked]
     public array $projection = [];
 
+    /** Owner/admin-only counts of drafts, NEVER claims or public availability. */
+    #[Locked]
+    public array $proposalCounts = [];
+
     #[Locked]
     public ?string $loadedCompanyId = null;
 
@@ -177,6 +181,7 @@ final class HallCalendar extends Page
     public function reloadCalendar(): void
     {
         $this->projection = [];
+        $this->proposalCounts = [];
         $this->loadedCompanyId = null;
         $this->loadedHallId = null;
 
@@ -205,6 +210,19 @@ final class HallCalendar extends Page
         );
         $this->loadedCompanyId = $this->companyId;
         $this->loadedHallId = $this->hallId;
+
+        if ($this->canOpenDraftProposals()) {
+            // Count only active, NONCONFIRMED internal proposals; a draft never
+            // changes the occupancy status projected from physical claims.
+            foreach (DB::table('booking_drafts')
+                ->where('company_id', $this->companyId)->where('hall_id', $this->hallId)
+                ->whereIn('status', ['draft', 'under_review'])
+                ->whereBetween('event_date', [$start->format('Y-m-d'), $end->format('Y-m-d')])
+                ->selectRaw('event_date, program, COUNT(*) AS total')
+                ->groupBy('event_date', 'program')->get() as $row) {
+                $this->proposalCounts[$row->event_date][$row->program] = (int) $row->total;
+            }
+        }
     }
 
     private function validAnchor(): DateTimeImmutable
