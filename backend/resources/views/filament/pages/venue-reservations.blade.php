@@ -111,6 +111,13 @@
                     @error('quoteExtraTables') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
                     <button type="button" wire:click="freezeQuote" wire:loading.attr="disabled"
                         class="rounded-lg border px-4 py-2 font-semibold">Freeze nonbinding complete internal price</button>
+                    <p class="text-xs">Numbered customer quotation issuance requires separate operator approval. No price snapshot is a tax invoice, deposit or payment request.</p>
+                    @if ($this->quoteIssuanceEnabled())
+                        <label class="block space-y-1"><span>Internal numbered quote issue purpose</span>
+                            <textarea wire:model="quoteIssuePurpose" rows="2" maxlength="500" class="w-full rounded-lg border p-3 text-gray-900"></textarea>
+                        </label>
+                        @error('quoteIssuePurpose') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                    @endif
                     @forelse ($quoteSnapshots as $quote)
                         <article wire:key="venue-quote-{{ $quote['id'] }}" class="space-y-1 rounded-lg border p-3 text-sm">
                             <p><strong>{{ $quote['currency'] }} {{ $quote['subtotalMinor'] }} minor units</strong> · frozen at reservation revision {{ $quote['reservationRevision'] }}</p>
@@ -118,10 +125,25 @@
                                 <p>{{ $line['code'] }}: {{ $line['quantity'] }} × {{ $line['rateMinor'] }} = {{ $line['amountMinor'] }} minor units</p>
                             @endforeach
                             <p class="break-all text-xs">Immutable internal snapshot {{ $quote['id'] }}</p>
+                            @if ($this->quoteIssuanceEnabled())
+                                <button type="button" wire:click="issueInternalQuote('{{ $quote['id'] }}')"
+                                    wire:loading.attr="disabled" class="rounded-lg border px-3 py-2 underline">
+                                    Issue numbered internal quote from this frozen snapshot
+                                </button>
+                            @endif
                         </article>
                     @empty
                         <p class="text-xs">No price snapshots yet for this reservation.</p>
                     @endforelse
+                    @foreach ($quoteIssues as $document)
+                        <article wire:key="quote-issued-{{ $document['id'] }}" class="space-y-1 rounded-lg border p-3 text-sm">
+                            <strong>Internal quote {{ $document['number'] }} · {{ $document['currency'] }} {{ $document['subtotalMinor'] }} minor units</strong>
+                            <p class="break-all text-xs">Issued reference {{ $document['id'] }} (not delivered to customer)</p>
+                            @foreach ($document['lines'] as $line)
+                                <p>{{ $line['code'] }}: {{ $line['quantity'] }} × {{ $line['rateMinor'] }} = {{ $line['amountMinor'] }}</p>
+                            @endforeach
+                        </article>
+                    @endforeach
                 </section>
             @endif
             @if ($selectedReservationId !== null)

@@ -14,6 +14,7 @@ use App\Services\HallAddonCatalogService;
 use App\Services\HallProgramRulesService;
 use App\Services\HallSeatingPriceService;
 use App\Services\VenueQuoteService;
+use App\Services\VenueQuoteIssueService;
 use App\Services\VenueReservationService;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -153,6 +154,30 @@ class VenueQuoteServiceTest extends TestCase
         $this->assertSame(0, DB::table('finance_journals')->count());
         $this->be($outsider);
         \Livewire\Livewire::test(VenueReservations::class)->assertForbidden();
+    }
+
+    public function test_owner_reservation_page_numbers_internal_quote_only_when_operator_gate_enabled(): void
+    {
+        [$company, , $owner, , $reservation] = $this->setupBooking();
+        $panel = \Livewire\Livewire::test(VenueReservations::class)
+            ->call('selectReservation', $reservation['id'])
+            ->set('quoteReason', 'Full synthetic quoted program price')
+            ->call('freezeQuote')->assertHasNoErrors()
+            ->assertDontSee('Issue numbered internal quote from this frozen snapshot');
+        $snapshotId = $panel->get('quoteSnapshots')[0]['id'];
+        $panel->call('issueInternalQuote', $snapshotId)->assertForbidden();
+        config()->set('quote_controls.issuance_enabled', true);
+        $panel = \Livewire\Livewire::test(VenueReservations::class)
+            ->call('selectReservation', $reservation['id'])
+            ->assertSee('Issue numbered internal quote from this frozen snapshot')
+            ->set('quoteIssuePurpose', 'Synthetic issue after owner signoff')
+            ->call('issueInternalQuote', $snapshotId)->assertHasNoErrors()
+            ->assertSee('Q-000000001')
+            ->assertSee('not delivered to customer');
+        $this->assertCount(1, $panel->get('quoteIssues'));
+        $this->assertSame(1, DB::table('venue_quote_issues')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+        $this->assertSame(0, DB::table('finance_journal_lines')->count());
     }
 
     public function test_immutable_quote_cannot_be_silently_edited(): void

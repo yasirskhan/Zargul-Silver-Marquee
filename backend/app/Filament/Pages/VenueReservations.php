@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\TenantAccess;
 use App\Services\VenueReservationService;
 use App\Services\VenueQuoteService;
+use App\Services\VenueQuoteIssueService;
 use BackedEnum;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
@@ -44,6 +45,14 @@ final class VenueReservations extends Page
 
     #[Locked]
     public array $quoteSnapshots = [];
+
+    #[Locked]
+    public array $quoteIssues = [];
+
+    #[Locked]
+    public string $quoteIssueRequestKey = '';
+
+    public string $quoteIssuePurpose = '';
 
     #[Locked]
     public string $quoteRequestKey = '';
@@ -250,6 +259,9 @@ final class VenueReservations extends Page
     private function resetQuoteForm(): void
     {
         $this->quoteSnapshots = [];
+        $this->quoteIssues = [];
+        $this->quoteIssuePurpose = '';
+        $this->quoteIssueRequestKey = (string) Str::uuid();
         $this->quoteExtraChairs = '0';
         $this->quoteExtraTables = '0';
         $this->quoteAddonQuantities = [];
@@ -278,6 +290,33 @@ final class VenueReservations extends Page
         abort_unless($catalog !== null, 409);
         return array_values(array_filter(json_decode($catalog->items, true, 512, JSON_THROW_ON_ERROR),
             fn (array $item): bool => $item['enabled'] === true));
+    }
+
+    public function quoteIssuanceEnabled(): bool
+    {
+        return config('quote_controls.issuance_enabled') === true;
+    }
+
+    public function issueInternalQuote(string $snapshotId): void
+    {
+        $actor = $this->authorizeLoaded();
+        abort_unless($this->quoteIssuanceEnabled() && $this->mayViewCustomerHistory()
+            && $this->selectedReservationId !== null && Str::isUuid($snapshotId), 403);
+        $this->validate(['quoteIssuePurpose' => ['required', 'string', 'min:3', 'max:500']]);
+        abort_unless(collect($this->quoteSnapshots)->contains('id', $snapshotId), 403);
+        try {
+            app(VenueQuoteIssueService::class)->issue(
+                $actor, $this->companyId, $snapshotId,
+                $this->quoteIssueRequestKey, $this->quoteIssuePurpose,
+            );
+        } catch (ConflictHttpException | InvalidArgumentException $e) {
+            throw ValidationException::withMessages(['quoteIssuePurpose' => $e->getMessage()]);
+        }
+        $this->quoteIssuePurpose = '';
+        $this->quoteIssueRequestKey = (string) Str::uuid();
+        $this->quoteIssues = app(VenueQuoteIssueService::class)->list(
+            $actor, $this->companyId, $this->selectedReservationId,
+        );
     }
 
     public function freezeQuote(): void
@@ -361,6 +400,9 @@ final class VenueReservations extends Page
         $this->resetQuoteForm();
         if ($this->mayViewCustomerHistory()) {
             $this->quoteSnapshots = app(VenueQuoteService::class)->list(
+                $this->authorizeLoaded(), $this->companyId, $reservationId,
+            );
+            $this->quoteIssues = app(VenueQuoteIssueService::class)->list(
                 $this->authorizeLoaded(), $this->companyId, $reservationId,
             );
         }
