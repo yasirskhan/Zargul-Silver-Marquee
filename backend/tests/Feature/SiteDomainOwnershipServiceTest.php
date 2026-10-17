@@ -272,6 +272,52 @@ SQL);
             ->where('action', 'website.domain_ownership_revoked')->count());
     }
 
+    public function test_revoked_publisher_after_first_check_cannot_deactivate_verified_domain(): void
+    {
+        [$company, $owner, $site] = $this->fixture('domain-revoke-interleave');
+        $resolver = $this->resolver();
+        $service = app(SiteDomainOwnershipService::class);
+        $challenge = $service->request($owner, $company->id, $site,
+            'interleave.marquee.org', 'Request original approved claim');
+        $resolver->answers[$challenge['txtName']] = [$challenge['txtValue']];
+        $service->verify($owner, $company->id, $site,
+            'interleave.marquee.org', 'Verify original domain');
+
+        $interleavingAccess = new class extends \App\Services\TenantAccess {
+            public int $checks = 0;
+            public function canPublishWebsite(User $user, string $companyId): bool
+            {
+                $this->checks++;
+                if ($this->checks === 2) {
+                    // Simulate revocation while the website/claim locks are
+                    // held, just before the second authorization check.
+                    DB::table('company_memberships')->where('company_id', $companyId)
+                        ->where('user_id', $user->getKey())->update([
+                            'role' => 'manager', 'can_publish_site' => false,
+                            'can_edit_site' => true,
+                        ]);
+                }
+                return parent::canPublishWebsite($user, $companyId);
+            }
+        };
+        $this->app->instance(\App\Services\TenantAccess::class, $interleavingAccess);
+        $revoker = app(SiteDomainOwnershipService::class);
+        $before = DB::table('site_domain_claims')->first();
+        try {
+            $revoker->revoke($owner, $company->id, $site,
+                'interleave.marquee.org', 'Must reject publisher revocation race');
+            $this->fail('Lost publisher privilege still revoked the domain.');
+        } catch (AuthorizationException) {
+            $this->assertGreaterThanOrEqual(2, $interleavingAccess->checks);
+        }
+        $after = DB::table('site_domain_claims')->first();
+        $this->assertSame('verified', $after->status);
+        $this->assertSame($before->verified_at, $after->verified_at);
+        $this->assertSame($before->token_hash, $after->token_hash);
+        $this->assertSame(0, DB::table('audit_events')
+            ->where('action', 'website.domain_ownership_revoked')->count());
+    }
+
     public function test_unverified_and_reserved_domain_claims_fail_without_persisting(): void
     {
         [$company, $owner, $site] = $this->fixture('invalid-dns');
