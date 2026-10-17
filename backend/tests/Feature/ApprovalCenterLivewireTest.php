@@ -618,4 +618,31 @@ class ApprovalCenterLivewireTest extends TestCase
         $this->assertSame(0, DB::table('finance_journals')->count());
     }
 
+
+    public function test_live_selection_rechecks_request_after_another_approver_resolves_it(): void
+    {
+        [$company, , $members] = $this->fixture();
+        $service = app(\App\Services\ApprovalWorkflowService::class);
+        $admin = $members['admin'][0];
+        $owner = $members['owner'][0];
+        $this->be($admin);
+        $key = (string) \Illuminate\Support\Str::uuid();
+        $service->request($admin, $company->id, $key, 'expense', 250,
+            'PKR', null, 'Stale inbox selection race test');
+        $this->be($owner);
+        $component = Livewire::test(ApprovalCenter::class)
+            ->assertSee('Stale inbox selection race test')
+            ->assertSet('selectedId', null);
+        $service->decide($owner, $company->id, $key, 1, 'approved',
+            'Another authorized decision completed before selection');
+        $component->call('selectRequest', $key)->assertStatus(409);
+        $this->assertSame(1, DB::table('approval_decisions')->count());
+        $this->assertSame('approved', DB::table('approval_requests')
+            ->where('id', $key)->value('status'));
+        $this->assertSame(0, DB::table('finance_journals')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+    }
+
+
+
 }

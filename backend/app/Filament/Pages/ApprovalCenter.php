@@ -400,13 +400,19 @@ final class ApprovalCenter extends Page
 
     public function selectRequest(string $id): void
     {
-        $this->authorizeLoaded();
+        $actor = $this->authorizeLoaded();
         $entry = collect($this->entries)->firstWhere('id', $id);
         abort_unless(Str::isUuid($id) && $entry !== null, 404);
         abort_unless($entry['status'] === 'pending' && $this->canReviewRequest($entry), 403);
-        // Caller cannot choose a stale/foreign revision merely by mutating state.
+        // A locked inbox snapshot can predate another approver's decision.
+        // Re-read the same authorized request before offering live controls.
+        $fresh = app(ApprovalWorkflowService::class)->inbox($actor, $this->companyId, 1, $id);
+        abort_unless(count($fresh) === 1, 404);
+        if ($fresh[0]['status'] !== 'pending' || $fresh[0]['revision'] !== $entry['revision']) {
+            throw new ConflictHttpException('This approval changed. Refresh the inbox before reviewing.');
+        }
         $this->selectedId = $id;
-        $this->selectedRevision = $entry['revision'];
+        $this->selectedRevision = $fresh[0]['revision'];
         $this->decisionReason = '';
     }
 
