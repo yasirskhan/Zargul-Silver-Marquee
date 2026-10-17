@@ -357,6 +357,35 @@ class ApprovalWorkflowServiceTest extends TestCase
         $service->inbox($manager, $company->id);
     }
 
+    public function test_approval_inbox_projects_only_scoped_non_pii_event_context(): void
+    {
+        [$company, , , $people, $booking] = $this->fixture();
+        $service = app(ApprovalWorkflowService::class);
+        $manager = $people['manager'][0];
+        $this->be($manager);
+        $id = (string) Str::uuid();
+        $service->request($manager, $company->id, $id, 'discount', 100,
+            'PKR', $booking, 'Owner reviews proposed hall discount');
+        $mine = $service->inbox($manager, $company->id, 30, $id);
+        $this->assertCount(1, $mine);
+        $this->assertSame([
+            'date' => '2027-01-02', 'program' => 'evening', 'hallName' => 'Grand',
+        ], $mine[0]['proposal']);
+        $this->assertArrayNotHasKey('customerId', $mine[0]);
+        $this->assertStringNotContainsString('fake-fixture@example.test',
+            json_encode($mine, JSON_THROW_ON_ERROR));
+
+        $this->be($people['owner'][0]);
+        $ownerInbox = $service->inbox($people['owner'][0], $company->id, 30, $id);
+        $this->assertSame($mine[0]['proposal'], $ownerInbox[0]['proposal']);
+        $expense = (string) Str::uuid();
+        $service->request($people['owner'][0], $company->id, $expense, 'expense',
+            100, 'PKR', null, 'Internal venue supply quote');
+        $this->assertNull($service->inbox($people['owner'][0], $company->id, 30, $expense)[0]['proposal']);
+        $this->assertSame(0, DB::table('approval_decisions')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+    }
+
     public function test_inbox_filters_manager_requests_and_owner_can_see_all(): void
     {
         [$company, , , $people] = $this->fixture();

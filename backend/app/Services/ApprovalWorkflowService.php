@@ -349,18 +349,32 @@ final class ApprovalWorkflowService
         if ($referenceId !== null && ! Str::isUuid($referenceId)) {
             throw new InvalidArgumentException('Invalid approval reference.');
         }
-        $q = DB::table('approval_requests')->where('company_id', $companyId);
+        $q = DB::table('approval_requests as req')
+            ->leftJoin('booking_drafts as booking', function ($join): void {
+                $join->on('booking.id', '=', 'req.booking_id')
+                    ->on('booking.company_id', '=', 'req.company_id');
+            })
+            ->leftJoin('halls as hall', function ($join): void {
+                $join->on('hall.id', '=', 'booking.hall_id')
+                    ->on('hall.company_id', '=', 'req.company_id');
+            })->where('req.company_id', $companyId);
         if ($referenceId !== null) {
-            $q->where('id', $referenceId);
+            $q->where('req.id', $referenceId);
         }
         if ($membership->role === 'manager') {
-            $q->where('requested_by', $actor->getKey());
+            $q->where('req.requested_by', $actor->getKey());
         }
 
-        return $q->orderByDesc('created_at')->orderByDesc('id')->limit($limit)
-            ->get(['id', 'category', 'status', 'revision', 'amount_minor',
-                'currency', 'reason', 'booking_id', 'requested_by', 'created_at'])
-            ->map(fn ($row) => $this->summary($row))->all();
+        return $q->orderByDesc('req.created_at')->orderByDesc('req.id')->limit($limit)
+            ->get(['req.id', 'req.category', 'req.status', 'req.revision', 'req.amount_minor',
+                'req.currency', 'req.reason', 'req.booking_id', 'req.requested_by', 'req.created_at',
+                'booking.event_date as proposed_date', 'booking.program as proposed_program',
+                'hall.name as proposed_hall'])
+            ->map(fn ($row) => array_merge($this->summary($row), [
+                'proposal' => $row->proposed_date !== null && $row->proposed_hall !== null
+                    ? ['date' => $row->proposed_date, 'program' => $row->proposed_program,
+                        'hallName' => $row->proposed_hall] : null,
+            ]))->all();
     }
 
     /**

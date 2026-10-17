@@ -78,6 +78,11 @@
                         <p>Requested by staff ID {{ $entry['requestedBy'] }} | revision {{ $entry['revision'] }}</p>
                         <p class="break-words">{{ $entry['reason'] }}</p>
                         <p class="break-all text-xs">ID: {{ $entry['id'] }} | proposal: {{ $entry['bookingId'] ?? 'none' }}</p>
+                        @if (is_array($entry['proposal'] ?? null))
+                            <p class="text-sm">Proposed event: {{ $entry['proposal']['date'] }}
+                                · {{ ucfirst($entry['proposal']['program']) }}
+                                · {{ $entry['proposal']['hallName'] }} (not confirmed)</p>
+                        @endif
                         @if ($entry['bookingId'] !== null && in_array($this->role(), ['owner', 'admin'], true))
                             <a class="inline-block underline" href="{{ '/admin/booking-proposals?company='.rawurlencode($companyId).'&proposal='.rawurlencode($entry['bookingId']) }}">
                                 View linked internal proposal
