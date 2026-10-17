@@ -18,6 +18,7 @@ require dirname(__DIR__).'/src/PaidInvoiceEligibility.php';
 require dirname(__DIR__).'/src/LicenseTermCalendar.php';
 require dirname(__DIR__).'/src/PaidLicensePreparation.php';
 require dirname(__DIR__).'/src/PreparedSignedGrantValidator.php';
+require dirname(__DIR__).'/src/SignedGrantFinalization.php';
 require dirname(__DIR__).'/signing/Ed25519GrantCodec.php';
 
 function issueUuid(): string {
@@ -155,4 +156,37 @@ $db->prepare("UPDATE central_licenses SET current_revision=1 WHERE id=:id")
 verifyIssue((int)$db->query("SELECT count(*) FROM central_paid_license_revisions WHERE state='signed'")->fetchColumn()===0,
     'validation never signs or activates the grant');
 echo "PASS: central protected signed-grant pre-finalization verifies invoice settlement, role, exact plan/date/domain/ID and signature\n";
+$sealKey=random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES);
+$seal=static function(string $plain)use($sealKey):string {
+    $nonce=random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+    return $nonce.sodium_crypto_secretbox($plain,$nonce,$sealKey);
+};
+$finalizer=new \Hafzatech\Central\SignedGrantFinalization($db,$validator,$seal);
+denyIssue(fn()=>$finalizer->finalize($r['revision_id'],$officer,true,true,$envelope),
+    'protected_signer_not_enabled');
+putenv('CENTRAL_SIGNER_FINALIZATION_ENABLED=true');
+denyIssue(fn()=>$finalizer->finalize($r['revision_id'],$officer,true,false,$envelope),
+    'protected_signer_not_enabled');
+denyIssue(fn()=>$finalizer->finalize($r['revision_id'],$officer,false,true,$envelope),
+    'mfa_required');
+$finalized=$finalizer->finalize($r['revision_id'],$officer,true,true,$envelope);
+verifyIssue($finalized['state']==='signed' && $finalized['license_id']===$r['license_id'],
+    'only exact authenticated grant finalized');
+$read=$db->prepare("SELECT state,encode(signed_envelope_ciphertext,'hex') AS sealed
+    FROM central_paid_license_revisions WHERE id=:id");
+$read->execute(['id'=>$r['revision_id']]);$sealedRow=$read->fetch(PDO::FETCH_ASSOC);
+verifyIssue($sealedRow['state']==='signed','revision changed to signed once');
+$binary=hex2bin($sealedRow['sealed']);
+$nonce=substr($binary,0,SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+$decrypted=sodium_crypto_secretbox_open(substr($binary,SODIUM_CRYPTO_SECRETBOX_NONCEBYTES),
+    $nonce,$sealKey);
+verifyIssue($decrypted===json_encode($envelope,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),
+    'signed grant was sealed and privately recoverable with test-only key');
+verifyIssue((int)$db->query("SELECT count(*) FROM central_license_signature_events")->fetchColumn()===1,
+    'single audited protected signature finalization');
+denyIssue(fn()=>$finalizer->finalize($r['revision_id'],$officer,true,true,$envelope),
+    'revision_not_pending');
+putenv('CENTRAL_SIGNER_FINALIZATION_ENABLED=false');
+echo "PASS: protected worker and release gate, atomic signed revision finalization, sealed storage and audit\n";
+
 
