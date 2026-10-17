@@ -6,11 +6,14 @@ use Illuminate\Support\Facades\DB;
 return new class extends Migration {
     public function up(): void
     {
+        // The function can survive migrate:fresh because dropping tables does not
+        // remove PostgreSQL functions. Recreate its exact guarded definition
+        // on replay without disabling any immutable row protections.
         // Event evidence is a strict single forward transition. A new event
         // must start as in_progress; only the service's finish transaction
         // may complete it once. No SQL rewrite after the actual closeout.
         DB::unprepared(<<<'SQL'
-CREATE FUNCTION venuedesk_guard_actual_event_operation() RETURNS trigger
+CREATE OR REPLACE FUNCTION venuedesk_guard_actual_event_operation() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
