@@ -87,6 +87,12 @@ jobs:
           php -l artisan
       - name: Compile all Blade templates before database tests
         run: php artisan view:cache --no-interaction
+      - name: Reject malformed PHP names in Blade page links
+        run: |
+          if grep -R -n -E 'AppFilamentPages[A-Z]' resources/views; then
+            echo "::error::Blade contains a missing fully qualified Filament PHP class namespace"
+            exit 1
+          fi
       - name: Run PostgreSQL migrations
         env:
           DB_CONNECTION: pgsql
