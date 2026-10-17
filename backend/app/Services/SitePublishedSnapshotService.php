@@ -91,7 +91,12 @@ final class SitePublishedSnapshotService
 
         return [
             'branding' => $branding,
-            'page' => ['slug' => $page->slug, 'title' => $page->title, 'sections' => $content['sections']],
+            'page' => [
+                'slug' => $page->slug,
+                'title' => $page->title,
+                'seoTitle' => $content['seoTitle'] ?? '',
+                'sections' => $content['sections'],
+            ],
             'media' => $media,
             'navigation' => $links,
         ];

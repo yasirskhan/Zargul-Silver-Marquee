@@ -73,6 +73,24 @@ class SiteContentValidatorTest extends TestCase
         }
     }
 
+    public function test_optional_page_seo_title_is_plain_bounded_and_backward_compatible(): void
+    {
+        $validator = app(SiteContentValidator::class);
+        $legacy = $this->valid();
+        $validator->validate($legacy);
+        $candidate = $legacy;
+        $candidate['seoTitle'] = 'Zargul Weddings & Events';
+        $validator->validate($candidate);
+        $candidate['seoTitle'] = '';
+        $validator->validate($candidate);
+        foreach (['<script>alert(1)</script>', 'javascript:alert(1)',
+            "Unsafe\nLine", str_repeat('x', 121), ['not a title']] as $invalid) {
+            $bad = $legacy;
+            $bad['seoTitle'] = $invalid;
+            $this->expectValidationFailure($bad);
+        }
+    }
+
     public function test_limits_sections_columns_and_nested_content(): void
     {
         $content = $this->valid();

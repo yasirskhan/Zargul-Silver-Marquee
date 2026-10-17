@@ -23,7 +23,7 @@
         $mediaBase = $canonicalUrl !== null && in_array($mediaPageSlug, $allowedMediaPages, true)
             ? '/_venue-media/'.$mediaPageSlug.'/' : null;
     @endphp
-    <title>{{ $snapshot['page']['title'] }} | {{ $branding['siteName'] }}</title>
+    <title>{{ ($snapshot['page']['seoTitle'] ?? '') !== '' ? $snapshot['page']['seoTitle'] : $snapshot['page']['title'].' | '.$branding['siteName'] }}</title>
     <meta name="description" content="{{ ($branding['seoDescription'] ?? '') !== '' ? $branding['seoDescription'] : ($branding['tagline'] !== '' ? $branding['tagline'] : $branding['siteName']) }}">
     @if ($canonicalUrl !== null)
         <link rel="canonical" href="{{ $canonicalUrl }}">

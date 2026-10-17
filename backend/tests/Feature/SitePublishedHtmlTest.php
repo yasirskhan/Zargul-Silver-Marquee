@@ -145,6 +145,32 @@ class SitePublishedHtmlTest extends TestCase
         $this->assertStringNotContainsString('rel="canonical"', $published);
     }
 
+    public function test_page_level_seo_title_is_versioned_escaped_and_hidden_before_publish(): void
+    {
+        [$company, $owner, $site, $page] = $this->fixture();
+        $this->brand($owner, $company->id, $site);
+        $pages = app(SitePagePublishingService::class);
+        $content = ['sections' => [[
+            'id' => 'intro', 'type' => 'text', 'data' => ['title' => 'Approved page body'],
+        ]]];
+        $pages->saveDraft($owner, $company->id, $page, $content, 0, 'Legacy safe page');
+        $pages->publish($owner, $company->id, $page, 1, 'Publish legacy page');
+        $reader = app(SitePublishedHtmlService::class);
+        $legacy = $reader->render($company->id, $site, '/');
+        $this->assertStringContainsString('<title>Official Home &amp; Venue | Zargul Silver &amp; Gold</title>', $legacy);
+
+        $content['seoTitle'] = 'Private Weddings & Celebrations';
+        $pages->saveDraft($owner, $company->id, $page, $content, 1, 'Prepare owner SEO title');
+        $this->assertSame($legacy, $reader->render($company->id, $site, '/'));
+        $pages->publish($owner, $company->id, $page, 2, 'Approve page search title');
+
+        $published = $reader->render($company->id, $site, '/');
+        $this->assertStringContainsString('<title>Private Weddings &amp; Celebrations</title>', $published);
+        $this->assertStringNotContainsString('<title>Official Home &amp; Venue |', $published);
+        $this->assertStringContainsString('content="noindex, nofollow"', $published);
+        $this->assertStringNotContainsString('rel="canonical"', $published);
+    }
+
     public function test_responsive_mobile_order_and_approved_image_placeholder_do_not_expose_raw_media(): void
     {
         [$company, $owner, $site, $page] = $this->fixture();

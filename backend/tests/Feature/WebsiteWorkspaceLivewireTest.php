@@ -73,6 +73,35 @@ class WebsiteWorkspaceLivewireTest extends TestCase
         $this->assertSame(1, DB::table('site_publishing_events')->where('action', 'publish')->count());
     }
 
+    public function test_owner_page_search_title_requires_draft_save_before_publication(): void
+    {
+        [, , $pageId] = $this->fixture(true);
+        $editor = Livewire::test(WebsiteWorkspace::class)
+            ->assertSee('Search title override (optional)')
+            ->call('addSection', 'text')
+            ->set('sections.0.data.title', 'Approved public introduction')
+            ->set('reason', 'Prepare original page content')
+            ->call('saveDraft')->assertHasNoErrors();
+        $savedOriginal = DB::table('site_page_revisions')->where('page_id', $pageId)
+            ->where('revision_number', 1)->value('content');
+        $this->assertArrayNotHasKey('seoTitle', json_decode($savedOriginal, true, 512, JSON_THROW_ON_ERROR));
+
+        $editor->set('pageSeoTitle', 'Private draft-only title')
+            ->set('reason', 'Reject unsaved search title')
+            ->call('publishDraft')->assertHasErrors(['pageSeoTitle']);
+        $this->assertNull(DB::table('site_pages')->where('id', $pageId)->value('published_revision_id'));
+
+        $editor->set('reason', 'Save safe search title')
+            ->call('saveDraft')->assertHasNoErrors()->assertSet('expectedRevision', 2)
+            ->set('reason', 'Owner approves page title')
+            ->call('publishDraft')->assertHasNoErrors();
+        $publishedId = DB::table('site_pages')->where('id', $pageId)->value('published_revision_id');
+        $saved = json_decode(DB::table('site_page_revisions')
+            ->where('id', $publishedId)->value('content'), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame('Private draft-only title', $saved['seoTitle']);
+        $this->assertSame(1, DB::table('site_publishing_events')->where('action', 'publish')->count());
+    }
+
     public function test_delegated_editor_has_draft_controls_but_no_publish_button(): void
     {
         [$company, , $pageId] = $this->fixture(false);

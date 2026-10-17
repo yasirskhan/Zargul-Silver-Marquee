@@ -60,6 +60,18 @@
                     class="rounded-lg border px-3 py-2 text-sm">Reload latest draft</button>
             </section>
 
+            <section class="space-y-3 rounded-xl border p-4" aria-label="Draft page search settings">
+                <h2 class="text-lg font-semibold">Page search title</h2>
+                <label class="block space-y-1">
+                    <span class="text-sm font-medium">Search title override (optional)</span>
+                    <input type="text" wire:model="pageSeoTitle" maxlength="120"
+                        class="w-full rounded border p-2 text-gray-900"
+                        placeholder="Leave blank to use the approved page title and venue name">
+                </label>
+                <p class="text-xs">Only saved and separately published page revisions change public metadata. Search indexing requires independent operator approval.</p>
+                @error('pageSeoTitle') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+            </section>
+
             <section class="space-y-4 rounded-xl border p-4" aria-label="Website branding">
                 <h2 class="text-lg font-semibold">Branding and theme</h2>
                 <p class="text-sm">Choose approved theme presets and company-owned images. Save a draft first; only an authorized publisher can approve changes for a future public release.</p>
