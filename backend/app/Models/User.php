@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
 
 class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery, MustVerifyEmail
 {
@@ -47,6 +48,11 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     {
         return $panel->getId() === 'admin'
             && $this->is_active
+            // A cached authenticated User can outlive a database suspension.
+            // Keep verification onboarding in Filament middleware, but block
+            // a persistently disabled account at the panel entrance too.
+            && DB::table('users')->where('id', $this->getKey())
+                ->where('is_active', true)->exists()
             && $this->memberships()
                 ->where('is_active', true)
                 ->whereHas('company', fn ($query) => $query->where('is_active', true))
