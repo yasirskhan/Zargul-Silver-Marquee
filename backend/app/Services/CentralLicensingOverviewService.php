@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use DateTimeImmutable;
+use App\Models\User;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -24,8 +25,17 @@ final class CentralLicensingOverviewService
     public function __construct(
         private readonly CentralSignedLicenseCache $cache,
         private readonly CentralLicenseStatusPolicy $policy,
-        private readonly CentralLicenseCheckSchedule $schedule
+        private readonly CentralLicenseCheckSchedule $schedule,
+        private readonly CentralInstallationCompanyScope $companyScope
     ) {}
+
+    /** @return array<string,mixed> */
+    public function snapshotForCompany(User $actor,string $companyId,DateTimeImmutable $now): array
+    {
+        // Authorization is not derived from a tenant-selected Livewire field.
+        $this->companyScope->assertCanRead($actor,$companyId);
+        return $this->snapshot($now);
+    }
 
     /** @return array<string,mixed> */
     public function snapshot(DateTimeImmutable $now): array
