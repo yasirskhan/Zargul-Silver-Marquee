@@ -203,6 +203,17 @@ final class ApprovalCenter extends Page
             fn (string $category): bool => $role !== 'manager' || $category !== 'expense'));
     }
 
+    /**
+     * Historical visibility is governed by the current company membership and
+     * requester scope, not by what categories that role can submit today.
+     * A downgraded member must still be able to audit their own past requests.
+     */
+    public function inboxCategoryOptions(): array
+    {
+        return in_array($this->role(), ['owner', 'admin', 'manager'], true)
+            ? ApprovalWorkflowService::CATEGORIES : [];
+    }
+
     public function proposalOptions(): array
     {
         if (! $this->companyId || ! in_array($this->role(), ['owner', 'admin', 'manager'], true)) {
@@ -352,7 +363,7 @@ final class ApprovalCenter extends Page
         $actor = $this->authorizeCompany();
         $this->validate([
             'statusFilter' => ['required', Rule::in(['all', 'pending', 'approved', 'rejected'])],
-            'categoryFilter' => ['required', Rule::in(array_merge(['all'], $this->requestCategoryOptions()))],
+            'categoryFilter' => ['required', Rule::in(array_merge(['all'], $this->inboxCategoryOptions()))],
         ]);
         if ($this->requestReference !== '' && ! Str::isUuid($this->requestReference)) {
             throw ValidationException::withMessages([

@@ -28,7 +28,7 @@
                 <span class="text-sm font-medium">Exception category filter</span>
                 <select wire:model.live="categoryFilter" class="w-full rounded-lg border p-3 text-gray-900">
                     <option value="all">All categories</option>
-                    @foreach ($this->requestCategoryOptions() as $category)
+                    @foreach ($this->inboxCategoryOptions() as $category)
                         <option value="{{ $category }}">{{ str_replace('_', ' ', ucfirst($category)) }}</option>
                     @endforeach
                 </select>

@@ -397,6 +397,40 @@ class ApprovalCenterLivewireTest extends TestCase
         $this->assertSame(0, DB::table('approval_alert_outbox')->count());
     }
 
+    public function test_downgraded_owner_can_find_only_own_historical_expense_without_ability_to_request_new_expense(): void
+    {
+        [$company, , $members] = $this->fixture();
+        $service = app(\App\Services\ApprovalWorkflowService::class);
+        $owner = $members['owner'][0];
+        $admin = $members['admin'][0];
+        $ownId = (string) \Illuminate\Support\Str::uuid();
+        $otherId = (string) \Illuminate\Support\Str::uuid();
+
+        $service->request($owner, $company->id, $ownId, 'expense', 225,
+            'PKR', null, 'Archived own staff expense');
+        $this->be($admin);
+        $service->request($admin, $company->id, $otherId, 'expense', 475,
+            'PKR', null, 'Another staff private expense');
+
+        $members['owner'][1]->update(['role' => 'manager']);
+        $this->be($owner);
+        $component = Livewire::test(ApprovalCenter::class);
+        $this->assertNotContains('expense', $component->instance()->requestCategoryOptions());
+        $this->assertContains('expense', $component->instance()->inboxCategoryOptions());
+        $component->set('categoryFilter', 'expense')->assertHasNoErrors()
+            ->assertSee('Archived own staff expense')
+            ->assertDontSee('Another staff private expense');
+        $this->assertSame([$ownId], array_column($component->get('entries'), 'id'));
+
+        $component->set('newCategory', 'expense')
+            ->set('newAmount', '500')->set('newCurrency', 'PKR')
+            ->set('newReason', 'Unauthorized new manager expense')
+            ->call('submitRequest')->assertHasErrors(['newCategory']);
+        $this->assertSame(2, DB::table('approval_requests')->where('company_id', $company->id)->count());
+        $this->assertSame(0, DB::table('approval_decisions')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
     public function test_same_company_role_downgrade_rejects_stale_owner_expense_submission(): void
     {
         [$company, , $members] = $this->fixture();
