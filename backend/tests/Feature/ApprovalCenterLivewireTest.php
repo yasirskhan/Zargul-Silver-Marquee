@@ -353,9 +353,13 @@ class ApprovalCenterLivewireTest extends TestCase
         $this->assertCount(1, $current);
         $this->assertSame($active, $current[0]['id']);
         $this->assertSame(['discount'], $current[0]['categories']);
+        $this->assertSame($owner->id, (int) $current[0]['granted_by']);
+        $this->assertSame('Owner limited exception authority', $current[0]['reason']);
         Livewire::test(ApprovalCenter::class)->assertSee('Active / scheduled grants')
             ->assertSee('Admin #'.$admin->id)
-            ->assertSee('Allowed: discount');
+            ->assertSee('Allowed: discount')
+            ->assertSee('Granted by staff #'.$owner->id)
+            ->assertSee('Grant reason: Owner limited exception authority');
         $this->be($admin);
         try {
             $service->activeDelegations($admin, $company->id);
