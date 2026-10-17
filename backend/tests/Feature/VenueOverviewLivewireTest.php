@@ -68,6 +68,52 @@ class VenueOverviewLivewireTest extends TestCase
         $this->assertSame(0, DB::table('finance_journals')->count());
     }
 
+    public function test_owner_upcoming_week_counts_only_current_company_active_drafts_not_holds(): void
+    {
+        [$company, $foreign, $hall, $people] = $this->fixture();
+        $this->travelTo(\Carbon\Carbon::parse('2026-11-10 12:00:00', 'UTC'));
+        try {
+            $customer = (string) Str::uuid();
+            DB::table('customer_profiles')->insert([
+                'id' => $customer, 'company_id' => $company->id,
+                'created_by' => $people['owner']->id,
+                'name_ciphertext' => \Illuminate\Support\Facades\Crypt::encryptString('Synthetic Private Name'),
+            ]);
+            foreach ([
+                ['2026-11-10', 'draft'],
+                ['2026-11-16', 'under_review'],
+                ['2026-11-17', 'draft'],
+                ['2026-11-13', 'withdrawn'],
+            ] as [$date, $status]) {
+                DB::table('booking_drafts')->insert([
+                    'id' => (string) Str::uuid(), 'company_id' => $company->id,
+                    'hall_id' => $hall->id, 'customer_id' => $customer,
+                    'event_date' => $date, 'program' => 'evening',
+                    'requested_guests' => 100, 'status' => $status,
+                    'created_by' => $people['owner']->id, 'revision' => 1,
+                ]);
+            }
+            $panel = Livewire::test(VenueOverview::class)
+                ->assertSet('summary.drafts', 3)
+                ->assertSet('summary.upcomingDrafts', 2)
+                ->assertSet('summary.upcomingFrom', '2026-11-10')
+                ->assertSet('summary.upcomingThrough', '2026-11-16')
+                ->assertSee('Next 7 days')
+                ->assertSee('Review upcoming drafts (not reserved)')
+                ->assertDontSee('Synthetic Private Name');
+            $this->assertSame(0, DB::table('hall_slot_claims')->count());
+            $this->assertSame(0, DB::table('finance_journals')->count());
+
+            $this->be($people['manager']);
+            Livewire::test(VenueOverview::class)
+                ->assertSet('summary.upcomingDrafts', null)
+                ->assertSet('summary.upcomingFrom', null)
+                ->assertDontSee('Review upcoming drafts (not reserved)');
+        } finally {
+            $this->travelBack();
+        }
+    }
+
     public function test_manager_aggregate_is_own_approval_only_and_company_draft_hidden(): void
     {
         [$company, $other, , $people] = $this->fixture();

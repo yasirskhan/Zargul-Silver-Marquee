@@ -28,6 +28,16 @@
                             <p class="text-xs">Draft or under review · not a reservation</p>
                         </div>
                     @endif
+                    @if ($summary['canSeeCompanyProposals'])
+                        <div class="rounded-xl border p-4">
+                            <p class="text-sm">Next 7 days · unconfirmed proposals</p>
+                            <p class="text-3xl font-semibold">{{ $summary['upcomingDrafts'] }}</p>
+                            <a class="text-xs underline"
+                                href="{{ \App\Filament\Pages\BookingProposals::getUrl(['company' => $companyId, 'from' => $summary['upcomingFrom'], 'to' => $summary['upcomingThrough']]) }}">
+                                Review upcoming drafts (not reserved)
+                            </a>
+                        </div>
+                    @endif
                     @if ($summary['canReadApprovals'])
                         <div class="rounded-xl border p-4">
                             <p class="text-sm">Pending approval requests in your view</p>

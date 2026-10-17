@@ -121,6 +121,8 @@ final class VenueOverview extends Page
         $canSeeCompanyProposals = in_array($role, ['owner', 'admin'], true);
         $canReadApprovals = in_array($role, ['owner', 'admin', 'manager'], true);
         $canSearch = in_array($role, ['owner', 'admin', 'manager', 'operations'], true);
+        $weekFrom = now()->toDateString();
+        $weekThrough = now()->addDays(6)->toDateString();
 
         $this->summary = [
             'role' => $role,
@@ -128,6 +130,12 @@ final class VenueOverview extends Page
             'drafts' => $canSeeCompanyProposals
                 ? DB::table('booking_drafts')->where('company_id', $this->companyId)
                     ->whereIn('status', ['draft', 'under_review'])->count() : null,
+            'upcomingDrafts' => $canSeeCompanyProposals
+                ? DB::table('booking_drafts')->where('company_id', $this->companyId)
+                    ->whereIn('status', ['draft', 'under_review'])
+                    ->whereBetween('event_date', [$weekFrom, $weekThrough])->count() : null,
+            'upcomingFrom' => $canSeeCompanyProposals ? $weekFrom : null,
+            'upcomingThrough' => $canSeeCompanyProposals ? $weekThrough : null,
             'pendingApprovals' => $canReadApprovals
                 ? app(ApprovalWorkflowService::class)->inboxCounts($actor, $this->companyId)['pending'] : null,
             'canSeeCompanyProposals' => $canSeeCompanyProposals,
