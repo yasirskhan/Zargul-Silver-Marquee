@@ -20,7 +20,7 @@
                                 Review this company's requests
                             </a>
                             @if ($item['latestRequestId'])
-                                <a href="{{ AppFilamentPagesApprovalCenter::getUrl(['company' => $item['companyId'], 'request' => $item['latestRequestId']]) }}"
+                                <a href="{{ \App\Filament\Pages\ApprovalCenter::getUrl(['company' => $item['companyId'], 'request' => $item['latestRequestId']]) }}"
                                     class="mt-2 block font-semibold underline">
                                     Review one pending request directly
                                 </a>
