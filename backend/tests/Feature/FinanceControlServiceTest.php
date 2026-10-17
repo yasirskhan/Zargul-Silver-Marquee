@@ -74,6 +74,41 @@ class FinanceControlServiceTest extends TestCase
         return [$company, $other, $hall, $people, $booking];
     }
 
+    public function test_stale_owner_session_cannot_read_or_post_after_account_revocation(): void
+    {
+        [$company, , , $people, $booking] = $this->fixture();
+        $owner = $people['owner'];
+        $service = app(FinanceControlService::class);
+        $policy = new \App\Policies\FinanceAccessPolicy();
+        $this->assertTrue($policy->view($owner, $company->id));
+        config()->set('finance_controls.posting_enabled', true);
+
+        foreach ([
+            ['is_active' => false],
+            ['is_active' => true, 'email_verified_at' => null],
+        ] as $change) {
+            DB::table('users')->where('id', $owner->id)->update($change);
+            $this->assertFalse($policy->view($owner, $company->id));
+            $this->assertFalse($policy->post($owner, $company->id));
+            foreach ([
+                fn () => $service->previews($owner, $company->id),
+                fn () => $service->preview($owner, $company->id,
+                    (string) Str::uuid(), $booking, 2, 'No revoked finance previews'),
+                fn () => $service->openCash($owner, $company->id,
+                    (string) Str::uuid(), 'PKR', 100, 'No revoked opening cash'),
+            ] as $operation) {
+                try {
+                    $operation();
+                    $this->fail('Revoked owner retained finance access.');
+                } catch (AuthorizationException) {
+                    $this->assertTrue(true);
+                }
+            }
+        }
+        $this->assertSame(0, DB::table('finance_quote_previews')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
     public function test_freezes_internal_rental_preview_without_issuing_invoice_or_changing_draft(): void
     {
         [$company, , $hall, $people, $booking] = $this->fixture();

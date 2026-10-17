@@ -10,6 +10,8 @@ final class FinanceAccessPolicy
     public function view(User $actor, string $companyId): bool
     {
         return $actor->is_active && $actor->hasVerifiedEmail()
+            && User::query()->whereKey($actor->getKey())
+                ->where('is_active', true)->whereNotNull('email_verified_at')->exists()
             && CompanyMembership::query()->where('company_id', $companyId)
                 ->where('user_id', $actor->getKey())->where('is_active', true)
                 ->whereIn('role', ['owner', 'admin'])
