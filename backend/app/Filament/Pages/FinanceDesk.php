@@ -69,6 +69,8 @@ final class FinanceDesk extends Page
         $this->closeoutRequestKey = (string) Str::uuid();
     }
 
+    /** Optional exact owner/admin internal booking proposal to preview; never auto-post. */
+    #[Url(as: 'proposal')]
     public string $draftBookingId = '';
 
     public string $previewReason = '';
@@ -140,11 +142,25 @@ final class FinanceDesk extends Page
         if (! $this->companyId || ! array_key_exists($this->companyId, $this->companyOptions())) {
             return [];
         }
-        return DB::table('booking_drafts')->where('company_id', $this->companyId)
+        $options = DB::table('booking_drafts')->where('company_id', $this->companyId)
             ->where('status', 'under_review')->orderBy('event_date')->limit(50)
             ->get(['id', 'event_date', 'program', 'revision'])
             ->mapWithKeys(fn ($row) => [$row->id => $row->event_date.' '.$row->program
                 .' revision '.$row->revision])->all();
+
+        // An exact authorized deep link may refer to a legitimate older proposal
+        // outside the latest 50 selector options. Recheck tenant and review state.
+        if ($this->draftBookingId !== '' && Str::isUuid($this->draftBookingId)
+            && ! array_key_exists($this->draftBookingId, $options)) {
+            $selected = DB::table('booking_drafts')->where('company_id', $this->companyId)
+                ->where('id', $this->draftBookingId)->where('status', 'under_review')
+                ->first(['id', 'event_date', 'program', 'revision']);
+            if ($selected) {
+                $options[$selected->id] = $selected->event_date.' '.$selected->program
+                    .' revision '.$selected->revision;
+            }
+        }
+        return $options;
     }
 
     public function mount(): void
@@ -159,6 +175,10 @@ final class FinanceDesk extends Page
         $this->closeDate = now('UTC')->toDateString();
         $this->initializeKeys();
         $this->refresh();
+        if ($this->draftBookingId !== '') {
+            abort_unless(Str::isUuid($this->draftBookingId)
+                && array_key_exists($this->draftBookingId, $this->proposalOptions()), 403);
+        }
     }
 
     public function hydrate(): void

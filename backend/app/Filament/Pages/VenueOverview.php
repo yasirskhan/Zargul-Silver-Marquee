@@ -166,6 +166,15 @@ final class VenueOverview extends Page
             'canSeeCompanyProposals' => $canSeeCompanyProposals,
             'canReadApprovals' => $canReadApprovals,
             'canReviewFinance' => $canSeeCompanyProposals,
+            'recentPreviewReferences' => $canSeeCompanyProposals
+                ? DB::table('finance_quote_previews')
+                    ->where('company_id', $this->companyId)
+                    ->orderByDesc('created_at')->orderByDesc('id')->limit(3)
+                    ->get(['id', 'program', 'booking_id'])
+                    ->map(fn ($row) => [
+                        'id' => $row->id, 'program' => $row->program,
+                        'bookingId' => $row->booking_id,
+                    ])->all() : [],
             'canSearch' => $canSearch,
             'canPlan' => $canPlan,
             'plannedTasks' => $canPlan

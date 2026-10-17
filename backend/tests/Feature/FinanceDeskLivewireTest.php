@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Filament\Pages\FinanceDesk;
+use App\Filament\Pages\VenueOverview;
+use App\Filament\Pages\BookingProposals;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\Hall;
@@ -139,6 +141,7 @@ class FinanceDeskLivewireTest extends TestCase
             ->assertSet('previewId', $first)
             ->assertSee('Showing only selected frozen preview')
             ->assertSee('Show all company rental previews')
+            ->assertSee('Review linked proposal')
             ->assertSee('Preview '.$first)
             ->assertDontSee('Preview '.$second)
             ->assertDontSee('private-test@example.test');
@@ -146,6 +149,10 @@ class FinanceDeskLivewireTest extends TestCase
         $panel->call('showAllPreviews')->assertSet('previewId', '')
             ->assertSee('Preview '.$first)->assertSee('Preview '.$second);
         $this->assertCount(2, $panel->get('previews'));
+        Livewire::withQueryParams([
+            'company' => $company->id, 'proposal' => $booking,
+        ])->test(BookingProposals::class)
+            ->assertSet('referenceSearch', $booking);
 
         Livewire::withQueryParams(['company' => $company->id,
             'preview' => (string) Str::uuid()])
@@ -155,6 +162,89 @@ class FinanceDeskLivewireTest extends TestCase
         $this->be($people['manager'][0]);
         Livewire::withQueryParams(['company' => $company->id, 'preview' => $first])
             ->test(FinanceDesk::class)->assertForbidden();
+        $this->assertSame(0, DB::table('finance_journals')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+    }
+
+    public function test_under_review_proposal_opens_private_finance_preview_without_creating_charge(): void
+    {
+        [$company, $other, $people, $booking] = $this->fixture();
+        Livewire::test(BookingProposals::class)
+            ->assertSee('Freeze rental preview');
+        Livewire::withQueryParams([
+            'company' => $company->id, 'proposal' => $booking,
+        ])->test(FinanceDesk::class)
+            ->assertSet('draftBookingId', $booking)
+            ->assertSee('Freeze internal rental-price preview')
+            ->set('previewReason', 'Synthetic frozen program price')
+            ->call('createPreview')
+            ->assertHasNoErrors()
+            ->assertSee('Hall Rental')
+            ->assertSee('3000')
+            ->assertDontSee('private-test@example.test');
+        $this->assertSame(1, DB::table('finance_quote_previews')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+
+        Livewire::withQueryParams([
+            'company' => $company->id, 'proposal' => (string) Str::uuid(),
+        ])->test(FinanceDesk::class)->assertForbidden();
+        Livewire::withQueryParams([
+            'company' => $other->id, 'proposal' => $booking,
+        ])->test(FinanceDesk::class)->assertForbidden();
+        $this->be($people['manager'][0]);
+        Livewire::withQueryParams([
+            'company' => $company->id, 'proposal' => $booking,
+        ])->test(FinanceDesk::class)->assertForbidden();
+    }
+
+    public function test_older_under_review_proposal_remains_selectable_by_exact_authorized_link(): void
+    {
+        [$company, , $people, $booking] = $this->fixture();
+        $saved = DB::table('booking_drafts')->where('id', $booking)->first();
+        for ($i = 0; $i < 50; $i++) {
+            DB::table('booking_drafts')->insert([
+                'id' => (string) Str::uuid(),
+                'company_id' => $company->id, 'hall_id' => $saved->hall_id,
+                'customer_id' => $saved->customer_id,
+                'event_date' => (new \DateTimeImmutable('2026-11-01'))
+                    ->modify('+'.$i.' days')->format('Y-m-d'),
+                'program' => 'morning', 'requested_guests' => 50,
+                'status' => 'under_review', 'created_by' => $people['owner'][0]->id,
+                'revision' => 2,
+            ]);
+        }
+        $panel = Livewire::withQueryParams([
+            'company' => $company->id, 'proposal' => $booking,
+        ])->test(FinanceDesk::class)->assertSet('draftBookingId', $booking);
+        $this->assertArrayHasKey($booking, $panel->instance()->proposalOptions());
+        $this->assertSame(0, DB::table('finance_quote_previews')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
+    public function test_owner_overview_links_recent_private_frozen_previews_but_manager_sees_none(): void
+    {
+        [$company, , $people, $booking] = $this->fixture();
+        $actor = $people['owner'][0];
+        $previewId = (string) Str::uuid();
+        app(FinanceControlService::class)->preview($actor, $company->id,
+            $previewId, $booking, 2, 'Synthetic owner overview finance card');
+        $ownerOverview = Livewire::test(VenueOverview::class)
+            ->assertSee('Recent private rental previews')
+            ->assertSee('Review frozen internal preview')
+            ->assertSee('Preview '.$previewId)
+            ->assertDontSee('private-test@example.test');
+        $this->assertSame([$previewId],
+            array_column($ownerOverview->get('summary')['recentPreviewReferences'], 'id'));
+        Livewire::withQueryParams(['company' => $company->id, 'preview' => $previewId])
+            ->test(FinanceDesk::class)->assertSet('previewId', $previewId);
+
+        $this->be($people['manager'][0]);
+        Livewire::test(VenueOverview::class)
+            ->assertSet('summary.recentPreviewReferences', [])
+            ->assertDontSee('Review frozen internal preview')
+            ->assertDontSee('Preview '.$previewId);
         $this->assertSame(0, DB::table('finance_journals')->count());
         $this->assertSame(0, DB::table('hall_slot_claims')->count());
     }

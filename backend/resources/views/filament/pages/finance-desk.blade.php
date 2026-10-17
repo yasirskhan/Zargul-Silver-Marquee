@@ -55,6 +55,10 @@
                                 @endforeach
                             </ul>
                             <p class="break-all text-xs">Preview {{ $item['id'] }} | Proposal {{ $item['bookingId'] }}</p>
+                            <a class="inline-flex rounded-lg border px-3 py-2 underline"
+                                href="{{ \App\Filament\Pages\BookingProposals::getUrl(['company' => $companyId, 'proposal' => $item['bookingId']]) }}">
+                                Review linked proposal
+                            </a>
                         </article>
                     @empty
                         <p class="text-sm">No internal rental previews.</p>

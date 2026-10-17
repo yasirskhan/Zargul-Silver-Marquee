@@ -99,6 +99,12 @@
                                                 href="{{ \App\Filament\Pages\ApprovalCenter::getUrl(['company' => $companyId, 'booking' => $item['id']]) }}">
                                                 Linked approvals
                                             </a>
+                                            @if ($item['status'] === 'under_review')
+                                                <a class="rounded-lg border px-3 py-2 underline"
+                                                    href="{{ \App\Filament\Pages\FinanceDesk::getUrl(['company' => $companyId, 'proposal' => $item['id']]) }}">
+                                                    Freeze rental preview
+                                                </a>
+                                            @endif
                                             @if (in_array($item['status'], ['draft', 'under_review'], true))
                                                 <a class="rounded-lg border px-3 py-2 underline"
                                                     href="{{ \App\Filament\Pages\OperationsPlanning::getUrl(['company' => $companyId, 'proposal' => $item['id']]) }}">

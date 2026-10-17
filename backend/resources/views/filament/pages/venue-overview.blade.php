@@ -92,6 +92,24 @@
                 <button type="button" wire:click="refreshSummary"
                     class="rounded-lg border px-4 py-2 text-sm">Refresh overview</button>
             </section>
+            @if ($summary['canReviewFinance'] && count($summary['recentPreviewReferences']) > 0)
+                <section class="space-y-3" aria-label="Recent nonbinding rental previews">
+                    <h2 class="font-semibold">Recent private rental previews</h2>
+                    <p class="text-xs">Owner/admin only · price snapshots are not invoices, bookings or payment authorizations.</p>
+                    <div class="grid gap-3 md:grid-cols-3">
+                        @foreach ($summary['recentPreviewReferences'] as $preview)
+                            <article wire:key="recent-preview-{{ $preview['id'] }}" class="space-y-2 rounded-xl border p-4 text-sm">
+                                <strong>{{ ucfirst($preview['program']) }} · internal frozen rental preview</strong>
+                                <p class="break-all text-xs">Preview {{ $preview['id'] }}</p>
+                                <a class="underline"
+                                    href="{{ \App\Filament\Pages\FinanceDesk::getUrl(['company' => $companyId, 'preview' => $preview['id']]) }}">
+                                    Review frozen internal preview
+                                </a>
+                            </article>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
             @if ($summary['canSeeCompanyProposals'] && count($summary['recentProposals']) > 0)
                 <section class="space-y-3" aria-label="Recent unconfirmed booking proposals">
                     <h2 class="font-semibold">Recent unconfirmed proposals</h2>
