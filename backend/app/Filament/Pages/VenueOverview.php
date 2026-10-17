@@ -23,7 +23,7 @@ final class VenueOverview extends Page
 {
     protected string $view = 'filament.pages.venue-overview';
 
-    protected static string | BackedEnum | null $navigationIcon = Heroicon::OutlinedSquares2X2;
+    protected static string | BackedEnum | null $navigationIcon = Heroicon::OutlinedCalendarDays;
 
     protected static ?string $navigationLabel = 'Overview';
 

@@ -98,6 +98,7 @@
                                                 'cleanup_required' => 'bg-orange-100 text-orange-900',
                                                 default => 'bg-gray-200 text-gray-900',
                                             };
+                                            $draftCount = (int) ($proposalCounts[$day['date']][$program] ?? 0);
                                         @endphp
                                         <td class="p-3">
                                             <span class="inline-flex rounded-lg px-3 py-2 font-medium {{ $style }}">
@@ -106,11 +107,11 @@
                                             @if ($status === 'hold')
                                                 <span class="mt-1 block text-xs">Expires: {{ $slot['expiresAt'] }}</span>
                                             @endif
-                                            @if ($canViewDrafts && ($proposalCounts[$day['date']][$program] ?? 0) > 0)
+                                            @if ($canViewDrafts && $draftCount > 0)
                                                 <a class="mt-1 block text-xs underline"
                                                     href="{{ \App\Filament\Pages\BookingProposals::getUrl(['company' => $companyId, 'hall' => $hallId, 'from' => $day['date'], 'to' => $day['date'], 'program' => $program]) }}">
-                                                    {{ $proposalCounts[$day['date']][$program] }} unconfirmed
-                                                    {{ ($proposalCounts[$day['date']][$program] === 1) ? 'draft' : 'drafts' }}
+                                                    {{ $draftCount }} unconfirmed
+                                                    {{ $draftCount === 1 ? 'draft' : 'drafts' }}
                                                     (not reserved) · review
                                                 </a>
                                             @endif
