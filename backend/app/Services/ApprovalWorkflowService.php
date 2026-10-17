@@ -510,7 +510,9 @@ final class ApprovalWorkflowService
                 'req.company_id', 'company.name',
                 DB::raw('COUNT(*) AS pending_count'),
                 DB::raw('MAX(req.created_at) AS newest_request'),
-                DB::raw('MAX(req.id::text) AS newest_id'),
+                // A same-second request replacement can preserve both count
+                // and MAX(id). Fingerprint the exact current pending ID set.
+                DB::raw("MD5(STRING_AGG(req.id::text, ',' ORDER BY req.id)) AS pending_ids_hash"),
             ]);
 
         $items = $rows->map(function ($row) use ($actor): array {
@@ -526,7 +528,7 @@ final class ApprovalWorkflowService
         })->all();
         $fingerprint = $rows->isEmpty() ? '' : hash('sha256',
             $rows->map(fn ($row) => implode(':', [
-                $row->company_id, $row->pending_count, $row->newest_request, $row->newest_id,
+                $row->company_id, $row->pending_count, $row->newest_request, $row->pending_ids_hash,
             ]))->implode('|'));
 
         return ['items' => $items, 'fingerprint' => $fingerprint];

@@ -145,4 +145,45 @@ class OwnerApprovalAttentionTest extends TestCase
         $component->call('dismiss')->assertSet('open', false)
             ->assertDontSee('Pending owner approval requests');
     }
+
+    public function test_same_count_same_timestamp_new_pending_request_reopens_dismissed_owner_notice(): void
+    {
+        [$company, , $people] = $this->fixture();
+        $this->travelTo(\Carbon\Carbon::parse('2027-02-01 12:00:00', 'UTC'));
+        try {
+            $service = app(ApprovalWorkflowService::class);
+            $this->be($people['admin']);
+            $high = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+            $middle = '88888888-8888-4888-8888-888888888888';
+            $low = '00000000-0000-4000-8000-000000000001';
+            $service->request($people['admin'], $company->id, $high,
+                'expense', 100, 'PKR', null, 'High synthetic pending marker');
+            $service->request($people['admin'], $company->id, $middle,
+                'expense', 200, 'PKR', null, 'Medium synthetic pending marker');
+            $this->be($people['owner']);
+            $first = $service->ownerPendingAttention($people['owner']);
+            $this->assertSame(2, $first['items'][0]['pending']);
+            Livewire::test(OwnerApprovalAttention::class)
+                ->assertSee('2 pending requests')
+                ->call('dismiss')->assertSet('open', false);
+
+            $service->decide($people['owner'], $company->id, $middle,
+                1, 'rejected', 'Synthetic replacement test rejection');
+            $this->be($people['admin']);
+            $service->request($people['admin'], $company->id, $low,
+                'expense', 200, 'PKR', null, 'Low synthetic replacement marker');
+            $this->be($people['owner']);
+            $new = $service->ownerPendingAttention($people['owner']);
+            $this->assertSame(2, $new['items'][0]['pending']);
+            $this->assertNotSame($first['fingerprint'], $new['fingerprint']);
+            Livewire::test(OwnerApprovalAttention::class)
+                ->assertSee('2 pending requests')->assertSet('open', true);
+            $this->assertSame(1, DB::table('approval_decisions')->count());
+        } finally {
+            $this->travelBack();
+        }
+    }
+
+
+
 }
