@@ -36,7 +36,7 @@
                         <option value="morning">Morning</option><option value="noon">Noon</option><option value="evening">Evening</option>
                     </select>
                 </label>
-                <label class="space-y-1"><span>Expected guests</span>
+                <label class="space-y-1"><span>New proposal guest count</span>
                     <input wire:model="intakeGuests" type="number" min="1" class="w-full rounded-lg border p-3 text-gray-900">
                 </label>
             </div>
