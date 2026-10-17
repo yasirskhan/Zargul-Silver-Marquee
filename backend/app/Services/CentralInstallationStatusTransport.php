@@ -18,7 +18,10 @@ use InvalidArgumentException;
  */
 final class CentralInstallationStatusTransport
 {
-    public function __construct(private readonly CentralSignedStatusReceiptVerifier $receiptVerifier) {}
+    public function __construct(
+        private readonly CentralSignedStatusReceiptVerifier $receiptVerifier,
+        private readonly CentralVerifiedLicenseDeliveryService $licenseDelivery
+    ) {}
 
     public function check(DateTimeImmutable $now): array
     {
@@ -83,6 +86,12 @@ final class CentralInstallationStatusTransport
             'revision_available' => $body['revision'],
             'licensed' => false,
         ];
+        if (array_key_exists('signed_grant', $body) &&
+            $body['signed_grant'] !== null &&
+            (! is_array($body['signed_grant']) ||
+             ! array_key_exists('signed_receipt', $body))) {
+            throw new InvalidArgumentException('Delivered license is missing trusted signed receipt.');
+        }
         if (array_key_exists('signed_receipt', $body)) {
             if (! is_array($body['signed_receipt'])) {
                 throw new InvalidArgumentException('Malformed signed status receipt.');
@@ -97,6 +106,18 @@ final class CentralInstallationStatusTransport
             }
             $result['vendor_signed'] = true;
             $result['receipt_issued_at'] = $signed['verified_at'];
+            if (isset($body['signed_grant'])) {
+                if ($signed['status'] !== 'signed_revision_pending_delivery') {
+                    throw new InvalidArgumentException('License attached to non-delivery signed status.');
+                }
+                $accepted = $this->licenseDelivery->accept(
+                    $body['signed_grant'], $body['signed_receipt'],
+                    $binding->customer_id, $binding->approved_domain, $nonce, $now
+                );
+                $result['licensed'] = $accepted['active'];
+                $result['license_revision_accepted'] = $accepted['revision'];
+                $result['license_changed'] = $accepted['changed'];
+            }
             if (in_array($signed['status'], ['suspended', 'revoked'], true)) {
                 // Inform future authorized UI without mutating entitlements.
                 // Public/operations gates must enforce only AFTER a separately

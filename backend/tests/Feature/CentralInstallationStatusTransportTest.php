@@ -226,6 +226,83 @@ class CentralInstallationStatusTransportTest extends TestCase
         $this->assertDatabaseCount('central_signed_license_cache',0);
     }
 
+    public function test_combined_vendor_signed_receipt_and_grant_can_renew_with_exact_nonce_and_revision(): void
+    {
+        [$local,$customer]=$this->enrolled();
+        $pair=sodium_crypto_sign_keypair();
+        config()->set('central_control.trusted_signing_public_keys', [
+            'test-vendor'=>self::encode(sodium_crypto_sign_publickey($pair)),
+        ]);
+        $sign=function(array $claim,string $context)use($pair):array {
+            $raw=json_encode($claim,JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR);
+            return [
+                'key_id'=>'test-vendor','payload'=>self::encode($raw),
+                'signature'=>self::encode(sodium_crypto_sign_detached(
+                    $context."\n".$raw,sodium_crypto_sign_secretkey($pair))),
+            ];
+        };
+        Http::fake(['https://lichall.hafzatech.com/api/v1/installations/status' =>
+            function(Request $request)use($local,$customer,$sign) {
+                $this->assertSame(0,$request['known_revision']);
+                $revision=1;
+                $receipt=[
+                    'api_version'=>'v1','issuer'=>'HAFZATECH',
+                    'installation_id'=>$local['installation_id'],
+                    'customer_id'=>$customer,'nonce'=>$request['nonce'],
+                    'status'=>'signed_revision_pending_delivery','revision'=>$revision,
+                    'issued_at'=>gmdate('Y-m-d\TH:i:s\Z'),
+                ];
+                $grant=[
+                    'api_version'=>'v1','issuer'=>'HAFZATECH','product'=>'VenueDesk',
+                    'license_id'=>(string) Str::uuid(),
+                    'installation_id'=>$local['installation_id'],
+                    'customer_id'=>$customer,'revision'=>$revision,'term_months'=>12,
+                    'edition'=>'standard','approved_domains'=>['test.example.test'],
+                    'not_before'=>'2026-10-01T00:00:00Z',
+                    'expires_at'=>'2027-10-01T00:00:00Z',
+                    'limits'=>['max_halls'=>2,'max_staff'=>20],
+                    'features'=>['booking'=>true],
+                ];
+                return Http::response([
+                    'api_version'=>'v1','registered_installation_id'=>$local['installation_id'],
+                    'nonce'=>$request['nonce'],'status'=>'signed_revision_pending_delivery',
+                    'revision'=>$revision,
+                    'signed_receipt'=>$sign($receipt,'HAFZATECH-INSTALL-STATUS-RECEIPT-V1'),
+                    'signed_grant'=>$sign($grant,'HAFZATECH-LICENSE-GRANT-V1'),
+                ],200);
+            },
+        ]);
+        $result=app(CentralInstallationStatusTransport::class)->check(new DateTimeImmutable('now'));
+        $this->assertTrue($result['vendor_signed']);
+        $this->assertTrue($result['licensed']);
+        $this->assertTrue($result['license_changed']);
+        $this->assertSame(1,$result['license_revision_accepted']);
+        $this->assertDatabaseCount('central_signed_license_cache',1);
+        $this->assertDatabaseCount('central_license_check_state',1);
+        $this->assertDatabaseCount('finance_journals',0);
+    }
+
+    public function test_unsigned_license_payload_does_not_mutate_cache_or_online_verification(): void
+    {
+        [$local]=$this->enrolled();
+        Http::fake(['https://lichall.hafzatech.com/api/v1/installations/status' =>
+            function(Request $request)use($local) {
+                return Http::response([
+                    'api_version'=>'v1','registered_installation_id'=>$local['installation_id'],
+                    'nonce'=>$request['nonce'],
+                    'status'=>'signed_revision_pending_delivery','revision'=>1,
+                    'signed_grant'=>['key_id'=>'attacker','payload'=>'fake','signature'=>'fake'],
+                ],200);
+            },
+        ]);
+        try {
+            app(CentralInstallationStatusTransport::class)->check(new DateTimeImmutable('now'));
+            $this->fail('Unpaired forged paid license accepted.');
+        }catch(InvalidArgumentException){}
+        $this->assertDatabaseCount('central_signed_license_cache',0);
+        $this->assertDatabaseCount('central_license_check_state',0);
+    }
+
     public function test_redirect_does_not_disclose_identity_to_untrusted_host(): void
     {
         $this->enrolled();
