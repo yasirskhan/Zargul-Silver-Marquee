@@ -114,6 +114,8 @@ jobs:
           find ../central -name '*.php' -print0 | xargs -0 -n1 php -l
           php ../central/bin/migrate.php
           php ../central/tests/installation_identity.php
+          php ../central/tests/staff_permissions.php
+          php ../central/tests/staff_access.php
       - name: Verify CMS, MFA and shared cache/session migration rollback and replay
         env:
           DB_CONNECTION: pgsql

@@ -9,5 +9,7 @@ if (!$dsn || !$username || $password === false || !str_starts_with($dsn, 'pgsql:
     exit(2);
 }
 $db = new PDO($dsn, $username, $password, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
-$db->exec(file_get_contents(dirname(__DIR__).'/schema/001_identity.sql'));
+foreach (glob(dirname(__DIR__).'/schema/*.sql') as $migration) {
+    $db->exec(file_get_contents($migration));
+}
 echo "HAFZATECH central identity schema installed in dedicated database.\n";
