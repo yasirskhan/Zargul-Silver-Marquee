@@ -112,6 +112,20 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   await expect(page.getByText('Synthetic Browser Customer')).toHaveCount(0);
   await expect(page.getByText('browser-e2e-private@example.test')).toHaveCount(0);
 
+  // Real 360px MFA-authenticated overview must surface role-scoped counts and
+  // navigate straight back to the owner's current company proposal workflow.
+  await page.goto('/admin/overview');
+  await expect(page.locator('section[aria-label="Private venue overview"]'))
+    .toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText('Unconfirmed company proposals')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Review booking proposals' })).toBeVisible();
+  await expect(page.getByText('Synthetic Browser Customer')).toHaveCount(0);
+  await page.getByRole('link', { name: 'Review booking proposals' }).click();
+  await expect(page.getByText('Internal booking proposals')).toBeVisible({ timeout: 20_000 });
+  await page.waitForFunction(
+    () => Boolean(window.Livewire?.all?.().length), null, { timeout: 30_000 }
+  );
+
   // The responsive table is intentionally wider than a 360px phone. Scroll
   // its actual overflow container, then exercise its keyboard-accessible
   // review action. Playwright's pointer click can otherwise report the last
