@@ -124,6 +124,10 @@
 - **Important**: An authenticated signed status receipt is still NOT a signed license grant. Transport returns `licensed=false` and does NOT mark last license-central-verified, post funds, activate site or change locally signed entitlement. The central public API does not yet deliver these receipts. Activation remains OFF.
 - Next: enable signed receipt delivery only through independently secured central signer worker with operator-provisioned key custody, then signed license grant retrieval and controlled renewal after separately verified payment, along with tenant owner Verify UI.
 
+## HOSTED CI REPAIR — RECEIPT TEST FIXTURE
+- For `8387c7edbbb9472f3d0212c9304658facccefda7`, GitHub Actions [39078509006](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39078509006) focused licensing-postgres failed: two new optional-receipt tests used `self::encode()` without defining their test-only base64url helper. **Fixture-only correction** adds that method; no production signer, trust validation, status semantics or release flags changed. Verify repair commit's exact hosted six-job CI before declaring this batch VERIFIED.
+- Next: connect a signed vendor response only after protected signing-worker custody and pinned production key rollout; no live licensing issuer yet.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`

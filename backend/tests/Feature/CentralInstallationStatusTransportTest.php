@@ -18,6 +18,11 @@ class CentralInstallationStatusTransportTest extends TestCase
 {
     use RefreshDatabase;
 
+    private static function encode(string $raw): string
+    {
+        return rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
+    }
+
     private function enrolled(): array
     {
         config()->set('central_control.activation_enabled', true);
