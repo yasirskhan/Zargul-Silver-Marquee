@@ -339,7 +339,10 @@ final class ApprovalWorkflowService
     }
 
     /** Tenant-authorized inbox: company-scoped staff names and non-PII proposal metadata; no customer data. */
-    public function inbox(User $actor, string $companyId, int $limit = 30, ?string $referenceId = null): array
+    public function inbox(
+        User $actor, string $companyId, int $limit = 30, ?string $referenceId = null,
+        string $status = 'all',
+    ): array
     {
         $membership = $this->member($actor, $companyId);
         if (! in_array($membership->role, ['owner', 'admin', 'manager'], true)
@@ -348,6 +351,9 @@ final class ApprovalWorkflowService
         }
         if ($referenceId !== null && ! Str::isUuid($referenceId)) {
             throw new InvalidArgumentException('Invalid approval reference.');
+        }
+        if (! in_array($status, ['all', 'pending', 'approved', 'rejected'], true)) {
+            throw new InvalidArgumentException('Invalid approval inbox status filter.');
         }
         $q = DB::table('approval_requests as req')
             ->leftJoin('users as requester', 'requester.id', '=', 'req.requested_by')
@@ -362,10 +368,18 @@ final class ApprovalWorkflowService
         if ($referenceId !== null) {
             $q->where('req.id', $referenceId);
         }
+        if ($status !== 'all') {
+            $q->where('req.status', $status);
+        }
         if ($membership->role === 'manager') {
             $q->where('req.requested_by', $actor->getKey());
         }
 
+        // Present actionable pending items first without moving private data
+        // across the existing company, role or exact-reference query boundaries.
+        if ($status === 'all' && $referenceId === null) {
+            $q->orderByRaw("CASE WHEN req.status = 'pending' THEN 0 ELSE 1 END");
+        }
         return $q->orderByDesc('req.created_at')->orderByDesc('req.id')->limit($limit)
             ->get(['req.id', 'req.category', 'req.status', 'req.revision', 'req.amount_minor',
                 'req.currency', 'req.reason', 'req.booking_id', 'req.requested_by', 'req.created_at',

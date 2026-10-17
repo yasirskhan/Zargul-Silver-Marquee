@@ -391,6 +391,45 @@ class ApprovalWorkflowServiceTest extends TestCase
         $this->assertSame(0, DB::table('hall_slot_claims')->count());
     }
 
+
+    public function test_inbox_status_filter_is_bounded_and_pending_requests_sort_first(): void
+    {
+        [$company, , , $people] = $this->fixture();
+        $service = app(ApprovalWorkflowService::class);
+        $admin = $people['admin'][0];
+        $owner = $people['owner'][0];
+        $this->be($admin);
+        $pendingId = (string) Str::uuid();
+        $approvedId = (string) Str::uuid();
+        $service->request($admin, $company->id, $pendingId,
+            'expense', 120, 'PKR', null, 'Pending internal expense');
+        $service->request($admin, $company->id, $approvedId,
+            'expense', 160, 'PKR', null, 'Approved internal expense');
+        $this->be($owner);
+        $service->decide($owner, $company->id, $approvedId, 1,
+            'approved', 'Synthetic owner decision');
+        $this->assertSame([$pendingId, $approvedId],
+            array_column($service->inbox($owner, $company->id), 'id'));
+        $this->assertSame([$pendingId],
+            array_column($service->inbox($owner, $company->id, 30, null, 'pending'), 'id'));
+        $this->assertSame([$approvedId],
+            array_column($service->inbox($owner, $company->id, 30, null, 'approved'), 'id'));
+        $this->assertSame([], $service->inbox($owner, $company->id, 30, null, 'rejected'));
+        $this->assertSame([], $service->inbox($owner, $company->id, 30,
+            $approvedId, 'pending'));
+        $this->be($people['manager'][0]);
+        $this->assertSame([], $service->inbox($people['manager'][0], $company->id, 30, null, 'pending'));
+        $this->be($owner);
+        try {
+            $service->inbox($owner, $company->id, 30, null, 'forged');
+            $this->fail('Unknown approval status was accepted.');
+        } catch (InvalidArgumentException) {
+            $this->assertTrue(true);
+        }
+        $this->assertSame(1, DB::table('approval_decisions')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
     public function test_inbox_filters_manager_requests_and_owner_can_see_all(): void
     {
         [$company, , , $people] = $this->fixture();

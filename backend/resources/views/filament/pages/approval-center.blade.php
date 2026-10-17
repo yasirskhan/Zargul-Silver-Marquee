@@ -15,6 +15,16 @@
 
         <section class="space-y-2 rounded-xl border p-4" aria-label="Find a private approval by reference">
             <label class="block space-y-1">
+                <span class="text-sm font-medium">Approval status</span>
+                <select wire:model.live="statusFilter" class="w-full rounded-lg border p-3 text-gray-900">
+                    <option value="all">All requests (pending first)</option>
+                    <option value="pending">Pending only</option>
+                    <option value="approved">Approved only</option>
+                    <option value="rejected">Rejected only</option>
+                </select>
+            </label>
+            @error('statusFilter') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+            <label class="block space-y-1">
                 <span class="text-sm font-medium">Approval request reference (optional exact UUID)</span>
                 <input type="text" wire:model="requestReference" maxlength="36" autocomplete="off"
                     class="w-full rounded-lg border p-3 font-mono text-sm text-gray-900"

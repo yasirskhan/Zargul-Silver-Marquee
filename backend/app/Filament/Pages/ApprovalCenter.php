@@ -47,6 +47,8 @@ final class ApprovalCenter extends Page
     #[Locked]
     public int $selectedRevision = 0;
 
+    public string $statusFilter = 'all';
+
     public string $newCategory = 'discount';
 
     public string $newAmount = '';
@@ -276,10 +278,16 @@ final class ApprovalCenter extends Page
         $this->grantReason = '';
         $this->revokeReason = '';
         $this->requestReference = '';
+        $this->statusFilter = 'all';
         $this->selectedId = null;
         $this->selectedRevision = 0;
         $this->telegramPairingUrl = null;
         $this->newRequestKey = (string) Str::uuid();
+        $this->refreshInbox();
+    }
+
+    public function updatedStatusFilter(): void
+    {
         $this->refreshInbox();
     }
 
@@ -300,6 +308,7 @@ final class ApprovalCenter extends Page
     public function refreshInbox(): void
     {
         $actor = $this->authorizeCompany();
+        $this->validate(['statusFilter' => ['required', Rule::in(['all', 'pending', 'approved', 'rejected'])]]);
         if ($this->requestReference !== '' && ! Str::isUuid($this->requestReference)) {
             throw ValidationException::withMessages([
                 'requestReference' => 'Enter a valid full approval request reference.',
@@ -308,6 +317,7 @@ final class ApprovalCenter extends Page
         $this->entries = app(ApprovalWorkflowService::class)->inbox(
             $actor, $this->companyId, 30,
             $this->requestReference === '' ? null : $this->requestReference,
+            $this->statusFilter,
         );
         $this->loadedCompanyId = $this->companyId;
         $this->selectedId = null;

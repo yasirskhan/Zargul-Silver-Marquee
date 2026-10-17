@@ -66,6 +66,51 @@ class ApprovalCenterLivewireTest extends TestCase
         $this->assertSame(2, DB::table('approval_alert_outbox')->count());
     }
 
+
+    public function test_owner_can_filter_scoped_approval_inbox_and_never_review_hidden_selection(): void
+    {
+        [$company, , $members] = $this->fixture();
+        $admin = $members['admin'][0];
+        $owner = $members['owner'][0];
+        $service = app(\App\Services\ApprovalWorkflowService::class);
+        $this->be($admin);
+        $approved = (string) \Illuminate\Support\Str::uuid();
+        $pending = (string) \Illuminate\Support\Str::uuid();
+        $service->request($admin, $company->id, $approved,
+            'expense', 300, 'PKR', null, 'Old approved synthetic expense');
+        $service->request($admin, $company->id, $pending,
+            'expense', 100, 'PKR', null, 'New pending synthetic expense');
+        $this->be($owner);
+        $service->decide($owner, $company->id, $approved, 1, 'approved',
+            'Owner approved synthetic planning request');
+
+        $component = Livewire::test(ApprovalCenter::class)
+            ->assertSee('Old approved synthetic expense')
+            ->assertSee('New pending synthetic expense')
+            ->set('statusFilter', 'pending')
+            ->assertSet('statusFilter', 'pending')
+            ->assertSee('New pending synthetic expense')
+            ->assertDontSee('Old approved synthetic expense');
+        $this->assertSame([$pending], array_column($component->get('entries'), 'id'));
+        $component->call('selectRequest', $pending)
+            ->assertSet('selectedId', $pending)
+            ->set('statusFilter', 'approved')
+            ->assertSet('selectedId', null)
+            ->assertSet('selectedRevision', 0)
+            ->assertSee('Old approved synthetic expense')
+            ->assertDontSee('New pending synthetic expense');
+        $component->set('decisionReason', 'Must not decide hidden request')
+            ->call('approve')->assertNotFound();
+        $component = Livewire::test(ApprovalCenter::class)
+            ->set('statusFilter', 'rejected')
+            ->assertSet('entries', [])
+            ->set('statusFilter', 'invalid')
+            ->assertHasErrors(['statusFilter']);
+        $this->assertSame('pending', DB::table('approval_requests')->where('id', $pending)->value('status'));
+        $this->assertSame(1, DB::table('approval_decisions')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
     public function test_private_approval_reference_link_opens_only_current_company_request(): void
     {
         [$company, $foreign, $members] = $this->fixture();
