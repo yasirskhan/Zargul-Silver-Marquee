@@ -5,4 +5,5 @@ return [
     // unavailable until independent counting and finance gates are certified.
     'catalog_enabled' => (bool) env('VENUE_INVENTORY_CATALOG_ENABLED', false),
     'stocktakes_enabled' => (bool) env('VENUE_INVENTORY_STOCKTAKES_ENABLED', false),
+    'loan_drafts_enabled' => (bool) env('VENUE_INVENTORY_LOAN_DRAFTS_ENABLED', false),
 ];
