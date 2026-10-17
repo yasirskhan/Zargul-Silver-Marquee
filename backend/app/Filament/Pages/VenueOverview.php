@@ -130,6 +130,11 @@ final class VenueOverview extends Page
         $this->summary = [
             'role' => $role,
             'visibleHalls' => $halls,
+            'hallsNeedingSetup' => $canSeeCompanyProposals
+                ? DB::table('halls')->where('company_id', $this->companyId)
+                    ->whereIn('id', $visibleHallIds)
+                    ->where('is_active', true)
+                    ->where('program_rules_revision', '<', 1)->count() : null,
             'drafts' => $canSeeCompanyProposals
                 ? DB::table('booking_drafts')->where('company_id', $this->companyId)
                     ->whereIn('status', ['draft', 'under_review'])->count() : null,

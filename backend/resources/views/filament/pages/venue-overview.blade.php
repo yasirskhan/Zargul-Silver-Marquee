@@ -23,6 +23,11 @@
                     </div>
                     @if ($summary['canSeeCompanyProposals'])
                         <div class="rounded-xl border p-4">
+                            <p class="text-sm">Halls needing program setup</p>
+                            <p class="text-3xl font-semibold">{{ $summary['hallsNeedingSetup'] }}</p>
+                            <p class="text-xs">Configure morning, noon and evening before confirming any booking</p>
+                        </div>
+                        <div class="rounded-xl border p-4">
                             <p class="text-sm">Unconfirmed company proposals</p>
                             <p class="text-3xl font-semibold">{{ $summary['drafts'] }}</p>
                             <p class="text-xs">Draft or under review · not a reservation</p>

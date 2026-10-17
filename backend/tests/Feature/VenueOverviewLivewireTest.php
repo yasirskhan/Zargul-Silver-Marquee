@@ -56,6 +56,7 @@ class VenueOverviewLivewireTest extends TestCase
             ->assertSet('companyId', $company->id)
             ->assertSet('summary.role', 'owner')
             ->assertSet('summary.visibleHalls', 1)
+            ->assertSet('summary.hallsNeedingSetup', 1)
             ->assertSet('summary.pendingApprovals', 1)
             ->assertSet('summary.drafts', 0)
             ->assertSee('Review booking proposals')
@@ -65,6 +66,37 @@ class VenueOverviewLivewireTest extends TestCase
             ->assertSee('Universal staff search')
             ->assertDontSee('Synthetic private supplies')
             ->assertDontSee('overview-admin@example.test');
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
+    public function test_owner_hall_program_setup_pulse_changes_after_saved_three_program_rules(): void
+    {
+        [$company, , $hall, $people] = $this->fixture();
+        Livewire::test(VenueOverview::class)
+            ->assertSet('summary.hallsNeedingSetup', 1)
+            ->assertSee('Halls needing program setup');
+
+        $slot = static fn (string $from, string $to): array => [
+            'start' => $from, 'end' => $to,
+            'setupMinutes' => 10, 'cleaningMinutes' => 10,
+            'graceMinutes' => 10, 'overtimeIntervalMinutes' => 30,
+            'overtimeRateMinor' => 0, 'rentalRateMinor' => 0,
+        ];
+        app(\App\Services\HallProgramRulesService::class)->configure(
+            $people['owner'], $company->id, $hall->id,
+            ['morning' => $slot('08:00', '11:00'),
+                'noon' => $slot('12:00', '15:00'),
+                'evening' => $slot('17:00', '22:00')],
+            'PKR', 0, 'Synthetic owner program setup pulse'
+        );
+        Livewire::test(VenueOverview::class)
+            ->assertSet('summary.hallsNeedingSetup', 0)
+            ->assertSet('summary.visibleHalls', 1);
+        $this->be($people['manager']);
+        Livewire::test(VenueOverview::class)
+            ->assertSet('summary.hallsNeedingSetup', null)
+            ->assertDontSee('Halls needing program setup');
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
         $this->assertSame(0, DB::table('finance_journals')->count());
     }
 
@@ -179,6 +211,7 @@ class VenueOverviewLivewireTest extends TestCase
         Livewire::test(VenueOverview::class)
             ->assertSet('summary.role', 'manager')
             ->assertSet('summary.visibleHalls', 1)
+            ->assertSet('summary.hallsNeedingSetup', null)
             ->assertSet('summary.pendingApprovals', 0)
             ->assertSet('summary.drafts', null)
             ->assertDontSee('Unconfirmed company proposals')
