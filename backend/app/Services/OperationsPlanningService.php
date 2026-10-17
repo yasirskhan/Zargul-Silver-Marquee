@@ -71,22 +71,34 @@ final class OperationsPlanningService
         if ($bookingId !== null && ! Str::isUuid($bookingId)) {
             throw new InvalidArgumentException('Invalid planning proposal reference.');
         }
-        $q = DB::table('operations_plan_tasks')->where('company_id', $companyId);
+        // Only link booking and hall metadata through the same company as
+        // the already policy-scoped task. Never expose customer/contact fields.
+        $q = DB::table('operations_plan_tasks as t')
+            ->join('booking_drafts as b', fn ($join) => $join
+                ->on('b.id', '=', 't.booking_id')->on('b.company_id', '=', 't.company_id'))
+            ->join('halls as h', fn ($join) => $join
+                ->on('h.id', '=', 't.hall_id')->on('h.company_id', '=', 't.company_id'))
+            ->where('t.company_id', $companyId);
         if ($bookingId !== null) {
-            $q->where('booking_id', $bookingId);
+            $q->where('t.booking_id', $bookingId);
         }
         if ($status !== 'all') {
-            $q->where('status', $status);
+            $q->where('t.status', $status);
         }
         if (in_array($member->role, ['manager', 'operations'], true)) {
             $halls = DB::table('hall_assignments')
                 ->where('company_id', $companyId)->where('membership_id', $member->id)
                 ->pluck('hall_id')->all();
-            $q->whereIn('hall_id', $halls);
+            $q->whereIn('t.hall_id', $halls);
         }
-        return $q->orderByDesc('created_at')->orderByDesc('id')->limit($limit)
-            ->get(['id', 'booking_id', 'hall_id', 'title', 'status', 'revision'])
-            ->map(fn ($row) => $this->snapshot($row))->all();
+        return $q->orderByDesc('t.created_at')->orderByDesc('t.id')->limit($limit)
+            ->get(['t.id', 't.booking_id', 't.hall_id', 't.title', 't.status',
+                't.revision', 'h.name as hall_name', 'b.event_date', 'b.program'])
+            ->map(fn ($row) => array_merge($this->snapshot($row), [
+                'hallName' => $row->hall_name,
+                'eventDate' => $row->event_date,
+                'program' => $row->program,
+            ]))->all();
     }
 
     /** Read-only chronological provenance, with fresh company and hall policy. */

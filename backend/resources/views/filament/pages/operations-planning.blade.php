@@ -60,6 +60,7 @@
                             <strong>{{ $task['title'] }}</strong>
                             <span>Planning status: {{ $task['status'] }} | revision {{ $task['revision'] }}</span>
                         </div>
+                        <p class="text-xs">Hall: {{ $task['hallName'] }} | {{ $task['eventDate'] }} ({{ ucfirst($task['program']) }})</p>
                         <p class="break-all text-xs">Proposal {{ $task['bookingId'] }}</p>
                         <button type="button" wire:click="showHistory('{{ $task['id'] }}')"
                             class="rounded-lg border px-3 py-2">View immutable review history</button>

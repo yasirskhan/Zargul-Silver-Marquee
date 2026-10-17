@@ -234,6 +234,38 @@ class OperationsPlanningTest extends TestCase
         $this->assertSame(0, DB::table('finance_journals')->count());
     }
 
+    public function test_authorized_planning_tasks_show_hall_date_and_program_without_customer_contact(): void
+    {
+        [$company, , , , $actors, $booking] = $this->fixture();
+        $owner = $actors['owner'][0];
+        $task = (string) Str::uuid();
+        app(OperationsPlanningService::class)->create(
+            $owner, $company->id, $task, $booking,
+            'Plan check-in table placement', 'Synthetic hall event preparation'
+        );
+
+        $listed = app(OperationsPlanningService::class)->tasks($owner, $company->id);
+        $this->assertCount(1, $listed);
+        $this->assertSame($task, $listed[0]['id']);
+        $this->assertSame('Test Setup Hall', $listed[0]['hallName']);
+        $this->assertSame('2027-03-15', $listed[0]['eventDate']);
+        $this->assertSame('evening', $listed[0]['program']);
+        $this->assertArrayNotHasKey('customer_id', $listed[0]);
+        $this->assertArrayNotHasKey('customerEmail', $listed[0]);
+
+        Livewire::test(OperationsPlanning::class)
+            ->assertSee('Hall: Test Setup Hall')
+            ->assertSee('2027-03-15')
+            ->assertSee('Evening')
+            ->assertDontSee('synthetic-ops@example.test');
+        $this->be($actors['manager'][0]);
+        $managerTasks = app(OperationsPlanningService::class)
+            ->tasks($actors['manager'][0], $company->id);
+        $this->assertSame('Test Setup Hall', $managerTasks[0]['hallName']);
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
     public function test_planning_status_filter_is_validated_for_company_scoped_links(): void
     {
         [$company, , , , $actors, $booking] = $this->fixture();
