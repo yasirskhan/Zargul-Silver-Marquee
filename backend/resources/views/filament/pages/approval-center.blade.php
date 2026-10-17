@@ -123,8 +123,23 @@
         @endif
 
         @if ($selectedId && $loadedCompanyId === $companyId)
+            @php($review = $this->selectedRequest())
+            @if ($review)
             <section class="space-y-3 rounded-xl border p-4" aria-label="Review selected approval">
                 <h2 class="font-semibold">Decide on request {{ $selectedId }}</h2>
+                <div class="space-y-1 rounded-lg border p-3 text-sm" aria-label="Selected exception details">
+                    <p><strong>Exception:</strong> {{ str_replace('_', ' ', ucfirst($review['category'])) }}</p>
+                    <p><strong>Proposed exception amount:</strong> {{ $review['currency'] }} {{ $review['amountMinor'] }} minor units</p>
+                    <p><strong>Requester:</strong> {{ $review['requesterName'] !== '' ? $review['requesterName'] : 'Staff member' }}
+                        (staff ID {{ $review['requestedBy'] }})</p>
+                    <p><strong>Requested:</strong> {{ $review['requestedAt'] }}</p>
+                    <p class="break-words"><strong>Reason:</strong> {{ $review['reason'] }}</p>
+                    @if (is_array($review['proposal'] ?? null))
+                        <p><strong>Linked unconfirmed event:</strong> {{ $review['proposal']['date'] }}
+                            · {{ ucfirst($review['proposal']['program']) }} · {{ $review['proposal']['hallName'] }}</p>
+                    @endif
+                    <p class="text-xs">Review is non-applying. This decision does not change any payment, booking or price.</p>
+                </div>
                 <p class="text-sm">Revision {{ $selectedRevision }}. Requesters cannot decide on their own requests.
                     Delegated administrators must have an active category- and amount-limited grant.</p>
                 <label class="block space-y-1"><span class="text-sm">Decision reason</span>
@@ -136,6 +151,7 @@
                     <button type="button" wire:click="reject" wire:loading.attr="disabled" class="rounded-lg border px-4 py-2">Reject proposal</button>
                 </div>
             </section>
+            @endif
         @endif
 
         @if ($this->role() === 'owner' && $loadedCompanyId === $companyId)

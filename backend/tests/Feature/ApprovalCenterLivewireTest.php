@@ -68,6 +68,55 @@ class ApprovalCenterLivewireTest extends TestCase
 
 
 
+
+    public function test_selected_owner_approval_shows_complete_nonapplying_request_details(): void
+    {
+        [$company, , $members] = $this->fixture();
+        $admin = $members['admin'][0];
+        $this->be($admin);
+        $id = (string) \Illuminate\Support\Str::uuid();
+        app(\App\Services\ApprovalWorkflowService::class)->request(
+            $admin, $company->id, $id, 'expense', 475, 'PKR', null,
+            'Synthetic lighting repair exception'
+        );
+        $this->be($members['owner'][0]);
+        $panel = Livewire::test(ApprovalCenter::class)
+            ->call('selectRequest', $id)
+            ->assertSee('Selected exception details')
+            ->assertSee('Proposed exception amount:')
+            ->assertSee('475 minor units')
+            ->assertSee('Requester:')
+            ->assertSee('Admin')
+            ->assertSee('Synthetic lighting repair exception')
+            ->assertSee('This decision does not change any payment, booking or price.');
+        $this->assertSame($id, $panel->instance()->selectedRequest()['id']);
+        $panel->set('statusFilter', 'approved')
+            ->assertSet('selectedId', null)
+            ->assertDontSee('Selected exception details');
+        $this->assertSame(0, DB::table('approval_decisions')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
+    public function test_select_request_never_allows_review_of_already_decided_approval(): void
+    {
+        [$company, , $members] = $this->fixture();
+        $admin = $members['admin'][0];
+        $owner = $members['owner'][0];
+        $service = app(\App\Services\ApprovalWorkflowService::class);
+        $this->be($admin);
+        $id = (string) \Illuminate\Support\Str::uuid();
+        $service->request($admin, $company->id, $id, 'expense', 300, 'PKR', null,
+            'Previously decided synthetic expense');
+        $this->be($owner);
+        $service->decide($owner, $company->id, $id, 1, 'approved',
+            'Owner already resolved proposed expense');
+        Livewire::test(ApprovalCenter::class)
+            ->assertSee('Previously decided synthetic expense')
+            ->call('selectRequest', $id)->assertForbidden();
+        $this->assertSame(1, DB::table('approval_decisions')->count());
+        $this->assertSame('approved', DB::table('approval_requests')->where('id', $id)->value('status'));
+    }
+
     public function test_owner_pages_old_approval_requests_without_losing_tenant_or_decision_scope(): void
     {
         [$company, , $members] = $this->fixture();

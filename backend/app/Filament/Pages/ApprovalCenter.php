@@ -366,12 +366,27 @@ final class ApprovalCenter extends Page
             && (int) ($entry['requestedBy'] ?? 0) !== (int) $actor->getKey();
     }
 
+    public function selectedRequest(): ?array
+    {
+        if ($this->selectedId === null || $this->loadedCompanyId !== $this->companyId) {
+            return null;
+        }
+        $this->authorizeLoaded();
+        $entry = collect($this->entries)->firstWhere('id', $this->selectedId);
+        if ($entry === null || $entry['status'] !== 'pending'
+            || $entry['revision'] !== $this->selectedRevision
+            || ! $this->canReviewRequest($entry)) {
+            return null;
+        }
+        return $entry;
+    }
+
     public function selectRequest(string $id): void
     {
         $this->authorizeLoaded();
         $entry = collect($this->entries)->firstWhere('id', $id);
         abort_unless(Str::isUuid($id) && $entry !== null, 404);
-        abort_unless($this->canReviewRequest($entry), 403);
+        abort_unless($entry['status'] === 'pending' && $this->canReviewRequest($entry), 403);
         // Caller cannot choose a stale/foreign revision merely by mutating state.
         $this->selectedId = $id;
         $this->selectedRevision = $entry['revision'];
