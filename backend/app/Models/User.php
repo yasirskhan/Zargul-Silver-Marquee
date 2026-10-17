@@ -48,11 +48,14 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     {
         return $panel->getId() === 'admin'
             && $this->is_active
-            // A cached authenticated User can outlive a database suspension.
-            // Keep verification onboarding in Filament middleware, but block
-            // a persistently disabled account at the panel entrance too.
+            // The cached User can outlive both persisted account suspension
+            // and an administrator's email verification reset.
+            // Allow genuinely unverified accounts to reach Filament's email
+            // verification onboarding, but revoke stale verified sessions.
             && DB::table('users')->where('id', $this->getKey())
-                ->where('is_active', true)->exists()
+                ->where('is_active', true)
+                ->when($this->hasVerifiedEmail(), fn ($query) => $query->whereNotNull('email_verified_at'))
+                ->exists()
             && $this->memberships()
                 ->where('is_active', true)
                 ->whereHas('company', fn ($query) => $query->where('is_active', true))
