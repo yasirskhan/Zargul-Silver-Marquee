@@ -52,5 +52,23 @@ authorized contractual adjustment and operator release.
 ## Phase 8 — Controlled pilot
 No real launch until finance, isolation, restores, booking concurrency and real user tests are accepted.
 
-## Later
-Inventory, payroll, purchases, vendors, assets, maintenance, profitability reporting and multilingual support.
+## Phase 9 — Commercial licensing and initial setup (approved, not implemented)
+Separate VenueDesk Central Control Center; signed license activation/renewal; hosted + self-hosted tenancy; scoped hall/user entitlements; public maintenance at expiry with backend grace; renew/export/reconcile; resumable securely closed owner/hall/pricing/payment setup wizard and existing-installation migration.
+
+## Phase 10 — Public website productization (approved, not implemented)
+Owner-selectable structural themes and company/hall profile; exact guest-count pricing brackets; one-hall auto-selection; published footer per-hall maps/contacts/phone and centrally governed per-license optional designer credit; safe 3-screen enquiry and 5% verified-payment hold.
+
+## Phase 11 — Provider payments and complete finance (approved, not implemented)
+Tenant-owned JazzCash/Easypaisa/Raast manual QR and approved APIs; optional unified gateway; named bank/wallet ledgers; independent verification; cash two-signature evidence, owner/staff custody and transfer confirmation; individual manager spend ceilings; vendor/payroll/utilities and reporting.
+
+## Phase 12 — Hall inventory and multi-item loans (approved, not implemented)
+Hall-owned inventory catalog and stock movements, inline item entry, monthly/quarterly/post-event audits, minimum levels, immutable discrepancy review, independent internal and outside-establishment multiple-item loans, count/return/condition evidence, partial receipts, automatic closure ONLY on independently confirmed full match, numbered PDF and hall reports. Start schema foundation after existing CI repair; preserve booking/finance gates.
+
+## Phase 13 — News, contextual Help, support and Smart Support (approved, not implemented)
+Central editorial news and versioned manuals/videos, contextual help buttons; full central agent/customer bidirectional ticket replies, status tracking, unread counters/banners, support after license expiry, safe queued manual/video/approved prior-solution suggestions without auto-closing ticket and no cross-tenant raw-ticket exposure.
+
+## Phase 14 — Performance and commercial release certification (approved, not implemented)
+Measure owner/manager/mobile booking/report latencies, indexes/queues/caching, tenant isolation, license offline grace, provider callbacks, financial correctness, real inventory reconciliation/loan concurrency, accessibility and self-hosted upgrade/restore. Green exact-SHA CI and staged pilot required.
+
+## Deferred beyond approved commercial scope
+Nonessential extensions only; inventory, wages, vendor finance and reporting are now approved product work, not a generic later bucket.

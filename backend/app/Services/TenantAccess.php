@@ -87,6 +87,22 @@ class TenantAccess
         return $membership !== null && in_array($membership->role, ['owner', 'admin'], true);
     }
 
+    /** Catalog edits are hall-specific and require active assigned manager or owner/admin. */
+    public function canManageHallInventory(User $user, Hall $hall): bool
+    {
+        $membership = $this->membership($user, $hall->company_id);
+
+        if (! $hall->is_active || $membership === null) {
+            return false;
+        }
+        if (in_array($membership->role, ['owner', 'admin'], true)) {
+            return true;
+        }
+
+        return $membership->role === 'manager'
+            && $membership->hallAssignments()->where('hall_id', $hall->getKey())->exists();
+    }
+
     public function canManageBookings(User $user, Hall $hall): bool
     {
         $membership = $this->membership($user, $hall->company_id);
