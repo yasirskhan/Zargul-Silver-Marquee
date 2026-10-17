@@ -352,8 +352,10 @@ class ApprovalCenterLivewireTest extends TestCase
             $current = $service->activeDelegations($owner, $company->id);
         $this->assertCount(1, $current);
         $this->assertSame($active, $current[0]['id']);
+        $this->assertSame(['discount'], $current[0]['categories']);
         Livewire::test(ApprovalCenter::class)->assertSee('Active / scheduled grants')
-            ->assertSee('Admin #'.$admin->id);
+            ->assertSee('Admin #'.$admin->id)
+            ->assertSee('Allowed: discount');
         $this->be($admin);
         try {
             $service->activeDelegations($admin, $company->id);

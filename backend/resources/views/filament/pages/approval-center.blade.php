@@ -192,7 +192,8 @@
                 @forelse ($this->delegations() as $grant)
                     <div class="flex flex-wrap justify-between gap-2 border-t py-2 text-sm">
                         <p class="break-all">Admin #{{ $grant['delegated_to'] }}, ceiling {{ $grant['ceiling_minor'] }},
-                            {{ $grant['starts_at'] }} to {{ $grant['ends_at'] }}</p>
+                            {{ $grant['starts_at'] }} to {{ $grant['ends_at'] }}.
+                            Allowed: {{ implode(', ', $grant['categories']) }}</p>
                         <button type="button" wire:click="revoke('{{ $grant['id'] }}')" class="rounded-lg border px-3 py-2">Revoke</button>
                     </div>
                 @empty

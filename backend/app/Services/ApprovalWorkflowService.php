@@ -443,8 +443,12 @@ final class ApprovalWorkflowService
             ->where('company_id', $companyId)->whereNull('revoked_at')
             ->where('ends_at', '>', now())
             ->orderBy('ends_at')->orderBy('id')->limit($limit)
-            ->get(['id', 'delegated_to', 'ceiling_minor', 'starts_at', 'ends_at'])
-            ->map(fn ($row) => (array) $row)->all();
+            ->get(['id', 'delegated_to', 'categories', 'ceiling_minor', 'starts_at', 'ends_at'])
+            ->map(function ($row): array {
+                $grant = (array) $row;
+                $grant['categories'] = json_decode($row->categories, true, 512, JSON_THROW_ON_ERROR);
+                return $grant;
+            })->all();
     }
 
     private function summary(object $row): array
