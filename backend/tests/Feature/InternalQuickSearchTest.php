@@ -207,6 +207,47 @@ class InternalQuickSearchTest extends TestCase
         $service->search($members['admin'][0], $foreign->id, 'operations');
     }
 
+    public function test_global_search_finds_linked_booking_approvals_without_cross_staff_disclosure(): void
+    {
+        [$company, $foreign, $members, $booking] = $this->fixture();
+        $manager = $members['manager'][0];
+        $owner = $members['owner'][0];
+        $service = app(InternalQuickSearchService::class);
+        $this->be($manager);
+        $reference = (string) Str::uuid();
+        app(ApprovalWorkflowService::class)->request(
+            $manager, $company->id, $reference, 'discount', 150,
+            'PKR', $booking, 'Manager internal program discount'
+        );
+        $matches = $service->search($manager, $company->id, $booking, 20, 'approval');
+        $this->assertSame([$reference], array_column($matches, 'id'));
+        $this->assertSame(['approval'], array_column($matches, 'kind'));
+        $this->assertStringContainsString('request='.rawurlencode($reference), $matches[0]['path']);
+        $this->assertStringContainsString('company='.rawurlencode($company->id), $matches[0]['path']);
+        $this->assertStringNotContainsString('contact-hidden@example.test',
+            json_encode($matches, JSON_THROW_ON_ERROR));
+
+        // Owner can also navigate a linked approval while the manager cannot
+        // search unrelated company or another staff member's request.
+        $this->be($owner);
+        $this->assertSame([$reference], array_column($service->search(
+            $owner, $company->id, $booking, 20, 'approval'), 'id'));
+        $this->be($members['operations'][0]);
+        try {
+            $service->search($members['operations'][0], $company->id, $booking, 20, 'approval');
+            $this->fail('Operations staff searched private approval records.');
+        } catch (AuthorizationException) {
+            $this->assertTrue(true);
+        }
+        $this->be($owner);
+        try {
+            $service->search($owner, $foreign->id, $booking, 20, 'approval');
+            $this->fail('Foreign company booking search was permitted.');
+        } catch (AuthorizationException) {
+            $this->assertTrue(true);
+        }
+    }
+
     public function test_owner_can_locate_pending_exceptions_and_planned_tasks_by_state(): void
     {
         [$company, , $members, , $task] = $this->fixture();

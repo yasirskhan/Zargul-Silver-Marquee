@@ -23,7 +23,9 @@ final class InternalQuickSearchService
             'path' => '/admin/operations-planning'],
         ['kind' => 'approval', 'table' => 'approval_requests',
             'label' => 'category', 'status' => true,
-            'fields' => ['id::text', 'category', 'status'],
+            // Internal owner/manager may look up a safe opaque booking ID to
+            // find its already-scoped approval proposals, not customer data.
+            'fields' => ['id::text', 'booking_id::text', 'category', 'status'],
             'path' => '/admin/approval-center'],
         ['kind' => 'finance', 'table' => 'finance_quote_previews',
             'label' => 'program', 'status' => false,
