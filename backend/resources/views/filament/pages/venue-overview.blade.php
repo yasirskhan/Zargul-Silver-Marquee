@@ -59,6 +59,12 @@
                             Approval center
                         </a>
                     @endif
+                    @if ($summary['canReviewFinance'])
+                        <a class="rounded-xl border p-4 underline"
+                            href="{{ \App\Filament\Pages\FinanceDesk::getUrl(['company' => $companyId]) }}">
+                            Finance review · internal only
+                        </a>
+                    @endif
                     @if ($summary['canPlan'])
                         <a class="rounded-xl border p-4 underline"
                             href="{{ \App\Filament\Pages\OperationsPlanning::getUrl(['company' => $companyId]) }}">

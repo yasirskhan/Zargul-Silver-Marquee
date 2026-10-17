@@ -128,6 +128,7 @@ final class VenueOverview extends Page
                 ? app(ApprovalWorkflowService::class)->inboxCounts($actor, $this->companyId)['pending'] : null,
             'canSeeCompanyProposals' => $canSeeCompanyProposals,
             'canReadApprovals' => $canReadApprovals,
+            'canReviewFinance' => $canSeeCompanyProposals,
             'canSearch' => $canSearch,
             'canPlan' => $halls > 0 && in_array($role, ['owner', 'admin', 'manager', 'operations'], true),
             'canManageHallRules' => $halls > 0 && in_array($role, ['owner', 'admin'], true),
