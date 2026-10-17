@@ -9,6 +9,7 @@ use BackedEnum;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Livewire\Attributes\Locked;
@@ -30,10 +31,16 @@ final class InternalQuickSearch extends Page
     #[Locked]
     public array $results = [];
 
+    private static function currentAccountAllowed(User $actor): bool
+    {
+        return DB::table('users')->where('id', $actor->getKey())
+            ->where('is_active', true)->whereNotNull('email_verified_at')->exists();
+    }
+
     public static function canAccess(): bool
     {
         $actor = Filament::auth()->user();
-        return $actor instanceof User && $actor->is_active && $actor->hasVerifiedEmail()
+        return $actor instanceof User && self::currentAccountAllowed($actor)
             && static::companiesFor($actor) !== [];
     }
 
@@ -50,7 +57,7 @@ final class InternalQuickSearch extends Page
     public function companyOptions(): array
     {
         $actor = Filament::auth()->user();
-        return $actor instanceof User && $actor->is_active && $actor->hasVerifiedEmail()
+        return $actor instanceof User && self::currentAccountAllowed($actor)
             ? static::companiesFor($actor) : [];
     }
 

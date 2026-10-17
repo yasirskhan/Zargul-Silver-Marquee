@@ -150,6 +150,26 @@ class InternalQuickSearchTest extends TestCase
         $mounted->call('runSearch')->assertForbidden();
     }
 
+
+    public function test_stale_authenticated_user_cannot_enter_private_search_panel_after_account_revocation(): void
+    {
+        [$company, , $members] = $this->fixture();
+        $actor = $members['owner'][0];
+        $this->assertTrue(InternalQuickSearch::canAccess());
+
+        \Illuminate\Support\Facades\DB::table('users')->where('id', $actor->id)
+            ->update(['is_active' => false]);
+        $this->assertTrue($actor->is_active);
+        $this->assertFalse(InternalQuickSearch::canAccess());
+        Livewire::test(InternalQuickSearch::class)->assertForbidden();
+
+        \Illuminate\Support\Facades\DB::table('users')->where('id', $actor->id)
+            ->update(['is_active' => true, 'email_verified_at' => null]);
+        $this->assertNotNull($actor->email_verified_at);
+        $this->assertFalse(InternalQuickSearch::canAccess());
+        Livewire::test(InternalQuickSearch::class)->assertForbidden();
+    }
+
     public function test_cached_authenticated_owner_cannot_search_after_persisted_account_shutdown(): void
     {
         [$company, , $members, $booking] = $this->fixture();
