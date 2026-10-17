@@ -130,6 +130,7 @@ class SitePublishedHtmlTest extends TestCase
         $legacy = $reader->render($company->id, $site, '/');
         $this->assertStringContainsString('content="Events &amp; celebrations"', $legacy);
         $this->assertStringContainsString('content="noindex, nofollow"', $legacy);
+        $this->assertStringContainsString('Preview rendering only.', $legacy);
 
         $brand = app(SiteBrandingService::class);
         $draft = $brand->publishedBranding($company->id, $site);

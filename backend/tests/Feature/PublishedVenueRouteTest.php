@@ -85,6 +85,7 @@ class PublishedVenueRouteTest extends TestCase
             ->assertSee('property="og:type" content="website"', false);
         $response->assertSee('content="noindex, nofollow"', false);
         $response->assertSee('Zargul Approved Site');
+        $response->assertDontSee('Preview rendering only.');
         $response->assertDontSee('site-media/private/');
         $response->assertDontSee('<script', false);
         $this->assertStringContainsString("script-src 'none'",

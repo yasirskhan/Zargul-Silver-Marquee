@@ -118,7 +118,9 @@
         </main>
         <footer class="site-footer">
             <p>{{ ($branding['footerText'] ?? '') !== '' ? $branding['footerText'] : $branding['siteName'] }}</p>
-            <p>Preview rendering only. Contact information, public media and booking services require separate release approval.</p>
+            @if ($canonicalUrl === null)
+                <p>Preview rendering only. Contact information, public media and booking services require separate release approval.</p>
+            @endif
         </footer>
     </div>
 </body>
