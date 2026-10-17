@@ -378,9 +378,8 @@ final class ApprovalCenter extends Page
     public function canReviewRequest(array $entry): bool
     {
         $actor = Filament::auth()->user();
-        return $actor instanceof User
-            && in_array($this->role(), ['owner', 'admin'], true)
-            && (int) ($entry['requestedBy'] ?? 0) !== (int) $actor->getKey();
+        return $actor instanceof User && $this->companyId !== null
+            && app(ApprovalWorkflowService::class)->mayReview($actor, $this->companyId, $entry);
     }
 
     public function selectedRequest(): ?array

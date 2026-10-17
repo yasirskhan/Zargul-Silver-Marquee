@@ -641,4 +641,35 @@ SQL);
         $this->assertSame(1, DB::table('approval_decisions')->count());
     }
 
+    public function test_delegated_admin_review_hint_checks_amount_category_and_current_owner(): void
+    {
+        [$company, , , $people, $booking] = $this->fixture();
+        $service = app(ApprovalWorkflowService::class);
+        $owner = $people['owner'][0];
+        $admin = $people['admin'][0];
+        $entry = ['status' => 'pending', 'requestedBy' => $owner->id,
+            'category' => 'discount', 'amountMinor' => 125];
+        $this->be($admin);
+        $this->assertFalse($service->mayReview($admin, $company->id, $entry));
+        $this->be($owner);
+        $grant = (string) Str::uuid();
+        $service->grant($owner, $company->id, $grant, $admin->id,
+            ['discount'], 200, now()->toIso8601String(),
+            now()->addHour()->toIso8601String(), 'Synthetic owner discount grant');
+        $this->be($admin);
+        $this->assertTrue($service->mayReview($admin, $company->id, $entry));
+        $this->assertFalse($service->mayReview($admin, $company->id,
+            array_merge($entry, ['amountMinor' => 201])));
+        $this->assertFalse($service->mayReview($admin, $company->id,
+            array_merge($entry, ['category' => 'expense'])));
+        $this->assertFalse($service->mayReview($admin, $company->id,
+            array_merge($entry, ['requestedBy' => $admin->id])));
+        $this->be($owner);
+        $service->revoke($owner, $company->id, $grant,
+            'Revoke synthetic discount authority');
+        $this->be($admin);
+        $this->assertFalse($service->mayReview($admin, $company->id, $entry));
+        $this->assertSame(0, DB::table('approval_decisions')->count());
+    }
+
 }

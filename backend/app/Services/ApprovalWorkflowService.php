@@ -339,6 +339,43 @@ final class ApprovalWorkflowService
     }
 
     /** Tenant-authorized inbox: company-scoped staff names and non-PII proposal metadata; no customer data. */
+    /**
+     * UI-only eligibility hint. Actual decisions must recheck grants under
+     * PostgreSQL row locks inside decide(), never rely on a rendered button.
+     */
+    public function mayReview(User $actor, string $companyId, array $request): bool
+    {
+        $membership = $this->member($actor, $companyId);
+        if (($request['status'] ?? '') !== 'pending'
+            || (int) ($request['requestedBy'] ?? 0) === (int) $actor->getKey()
+            || ! in_array($request['category'] ?? null, self::CATEGORIES, true)
+            || ! is_int($request['amountMinor'] ?? null)) {
+            return false;
+        }
+        if ($membership->role === 'owner') {
+            return true;
+        }
+        if ($membership->role !== 'admin') {
+            return false;
+        }
+        $grants = DB::table('approval_delegations')
+            ->where('company_id', $companyId)->where('delegated_to', $actor->getKey())
+            ->whereNull('revoked_at')->where('starts_at', '<=', now())
+            ->where('ends_at', '>', now())
+            ->where('ceiling_minor', '>=', $request['amountMinor'])
+            ->get(['granted_by', 'categories']);
+        foreach ($grants as $grant) {
+            if (in_array($request['category'],
+                json_decode($grant->categories, true, 512, JSON_THROW_ON_ERROR), true)
+                && DB::table('company_memberships')->where('company_id', $companyId)
+                    ->where('user_id', $grant->granted_by)->where('role', 'owner')
+                    ->where('is_active', true)->exists()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Live totals for the same currently authorized company/role as the private inbox. */
     public function inboxCounts(User $actor, string $companyId): array
     {

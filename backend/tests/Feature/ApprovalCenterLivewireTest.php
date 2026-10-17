@@ -645,4 +645,38 @@ class ApprovalCenterLivewireTest extends TestCase
 
 
 
+    public function test_admin_review_button_tracks_fresh_emergency_grant_scope(): void
+    {
+        [$company, , $members] = $this->fixture();
+        $admin = $members['admin'][0];
+        $owner = $members['owner'][0];
+        $service = app(\App\Services\ApprovalWorkflowService::class);
+        $request = (string) \Illuminate\Support\Str::uuid();
+        $service->request($owner, $company->id, $request, 'expense', 150,
+            'PKR', null, 'Owner requests delegated supplies review');
+        $this->be($admin);
+        Livewire::test(ApprovalCenter::class)
+            ->assertSee('Owner requests delegated supplies review')
+            ->assertDontSee('Review decision')
+            ->call('selectRequest', $request)->assertForbidden();
+        $this->be($owner);
+        $grant = (string) \Illuminate\Support\Str::uuid();
+        $service->grant($owner, $company->id, $grant, $admin->id,
+            ['expense'], 200, now()->toIso8601String(),
+            now()->addHour()->toIso8601String(), 'Synthetic limited decision grant');
+        $this->be($admin);
+        Livewire::test(ApprovalCenter::class)
+            ->assertSee('Review decision')
+            ->call('selectRequest', $request)->assertSet('selectedId', $request);
+        $this->be($owner);
+        $service->revoke($owner, $company->id, $grant,
+            'Immediate removal of synthetic admin authority');
+        $this->be($admin);
+        Livewire::test(ApprovalCenter::class)
+            ->assertDontSee('Review decision')
+            ->call('selectRequest', $request)->assertForbidden();
+        $this->assertSame('pending', DB::table('approval_requests')->where('id', $request)->value('status'));
+        $this->assertSame(0, DB::table('approval_decisions')->count());
+    }
+
 }
