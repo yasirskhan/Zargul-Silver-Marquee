@@ -43,6 +43,8 @@ final class InternalQuickSearchService
             ->whereHas('company', fn ($q) => $q->where('is_active', true))->first();
         if (! Auth::check() || (int) Auth::id() !== (int) $actor->getKey()
             || ! $actor->is_active || ! $actor->hasVerifiedEmail()
+            || ! User::query()->whereKey($actor->getKey())
+                ->where('is_active', true)->whereNotNull('email_verified_at')->exists()
             || ! $membership) {
             throw new AuthorizationException('An active verified company staff session is required.');
         }

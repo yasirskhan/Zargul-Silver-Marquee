@@ -150,6 +150,29 @@ class InternalQuickSearchTest extends TestCase
         $mounted->call('runSearch')->assertForbidden();
     }
 
+    public function test_cached_authenticated_owner_cannot_search_after_persisted_account_shutdown(): void
+    {
+        [$company, , $members, $booking] = $this->fixture();
+        $actor = $members['owner'][0];
+        $service = app(InternalQuickSearchService::class);
+        $this->assertContains($booking, array_column(
+            $service->search($actor, $company->id, '2027-05-20', 20, 'proposal'), 'id'
+        ));
+        // Mutate the account directly, leaving the current Auth User instance stale.
+        \Illuminate\Support\Facades\DB::table('users')->where('id', $actor->id)
+            ->update(['is_active' => false]);
+        try {
+            $service->search($actor, $company->id, '2027-05-20', 20, 'proposal');
+            $this->fail('Deactivated account retained search access through cached session.');
+        } catch (AuthorizationException) {
+            $this->assertTrue(true);
+        }
+        \Illuminate\Support\Facades\DB::table('users')->where('id', $actor->id)
+            ->update(['is_active' => true, 'email_verified_at' => null]);
+        $this->expectException(AuthorizationException::class);
+        $service->search($actor, $company->id, '2027-05-20', 20, 'proposal');
+    }
+
     public function test_admin_audit_search_matches_existing_history_policy_and_stays_tenant_scoped(): void
     {
         [$company, $foreign, $members] = $this->fixture();
