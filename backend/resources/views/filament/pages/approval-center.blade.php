@@ -76,7 +76,8 @@
                             <p class="font-semibold">{{ str_replace('_', ' ', ucfirst($entry['category'])) }} | {{ $entry['status'] }}</p>
                             <p>{{ $entry['currency'] }} minor units: {{ $entry['amountMinor'] }}</p>
                         </div>
-                        <p>Requested by staff ID {{ $entry['requestedBy'] }} | revision {{ $entry['revision'] }}</p>
+                        <p>Requested by {{ ($entry['requesterName'] ?? '') !== '' ? $entry['requesterName'] : 'staff member' }}
+                            (staff ID {{ $entry['requestedBy'] }}) | revision {{ $entry['revision'] }}</p>
                         <p class="break-words">{{ $entry['reason'] }}</p>
                         <p class="break-all text-xs">ID: {{ $entry['id'] }} | proposal: {{ $entry['bookingId'] ?? 'none' }}</p>
                         @if (is_array($entry['proposal'] ?? null))

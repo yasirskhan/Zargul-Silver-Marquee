@@ -338,7 +338,7 @@ final class ApprovalWorkflowService
         }, 3);
     }
 
-    /** Tenant-authorized inbox contains IDs and non-PII proposal metadata only. */
+    /** Tenant-authorized inbox: company-scoped staff names and non-PII proposal metadata; no customer data. */
     public function inbox(User $actor, string $companyId, int $limit = 30, ?string $referenceId = null): array
     {
         $membership = $this->member($actor, $companyId);
@@ -350,6 +350,7 @@ final class ApprovalWorkflowService
             throw new InvalidArgumentException('Invalid approval reference.');
         }
         $q = DB::table('approval_requests as req')
+            ->leftJoin('users as requester', 'requester.id', '=', 'req.requested_by')
             ->leftJoin('booking_drafts as booking', function ($join): void {
                 $join->on('booking.id', '=', 'req.booking_id')
                     ->on('booking.company_id', '=', 'req.company_id');
@@ -368,9 +369,10 @@ final class ApprovalWorkflowService
         return $q->orderByDesc('req.created_at')->orderByDesc('req.id')->limit($limit)
             ->get(['req.id', 'req.category', 'req.status', 'req.revision', 'req.amount_minor',
                 'req.currency', 'req.reason', 'req.booking_id', 'req.requested_by', 'req.created_at',
-                'booking.event_date as proposed_date', 'booking.program as proposed_program',
+                'requester.name as requester_name', 'booking.event_date as proposed_date', 'booking.program as proposed_program',
                 'hall.name as proposed_hall'])
             ->map(fn ($row) => array_merge($this->summary($row), [
+                'requesterName' => (string) ($row->requester_name ?? ''),
                 'proposal' => $row->proposed_date !== null && $row->proposed_hall !== null
                     ? ['date' => $row->proposed_date, 'program' => $row->proposed_program,
                         'hallName' => $row->proposed_hall] : null,

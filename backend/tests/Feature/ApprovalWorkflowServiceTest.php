@@ -368,6 +368,7 @@ class ApprovalWorkflowServiceTest extends TestCase
             'PKR', $booking, 'Owner reviews proposed hall discount');
         $mine = $service->inbox($manager, $company->id, 30, $id);
         $this->assertCount(1, $mine);
+        $this->assertSame('Manager', $mine[0]['requesterName']);
         $this->assertSame([
             'date' => '2027-01-02', 'program' => 'evening', 'hallName' => 'Grand',
         ], $mine[0]['proposal']);
@@ -378,6 +379,7 @@ class ApprovalWorkflowServiceTest extends TestCase
         $this->be($people['owner'][0]);
         $ownerInbox = $service->inbox($people['owner'][0], $company->id, 30, $id);
         $this->assertSame($mine[0]['proposal'], $ownerInbox[0]['proposal']);
+        $this->assertSame('Manager', $ownerInbox[0]['requesterName']);
         $expense = (string) Str::uuid();
         $service->request($people['owner'][0], $company->id, $expense, 'expense',
             100, 'PKR', null, 'Internal venue supply quote');

@@ -56,6 +56,7 @@ class ApprovalCenterLivewireTest extends TestCase
         $this->be($members['owner'][0]);
         Livewire::test(ApprovalCenter::class)
             ->assertSee('Proposed supplies expense')
+            ->assertSee('Requested by Admin')
             ->call('selectRequest', $approval->id)
             ->set('decisionReason', 'Owner reviewed proposed expense')
             ->call('approve')->assertHasNoErrors()
