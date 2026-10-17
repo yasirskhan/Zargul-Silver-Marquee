@@ -68,6 +68,18 @@ final class InstallationStatusService
             if(!sodium_crypto_sign_verify_detached($signature,$payload,$pub)){
                 throw new RegistrationError('invalid_installation_proof');
             }
+            // Bound replay-ledger growth when a legitimate installation key
+            // is misconfigured or abused. Row lock serializes concurrent
+            // check-ins per installation; manual Verify remains available
+            // without an artificial 15-day limitation at normal usage rates.
+            $rate=$this->db->prepare(
+                "SELECT count(*) FROM central_installation_status_checks
+                 WHERE installation_id=:installation AND checked_at > now()-interval '1 hour'"
+            );
+            $rate->execute(['installation'=>$input['installation_id']]);
+            if ((int)$rate->fetchColumn() >= 60) {
+                throw new RegistrationError('status_rate_limited',429);
+            }
             $q=$this->db->prepare(
                 "INSERT INTO central_installation_status_checks
                  (installation_id,customer_id,nonce_sha256,known_revision)

@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lichall.hafzatech.com/contracts/installation-status-v1",
+  "title": "HAFZATECH authenticated installation status check v1",
+  "description": "Authenticated installation-to-vendor connectivity check. Response is NOT digitally signed and must NEVER update paid license entitlement, renewal, revocation, or last authenticated license grant verification. Activation remains default OFF.",
+  "request": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "installation_id",
+      "customer_id",
+      "request_time",
+      "nonce",
+      "known_revision",
+      "signature"
+    ],
+    "properties": {
+      "installation_id": {
+        "$ref": "#/$defs/uuidV4"
+      },
+      "customer_id": {
+        "$ref": "#/$defs/uuidV4"
+      },
+      "request_time": {
+        "type": "string",
+        "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+      },
+      "nonce": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_-]{43}$"
+      },
+      "known_revision": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 2147483647
+      },
+      "signature": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_-]{86}$"
+      }
+    }
+  },
+  "response": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "api_version",
+      "status",
+      "registered_installation_id",
+      "nonce",
+      "revision"
+    ],
+    "properties": {
+      "api_version": {
+        "const": "v1"
+      },
+      "status": {
+        "enum": [
+          "registered_pending_license",
+          "signed_revision_pending_delivery"
+        ]
+      },
+      "registered_installation_id": {
+        "$ref": "#/$defs/uuidV4"
+      },
+      "nonce": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_-]{43}$"
+      },
+      "revision": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 2147483647
+      }
+    }
+  },
+  "$defs": {
+    "uuidV4": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    }
+  },
+  "x-request-signature": {
+    "algorithm": "Ed25519",
+    "input": "HAFZATECH-INSTALL-CHECK-V1\\n<installation_id>\\n<customer_id>\\n<request_time>\\n<nonce>\\n<known_revision>",
+    "timestamp_skew_seconds": 300,
+    "nonce": "cryptographically random 32 bytes, base64url without padding"
+  },
+  "x-response-security": "Authenticated by the vendor HTTPS channel and request nonce echo only. It cannot authorize license renewal or check-in success until an independently vendor-signed grant/status response has been verified.",
+  "x-rate-limit": "At most 60 accepted signed check requests per installation per rolling hour; requests over limit return status_rate_limited."
+}

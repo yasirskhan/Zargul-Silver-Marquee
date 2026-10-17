@@ -74,6 +74,20 @@ $old=$sign($c,gmdate('Y-m-d\TH:i:s\Z',time()-3600));
 statusDenied(fn()=>$service->check($old),'invalid_timestamp');
 requireStatus((int)$db->query('SELECT count(*) FROM central_installation_status_checks')->fetchColumn()===1,
     'Only successfully authenticated unique check-in recorded');
+// Add 59 more synthetic distinct nonce events after the first validated
+// check-in, then require the 61st authenticated request to be throttled.
+$insert=$db->prepare(
+    "INSERT INTO central_installation_status_checks
+     (installation_id,customer_id,nonce_sha256,known_revision)
+     VALUES(:installation,:customer,:nonce,0)"
+);
+for($n=0;$n<59;$n++){
+    $insert->execute(['installation'=>$installation,'customer'=>$c,
+        'nonce'=>hash('sha256',random_bytes(32))]);
+}
+statusDenied(fn()=>$service->check($sign($c)),'status_rate_limited');
+requireStatus((int)$db->query('SELECT count(*) FROM central_installation_status_checks')->fetchColumn()===60,
+    'rate limit denies extra inserts and does not mutate licensing');
 $db->prepare("UPDATE vendor_customers SET status='suspended' WHERE id=:id")->execute(['id'=>$c]);
 statusDenied(fn()=>$service->check($sign($c)),'unauthorized_installation');
 echo "PASS: signed central check-in enforces install binding, nonce replay, clock skew, cross-customer and suspension\n";
