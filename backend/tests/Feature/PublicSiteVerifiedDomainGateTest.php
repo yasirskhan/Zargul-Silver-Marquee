@@ -87,6 +87,33 @@ class PublicSiteVerifiedDomainGateTest extends TestCase
         $this->assertFalse((bool) config('public_site.indexing_enabled'));
     }
 
+    public function test_unverified_domain_cannot_access_any_public_site_http_endpoint(): void
+    {
+        [$company, $siteId, $owner] = $this->fixture();
+        $paths = ['/', '/halls', '/robots.txt', '/sitemap.xml',
+            '/_venue-media/home/'.Str::uuid().'.webp'];
+        foreach ($paths as $path) {
+            $this->get('https://marquee.example.org'.$path)->assertStatus(503);
+        }
+        $claimId = $this->claim($company, $siteId, $owner, 'pending');
+        foreach ($paths as $path) {
+            $this->get('https://marquee.example.org'.$path)->assertStatus(503);
+        }
+        DB::table('site_domain_claims')->where('id', $claimId)->update([
+            'status' => 'verified', 'verified_by' => $owner->id, 'verified_at' => now(),
+        ]);
+        // Domain proof only opens the HOST gate. There is no approved
+        // homepage, sitemap, media or public launch content in this fixture.
+        $this->get('https://marquee.example.org/')->assertNotFound();
+        $this->get('https://marquee.example.org/halls')->assertNotFound();
+        $this->get('https://marquee.example.org/sitemap.xml')->assertNotFound();
+        $this->get('https://marquee.example.org/robots.txt')->assertOk()
+            ->assertSee('Disallow: /');
+        $this->get('https://marquee.example.org/_venue-media/home/'.Str::uuid().'.webp')
+            ->assertNotFound();
+        $this->get('https://forged.example.org/robots.txt')->assertNotFound();
+    }
+
     public function test_verified_dns_claim_never_crosses_tenant_or_website_release(): void
     {
         [$company, $siteId, $owner] = $this->fixture();
