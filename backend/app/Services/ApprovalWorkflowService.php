@@ -397,6 +397,7 @@ final class ApprovalWorkflowService
     public function inbox(
         User $actor, string $companyId, int $limit = 30, ?string $referenceId = null,
         string $status = 'all', int $offset = 0, string $category = 'all',
+        ?string $bookingId = null,
     ): array
     {
         $membership = $this->member($actor, $companyId);
@@ -415,6 +416,9 @@ final class ApprovalWorkflowService
         }
         if ($category !== 'all' && ! in_array($category, self::CATEGORIES, true)) {
             throw new InvalidArgumentException('Invalid approval inbox category filter.');
+        }
+        if ($bookingId !== null && ! Str::isUuid($bookingId)) {
+            throw new InvalidArgumentException('Invalid linked booking reference.');
         }
         $q = DB::table('approval_requests as req')
             ->leftJoin('users as requester', 'requester.id', '=', 'req.requested_by')
@@ -439,6 +443,9 @@ final class ApprovalWorkflowService
         }
         if ($category !== 'all') {
             $q->where('req.category', $category);
+        }
+        if ($bookingId !== null) {
+            $q->where('req.booking_id', $bookingId);
         }
         if ($membership->role === 'manager') {
             $q->where('req.requested_by', $actor->getKey());

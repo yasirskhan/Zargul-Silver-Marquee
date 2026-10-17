@@ -82,7 +82,15 @@
                                     <td class="p-3">{{ $item['guests'] }}</td>
                                     <td class="p-3 font-medium">{{ str_replace('_', ' ', ucfirst($item['status'])) }}</td>
                                     <td class="p-3">{{ $item['revision'] }}</td>
-                                    <td class="p-3"><button type="button" wire:click="selectDraft('{{ $item['id'] }}')" class="rounded-lg border px-3 py-2 font-semibold">Review/edit</button></td>
+                                    <td class="p-3">
+                                        <div class="flex flex-wrap gap-2">
+                                            <button type="button" wire:click="selectDraft('{{ $item['id'] }}')" class="rounded-lg border px-3 py-2 font-semibold">Review/edit</button>
+                                            <a class="rounded-lg border px-3 py-2 underline"
+                                                href="{{ AppFilamentPagesApprovalCenter::getUrl(['company' => $companyId, 'booking' => $item['id']]) }}">
+                                                Linked approvals
+                                            </a>
+                                        </div>
+                                    </td>
                                 </tr>
                             @empty
                                 <tr><td colspan="8" class="p-4 text-sm">No matching internal proposals.</td></tr>

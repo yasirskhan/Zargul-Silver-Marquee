@@ -37,6 +37,10 @@ final class ApprovalCenter extends Page
     #[Url(as: 'request')]
     public string $requestReference = '';
 
+    /** Optional exact linked draft from the private booking proposal workspace. */
+    #[Url(as: 'booking')]
+    public string $bookingFilter = '';
+
     #[Locked]
     public ?string $loadedCompanyId = null;
 
@@ -302,6 +306,7 @@ final class ApprovalCenter extends Page
         $this->grantReason = '';
         $this->revokeReason = '';
         $this->requestReference = '';
+        $this->bookingFilter = '';
         $this->statusFilter = 'all';
         $this->categoryFilter = 'all';
         $this->selectedId = null;
@@ -335,6 +340,20 @@ final class ApprovalCenter extends Page
         $this->refreshInbox();
     }
 
+    public function updatedBookingFilter(): void
+    {
+        // The old selected decision must never survive a changed proposal scope.
+        $this->selectedId = null;
+        $this->selectedRevision = 0;
+        $this->decisionReason = '';
+    }
+
+    public function clearBookingFilter(): void
+    {
+        $this->bookingFilter = '';
+        $this->refreshInbox();
+    }
+
     public function refreshInbox(): void
     {
         $this->inboxOffset = 0;
@@ -364,6 +383,7 @@ final class ApprovalCenter extends Page
         $this->validate([
             'statusFilter' => ['required', Rule::in(['all', 'pending', 'approved', 'rejected'])],
             'categoryFilter' => ['required', Rule::in(array_merge(['all'], $this->inboxCategoryOptions()))],
+            'bookingFilter' => ['nullable', 'uuid'],
         ]);
         if ($this->requestReference !== '' && ! Str::isUuid($this->requestReference)) {
             throw ValidationException::withMessages([
@@ -374,6 +394,7 @@ final class ApprovalCenter extends Page
             $actor, $this->companyId, self::INBOX_PAGE_SIZE + 1,
             $this->requestReference === '' ? null : $this->requestReference,
             $this->statusFilter, $this->inboxOffset, $this->categoryFilter,
+            $this->bookingFilter === '' ? null : $this->bookingFilter,
         );
         $this->inboxHasMore = count($rows) > self::INBOX_PAGE_SIZE;
         $this->entries = array_slice($rows, 0, self::INBOX_PAGE_SIZE);

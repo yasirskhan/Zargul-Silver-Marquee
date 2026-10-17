@@ -672,4 +672,54 @@ SQL);
         $this->assertSame(0, DB::table('approval_decisions')->count());
     }
 
+    public function test_approval_inbox_exact_linked_booking_filter_preserves_scoped_manager_history(): void
+    {
+        [$company, , , $people, $bookingId] = $this->fixture();
+        $owner = $people['owner'][0];
+        $manager = $people['manager'][0];
+        $admin = $people['admin'][0];
+        $service = app(ApprovalWorkflowService::class);
+        $discount = (string) Str::uuid();
+        $expense = (string) Str::uuid();
+
+        $this->be($manager);
+        $service->request($manager, $company->id, $discount, 'discount',
+            500, 'PKR', $bookingId, 'Manager linked synthetic discount');
+        $this->be($admin);
+        $service->request($admin, $company->id, $expense, 'expense',
+            100, 'PKR', null, 'Admin unrelated synthetic expense');
+
+        $this->be($owner);
+        $this->assertSame([$discount], array_column($service->inbox(
+            $owner, $company->id, 30, null, 'all', 0, 'all', $bookingId), 'id'));
+        $this->assertSame([], $service->inbox($owner, $company->id,
+            30, null, 'all', 0, 'all', (string) Str::uuid()));
+        $this->assertSame([], $service->inbox($owner, $company->id,
+            30, $expense, 'all', 0, 'all', $bookingId));
+        try {
+            $service->inbox($owner, $company->id, 30, null, 'all', 0, 'all', 'not-a-uuid');
+            $this->fail('Invalid linked booking reference was accepted.');
+        } catch (InvalidArgumentException) {
+            $this->assertTrue(true);
+        }
+
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Livewire::test(ApprovalCenter::class)
+            ->set('bookingFilter', $bookingId)
+            ->call('refreshInbox')
+            ->assertSee('Manager linked synthetic discount')
+            ->assertDontSee('Admin unrelated synthetic expense')
+            ->assertSet('bookingFilter', $bookingId)
+            ->set('bookingFilter', 'invalid')->call('refreshInbox')
+            ->assertHasErrors(['bookingFilter']);
+
+        $this->be($manager);
+        $this->assertSame([$discount], array_column($service->inbox(
+            $manager, $company->id, 30, null, 'all', 0, 'all', $bookingId), 'id'));
+        $this->assertSame(0, DB::table('approval_decisions')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
+
+
 }

@@ -41,12 +41,23 @@
                     placeholder="Paste the full internal reference">
             </label>
             @error('requestReference') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+            <label class="block space-y-1">
+                <span class="text-sm font-medium">Linked booking proposal reference (optional UUID)</span>
+                <input type="text" wire:model="bookingFilter" maxlength="36" autocomplete="off"
+                    class="w-full rounded-lg border p-3 font-mono text-sm text-gray-900"
+                    placeholder="Paste a booking proposal reference">
+            </label>
+            @error('bookingFilter') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
             <div class="flex flex-wrap gap-2">
                 <button type="button" wire:click="refreshInbox" class="rounded-lg border px-3 py-2">Find request</button>
                 <button type="button" wire:click="clearRequestReference" class="rounded-lg border px-3 py-2">Show recent requests</button>
+                <button type="button" wire:click="clearBookingFilter" class="rounded-lg border px-3 py-2">Clear booking filter</button>
             </div>
             @if ($requestReference !== '')
                 <p class="break-all text-xs">Filtered exact request: {{ $requestReference }}</p>
+            @endif
+            @if ($bookingFilter !== '')
+                <p class="break-all text-xs">Filtered linked booking: {{ $bookingFilter }}</p>
             @endif
         </section>
 
