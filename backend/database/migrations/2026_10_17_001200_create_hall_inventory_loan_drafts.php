@@ -82,7 +82,7 @@ SQL);
         // external-in lines must point to the borrowing hall's local catalog.
         DB::unprepared(<<<'SQL'
 CREATE OR REPLACE FUNCTION venuedesk_inventory_guard_loan_line_hall() RETURNS trigger
-LANGUAGE plpgsql AS $
+LANGUAGE plpgsql AS $$
 DECLARE source_hall uuid;
 BEGIN
     SELECT CASE
@@ -97,7 +97,7 @@ BEGIN
     END IF;
     RETURN NEW;
 END
-$;
+$$;
 SQL);
         DB::statement('CREATE TRIGGER inventory_loan_line_hall_guard BEFORE INSERT ON hall_inventory_loan_draft_lines FOR EACH ROW EXECUTE FUNCTION venuedesk_inventory_guard_loan_line_hall()');
 
