@@ -81,6 +81,8 @@ class PublishedVenueRouteTest extends TestCase
             ->assertHeader('Cache-Control', 'no-store, private')
             ->assertHeader('X-Robots-Tag', 'noindex, nofollow');
         $response->assertSee('Approved Hall Opening');
+        $response->assertSee('class="skip-link" href="#main-content"', false)
+            ->assertSee('<main id="main-content" tabindex="-1">', false);
         $response->assertSee('https://venue.example.test/');
         $response->assertSee('property="og:title" content="Approved venue home | Zargul Approved Site"', false)
             ->assertSee('property="og:description" content="Real venue pending launch review"', false)

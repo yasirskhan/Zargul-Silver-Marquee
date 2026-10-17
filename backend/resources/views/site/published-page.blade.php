@@ -70,6 +70,8 @@
         .site-section p { overflow-wrap: anywhere; white-space: pre-line; }
         .site-section a { color: {{ $palette['foreground'] }}; text-underline-offset: 3px; }
         a:focus-visible { outline: 3px solid {{ $palette['accent'] }}; outline-offset: 4px; }
+        .skip-link { position: absolute; left: 12px; top: -100px; z-index: 10; padding: 10px 16px; border-radius: 6px; background: {{ $palette['foreground'] }}; color: {{ $palette['background'] }}; font-weight: 700; }
+        .skip-link:focus { top: 12px; }
         .layout-columns { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; }
         .layout-column { grid-column: span var(--desktop-span); min-width: 0; }
         .site-section img, .brand-logo { display: block; max-width: 100%; height: auto; border-radius: 10px; }
@@ -84,6 +86,7 @@
     </style>
 </head>
 <body>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
     <div class="shell">
         <header class="site-header" aria-label="Venue branding">
             <p class="site-title">{{ $branding['siteName'] }}</p>
@@ -110,7 +113,7 @@
                 </nav>
             @endif
         </header>
-        <main id="main-content">
+        <main id="main-content" tabindex="-1">
             <h1>{{ $snapshot['page']['title'] }}</h1>
             @foreach ($snapshot['page']['sections'] as $block)
                 @include('site.partials.published-block', ['block' => $block, 'media' => $snapshot['media'], 'mediaBase' => $mediaBase])
