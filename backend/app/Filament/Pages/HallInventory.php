@@ -6,6 +6,7 @@ use App\Models\CompanyMembership;
 use App\Models\Hall;
 use App\Models\User;
 use App\Services\HallInventoryCatalogService;
+use App\Services\HallInventoryLoanDraftService;
 use App\Services\HallInventoryStocktakeService;
 use App\Services\TenantAccess;
 use BackedEnum;
@@ -48,6 +49,29 @@ final class HallInventory extends Page
     public string $auditKind = 'ad_hoc';
     public string $auditReason = '';
     public array $countRows = [];
+
+    #[Locked]
+    public string $loanRequestId = '';
+    #[Locked]
+    public ?string $lastLoanReference = null;
+
+    public string $loanDirection = 'internal';
+    public string $loanCounterpartHallId = '';
+    public string $loanOutsideName = '';
+    public string $loanOutsideContact = '';
+    public string $loanOutsidePhone = '';
+    public string $loanOutsideAddress = '';
+    public string $loanReturnDate = '';
+    public string $loanPurpose = '';
+    public array $loanRows = [];
+
+    #[Locked]
+    public string $loanInlineRequestId = '';
+    public ?string $loanInlineRowKey = null;
+    public string $loanInlineName = '';
+    public string $loanInlineCategory = 'Crockery';
+    public string $loanInlineUnit = 'piece';
+    public string $loanInlineMinimumQuantity = '0';
 
     private static function userAllowed(User $actor): bool
     {
@@ -109,6 +133,14 @@ final class HallInventory extends Page
             ? static::authorizedHallOptions($actor, $this->companyId) : [];
     }
 
+    public function otherHallOptions(): array
+    {
+        $this->authorizeSelection();
+        return Hall::query()->where('company_id', $this->companyId)
+            ->where('is_active', true)->where('id', '<>', $this->hallId)
+            ->orderBy('name')->limit(100)->pluck('name', 'id')->all();
+    }
+
     private function authorizeSelection(): User
     {
         abort_unless(static::canAccess() && $this->companyId !== null
@@ -135,6 +167,8 @@ final class HallInventory extends Page
         $this->hallId = array_key_first($this->hallOptions());
         $this->createRequestId = (string) Str::uuid();
         $this->countRequestId = (string) Str::uuid();
+        $this->loanRequestId = (string) Str::uuid();
+        $this->loanInlineRequestId = (string) Str::uuid();
         $this->reloadCatalog();
     }
 
@@ -170,8 +204,25 @@ final class HallInventory extends Page
         $this->auditReason = '';
         $this->countRows = [];
         $this->lastCountReference = null;
+        $this->loanRows = [];
+        $this->loanDirection = 'internal';
+        $this->loanCounterpartHallId = '';
+        $this->loanOutsideName = '';
+        $this->loanOutsideContact = '';
+        $this->loanOutsidePhone = '';
+        $this->loanOutsideAddress = '';
+        $this->loanReturnDate = '';
+        $this->loanPurpose = '';
+        $this->lastLoanReference = null;
+        $this->loanInlineRowKey = null;
+        $this->loanInlineName = '';
+        $this->loanInlineCategory = 'Crockery';
+        $this->loanInlineUnit = 'piece';
+        $this->loanInlineMinimumQuantity = '0';
+        $this->loanInlineRequestId = (string) Str::uuid();
         $this->createRequestId = (string) Str::uuid();
         $this->countRequestId = (string) Str::uuid();
+        $this->loanRequestId = (string) Str::uuid();
     }
 
     public function reloadCatalog(): void
@@ -230,6 +281,110 @@ final class HallInventory extends Page
         $this->authorizeSelection();
         $this->countRows = array_values(array_filter(
             $this->countRows, fn ($row) => ($row['key'] ?? '') !== $rowKey));
+    }
+
+    public function openLoanInlineItem(string $rowKey): void
+    {
+        $this->authorizeSelection();
+        abort_unless(config('inventory_controls.loan_drafts_enabled'), 403);
+        abort_unless(collect($this->loanRows)->contains(fn ($row) =>
+            ($row['key'] ?? null) === $rowKey), 403);
+        $this->loanInlineRowKey = $rowKey;
+    }
+
+    public function saveLoanInlineItem(): void
+    {
+        $actor = $this->authorizeSelection();
+        abort_unless(config('inventory_controls.loan_drafts_enabled'), 403);
+        $rowIndex = null;
+        foreach ($this->loanRows as $index => $row) {
+            if (($row['key'] ?? null) === $this->loanInlineRowKey) {
+                $rowIndex = $index;
+                break;
+            }
+        }
+        abort_unless($rowIndex !== null, 403);
+        $this->validate([
+            'loanInlineName' => 'required|string|min:1|max:160',
+            'loanInlineCategory' => 'required|string|max:80',
+            'loanInlineUnit' => 'required|in:piece,set,pair,kg,liter',
+            'loanInlineMinimumQuantity' => ['required', 'regex:/\\A[0-9]{1,9}\\z/'],
+        ]);
+        try {
+            $itemId = app(HallInventoryCatalogService::class)->create(
+                $actor, $this->companyId, $this->hallId, $this->loanInlineRequestId,
+                $this->loanInlineName, $this->loanInlineCategory, $this->loanInlineUnit,
+                (int) $this->loanInlineMinimumQuantity,
+                'Created from multi-item borrowing request',
+            );
+        } catch (InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['loanInlineName' => $e->getMessage()]);
+        }
+        $this->loanRows[$rowIndex]['itemId'] = $itemId;
+        $this->loanInlineRowKey = null;
+        $this->loanInlineName = '';
+        $this->loanInlineMinimumQuantity = '0';
+        $this->loanInlineRequestId = (string) Str::uuid();
+        $this->reloadCatalog();
+    }
+
+    public function addLoanRow(): void
+    {
+        $this->authorizeSelection();
+        abort_unless(config('inventory_controls.loan_drafts_enabled'), 403);
+        abort_unless(count($this->loanRows) < 100, 403);
+        $this->loanRows[] = [
+            'key' => (string) Str::uuid(), 'itemId' => '', 'quantity' => '',
+        ];
+    }
+
+    public function removeLoanRow(string $rowKey): void
+    {
+        $this->authorizeSelection();
+        abort_unless(config('inventory_controls.loan_drafts_enabled'), 403);
+        $this->loanRows = array_values(array_filter(
+            $this->loanRows, fn ($row) => ($row['key'] ?? '') !== $rowKey));
+    }
+
+    public function submitLoanDraft(): void
+    {
+        $actor = $this->authorizeSelection();
+        abort_unless(config('inventory_controls.loan_drafts_enabled'), 403);
+        if (count($this->loanRows) < 1 || count($this->loanRows) > 100) {
+            throw ValidationException::withMessages(['loanRows' => 'Add 1 to 100 items before saving a loan request.']);
+        }
+        $lines = [];
+        foreach ($this->loanRows as $row) {
+            if (! is_string($row['quantity'] ?? null)
+                || ! preg_match('/\\A[1-9][0-9]{0,8}\\z/D', $row['quantity'])) {
+                throw ValidationException::withMessages(['loanRows' => 'Every loan row needs a positive whole-number quantity.']);
+            }
+            $lines[] = [
+                'itemId' => $row['itemId'] ?? '',
+                'quantity' => (int) $row['quantity'],
+            ];
+        }
+        $lending = $this->loanDirection === 'external_in' ? null : $this->hallId;
+        $borrowing = $this->loanDirection === 'internal' ? $this->loanCounterpartHallId
+            : ($this->loanDirection === 'external_in' ? $this->hallId : null);
+        try {
+            $this->lastLoanReference = app(HallInventoryLoanDraftService::class)->create(
+                $actor, $this->companyId, $this->loanRequestId, $this->loanDirection,
+                $lending, $borrowing, $lines, $this->loanReturnDate, $this->loanPurpose,
+                $this->loanDirection === 'internal' ? null : $this->loanOutsideName,
+                $this->loanDirection === 'internal' ? null : $this->loanOutsideContact,
+                $this->loanDirection === 'internal' ? null : $this->loanOutsidePhone,
+                $this->loanDirection === 'internal' ? null : $this->loanOutsideAddress,
+            );
+        } catch (InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['loanRows' => $e->getMessage()]);
+        }
+        $this->loanRows = [];
+        $this->loanPurpose = '';
+        $this->loanOutsideContact = '';
+        $this->loanOutsidePhone = '';
+        $this->loanOutsideAddress = '';
+        $this->loanRequestId = (string) Str::uuid();
     }
 
     public function submitCount(): void

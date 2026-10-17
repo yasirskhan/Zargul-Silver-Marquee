@@ -141,5 +141,141 @@
                 @endif
             </section>
         @endif
+
+        @if(config('inventory_controls.loan_drafts_enabled'))
+            <section class="space-y-4 rounded-xl border p-4" aria-label="Multi-item internal or external borrowing request">
+                <h2 class="text-lg font-semibold">Borrow / lend multiple inventory items</h2>
+                <p class="text-sm text-gray-600 dark:text-gray-300">
+                    Draft request only. Nothing is dispatched, transferred or returned here.
+                    Actual handover, independent confirmation, partial returns and final
+                    receipt are separate controlled steps.
+                </p>
+                <div class="grid gap-3 md:grid-cols-2">
+                    <label class="block space-y-1"><span class="text-sm">Borrowing transaction type</span>
+                        <select wire:model.live="loanDirection" class="w-full rounded-lg border p-3 text-gray-900">
+                            <option value="internal">Lend from this hall to another hall</option>
+                            <option value="external_in">Borrow from outside into this hall</option>
+                            <option value="external_out">Lend from this hall to an outside establishment</option>
+                        </select>
+                    </label>
+                    <label class="block space-y-1"><span class="text-sm">Expected return date</span>
+                        <input type="date" wire:model="loanReturnDate" class="w-full rounded-lg border p-3 text-gray-900">
+                    </label>
+                </div>
+                @if($loanDirection === 'internal')
+                    <label class="block space-y-1">
+                        <span class="text-sm">Receiving hall in this establishment</span>
+                        <select wire:model="loanCounterpartHallId" class="w-full rounded-lg border p-3 text-gray-900">
+                            <option value="">Select receiving hall</option>
+                            @foreach($this->otherHallOptions() as $id => $name)
+                                <option value="{{ $id }}">{{ $name }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                @else
+                    <div class="grid gap-3 md:grid-cols-2">
+                        <label class="block space-y-1"><span class="text-sm">Outside hall / establishment</span>
+                            <input wire:model="loanOutsideName" type="text" maxlength="160" placeholder="e.g. Royal Marriage Hall"
+                                class="w-full rounded-lg border p-3 text-gray-900">
+                        </label>
+                        <label class="block space-y-1"><span class="text-sm">Contact person</span>
+                            <input wire:model="loanOutsideContact" type="text" maxlength="240"
+                                class="w-full rounded-lg border p-3 text-gray-900">
+                        </label>
+                        <label class="block space-y-1"><span class="text-sm">Contact phone</span>
+                            <input wire:model="loanOutsidePhone" type="text" maxlength="100"
+                                class="w-full rounded-lg border p-3 text-gray-900">
+                        </label>
+                        <label class="block space-y-1"><span class="text-sm">Outside address (optional)</span>
+                            <input wire:model="loanOutsideAddress" type="text" maxlength="500"
+                                class="w-full rounded-lg border p-3 text-gray-900">
+                        </label>
+                    </div>
+                @endif
+                <p class="text-sm text-gray-600 dark:text-gray-300">
+                    Add as many different items as required. Choose an existing catalog
+                    item or create a new item directly within its row without changing owned stock.
+                </p>
+                @foreach($loanRows as $i => $row)
+                    <div class="grid gap-3 rounded-lg bg-gray-100 p-3 text-gray-900 md:grid-cols-5"
+                        wire:key="loan-line-{{ $row['key'] }}">
+                        <label class="block space-y-1 md:col-span-3"><span class="text-xs">Inventory item {{ $i + 1 }}</span>
+                            <select wire:model="loanRows.{{ $i }}.itemId" class="w-full rounded-lg border p-2 text-gray-900">
+                                <option value="">Select an existing item</option>
+                                @foreach($catalog as $item)
+                                    <option value="{{ $item['id'] }}">{{ $item['name'] }} — {{ $item['unit'] }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        <label class="block space-y-1"><span class="text-xs">Quantity</span>
+                            <input wire:model="loanRows.{{ $i }}.quantity" type="number" min="1"
+                                class="w-full rounded-lg border p-2 text-gray-900">
+                        </label>
+                        <div class="flex items-end gap-2">
+                            <button type="button" wire:click="openLoanInlineItem('{{ $row['key'] }}')"
+                                class="rounded-lg border px-3 py-2 text-sm">+ New item</button>
+                            <button type="button" wire:click="removeLoanRow('{{ $row['key'] }}')"
+                                class="rounded-lg border px-3 py-2 text-sm">Remove</button>
+                        </div>
+                        @if($loanInlineRowKey === $row['key'])
+                            <div class="space-y-3 rounded-lg border border-emerald-300 bg-white p-4 md:col-span-5"
+                                aria-label="Create a new inventory item directly in this borrowing row">
+                                <h3 class="font-semibold">Create item for this hall</h3>
+                                <p class="text-xs text-gray-600">Creating a catalog item does not purchase stock or increase owned quantities.</p>
+                                <div class="grid gap-3 md:grid-cols-2">
+                                    <label class="space-y-1"><span class="text-xs">New item name</span>
+                                        <input type="text" wire:model="loanInlineName" maxlength="160"
+                                            class="w-full rounded-lg border p-2" placeholder="e.g. Dinner Spoons">
+                                    </label>
+                                    <label class="space-y-1"><span class="text-xs">Category</span>
+                                        <select wire:model="loanInlineCategory" class="w-full rounded-lg border p-2">
+                                            @foreach(['Furniture', 'Crockery', 'Cutlery', 'Glassware', 'Serving', 'Decoration', 'Equipment', 'Consumables', 'Other'] as $category)
+                                                <option value="{{ $category }}">{{ $category }}</option>
+                                            @endforeach
+                                        </select>
+                                    </label>
+                                    <label class="space-y-1"><span class="text-xs">Unit</span>
+                                        <select wire:model="loanInlineUnit" class="w-full rounded-lg border p-2">
+                                            @foreach(['piece', 'set', 'pair', 'kg', 'liter'] as $unit)
+                                                <option value="{{ $unit }}">{{ $unit }}</option>
+                                            @endforeach
+                                        </select>
+                                    </label>
+                                    <label class="space-y-1"><span class="text-xs">Minimum stock target</span>
+                                        <input wire:model="loanInlineMinimumQuantity" type="number" min="0" max="100000000"
+                                            class="w-full rounded-lg border p-2">
+                                    </label>
+                                </div>
+                                @error('loanInlineName') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                                @error('loanInlineMinimumQuantity') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                                <button type="button" wire:click="saveLoanInlineItem"
+                                    class="rounded-lg bg-emerald-800 px-4 py-2 text-sm font-medium text-white">
+                                    Save and select this item
+                                </button>
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
+                <button type="button" wire:click="addLoanRow" class="rounded-lg border px-4 py-2 text-sm">
+                    + Add Item Row
+                </button>
+                <label class="block space-y-1"><span class="text-sm">Purpose / linked event details</span>
+                    <input wire:model="loanPurpose" type="text" maxlength="500"
+                        placeholder="e.g. Additional chairs for evening wedding"
+                        class="w-full rounded-lg border p-3 text-gray-900">
+                </label>
+                @error('loanRows') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                <button type="button" wire:click="submitLoanDraft"
+                    class="rounded-lg bg-emerald-800 px-4 py-2 text-sm font-medium text-white">
+                    Save borrowing request (no stock moved)
+                </button>
+                @if($lastLoanReference)
+                    <p role="status" class="rounded-lg bg-amber-100 p-3 text-sm text-amber-900">
+                        Multi-item loan request saved: {{ $lastLoanReference }}.
+                        No inventory was dispatched or received. Await controlled handover and independent counts.
+                    </p>
+                @endif
+            </section>
+        @endif
     </div>
 </x-filament-panels::page>

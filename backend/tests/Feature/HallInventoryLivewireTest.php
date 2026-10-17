@@ -91,6 +91,83 @@ class HallInventoryLivewireTest extends TestCase
         $this->assertSame(0, DB::table('finance_journals')->count());
     }
 
+    public function test_manager_builds_multi_line_internal_hall_loan_draft_from_inventory_window(): void
+    {
+        [$company, $hall, $other, $manager] = $this->fixture();
+        config()->set('inventory_controls.catalog_enabled', true);
+        config()->set('inventory_controls.loan_drafts_enabled', true);
+        $a = (string) \Illuminate\Support\Str::uuid();
+        $b = (string) \Illuminate\Support\Str::uuid();
+        $catalog = app(\App\Services\HallInventoryCatalogService::class);
+        $catalog->create($manager, $company->id, $hall->id, $a,
+            'Chairs', 'Furniture', 'piece', 500, 'Hall A catalog');
+        $catalog->create($manager, $company->id, $hall->id, $b,
+            'Glasses', 'Glassware', 'piece', 200, 'Hall A catalog');
+        Livewire::test(HallInventory::class)
+            ->call('addLoanRow')
+            ->set('loanRows.0.itemId', $a)
+            ->set('loanRows.0.quantity', '50')
+            ->call('addLoanRow')
+            ->set('loanRows.1.itemId', $b)
+            ->set('loanRows.1.quantity', '100')
+            ->set('loanCounterpartHallId', $other->id)
+            ->set('loanReturnDate', '2027-04-30')
+            ->set('loanPurpose', 'Hall B evening wedding request')
+            ->call('submitLoanDraft')->assertHasNoErrors()
+            ->assertSee('Multi-item loan request saved');
+        $this->assertSame(1, DB::table('hall_inventory_loan_drafts')->count());
+        $this->assertSame(2, DB::table('hall_inventory_loan_draft_lines')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
+    public function test_external_establishment_name_is_saved_with_encrypted_contact_from_window(): void
+    {
+        [$company, $hall, , $manager] = $this->fixture();
+        config()->set('inventory_controls.catalog_enabled', true);
+        config()->set('inventory_controls.loan_drafts_enabled', true);
+        $id = (string) \Illuminate\Support\Str::uuid();
+        app(\App\Services\HallInventoryCatalogService::class)->create(
+            $manager, $company->id, $hall->id, $id,
+            'Serving Jugs', 'Serving', 'piece', 30, 'Outside borrowing catalog');
+        Livewire::test(HallInventory::class)
+            ->set('loanDirection', 'external_in')
+            ->set('loanOutsideName', 'Outside Marriage Hall')
+            ->set('loanOutsideContact', 'External Manager')
+            ->set('loanOutsidePhone', '0300-444-4444')
+            ->set('loanReturnDate', '2027-06-01')
+            ->set('loanPurpose', 'Borrow jugs for weekend event')
+            ->call('addLoanRow')
+            ->set('loanRows.0.itemId', $id)
+            ->set('loanRows.0.quantity', '20')
+            ->call('submitLoanDraft')->assertHasNoErrors()
+            ->assertSee('Multi-item loan request saved');
+        $partner = DB::table('hall_inventory_external_partners')->first();
+        $this->assertSame('Outside Marriage Hall', $partner->name);
+        $this->assertStringNotContainsString('0300-444-4444', $partner->phone_ciphertext);
+    }
+
+    public function test_manager_creates_new_catalog_item_directly_in_borrowing_row(): void
+    {
+        [$company, $hall, $other, $manager] = $this->fixture();
+        config()->set('inventory_controls.catalog_enabled', true);
+        config()->set('inventory_controls.loan_drafts_enabled', true);
+        $page = Livewire::test(HallInventory::class)->call('addLoanRow');
+        $rows = $page->get('loanRows');
+        $this->assertCount(1, $rows);
+        $page->call('openLoanInlineItem', $rows[0]['key'])
+            ->set('loanInlineName', 'Dessert Spoons')
+            ->set('loanInlineCategory', 'Cutlery')
+            ->set('loanInlineUnit', 'piece')
+            ->set('loanInlineMinimumQuantity', '250')
+            ->call('saveLoanInlineItem')->assertHasNoErrors()->assertSee('Dessert Spoons');
+        $itemId = DB::table('hall_inventory_items')->where('hall_id', $hall->id)
+            ->where('name', 'Dessert Spoons')->value('id');
+        $this->assertNotNull($itemId);
+        $this->assertSame($itemId, $page->get('loanRows')[0]['itemId']);
+        $this->assertSame(0, DB::table('finance_journals')->count());
+        $this->assertSame(0, DB::table('hall_inventory_loan_drafts')->count());
+    }
+
     public function test_manager_role_revocation_blocks_live_hall_inventory_actions(): void
     {
         [$company, $hall, , , $membership] = $this->fixture();
