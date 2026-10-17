@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Filament\Pages\OperationsPlanning;
+use App\Filament\Pages\BookingProposals;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\Hall;
@@ -73,6 +74,78 @@ class OperationsPlanningTest extends TestCase
         return [$company, $other, $hall, $otherHall, $actors, $booking];
     }
 
+
+
+    public function test_owner_can_open_exact_booking_directly_in_planning_without_creating_claim(): void
+    {
+        [$company, $other, , , , $booking] = $this->fixture();
+        Livewire::test(BookingProposals::class)
+            ->assertSee('Plan setup');
+        Livewire::withQueryParams(['company' => $company->id, 'proposal' => $booking])
+            ->test(OperationsPlanning::class)
+            ->assertSet('bookingId', $booking)
+            ->assertSee('Save nonbinding planning task');
+
+        // A forged or inaccessible UUID is never accepted as a selected task source.
+        Livewire::withQueryParams(['company' => $company->id, 'proposal' => (string) Str::uuid()])
+            ->test(OperationsPlanning::class)->assertForbidden();
+        Livewire::withQueryParams(['company' => $other->id, 'proposal' => $booking])
+            ->test(OperationsPlanning::class)->assertForbidden();
+        $this->assertSame(0, DB::table('operations_plan_tasks')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
+    public function test_exact_authorized_older_proposal_outside_dropdown_limit_is_still_selectable(): void
+    {
+        [$company, , $hall, , $actors, $booking] = $this->fixture();
+        $existing = DB::table('booking_drafts')->where('id', $booking)->first();
+        for ($i = 0; $i < 50; $i++) {
+            DB::table('booking_drafts')->insert([
+                'id' => (string) Str::uuid(), 'company_id' => $company->id,
+                'hall_id' => $hall->id, 'customer_id' => $existing->customer_id,
+                'event_date' => (new \DateTimeImmutable('2027-01-01'))
+                    ->modify('+'.$i.' days')->format('Y-m-d'),
+                'program' => 'evening', 'requested_guests' => 80,
+                'status' => 'draft', 'created_by' => $actors['owner'][0]->id,
+                'revision' => 1,
+            ]);
+        }
+
+        $component = Livewire::withQueryParams([
+            'company' => $company->id, 'proposal' => $booking,
+        ])->test(OperationsPlanning::class)->assertSet('bookingId', $booking);
+        $this->assertArrayHasKey($booking, $component->instance()->proposalOptions());
+        $this->assertSame(0, DB::table('operations_plan_tasks')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+    }
+
+
+    public function test_manager_proposal_deep_link_rejects_unassigned_hall_record(): void
+    {
+        [$company, , , $unassigned, $actors, $booking] = $this->fixture();
+        $saved = DB::table('booking_drafts')->where('id', $booking)->first();
+        $private = (string) Str::uuid();
+
+        // Synthetic cross-hall record to challenge the screen's scope gate.
+        DB::table('booking_drafts')->insert([
+            'id' => $private, 'company_id' => $company->id,
+            'hall_id' => $unassigned->id, 'customer_id' => $saved->customer_id,
+            'event_date' => '2027-03-18', 'program' => 'noon',
+            'requested_guests' => 100, 'status' => 'draft',
+            'created_by' => $actors['owner'][0]->id, 'revision' => 1,
+        ]);
+
+        $this->be($actors['manager'][0]);
+        Livewire::withQueryParams(['company' => $company->id, 'proposal' => $booking])
+            ->test(OperationsPlanning::class)->assertSet('bookingId', $booking);
+        Livewire::withQueryParams(['company' => $company->id, 'proposal' => $private])
+            ->test(OperationsPlanning::class)->assertForbidden();
+
+        $this->assertSame(0, DB::table('operations_plan_tasks')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
 
     public function test_planning_status_filter_is_validated_for_company_scoped_links(): void
     {

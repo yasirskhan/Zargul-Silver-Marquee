@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\CompanyMembership;
 use App\Models\User;
 use App\Services\OperationsPlanningService;
+use App\Policies\OperationsPlanningPolicy;
 use BackedEnum;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
@@ -43,6 +44,8 @@ final class OperationsPlanning extends Page
     #[Locked]
     public string $createRequestKey = '';
 
+    /** Optional scoped deep link from an internal booking proposal. */
+    #[Url(as: 'proposal')]
     public string $bookingId = '';
     public string $taskTitle = '';
     public string $reason = '';
@@ -107,6 +110,10 @@ final class OperationsPlanning extends Page
         $this->companyId = $requested ?? array_key_first($options);
         $this->createRequestKey = (string) Str::uuid();
         $this->refresh();
+        if ($this->bookingId !== '') {
+            abort_unless(Str::isUuid($this->bookingId)
+                && array_key_exists($this->bookingId, $this->proposalOptions()), 403);
+        }
     }
 
     public function hydrate(): void
@@ -140,8 +147,26 @@ final class OperationsPlanning extends Page
                 ->where('membership_id', $member->id)->pluck('hall_id')->all();
             $q->whereIn('hall_id', $halls);
         }
-        return $q->orderBy('event_date')->limit(50)->get(['id', 'event_date', 'program'])
+        $options = $q->orderBy('event_date')->limit(50)->get(['id', 'event_date', 'program'])
             ->mapWithKeys(fn ($row) => [$row->id => $row->event_date.' '.$row->program])->all();
+
+        // A signed-in staff member may open a valid older proposal by exact
+        // reference even when it falls outside the 50-item dropdown window.
+        // Its scope must be independently rechecked, never inferred from URL.
+        if ($this->bookingId !== '' && Str::isUuid($this->bookingId)
+            && ! array_key_exists($this->bookingId, $options)) {
+            $selected = DB::table('booking_drafts')->where('company_id', $this->companyId)
+                ->where('id', $this->bookingId)
+                ->whereIn('status', ['draft', 'under_review'])
+                ->first(['id', 'hall_id', 'event_date', 'program']);
+            if ($selected && app(OperationsPlanningPolicy::class)->plan(
+                $actor, $this->companyId, $selected->hall_id
+            )) {
+                $options[$selected->id] = $selected->event_date.' '.$selected->program;
+            }
+        }
+
+        return $options;
     }
 
     public function updatedStatusFilter(): void
