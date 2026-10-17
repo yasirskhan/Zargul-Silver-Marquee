@@ -12,6 +12,7 @@ use DateTimeImmutable;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 
@@ -42,12 +43,18 @@ final class HallCalendar extends Page
     #[Locked]
     public ?string $loadedHallId = null;
 
+    private static function currentAccountAllowed(User $actor): bool
+    {
+        return DB::table('users')->where('id', $actor->getKey())
+            ->where('is_active', true)->whereNotNull('email_verified_at')->exists();
+    }
+
     public static function canAccess(): bool
     {
         $actor = Filament::auth()->user();
 
-        return $actor instanceof User && $actor->is_active
-            && $actor->hasVerifiedEmail() && static::visibleCompanies($actor) !== [];
+        return $actor instanceof User && self::currentAccountAllowed($actor)
+            && static::visibleCompanies($actor) !== [];
     }
 
     /** Only tenants with an active hall visible to this staff member are listed. */
@@ -91,7 +98,8 @@ final class HallCalendar extends Page
     {
         $actor = Filament::auth()->user();
 
-        return $actor instanceof User ? static::visibleCompanies($actor) : [];
+        return $actor instanceof User && self::currentAccountAllowed($actor)
+            ? static::visibleCompanies($actor) : [];
     }
 
     public function hallOptions(): array

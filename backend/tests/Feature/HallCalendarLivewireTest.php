@@ -57,6 +57,27 @@ class HallCalendarLivewireTest extends TestCase
         return [$company, $hall, $owner];
     }
 
+
+    public function test_stale_owner_account_revocation_blocks_private_hall_calendar_read(): void
+    {
+        [$company, $hall, $owner] = $this->fixture();
+        $this->assertTrue(HallCalendar::canAccess());
+
+        // Current persisted user state overrides a previously verified Auth model.
+        DB::table('users')->where('id', $owner->id)->update(['is_active' => false]);
+        $this->assertTrue($owner->is_active);
+        $this->assertFalse(HallCalendar::canAccess());
+        Livewire::test(HallCalendar::class)->assertForbidden();
+
+        DB::table('users')->where('id', $owner->id)
+            ->update(['is_active' => true, 'email_verified_at' => null]);
+        $this->assertNotNull($owner->email_verified_at);
+        $this->assertFalse(HallCalendar::canAccess());
+        Livewire::test(HallCalendar::class)->assertForbidden();
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, DB::table('hall_slot_claim_events')->count());
+    }
+
     public function test_owner_can_switch_day_week_month_and_navigate_without_mutation(): void
     {
         [$company, $hall] = $this->fixture();
