@@ -128,12 +128,18 @@ final class OperationsPlanningService
             throw new AuthorizationException('Planning history is unavailable.');
         }
         $this->authorize($actor, $companyId, $task->hall_id);
-        return DB::table('operations_plan_events')->where('company_id', $companyId)
-            ->where('task_id', $taskId)->orderByDesc('revision')->limit($limit)
-            ->get(['revision', 'action', 'status', 'actor_id', 'reason', 'created_at'])
+        // The immutable actor ID is authoritative. Resolve only the staff's
+        // display name for authorized history viewers; do not fetch emails.
+        return DB::table('operations_plan_events as e')
+            ->leftJoin('users as u', 'u.id', '=', 'e.actor_id')
+            ->where('e.company_id', $companyId)->where('e.task_id', $taskId)
+            ->orderByDesc('e.revision')->limit($limit)
+            ->get(['e.revision', 'e.action', 'e.status', 'e.actor_id',
+                'e.reason', 'e.created_at', 'u.name as actor_name'])
             ->map(fn ($row) => [
                 'revision' => (int) $row->revision, 'action' => $row->action,
                 'status' => $row->status, 'actorId' => (int) $row->actor_id,
+                'actorName' => $row->actor_name ?: 'Former staff member',
                 'reason' => $row->reason, 'at' => (string) $row->created_at,
             ])->all();
     }

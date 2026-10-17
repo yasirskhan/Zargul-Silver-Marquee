@@ -131,6 +131,15 @@ final class OperationsPlanning extends Page
         $this->authorizeCompany();
     }
 
+    /** Only the current company's owner/admin may follow planning rows into private proposal review. */
+    public function canReviewProposals(): bool
+    {
+        $actor = $this->authorizeLoaded();
+        return CompanyMembership::query()->where('company_id', $this->companyId)
+            ->where('user_id', $actor->getKey())->where('is_active', true)
+            ->whereIn('role', ['owner', 'admin'])->exists();
+    }
+
     public function hallOptions(): array
     {
         $actor = $this->authorizeCompany();

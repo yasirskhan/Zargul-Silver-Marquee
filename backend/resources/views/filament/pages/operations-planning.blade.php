@@ -71,6 +71,7 @@
                     <textarea wire:model="reviewReason" rows="2" maxlength="500" class="w-full rounded-lg border p-3 text-gray-900"></textarea>
                 </label>
                 @error('reviewReason') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                @php($mayReviewProposals = $this->canReviewProposals())
                 @forelse ($tasks as $task)
                     <article wire:key="plan-{{ $task['id'] }}" class="space-y-2 rounded-xl border p-4 text-sm">
                         <div class="flex flex-wrap justify-between gap-2">
@@ -79,6 +80,10 @@
                         </div>
                         <p class="text-xs">Hall: {{ $task['hallName'] }} | {{ $task['eventDate'] }} ({{ ucfirst($task['program']) }})</p>
                         <p class="break-all text-xs">Proposal {{ $task['bookingId'] }}</p>
+                        @if ($mayReviewProposals)
+                            <a href="{{ \App\Filament\Pages\BookingProposals::getUrl(['company' => $companyId, 'proposal' => $task['bookingId']]) }}"
+                                class="inline-flex rounded-lg border px-3 py-2 underline">Review proposal details</a>
+                        @endif
                         <button type="button" wire:click="showHistory('{{ $task['id'] }}')"
                             class="rounded-lg border px-3 py-2">View immutable review history</button>
                         @if ($task['status'] === 'planned')
@@ -109,7 +114,7 @@
                         <p class="break-all text-xs">Task {{ $historyTaskId }}</p>
                         @foreach ($historyEvents as $event)
                             <div wire:key="ops-history-{{ $historyTaskId }}-{{ $event['revision'] }}" class="border-t py-2">
-                                <p>Revision {{ $event['revision'] }}: {{ $event['action'] }} by staff #{{ $event['actorId'] }}</p>
+                                <p>Revision {{ $event['revision'] }}: {{ $event['action'] }} by {{ $event['actorName'] }} (staff #{{ $event['actorId'] }})</p>
                                 <p>{{ $event['at'] }} | {{ $event['status'] }}</p>
                                 <p class="break-words">{{ $event['reason'] }}</p>
                             </div>

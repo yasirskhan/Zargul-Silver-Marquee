@@ -389,6 +389,30 @@ class OperationsPlanningTest extends TestCase
             str_repeat('x', 101));
     }
 
+    public function test_only_current_company_owner_or_admin_gets_proposal_review_links_from_tasks(): void
+    {
+        [$company, , , , $actors, $booking] = $this->fixture();
+        app(OperationsPlanningService::class)->create(
+            $actors['owner'][0], $company->id, (string) Str::uuid(), $booking,
+            'Internal plan for proposal navigation', 'Synthetic context only'
+        );
+        Livewire::test(OperationsPlanning::class)
+            ->assertSee('Review proposal details');
+        Livewire::withQueryParams(['company' => $company->id, 'proposal' => $booking])
+            ->test(BookingProposals::class)->assertSet('referenceSearch', $booking);
+
+        foreach (['manager', 'operations'] as $role) {
+            $this->be($actors[$role][0]);
+            Livewire::test(OperationsPlanning::class)
+                ->assertSee('Internal plan for proposal navigation')
+                ->assertDontSee('Review proposal details');
+        }
+        $this->be($actors['admin'][0]);
+        Livewire::test(OperationsPlanning::class)->assertSee('Review proposal details');
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
     public function test_planning_status_filter_is_validated_for_company_scoped_links(): void
     {
         [$company, , , , $actors, $booking] = $this->fixture();
@@ -838,6 +862,34 @@ SQL);
         $this->be($actors['owner'][0]);
         $this->expectException(AuthorizationException::class);
         $service->history($actors['owner'][0], $foreign->id, $id);
+    }
+
+    public function test_immutable_task_history_names_authorized_staff_without_contact_fields(): void
+    {
+        [$company, , , , $actors, $booking] = $this->fixture();
+        $service = app(OperationsPlanningService::class);
+        $taskId = (string) Str::uuid();
+        $service->create($actors['owner'][0], $company->id, $taskId, $booking,
+            'Record hall staff setup review', 'Original internal setup note');
+        $this->be($actors['manager'][0]);
+        $service->setReviewed($actors['manager'][0], $company->id,
+            $taskId, 1, true, 'Assigned hall manager review');
+
+        $this->be($actors['owner'][0]);
+        $history = $service->history($actors['owner'][0], $company->id, $taskId);
+        $this->assertSame([2, 1], array_column($history, 'revision'));
+        $this->assertSame(['Manager', 'Owner'], array_column($history, 'actorName'));
+        $this->assertSame([$actors['manager'][0]->id, $actors['owner'][0]->id],
+            array_column($history, 'actorId'));
+        $this->assertArrayNotHasKey('email', $history[0]);
+        Livewire::test(OperationsPlanning::class)
+            ->call('showHistory', $taskId)
+            ->assertSee('by Manager (staff #')
+            ->assertSee('by Owner (staff #')
+            ->assertDontSee('ops-manager@example.test');
+        $this->assertSame(2, DB::table('operations_plan_events')->where('task_id', $taskId)->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
     }
 
     public function test_livewire_rejects_invalid_status_filter_without_querying_tasks(): void
