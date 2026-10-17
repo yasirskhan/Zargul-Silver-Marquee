@@ -318,6 +318,10 @@ final class VenueReservationService
                 || $saved->claim_id === $newClaimId) {
                 throw new ConflictHttpException('Reservation revision or destination is invalid.');
             }
+            if (DB::table('venue_event_operations')->where('company_id', $companyId)
+                ->where('reservation_id', $reservationId)->exists()) {
+                throw new ConflictHttpException('Started events cannot be transferred or rescheduled.');
+            }
             if ((int) $targetHall->program_rules_revision < 1
                 || (int) $saved->guests > (int) $targetHall->capacity) {
                 throw new ConflictHttpException('Destination hall rules or capacity need review.');
@@ -377,6 +381,10 @@ final class VenueReservationService
             if (! $saved || $saved->hall_id !== $hall->id || $saved->status !== 'confirmed'
                 || (int) $saved->revision !== $revision) {
                 throw new ConflictHttpException('Reservation already changed or cancelled.');
+            }
+            if (DB::table('venue_event_operations')->where('company_id', $companyId)
+                ->where('reservation_id', $reservationId)->exists()) {
+                throw new ConflictHttpException('Started events cannot be silently cancelled.');
             }
             $claim = DB::table('hall_slot_claims')->where('company_id', $companyId)
                 ->where('id', $saved->claim_id)->lockForUpdate()->first();

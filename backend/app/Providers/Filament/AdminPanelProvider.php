@@ -10,6 +10,7 @@ use App\Filament\Pages\FinanceDesk;
 use App\Filament\Pages\AuditHistory;
 use App\Filament\Pages\BookingProposals;
 use App\Filament\Pages\VenueReservations;
+use App\Filament\Pages\EventOperations;
 use App\Filament\Pages\HallCalendar;
 use App\Filament\Pages\HallPrograms;
 use App\Filament\Pages\WebsiteWorkspace;
@@ -45,7 +46,7 @@ class AdminPanelProvider extends PanelProvider
             ->multiFactorAuthentication([
                 AppAuthentication::make()->recoverable(),
             ], isRequired: true)
-            ->pages([VenueOverview::class, InternalQuickSearch::class, OperationsPlanning::class, ApprovalCenter::class, FinanceDesk::class, AuditHistory::class, BookingProposals::class, VenueReservations::class, HallCalendar::class, HallPrograms::class, WebsiteWorkspace::class])
+            ->pages([VenueOverview::class, InternalQuickSearch::class, OperationsPlanning::class, ApprovalCenter::class, FinanceDesk::class, AuditHistory::class, BookingProposals::class, VenueReservations::class, EventOperations::class, HallCalendar::class, HallPrograms::class, WebsiteWorkspace::class])
             ->renderHook(
                 PanelsRenderHook::PAGE_START,
                 fn (): \Illuminate\Contracts\View\View => view('filament.hooks.owner-approval-attention'),

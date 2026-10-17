@@ -28,6 +28,13 @@ Production-grade Zargul Silver Marquee brand site and integrated enquiry flow, l
 ## Phase 7 — Operations/readiness
 Event actual times, setup/cleaning, services, staffing, overtime billing and operational reports.
 
+## Phase 7.1 — Actual event operations (release gated)
+Authenticated assigned-hall event start/finish observations, strict optimistic revision checks,
+immutable evidence and current owner rules-based overtime/grace/hard-stop preview.
+Actual extension remains unauthorized and no invoice or money changes are made automatically.
+Operator release flag `VENUE_EVENT_RECORDING_ENABLED` remains OFF until separate venue signoff.
+Catering fulfilment, authorized overtime charge adjustments and event closeout reporting follow.
+
 ## Phase 8 — Controlled pilot
 No real launch until finance, isolation, restores, booking concurrency and real user tests are accepted.
 

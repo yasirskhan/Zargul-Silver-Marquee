@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Filament\Pages\HallCalendar;
 use App\Filament\Pages\VenueReservations;
+use App\Filament\Pages\EventOperations;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\Hall;
@@ -16,9 +17,11 @@ use App\Services\HallOccupancyCalendarService;
 use App\Services\HallProgramRulesService;
 use App\Services\HallSlotHoldService;
 use App\Services\VenueReservationService;
+use App\Services\VenueEventOperationsService;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
+use InvalidArgumentException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -615,4 +618,142 @@ class VenueReservationServiceTest extends TestCase
         $this->assertSame(0, DB::table('venue_reservations')->count());
         $this->assertSame(0, DB::table('hall_slot_claims')->count());
     }
+    public function test_actual_event_start_and_finish_record_grace_overrun_without_booking_or_money_mutation(): void
+    {
+        [$company, , $hall, $people, $customer] = $this->fixture();
+        $draft = $this->review($company, $hall, $people['owner'], $customer,
+            '2027-04-08', 'morning');
+        $this->be($people['manager']);
+        $booking = $this->confirm($people['manager'], $company, $draft);
+        config()->set('event_controls.recording_enabled', true);
+        $this->be($people['operations']);
+        $operations = app(VenueEventOperationsService::class);
+        $id = (string) Str::uuid();
+        $started = $operations->start($people['operations'], $company->id,
+            $booking['id'], $id, '08:05', 'Actual stage crew check in');
+        $this->assertSame('in_progress', $started['status']);
+        $this->assertSame(1, $started['revision']);
+        try {
+            $operations->start($people['operations'], $company->id,
+                $booking['id'], (string) Str::uuid(), '08:07', 'Duplicate event start');
+            $this->fail('Duplicate actual event start was permitted.');
+        } catch (ConflictHttpException) {
+            $this->assertSame(1, DB::table('venue_event_operations')->count());
+        }
+        $completed = $operations->finish($people['operations'], $company->id,
+            $booking['id'], 1, '11:45', 'Recorded actual late finish for audit');
+        $this->assertSame('completed', $completed['status']);
+        $this->assertSame(2, $completed['revision']);
+        $this->assertSame('08:05', $completed['start']);
+        $this->assertSame('11:45', $completed['end']);
+        $this->assertSame(45, $completed['overtime']['overtimeMinutes']);
+        $this->assertSame(35, $completed['overtime']['chargeableMinutes']);
+        $this->assertSame(2, $completed['overtime']['startedIntervals']);
+        $this->assertTrue($completed['overtime']['conflictsWithTurnover']);
+        $this->assertFalse($completed['overtime']['extensionAuthorized']);
+        $this->assertSame('internal_nonbinding', $completed['overtime']['status']);
+        $this->assertSame(2, DB::table('venue_event_operation_events')->count());
+        $this->assertSame(2, DB::table('audit_events')
+            ->where('entity_type', 'venue_event_operation')->count());
+        $this->assertSame(1, DB::table('hall_slot_claims')
+            ->where('id', $booking['claimId'])->where('status', 'confirmed')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+        $this->assertSame(0, DB::table('venue_invoice_payments')->count());
+        $this->be($people['manager']);
+        foreach ([
+            fn () => app(VenueReservationService::class)->reschedule(
+                $people['manager'], $company->id, $booking['id'],
+                '2027-04-09', 'noon', (string) Str::uuid(), 1,
+                'Cannot rewrite observed event hall after check-in'),
+            fn () => app(VenueReservationService::class)->cancel(
+                $people['manager'], $company->id, $booking['id'], 1,
+                'Cannot silently cancel event after check-in'),
+        ] as $action) {
+            try {
+                $action();
+                $this->fail('Already-started event was mutated.');
+            } catch (ConflictHttpException) {
+                $this->assertSame('confirmed', DB::table('venue_reservations')
+                    ->where('id', $booking['id'])->value('status'));
+            }
+        }
+        $this->expectException(QueryException::class);
+        DB::table('venue_event_operation_events')->where('operation_id', $id)
+            ->update(['reason' => 'Tampered with immutable observation']);
+    }
+
+    public function test_actual_event_recording_requires_gate_current_hall_assignment_and_valid_time(): void
+    {
+        [$company, $foreign, $hall, $people, $customer] = $this->fixture();
+        $draft = $this->review($company, $hall, $people['owner'], $customer);
+        $this->be($people['manager']);
+        $booking = $this->confirm($people['manager'], $company, $draft);
+        $service = app(VenueEventOperationsService::class);
+        try {
+            $service->start($people['manager'], $company->id, $booking['id'],
+                (string) Str::uuid(), '17:10', 'Recording disabled by policy');
+            $this->fail('Operator gate was ignored.');
+        } catch (ConflictHttpException) {
+            $this->assertSame(0, DB::table('venue_event_operations')->count());
+        }
+        config()->set('event_controls.recording_enabled', true);
+        try {
+            $service->start($people['manager'], $foreign->id, $booking['id'],
+                (string) Str::uuid(), '17:10', 'Foreign company not allowed');
+            $this->fail('Other company booked event was accessible.');
+        } catch (AuthorizationException) {
+            $this->assertSame(0, DB::table('venue_event_operations')->count());
+        }
+        try {
+            $service->start($people['manager'], $company->id, $booking['id'],
+                (string) Str::uuid(), '25:10', 'Invalid observed start clock');
+            $this->fail('Invalid local clock accepted.');
+        } catch (InvalidArgumentException) {
+            $this->assertSame(0, DB::table('venue_event_operations')->count());
+        }
+        $started = $service->start($people['manager'], $company->id, $booking['id'],
+            (string) Str::uuid(), '17:05', 'Manager observed actual evening start');
+        try {
+            $service->finish($people['manager'], $company->id, $booking['id'],
+                1, '16:00', 'Invalid observed finish before start');
+            $this->fail('Backwards event clock accepted.');
+        } catch (ConflictHttpException) {
+            $this->assertSame(1, DB::table('venue_event_operation_events')->count());
+        }
+        HallAssignment::query()->where('hall_id', $hall->id)
+            ->whereHas('membership', fn ($q) => $q->where('user_id', $people['manager']->id))
+            ->delete();
+        $this->expectException(AuthorizationException::class);
+        $service->finish($people['manager'], $company->id, $booking['id'],
+            $started['revision'], '22:10', 'Revoked hall operator not authorized');
+    }
+
+    public function test_operations_role_can_check_in_and_complete_confirmed_event_from_livewire(): void
+    {
+        [$company, , $hall, $people, $customer] = $this->fixture();
+        $draft = $this->review($company, $hall, $people['owner'], $customer, '2027-04-08', 'morning');
+        $this->be($people['manager']);
+        $booking = $this->confirm($people['manager'], $company, $draft);
+        config()->set('event_controls.recording_enabled', true);
+        $this->be($people['operations']);
+        $panel = Livewire::withQueryParams(['company' => $company->id])
+            ->test(EventOperations::class)
+            ->assertSee('Record or review event')
+            ->assertSee('Test Marquee')
+            ->assertDontSee('hidden-reservation@example.test')
+            ->call('selectReservation', $booking['id'])
+            ->set('startClock', '08:02')
+            ->set('reason', 'Staff observed hall guest arrival')
+            ->call('startEvent')->assertHasNoErrors()
+            ->assertSee('in progress')
+            ->set('endClock', '11:10')
+            ->set('reason', 'Staff observed end of morning program')
+            ->call('finishEvent')->assertHasNoErrors()
+            ->assertSee('Event completed and sealed');
+        $this->assertSame(2, DB::table('venue_event_operation_events')->count());
+        $this->assertSame(1, DB::table('hall_slot_claims')
+            ->where('id', $booking['claimId'])->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
 }
