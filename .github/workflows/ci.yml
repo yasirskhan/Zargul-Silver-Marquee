@@ -89,6 +89,8 @@ jobs:
           php central/tests/payment_eligibility.php
           php central/tests/domain_ownership.php
           php central/tests/license_term_calendar.php
+          php central/tests/grant_signature_codec.php
+          php central/tests/paid_license_preparation.php
 
   laravel-postgres:
     runs-on: ubuntu-latest
