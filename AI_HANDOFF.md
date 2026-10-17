@@ -195,6 +195,10 @@
 - This is implementation, not HAFZATECH production hosting or customer paid activation. Exact SHA hosted CI is mandatory before VERIFIED. Previous `1c9fd17` immutable settlement and signature audit database tests passed focused central checks; full suite may still be running.
 - Next: protected paired signed status receipt/grant response endpoint and client authorized Verify License operation + automatic 15-day scheduler; keep production release defaults OFF.
 
+## CENTRAL TEST JOURNAL SCOPING REPAIR (OCT 17)
+- `00978f3` introduced valid authenticated signed-grant readback check-ins before the existing installation-status fixture. The central tests share one PostgreSQL database. Both legacy status journal count assertions were global; first fixed in `7b597c9`, second repaired now to scope by this fixture's installation/customer. The preceding run `39080720518` exposed the second assertion; production authentication, replay prevention, 60-per-hour limit, payment and license controls remain unchanged.
+- Verify the exact repair commit's central-postgres and all six hosted CI jobs before marking signed readback VERIFIED. After green, continue the already-prepared isolated paired signed receipt+grant response batch, with central release gates OFF and no private keys committed.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`

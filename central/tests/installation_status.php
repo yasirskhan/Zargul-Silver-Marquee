@@ -89,8 +89,11 @@ for($n=0;$n<59;$n++){
         'nonce'=>hash('sha256',random_bytes(32))]);
 }
 statusDenied(fn()=>$service->check($sign($c)),'status_rate_limited');
-requireStatus((int)$db->query('SELECT count(*) FROM central_installation_status_checks')->fetchColumn()===60,
-    'rate limit denies extra inserts and does not mutate licensing');
+$count=$db->prepare("SELECT count(*) FROM central_installation_status_checks
+    WHERE installation_id=:installation AND customer_id=:customer");
+$count->execute(['installation'=>$installation,'customer'=>$c]);
+requireStatus((int)$count->fetchColumn()===60,
+    'rate limit denies extra inserts for this installation and does not mutate licensing');
 $db->prepare("UPDATE vendor_customers SET status='suspended' WHERE id=:id")->execute(['id'=>$c]);
 statusDenied(fn()=>$service->check($sign($c)),'unauthorized_installation');
 echo "PASS: signed central check-in enforces install binding, nonce replay, clock skew, cross-customer and suspension\n";
