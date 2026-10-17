@@ -92,6 +92,7 @@ jobs:
           php central/tests/grant_signature_codec.php
           php central/tests/paid_license_preparation.php
           php central/tests/installation_status.php
+          php central/tests/status_receipt_codec.php
 
   licensing-postgres:
     runs-on: ubuntu-latest
