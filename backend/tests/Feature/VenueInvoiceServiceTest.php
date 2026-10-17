@@ -8,6 +8,9 @@ use App\Models\Hall;
 use App\Models\User;
 use App\Services\VenueInvoiceService;
 use App\Services\VenueInvoicePaymentService;
+use App\Services\VenueInvoiceRefundService;
+use App\Services\ApprovalWorkflowService;
+use App\Models\HallAssignment;
 use App\Filament\Pages\VenueReservations;
 use Livewire\Livewire;
 use Filament\Facades\Filament;
@@ -264,6 +267,68 @@ class VenueInvoiceServiceTest extends TestCase
         $this->expectException(AuthorizationException::class);
         $service->record($manager, $company->id, $invoice, (string) Str::uuid(),
             'cash', 100, null, 'Manager cannot post customer money');
+    }
+
+    public function test_confirmed_manager_refund_request_owner_decision_then_exact_receipt_reversal(): void
+    {
+        [$company, $owner, $manager, $reservation, $quote] = $this->fixture();
+        config()->set('invoice_controls.issuance_enabled', true);
+        config()->set('invoice_controls.tax_rate_bps', 0);
+        $invoice = (string) Str::uuid();
+        app(VenueInvoiceService::class)->issue($owner, $company->id, $quote, $invoice,
+            'Confirmed synthetic invoice requiring later correction');
+        config()->set('payment_controls.enabled', true);
+        config()->set('finance_controls.posting_enabled', true);
+        $payment = (string) Str::uuid();
+        $payments = app(VenueInvoicePaymentService::class);
+        $payments->record($owner, $company->id, $invoice, $payment, 'cash',
+            40000, null, 'Synthetic cash deposit to be refunded');
+
+        $reservationRow = DB::table('venue_reservations')->where('id', $reservation)->first();
+        $managerMember = CompanyMembership::query()
+            ->where('company_id', $company->id)->where('user_id', $manager->id)->firstOrFail();
+        HallAssignment::create(['company_id'=>$company->id,
+            'hall_id'=>$reservationRow->hall_id,'membership_id'=>$managerMember->id]);
+        $this->be($manager);
+        $approval = (string) Str::uuid();
+        $workflow = app(ApprovalWorkflowService::class);
+        $workflow->request($manager, $company->id, $approval, 'refund', 40000,
+            'PKR', $reservationRow->source_draft_id, 'Manager refund of synthetic deposit');
+
+        $this->be($owner);
+        $service = app(VenueInvoiceRefundService::class);
+        try {
+            $service->record($owner, $company->id, $payment, (string) Str::uuid(),
+                $approval, 'Synthetic refund before separate decision');
+            $this->fail('Pending refund applied to actual ledger.');
+        } catch (ConflictHttpException) {
+            $this->assertSame(0, DB::table('venue_invoice_refunds')->count());
+        }
+        $workflow->decide($owner, $company->id, $approval, 1, 'approved',
+            'Owner authorizes exact synthetic cash refund');
+        config()->set('refund_controls.enabled', true);
+        $refundId = (string) Str::uuid();
+        $refund = $service->record($owner, $company->id, $payment, $refundId,
+            $approval, 'Synthetic verified refund handover');
+        $this->assertSame('RF-000000001', $refund['refundNumber']);
+        $this->assertSame($refund, $service->record($owner, $company->id,
+            $payment, $refundId, $approval, 'Synthetic verified refund handover'));
+        $history = $payments->history($owner, $company->id, $invoice);
+        $this->assertSame(40000, $history['refundedMinor']);
+        $this->assertSame(0, $history['paidMinor']);
+        $this->assertSame(150000, $history['dueMinor']);
+        $this->assertSame(2, DB::table('finance_journals')->count());
+        $this->assertSame(4, DB::table('finance_journal_lines')->count());
+        $this->assertSame(1, DB::table('finance_journals')
+            ->where('entry_type','reversal')->where('reversal_of',$payment)->count());
+        $this->assertSame(1, DB::table('approval_decisions')->count());
+        Livewire::test(VenueReservations::class)
+            ->call('selectReservation', $reservation)
+            ->assertSee('RF-000000001')
+            ->assertSee('remaining balance 150000');
+        $this->expectException(ConflictHttpException::class);
+        $service->record($owner, $company->id, $payment, (string) Str::uuid(),
+            $approval, 'Another invalid synthetic full refund');
     }
 
     public function test_manager_denied_and_stale_reservation_prevents_invoice(): void

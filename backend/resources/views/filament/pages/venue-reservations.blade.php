@@ -55,6 +55,12 @@
                                 <button type="button" wire:click="showCustomerHistory('{{ $row['customerId'] }}')"
                                     class="rounded-lg border px-3 py-2 underline">Customer booking history</button>
                             @endif
+                            @if ($row['status'] === 'confirmed' && $this->mayRequestRefundApproval())
+                                <a class="inline-flex rounded-lg border px-3 py-2 underline"
+                                    href="{{ \App\Filament\Pages\ApprovalCenter::getUrl(['company' => $companyId, 'proposal' => $row['sourceDraftId'], 'category' => 'refund']) }}">
+                                    Request controlled refund review
+                                </a>
+                            @endif
                             @if ($row['status'] === 'confirmed')
                                 <button type="button" wire:click="selectReservation('{{ $row['id'] }}')"
                                     class="rounded-lg border px-3 py-2 underline">Manage reservation</button>
@@ -182,6 +188,19 @@
                             @error('paymentAmountMinor') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
                         </section>
                     @endif
+                    @if ($this->refundPostingEnabled())
+                        <section class="space-y-2 rounded-lg border p-3" aria-label="Approved full-receipt refund correction">
+                            <h3 class="font-semibold">Record approved full-receipt refund</h3>
+                            <p class="text-xs">Requires a separately approved refund exception for the exact receipt amount and linked confirmed booking. Record real-world handover evidence in the reason; no processor refund occurs automatically.</p>
+                            <label class="block space-y-1"><span>Approved refund reference</span>
+                                <input wire:model="refundApprovalId" maxlength="36" class="w-full rounded-lg border p-2 font-mono text-gray-900">
+                            </label>
+                            <label class="block space-y-1"><span>Refund custody and settlement reason</span>
+                                <textarea wire:model="refundReason" rows="2" maxlength="500" class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                            </label>
+                            @error('refundReason') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                        </section>
+                    @endif
                     @foreach ($issuedInvoices as $invoice)
                         <article wire:key="issued-invoice-{{ $invoice['id'] }}" class="space-y-1 rounded-lg border p-3 text-sm"
                             aria-label="Immutable numbered invoice record">
@@ -194,8 +213,19 @@
                             <p class="break-all text-xs">Immutable invoice reference {{ $invoice['id'] }} · customer delivery is not enabled.</p>
                             @if (isset($paymentBalances[$invoice['id']]))
                                 <p>Received {{ $paymentBalances[$invoice['id']]['paidMinor'] }}; remaining balance {{ $paymentBalances[$invoice['id']]['dueMinor'] }} minor units</p>
+                                <p>Controlled refunds recorded: {{ $paymentBalances[$invoice['id']]['refundedMinor'] }} minor units</p>
+                                @foreach ($paymentBalances[$invoice['id']]['refunds'] as $refund)
+                                    <p>Immutable reversal {{ $refund['refundNumber'] }} · {{ $refund['amountMinor'] }} minor units · approval {{ $refund['approvalId'] }}</p>
+                                @endforeach
                                 @foreach ($paymentBalances[$invoice['id']]['payments'] as $paid)
                                     <p>Immutable receipt {{ $paid['receiptNumber'] }} · {{ $paid['method'] }} · {{ $paid['amountMinor'] }} minor units</p>
+                                    @if ($this->refundPostingEnabled() &&
+                                        ! collect($paymentBalances[$invoice['id']]['refunds'])->contains('paymentId', $paid['id']))
+                                        <button type="button" wire:click="applyApprovedRefund('{{ $paid['id'] }}')"
+                                            wire:loading.attr="disabled" class="rounded-lg border px-3 py-2 underline">
+                                            Reverse this receipt after approved refund
+                                        </button>
+                                    @endif
                                 @endforeach
                                 @if ($this->paymentPostingEnabled() && $paymentBalances[$invoice['id']]['dueMinor'] > 0)
                                     <button type="button" wire:click="recordInvoicePayment('{{ $invoice['id'] }}')"

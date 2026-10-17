@@ -52,11 +52,23 @@ final class VenueInvoicePaymentService
         $payments = DB::table('venue_invoice_payments')->where('company_id', $companyId)
             ->where('invoice_id', $invoiceId)->orderBy('number')->limit(200)
             ->get()->map(fn ($p) => $this->summary($p))->all();
-        $paid = (int) DB::table('venue_invoice_payments')->where('company_id', $companyId)
+        $gross = (int) DB::table('venue_invoice_payments')->where('company_id', $companyId)
             ->where('invoice_id', $invoiceId)->sum('amount_minor');
+        $refunded = (int) DB::table('venue_invoice_refunds')->where('company_id', $companyId)
+            ->where('invoice_id', $invoiceId)->sum('amount_minor');
+        $refunds = DB::table('venue_invoice_refunds')->where('company_id', $companyId)
+            ->where('invoice_id', $invoiceId)->orderBy('number')->limit(200)
+            ->get(['id', 'refund_number', 'payment_id', 'approval_id', 'amount_minor'])
+            ->map(fn ($row) => [
+                'id' => $row->id, 'refundNumber' => $row->refund_number,
+                'paymentId' => $row->payment_id, 'approvalId' => $row->approval_id,
+                'amountMinor' => (int) $row->amount_minor,
+            ])->all();
+        $net = $gross - $refunded;
         return ['invoiceId' => $invoiceId, 'currency' => $invoice->currency_code,
-            'totalMinor' => (int) $invoice->total_minor, 'paidMinor' => $paid,
-            'dueMinor' => (int) $invoice->total_minor - $paid, 'payments' => $payments];
+            'totalMinor' => (int) $invoice->total_minor, 'paidMinor' => $net,
+            'refundedMinor' => $refunded, 'dueMinor' => (int) $invoice->total_minor - $net,
+            'payments' => $payments, 'refunds' => $refunds];
     }
 
     public function record(
@@ -115,7 +127,9 @@ final class VenueInvoicePaymentService
             }
             $paid = (int) DB::table('venue_invoice_payments')->where('company_id', $companyId)
                 ->where('invoice_id', $invoiceId)->sum('amount_minor');
-            if ($amountMinor > (int) $invoice->total_minor - $paid) {
+            $refunded = (int) DB::table('venue_invoice_refunds')->where('company_id', $companyId)
+                ->where('invoice_id', $invoiceId)->sum('amount_minor');
+            if ($amountMinor > (int) $invoice->total_minor - ($paid - $refunded)) {
                 throw new ConflictHttpException('Deposit exceeds the invoice balance.');
             }
             if ($method === 'cash' && DB::table('finance_cash_closeouts')

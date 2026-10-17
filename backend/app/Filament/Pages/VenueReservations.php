@@ -11,6 +11,7 @@ use App\Services\VenueQuoteService;
 use App\Services\VenueQuoteIssueService;
 use App\Services\VenueInvoiceService;
 use App\Services\VenueInvoicePaymentService;
+use App\Services\VenueInvoiceRefundService;
 use BackedEnum;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
@@ -64,6 +65,11 @@ final class VenueReservations extends Page
     public string $paymentMethod = 'cash';
     public string $paymentReference = '';
     public string $paymentReason = '';
+
+    #[Locked]
+    public string $refundRequestKey = '';
+    public string $refundApprovalId = '';
+    public string $refundReason = '';
 
     #[Locked]
     public string $invoiceRequestKey = '';
@@ -141,6 +147,14 @@ final class VenueReservations extends Page
         $actor = Filament::auth()->user();
         return $actor instanceof User && self::currentUserAllowed($actor)
             ? self::companiesFor($actor) : [];
+    }
+
+    public function mayRequestRefundApproval(): bool
+    {
+        $actor = $this->authorizeCompany();
+        return CompanyMembership::query()->where('company_id', $this->companyId)
+            ->where('user_id', $actor->getKey())->where('is_active', true)
+            ->whereIn('role', ['owner', 'admin', 'manager'])->exists();
     }
 
     public function mayViewCustomerHistory(): bool
@@ -288,6 +302,9 @@ final class VenueReservations extends Page
         $this->paymentReference = '';
         $this->paymentReason = '';
         $this->paymentRequestKey = (string) Str::uuid();
+        $this->refundApprovalId = '';
+        $this->refundReason = '';
+        $this->refundRequestKey = (string) Str::uuid();
         $this->invoiceIssueReason = '';
         $this->invoiceRequestKey = (string) Str::uuid();
         $this->quoteIssuePurpose = '';
@@ -320,6 +337,36 @@ final class VenueReservations extends Page
         abort_unless($catalog !== null, 409);
         return array_values(array_filter(json_decode($catalog->items, true, 512, JSON_THROW_ON_ERROR),
             fn (array $item): bool => $item['enabled'] === true));
+    }
+
+    public function refundPostingEnabled(): bool
+    {
+        return config('refund_controls.enabled') === true
+            && $this->paymentPostingEnabled();
+    }
+
+    public function applyApprovedRefund(string $paymentId): void
+    {
+        $actor = $this->authorizeLoaded();
+        abort_unless($this->refundPostingEnabled() && $this->mayViewCustomerHistory()
+            && $this->selectedReservationId !== null && Str::isUuid($paymentId), 403);
+        abort_unless(collect($this->paymentBalances)->contains(
+            fn (array $balance) => collect($balance['payments'])->contains('id', $paymentId)
+        ), 403);
+        $this->validate([
+            'refundApprovalId' => ['required','uuid'],
+            'refundReason' => ['required','string','min:3','max:500'],
+        ]);
+        try {
+            app(VenueInvoiceRefundService::class)->record($actor, $this->companyId,
+                $paymentId, $this->refundRequestKey, $this->refundApprovalId, $this->refundReason);
+        } catch (ConflictHttpException | InvalidArgumentException $e) {
+            throw ValidationException::withMessages(['refundReason' => $e->getMessage()]);
+        }
+        $this->refundRequestKey = (string) Str::uuid();
+        $this->refundApprovalId = '';
+        $this->refundReason = '';
+        $this->refreshPaymentBalances($actor);
     }
 
     public function paymentPostingEnabled(): bool

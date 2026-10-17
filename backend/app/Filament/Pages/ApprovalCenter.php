@@ -67,6 +67,7 @@ final class ApprovalCenter extends Page
 
     public string $categoryFilter = 'all';
 
+    #[Url(as: 'category')]
     public string $newCategory = 'discount';
 
     public string $newAmount = '';
@@ -225,7 +226,8 @@ final class ApprovalCenter extends Page
             return [];
         }
         $query = DB::table('booking_drafts')->where('booking_drafts.company_id', $this->companyId)
-            ->where('booking_drafts.status', 'under_review');
+            ->whereIn('booking_drafts.status', $this->newCategory === 'refund'
+                ? ['under_review', 'booked'] : ['under_review']);
         if ($this->role() === 'manager') {
             $actor = Filament::auth()->user();
             $query->join('hall_assignments', function ($join) use ($actor): void {
@@ -265,6 +267,11 @@ final class ApprovalCenter extends Page
         $this->companyId = $requested ?? array_key_first($options);
         $this->newRequestKey = (string) Str::uuid();
         $this->refreshInbox();
+        abort_unless(in_array($this->newCategory, $this->requestCategoryOptions(), true), 403);
+        if ($this->newBookingId !== '') {
+            abort_unless(Str::isUuid($this->newBookingId)
+                && array_key_exists($this->newBookingId, $this->proposalOptions()), 403);
+        }
     }
 
     public function hydrate(): void
@@ -315,6 +322,16 @@ final class ApprovalCenter extends Page
         $this->telegramPairingUrl = null;
         $this->newRequestKey = (string) Str::uuid();
         $this->refreshInbox();
+    }
+
+    public function updatedNewCategory(): void
+    {
+        $this->authorizeLoaded();
+        abort_unless(in_array($this->newCategory, $this->requestCategoryOptions(), true), 403);
+        $this->newBookingId = '';
+        $this->newAmount = '';
+        $this->newReason = '';
+        $this->newRequestKey = (string) Str::uuid();
     }
 
     public function updatedStatusFilter(): void

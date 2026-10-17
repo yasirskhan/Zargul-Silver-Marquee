@@ -105,7 +105,9 @@ final class ApprovalWorkflowService
             if ($bookingId !== null) {
                 $booking = DB::table('booking_drafts')
                     ->where('company_id', $companyId)->where('id', $bookingId)->first();
-                if (! $booking || $booking->status !== 'under_review') {
+                $allowedStates = $category === 'refund'
+                    ? ['under_review', 'booked'] : ['under_review'];
+                if (! $booking || ! in_array($booking->status, $allowedStates, true)) {
                     throw new ConflictHttpException('This proposal is unavailable for exception review.');
                 }
                 if ($membership->role === 'manager'
