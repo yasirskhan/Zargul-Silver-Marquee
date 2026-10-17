@@ -96,6 +96,26 @@
                     @else
                         <p class="text-sm">Event completed and sealed in immutable audit history.
                             Overtime, if observed, remains a nonbinding calculation and cannot authorize a late hall extension.</p>
+                        @if (is_array($selected['closeout'] ?? null))
+                            <section class="space-y-2 rounded-lg border p-3" aria-label="Frozen actual event closeout">
+                                <h3 class="font-semibold">Frozen operational closeout</h3>
+                                <p>Observed overtime: {{ $selected['closeout']['overtimeMinutes'] }} minutes;
+                                    beyond grace: {{ $selected['closeout']['chargeableMinutes'] }} minutes
+                                    ({{ $selected['closeout']['startedIntervals'] }} started billing intervals).
+                                    Nonbinding estimate: {{ $selected['closeout']['currency'] }}
+                                    {{ $selected['closeout']['projectedAmountMinor'] }} minor units.</p>
+                                @if ($selected['closeout']['conflictsWithTurnover'])
+                                    <p role="status" class="font-semibold">Actual finish exceeded the protected next-program turnover limit.
+                                        This record does NOT authorize a hall extension.</p>
+                                @endif
+                                <p>Reviewed setup tasks: {{ $selected['closeout']['taskCloseout']['reviewedCount'] }};
+                                    witnessed performed: {{ $selected['closeout']['taskCloseout']['performedCount'] }};
+                                    not witnessed: {{ $selected['closeout']['taskCloseout']['unperformedCount'] }}.</p>
+                                @if (! $selected['closeout']['taskCloseout']['allReviewedTasksPerformed'])
+                                    <p role="status" class="font-semibold">Outstanding setup fulfilment remains unresolved in this immutable closeout.</p>
+                                @endif
+                            </section>
+                        @endif
                     @endif
                 </section>
             @endif

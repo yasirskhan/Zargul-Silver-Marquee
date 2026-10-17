@@ -122,7 +122,8 @@ final class VenueEventOperationsService
             ->orderByDesc('r.event_date')->orderByDesc('r.id')->limit($limit)
             ->get(['r.id', 'r.event_date', 'r.program', 'h.name as hall_name',
                 'o.id as operation_id', 'o.status as operation_status',
-                'o.started_clock', 'o.ended_clock', 'o.revision'])
+                'o.started_clock', 'o.ended_clock', 'o.revision',
+                'o.overtime_snapshot'])
             ->map(fn ($row) => [
                 'reservationId' => $row->id, 'date' => $row->event_date,
                 'program' => $row->program, 'hallName' => $row->hall_name,
@@ -130,6 +131,8 @@ final class VenueEventOperationsService
                 'status' => $row->operation_status ?? 'not_started',
                 'start' => $row->started_clock, 'end' => $row->ended_clock,
                 'revision' => (int) ($row->revision ?? 0),
+                'closeout' => $row->overtime_snapshot === null ? null
+                    : json_decode($row->overtime_snapshot, true, 512, JSON_THROW_ON_ERROR),
             ])->all();
     }
 
@@ -218,6 +221,28 @@ final class VenueEventOperationsService
             // contract adjustment, bill, or permission to exceed turnover.
             $preview = $this->overtime->preview($actor, $companyId,
                 $reservation->hall_id, $reservation->program, $clock);
+
+            // Lock approved original-hall preparation before sealing closure.
+            // A planning task is not actual delivery: preserve the distinction.
+            $reviewedIds = DB::table('operations_plan_tasks')
+                ->where('company_id', $companyId)
+                ->where('booking_id', $reservation->source_draft_id)
+                ->where('hall_id', $reservation->hall_id)->where('status', 'reviewed')
+                ->orderBy('id')->lockForUpdate()->pluck('id')->all();
+            $performedIds = $reviewedIds === [] ? [] :
+                DB::table('venue_event_task_fulfillments')
+                    ->where('company_id', $companyId)
+                    ->where('reservation_id', $reservationId)
+                    ->whereIn('planning_task_id', $reviewedIds)
+                    ->pluck('planning_task_id')->all();
+            $unperformed = array_values(array_diff($reviewedIds, $performedIds));
+            $preview['taskCloseout'] = [
+                'reviewedCount' => count($reviewedIds),
+                'performedCount' => count($performedIds),
+                'unperformedCount' => count($unperformed),
+                'unperformedTaskIds' => $unperformed,
+                'allReviewedTasksPerformed' => $unperformed === [],
+            ];
             $before = $this->snapshot($operation);
             DB::table('venue_event_operations')->where('id', $operation->id)
                 ->update(['status' => 'completed', 'ended_clock' => $clock,

@@ -857,4 +857,90 @@ class VenueReservationServiceTest extends TestCase
         $this->assertSame(0, DB::table('finance_journals')->count());
     }
 
+    public function test_event_closeout_freezes_unperformed_reviewed_setup_and_nonbinding_overtime(): void
+    {
+        [$company, , $hall, $people, $customer] = $this->fixture();
+        $draft = $this->review($company, $hall, $people['owner'], $customer, '2027-04-08', 'morning');
+        $planner = app(OperationsPlanningService::class);
+        $doneId = (string) Str::uuid();
+        $missingId = (string) Str::uuid();
+        foreach ([
+            [$doneId, 'Place welcome center lights'],
+            [$missingId, 'Verify catering buffet placement'],
+        ] as [$id, $title]) {
+            $planner->create($people['owner'], $company->id, $id, $draft,
+                $title, 'Approved synthetic service planning');
+            $planner->setReviewed($people['owner'], $company->id, $id, 1, true,
+                'Reviewed task required for event setup');
+        }
+        $this->be($people['manager']);
+        $booking = $this->confirm($people['manager'], $company, $draft);
+        config()->set('event_controls.recording_enabled', true);
+        $this->be($people['operations']);
+        $service = app(VenueEventOperationsService::class);
+        $service->start($people['operations'], $company->id,
+            $booking['id'], (string) Str::uuid(), '08:02',
+            'Welcome desk observed actual opening');
+        $service->fulfillTask($people['operations'], $company->id,
+            $booking['id'], $doneId, (string) Str::uuid(),
+            'Observed welcome lighting installed');
+        $close = $service->finish($people['operations'], $company->id,
+            $booking['id'], 1, '11:45', 'Actual guests exited later than turnover');
+        $this->assertSame([
+            'reviewedCount' => 2, 'performedCount' => 1,
+            'unperformedCount' => 1, 'unperformedTaskIds' => [$missingId],
+            'allReviewedTasksPerformed' => false,
+        ], $close['overtime']['taskCloseout']);
+        $this->assertTrue($close['overtime']['conflictsWithTurnover']);
+        $this->assertFalse($close['overtime']['extensionAuthorized']);
+        $rows = $service->worklist($people['operations'], $company->id);
+        $this->assertSame($missingId, $rows[0]['closeout']['taskCloseout']['unperformedTaskIds'][0]);
+        Livewire::withQueryParams(['company' => $company->id])
+            ->test(EventOperations::class)
+            ->call('selectReservation', $booking['id'])
+            ->assertSee('Frozen operational closeout')
+            ->assertSee('Outstanding setup fulfilment remains unresolved')
+            ->assertSee('Actual finish exceeded the protected next-program turnover limit')
+            ->assertDontSee('hidden-reservation@example.test');
+        $this->assertSame(1, DB::table('hall_slot_claims')
+            ->where('id', $booking['claimId'])->where('status', 'confirmed')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+        $this->assertSame(0, DB::table('venue_invoice_payments')->count());
+    }
+
+    public function test_actual_event_start_time_cannot_be_silently_rewritten_in_postgres(): void
+    {
+        [$company, , $hall, $people, $customer] = $this->fixture();
+        $draft = $this->review($company, $hall, $people['owner'], $customer);
+        $this->be($people['manager']);
+        $booked = $this->confirm($people['manager'], $company, $draft);
+        config()->set('event_controls.recording_enabled', true);
+        $service = app(VenueEventOperationsService::class);
+        $event = $service->start($people['manager'], $company->id,
+            $booked['id'], (string) Str::uuid(), '17:02',
+            'Observed evening event began at hall');
+        $this->assertSame(1, DB::table('venue_event_operation_events')->count());
+        $this->expectException(QueryException::class);
+        DB::table('venue_event_operations')->where('id', $event['id'])
+            ->update(['started_clock' => '17:00']);
+    }
+
+    public function test_completed_event_operations_cannot_be_hard_deleted_after_closeout(): void
+    {
+        [$company, , $hall, $people, $customer] = $this->fixture();
+        $draft = $this->review($company, $hall, $people['owner'], $customer);
+        $this->be($people['manager']);
+        $booked = $this->confirm($people['manager'], $company, $draft);
+        config()->set('event_controls.recording_enabled', true);
+        $service = app(VenueEventOperationsService::class);
+        $event = $service->start($people['manager'], $company->id,
+            $booked['id'], (string) Str::uuid(), '17:01',
+            'Observed evening guest arrival');
+        $service->finish($people['manager'], $company->id, $booked['id'],
+            1, '22:10', 'Observed actual final guest departure');
+        $this->assertSame(2, DB::table('venue_event_operation_events')->count());
+        $this->expectException(QueryException::class);
+        DB::table('venue_event_operations')->where('id', $event['id'])->delete();
+    }
+
 }

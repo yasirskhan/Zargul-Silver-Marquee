@@ -42,6 +42,13 @@ immutable one-time fulfilment evidence under the current hall/company policy.
 A reviewed plan alone never proves service delivery. No automatic invoice,
 payment, hall extension, or added customer charge occurs.
 
+## Phase 7.3 — Frozen operational event closeout
+Seal current nonbinding grace/overtime/turnover observations together with
+reviewed planned-task counts and witnessed performed/unperformed evidence.
+Display unresolved services without falsely marking them delivered, do not silently
+change customer invoice, reservation or ledger. Actual overtime billing still needs
+authorized contractual adjustment and operator release.
+
 ## Phase 8 — Controlled pilot
 No real launch until finance, isolation, restores, booking concurrency and real user tests are accepted.
 
