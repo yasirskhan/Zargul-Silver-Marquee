@@ -58,6 +58,7 @@ class VenueOverviewLivewireTest extends TestCase
             ->assertSet('summary.visibleHalls', 1)
             ->assertSet('summary.hallsNeedingSetup', 1)
             ->assertSet('summary.pendingApprovals', 1)
+            ->assertSee('Review pending approvals')
             ->assertSet('summary.drafts', 0)
             ->assertSee('Review booking proposals')
             ->assertSee('Approval center')

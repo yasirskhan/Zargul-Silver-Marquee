@@ -55,6 +55,12 @@
                             <p class="text-sm">Pending approval requests in your view</p>
                             <p class="text-3xl font-semibold">{{ $summary['pendingApprovals'] }}</p>
                             <p class="text-xs">Manager counts include only their own requests</p>
+                            @if ($summary['pendingApprovals'] > 0)
+                                <a class="text-xs underline"
+                                    href="{{ \App\Filament\Pages\ApprovalCenter::getUrl(['company' => $companyId, 'status' => 'pending']) }}">
+                                    Review pending approvals
+                                </a>
+                            @endif
                         </div>
                     @endif
                 </div>

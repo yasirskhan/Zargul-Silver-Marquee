@@ -177,6 +177,35 @@ class ApprovalCenterLivewireTest extends TestCase
         $this->assertSame(0, DB::table('finance_journals')->count());
     }
 
+    public function test_status_query_uses_current_inbox_scope_and_rejects_forged_status(): void
+    {
+        [$company, , $members] = $this->fixture();
+        $service = app(\App\Services\ApprovalWorkflowService::class);
+        $admin = $members['admin'][0];
+        $owner = $members['owner'][0];
+        $pendingId = (string) \Illuminate\Support\Str::uuid();
+        $resolvedId = (string) \Illuminate\Support\Str::uuid();
+
+        $this->be($admin);
+        $service->request($admin, $company->id, $pendingId, 'expense',
+            200, 'PKR', null, 'Pending owner exception test');
+        $service->request($admin, $company->id, $resolvedId, 'expense',
+            150, 'PKR', null, 'Already resolved synthetic exception');
+        $this->be($owner);
+        $service->decide($owner, $company->id, $resolvedId, 1,
+            'rejected', 'Synthetic owner rejection reason');
+        Livewire::test(ApprovalCenter::class)
+            ->set('statusFilter', 'pending')
+            ->assertHasNoErrors()
+            ->assertSee('Pending owner exception test')
+            ->assertDontSee('Already resolved synthetic exception')
+            ->assertSet('statusFilter', 'pending')
+            ->set('statusFilter', 'forged')->assertHasErrors(['statusFilter']);
+        $this->assertSame(2, DB::table('approval_requests')->count());
+        $this->assertSame(1, DB::table('approval_decisions')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
     public function test_owner_can_filter_scoped_approval_inbox_and_never_review_hidden_selection(): void
     {
         [$company, , $members] = $this->fixture();

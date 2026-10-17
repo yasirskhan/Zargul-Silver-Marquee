@@ -62,6 +62,7 @@ final class ApprovalCenter extends Page
     #[Locked]
     public int $selectedRevision = 0;
 
+    #[Url(as: 'status')]
     public string $statusFilter = 'all';
 
     public string $categoryFilter = 'all';
