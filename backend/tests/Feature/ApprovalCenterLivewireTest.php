@@ -265,6 +265,32 @@ class ApprovalCenterLivewireTest extends TestCase
         $this->assertSame(1, DB::table('approval_requests')->where('company_id', $company->id)->count());
     }
 
+
+    public function test_stale_authenticated_owner_loses_panel_access_after_persisted_account_revocation(): void
+    {
+        [, , $members] = $this->fixture();
+        $owner = $members['owner'][0];
+        $component = Livewire::test(ApprovalCenter::class)
+            ->assertSee('Request approval');
+        // Keep the auth model in memory; revoke only the persisted database account.
+        DB::table('users')->where('id', $owner->id)->update(['is_active' => false]);
+        $this->assertTrue($owner->is_active);
+        $this->assertSame([], $component->instance()->companyOptions());
+        $this->assertSame('', $component->instance()->role());
+        $component->call('refreshInbox')->assertForbidden();
+        Livewire::test(ApprovalCenter::class)->assertForbidden();
+
+        DB::table('users')->where('id', $owner->id)
+            ->update(['is_active' => true, 'email_verified_at' => null]);
+        $this->assertNotNull($owner->email_verified_at);
+        $this->assertSame([], $component->instance()->companyOptions());
+        $component->call('refreshInbox')->assertForbidden();
+        Livewire::test(ApprovalCenter::class)->assertForbidden();
+        $this->assertSame(0, DB::table('approval_requests')->count());
+        $this->assertSame(0, DB::table('approval_decisions')->count());
+        $this->assertSame(0, DB::table('approval_alert_outbox')->count());
+    }
+
     public function test_revoked_or_unverified_member_cannot_use_livewire_actions(): void
     {
         [, , $members] = $this->fixture();

@@ -120,11 +120,18 @@ final class ApprovalCenter extends Page
         $this->telegramPairingUrl = null;
     }
 
+    private static function currentAccountAllowed(User $actor): bool
+    {
+        // Authenticate current persisted state, not a cached session User instance.
+        return DB::table('users')->where('id', $actor->getKey())
+            ->where('is_active', true)->whereNotNull('email_verified_at')->exists();
+    }
+
     public static function canAccess(): bool
     {
         $actor = Filament::auth()->user();
 
-        return $actor instanceof User && $actor->is_active && $actor->hasVerifiedEmail()
+        return $actor instanceof User && self::currentAccountAllowed($actor)
             && self::companiesFor($actor) !== [];
     }
 
@@ -142,14 +149,14 @@ final class ApprovalCenter extends Page
     {
         $actor = Filament::auth()->user();
 
-        return $actor instanceof User && $actor->is_active && $actor->hasVerifiedEmail()
+        return $actor instanceof User && self::currentAccountAllowed($actor)
             ? self::companiesFor($actor) : [];
     }
 
     public function role(): string
     {
         $actor = Filament::auth()->user();
-        if (! $actor instanceof User || ! $this->companyId) {
+        if (! $actor instanceof User || ! self::currentAccountAllowed($actor) || ! $this->companyId) {
             return '';
         }
 
