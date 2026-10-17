@@ -114,6 +114,11 @@
 - New pure `central/signing/Ed25519StatusReceiptCodec.php`, central tests and dedicated CI. Strict domain-separated signature, vendor/installation/customer/nonce, typed state, revision and issued timestamp; no private key committed, no public signer route enabled. Signed receipt delivery, 15-day online check integration and operator KMS provisioning remain outstanding. This code is pending exact-SHA hosted CI, not deployed.
 - Previous client signed status request `323cf8a` CI 39077576742 PASS all six; `fdc6345` and `9fc1760` still require full six-job conclusion verification. Never claim any unsigned status as a paid/valid license.
 
+## CROSS-BOUNDARY SIGNED RECEIPT INTEROPERABILITY — PENDING EXACT CI
+- Added PostgreSQL-backed Laravel `CentralSignedStatusReceiptContractTest` directly exercising the pure HAFZATECH isolated `Ed25519StatusReceiptCodec` against the VenueDesk pinned `CentralSignedStatusReceiptVerifier`. Confirms actual matching signature bytes, installation/customer/nonce/issuer/time/revision semantics and rejects replay nonce mismatch.
+- This test is not a live signed receipt API; central key custody and public endpoint integration remain unimplemented. Existing `VENUE_CENTRAL_ACTIVATION_ENABLED` and vendor API remain default OFF.
+- Previous `323cf8a` and `fdc6345` have exact six-job SUCCESS; `9fc1760` and `f989e23` focused tests green with full CI conclusion to verify before marking VERIFIED.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`
