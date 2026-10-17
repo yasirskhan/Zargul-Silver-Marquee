@@ -33,6 +33,13 @@
                 @error('statusFilter') <span role="alert" class="text-sm text-red-600">{{ $message }}</span> @enderror
             </label>
             <label class="block space-y-2">
+                <span class="text-sm font-medium">Proposal reference (exact UUID)</span>
+                <input type="text" wire:model="referenceSearch" maxlength="36" autocomplete="off"
+                    placeholder="Paste full internal proposal reference"
+                    class="w-full rounded-lg border p-3 font-mono text-sm text-gray-900">
+                @error('referenceSearch') <span role="alert" class="text-sm text-red-600">{{ $message }}</span> @enderror
+            </label>
+            <label class="block space-y-2">
                 <span class="text-sm font-medium">Event date from</span>
                 <input type="date" wire:model="fromDate" class="w-full rounded-lg border p-3 text-gray-900">
             </label>
@@ -51,11 +58,12 @@
             <section class="space-y-4" aria-label="Private company proposal results">
                 <p class="text-sm">Showing {{ count($entries) }} internal proposal(s), starting at {{ $offset + 1 }}.</p>
                 <div class="overflow-x-auto rounded-xl border">
-                    <table class="w-full min-w-[630px] border-collapse text-left text-sm">
+                    <table class="w-full min-w-[850px] border-collapse text-left text-sm">
                         <caption class="sr-only">Unconfirmed owner-only proposal metadata, no customer contact details</caption>
                         <thead class="bg-gray-100 text-gray-900">
                             <tr>
                                 <th scope="col" class="p-3">Date</th>
+                                <th scope="col" class="p-3">Reference</th>
                                 <th scope="col" class="p-3">Hall</th>
                                 <th scope="col" class="p-3">Program</th>
                                 <th scope="col" class="p-3">Guests</th>
@@ -68,6 +76,7 @@
                             @forelse ($entries as $item)
                                 <tr wire:key="booking-proposal-{{ $item['id'] }}" class="border-t">
                                     <td class="p-3">{{ $item['eventDate'] }}</td>
+                                    <td class="p-3 font-mono text-xs">{{ $item['id'] }}</td>
                                     <td class="p-3">{{ $item['hallName'] }}</td>
                                     <td class="p-3">{{ ucfirst($item['program']) }}</td>
                                     <td class="p-3">{{ $item['guests'] }}</td>
@@ -76,7 +85,7 @@
                                     <td class="p-3"><button type="button" wire:click="selectDraft('{{ $item['id'] }}')" class="rounded-lg border px-3 py-2 font-semibold">Review/edit</button></td>
                                 </tr>
                             @empty
-                                <tr><td colspan="7" class="p-4 text-sm">No matching internal proposals.</td></tr>
+                                <tr><td colspan="8" class="p-4 text-sm">No matching internal proposals.</td></tr>
                             @endforelse
                         </tbody>
                     </table>

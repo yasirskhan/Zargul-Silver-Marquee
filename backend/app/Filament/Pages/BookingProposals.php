@@ -14,6 +14,7 @@ use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
@@ -38,6 +39,9 @@ final class BookingProposals extends Page
     public ?string $hallId = null;
 
     public string $statusFilter = '';
+
+    /** Exact opaque proposal reference, never a customer name or contact search. */
+    public string $referenceSearch = '';
 
     public string $fromDate = '';
 
@@ -326,6 +330,11 @@ final class BookingProposals extends Page
         if (! in_array($this->statusFilter, ['', 'draft', 'under_review', 'withdrawn'], true)) {
             throw ValidationException::withMessages(['statusFilter' => 'Choose a valid proposal status.']);
         }
+        if ($this->referenceSearch !== '' && ! Str::isUuid($this->referenceSearch)) {
+            throw ValidationException::withMessages([
+                'referenceSearch' => 'Enter the complete valid proposal reference (UUID).',
+            ]);
+        }
         $from = $this->parseDate($this->fromDate);
         $to = $this->parseDate($this->toDate);
         if ($from !== null && $to !== null && $from > $to) {
@@ -344,6 +353,9 @@ final class BookingProposals extends Page
         }
         if ($this->statusFilter !== '') {
             $query->where('booking_drafts.status', $this->statusFilter);
+        }
+        if ($this->referenceSearch !== '') {
+            $query->where('booking_drafts.id', $this->referenceSearch);
         }
         if ($from !== null) {
             $query->whereDate('booking_drafts.event_date', '>=', $from);

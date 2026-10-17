@@ -60,14 +60,17 @@ class BookingProposalsLivewireTest extends TestCase
     private function proposal(
         string $companyId, string $hallId, string $customerId,
         int $actorId, string $date = '2026-12-15', string $status = 'draft',
-    ): void {
+    ): string {
+        $id = (string) Str::uuid();
         DB::table('booking_drafts')->insert([
-            'id' => (string) Str::uuid(), 'company_id' => $companyId,
+            'id' => $id, 'company_id' => $companyId,
             'hall_id' => $hallId, 'customer_id' => $customerId,
             'event_date' => $date, 'program' => 'evening',
             'requested_guests' => 180, 'status' => $status,
             'created_by' => $actorId, 'revision' => 1,
         ]);
+
+        return $id;
     }
 
     public function test_owner_sees_only_company_proposal_metadata_without_contact_or_claims(): void
@@ -88,6 +91,34 @@ class BookingProposalsLivewireTest extends TestCase
         $this->assertCount(1, $component->get('entries'));
         $this->assertSame('2026-12-15', $component->get('entries')[0]['eventDate']);
         $this->assertArrayNotHasKey('customerId', $component->get('entries')[0]);
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, DB::table('audit_events')->count());
+    }
+
+    public function test_reference_lookup_is_exact_company_scoped_and_never_returns_customer_contact(): void
+    {
+        [$company, $foreign, $hall, $foreignHall, $owner, , $customer, $otherCustomer] = $this->fixture();
+        $first = $this->proposal($company->id, $hall->id, $customer, $owner->id, '2026-12-15');
+        $second = $this->proposal($company->id, $hall->id, $customer, $owner->id, '2026-12-16');
+        $foreignId = $this->proposal($foreign->id, $foreignHall->id, $otherCustomer, $owner->id);
+
+        $component = Livewire::test(BookingProposals::class)
+            ->assertSee('Proposal reference (exact UUID)')
+            ->assertSee($first)
+            ->assertSee($second)
+            ->set('referenceSearch', $second)
+            ->call('refreshResults')
+            ->assertSee($second)
+            ->assertDontSee($first)
+            ->assertDontSee('Secret Customer Name')
+            ->assertDontSee('private@example.test');
+        $this->assertCount(1, $component->get('entries'));
+        $this->assertSame($second, $component->get('entries')[0]['id']);
+        $component->set('referenceSearch', $foreignId)
+            ->call('refreshResults')->assertSet('entries', []);
+        $component->set('referenceSearch', 'not-a-valid-reference')
+            ->call('refreshResults')->assertHasErrors(['referenceSearch']);
+        $this->assertSame(3, DB::table('booking_drafts')->count());
         $this->assertSame(0, DB::table('hall_slot_claims')->count());
         $this->assertSame(0, DB::table('audit_events')->count());
     }
