@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lichall.hafzatech.com/contracts/installation-registration-v1",
+  "title": "HAFZATECH installation identity protocol v1",
+  "description": "Contract-only. These endpoints do not issue or verify a paid VenueDesk license.",
+  "type": "object",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/challengeRequest"
+    },
+    {
+      "$ref": "#/$defs/challengeResponse"
+    },
+    {
+      "$ref": "#/$defs/registrationRequest"
+    },
+    {
+      "$ref": "#/$defs/registrationResponse"
+    },
+    {
+      "$ref": "#/$defs/apiError"
+    }
+  ],
+  "x-signature-message": {
+    "algorithm": "Ed25519",
+    "context": "HAFZATECH-INSTALL-REGISTER-V1",
+    "encoding": "UTF-8 with LF between seven ordered fields and no trailing LF",
+    "ordered_fields": [
+      "context",
+      "installation_id",
+      "customer_id",
+      "enrollment_id",
+      "domain",
+      "nonce",
+      "public_key"
+    ]
+  },
+  "$defs": {
+    "uuidV4": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "nonceOrToken": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{43}$"
+    },
+    "domain": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 253,
+      "pattern": "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"
+    },
+    "challengeRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enrollment_id",
+        "enrollment_token"
+      ],
+      "properties": {
+        "enrollment_id": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "enrollment_token": {
+          "$ref": "#/$defs/nonceOrToken"
+        }
+      }
+    },
+    "challengeResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "api_version",
+        "nonce",
+        "expires_in_seconds"
+      ],
+      "properties": {
+        "api_version": {
+          "const": "v1"
+        },
+        "nonce": {
+          "$ref": "#/$defs/nonceOrToken"
+        },
+        "expires_in_seconds": {
+          "const": 300
+        }
+      }
+    },
+    "registrationRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enrollment_id",
+        "enrollment_token",
+        "installation_id",
+        "customer_id",
+        "domain",
+        "nonce",
+        "public_key",
+        "signature"
+      ],
+      "properties": {
+        "enrollment_id": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "enrollment_token": {
+          "$ref": "#/$defs/nonceOrToken"
+        },
+        "installation_id": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "customer_id": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "domain": {
+          "$ref": "#/$defs/domain"
+        },
+        "nonce": {
+          "$ref": "#/$defs/nonceOrToken"
+        },
+        "public_key": {
+          "$ref": "#/$defs/nonceOrToken"
+        },
+        "signature": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{86}$"
+        }
+      }
+    },
+    "registrationResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "api_version",
+        "installation_id",
+        "customer_id",
+        "status"
+      ],
+      "properties": {
+        "api_version": {
+          "const": "v1"
+        },
+        "installation_id": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "customer_id": {
+          "$ref": "#/$defs/uuidV4"
+        },
+        "status": {
+          "const": "registered_pending_license"
+        }
+      }
+    },
+    "apiError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "api_version",
+        "error"
+      ],
+      "properties": {
+        "api_version": {
+          "const": "v1"
+        },
+        "error": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
