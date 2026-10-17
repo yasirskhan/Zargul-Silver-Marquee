@@ -4,6 +4,54 @@
             Internal booking proposals for owner/admin review and safe draft editing. These are NOT confirmed bookings or holds.
             Availability, prices, consent and booking approval must be checked separately. No customer contact is displayed.
         </p>
+        <section class="space-y-3 rounded-xl border p-4" aria-label="Private customer and proposal intake">
+            <h2 class="text-lg font-semibold">Create customer and internal booking proposal</h2>
+            <p class="text-xs">Owner/admin only. Choose an existing customer by exact private ID, or enter a new customer below. Personal contact information is encrypted and never shown in the proposal list. Submitting for review does not reserve a hall.</p>
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <label class="space-y-1"><span>Existing customer ID (optional)</span>
+                    <input wire:model="intakeCustomerId" maxlength="36" class="w-full rounded-lg border p-3 text-gray-900">
+                </label>
+                <label class="space-y-1"><span>New customer's name</span>
+                    <input wire:model="intakeName" maxlength="120" autocomplete="off" class="w-full rounded-lg border p-3 text-gray-900">
+                </label>
+                <label class="space-y-1"><span>Customer email (optional)</span>
+                    <input wire:model="intakeEmail" type="email" maxlength="254" autocomplete="off" class="w-full rounded-lg border p-3 text-gray-900">
+                </label>
+                <label class="space-y-1"><span>Customer phone (optional)</span>
+                    <input wire:model="intakePhone" maxlength="32" autocomplete="off" class="w-full rounded-lg border p-3 text-gray-900">
+                </label>
+                <label class="space-y-1"><span>Hall</span>
+                    <select wire:model="intakeHallId" class="w-full rounded-lg border p-3 text-gray-900">
+                        <option value="">Select hall</option>
+                        @foreach ($this->hallOptions() as $id => $name)
+                            <option value="{{ $id }}">{{ $name }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label class="space-y-1"><span>Event date</span>
+                    <input wire:model="intakeDate" type="date" class="w-full rounded-lg border p-3 text-gray-900">
+                </label>
+                <label class="space-y-1"><span>Program</span>
+                    <select wire:model="intakeProgram" class="w-full rounded-lg border p-3 text-gray-900">
+                        <option value="morning">Morning</option><option value="noon">Noon</option><option value="evening">Evening</option>
+                    </select>
+                </label>
+                <label class="space-y-1"><span>Expected guests</span>
+                    <input wire:model="intakeGuests" type="number" min="1" class="w-full rounded-lg border p-3 text-gray-900">
+                </label>
+            </div>
+            <label class="block space-y-1"><span>Internal creation/review reason (no personal details)</span>
+                <textarea wire:model="intakeReason" rows="2" maxlength="500" class="w-full rounded-lg border p-3 text-gray-900"></textarea>
+            </label>
+            <label class="flex items-center gap-2"><input type="checkbox" wire:model="intakeSubmitReview">
+                Submit new proposal for review after creating it
+            </label>
+            @foreach (['intakeCustomerId','intakeName','intakeEmail','intakePhone','intakeHallId','intakeDate','intakeProgram','intakeGuests','intakeReason'] as $field)
+                @error($field) <p role="alert" class="text-xs text-red-600">{{ $message }}</p> @enderror
+            @endforeach
+            <button type="button" wire:click="createIntake" wire:loading.attr="disabled"
+                class="rounded-lg border px-4 py-2 font-semibold">Save private customer and proposal</button>
+        </section>
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <label class="block space-y-2">
                 <span class="text-sm font-medium">Company</span>

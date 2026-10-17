@@ -74,6 +74,65 @@ class BookingProposalsLivewireTest extends TestCase
         return $id;
     }
 
+    public function test_owner_creates_encrypted_customer_and_reviewed_proposal_atomically_without_booking(): void
+    {
+        [$company, , $hall, , $owner] = $this->fixture();
+        // Keep the only required hall configuration consistent with actual
+        // service validation; do not bypass live domain business rules.
+        $slot = static fn (string $from, string $to): array => [
+            'start' => $from, 'end' => $to, 'setupMinutes' => 10,
+            'cleaningMinutes' => 10, 'graceMinutes' => 10,
+            'overtimeIntervalMinutes' => 30, 'overtimeRateMinor' => 0,
+            'rentalRateMinor' => 10000,
+        ];
+        app(\App\Services\HallProgramRulesService::class)->configure(
+            $owner, $company->id, $hall->id, [
+                'morning' => $slot('08:00', '11:00'),
+                'noon' => $slot('12:00', '15:00'),
+                'evening' => $slot('17:00', '22:00'),
+            ], 'PKR', 0, 'Synthetic configured venue');
+        $page = Livewire::test(BookingProposals::class)
+            ->set('intakeName', 'Private New Customer')
+            ->set('intakeEmail', 'new-private@example.test')
+            ->set('intakeHallId', $hall->id)
+            ->set('intakeDate', '2027-09-18')
+            ->set('intakeProgram', 'evening')
+            ->set('intakeGuests', '120')
+            ->set('intakeReason', 'Staff confirmed private customer intake')
+            ->set('intakeSubmitReview', true)
+            ->call('createIntake')->assertHasNoErrors()
+            ->assertSet('intakeName', '')
+            ->assertSet('intakeEmail', '')
+            ->assertDontSee('Private New Customer')
+            ->assertDontSee('new-private@example.test');
+        $this->assertSame(1, DB::table('customer_profiles')->where('company_id', $company->id)->count());
+        $this->assertSame(1, DB::table('booking_drafts')->where('company_id', $company->id)
+            ->where('status', 'under_review')->count());
+        $saved = DB::table('customer_profiles')->first();
+        $this->assertNotSame('Private New Customer', $saved->name_ciphertext);
+        $this->assertSame(2, DB::table('booking_draft_events')->count());
+        $this->assertSame(0, DB::table('venue_reservations')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
+    public function test_customer_intake_rolls_back_when_hall_or_guest_validation_fails(): void
+    {
+        [$company, , $hall] = $this->fixture();
+        Livewire::test(BookingProposals::class)
+            ->set('intakeName', 'Rollback Private Customer')
+            ->set('intakeHallId', $hall->id)
+            ->set('intakeDate', '2027-09-18')
+            ->set('intakeProgram', 'morning')
+            ->set('intakeGuests', '9999')
+            ->set('intakeReason', 'Invalid capacity must rollback')
+            ->call('createIntake')->assertHasErrors(['intakeReason']);
+        $this->assertSame(0, DB::table('customer_profiles')->where('company_id', $company->id)->count());
+        $this->assertSame(0, DB::table('booking_drafts')->where('company_id', $company->id)->count());
+        $this->assertSame(0, DB::table('customer_profile_events')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+    }
+
     public function test_owner_sees_only_company_proposal_metadata_without_contact_or_claims(): void
     {
         [$company, $foreign, $hall, $foreignHall, $owner, , $customer, $otherCustomer] = $this->fixture();

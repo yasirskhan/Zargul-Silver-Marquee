@@ -7,6 +7,7 @@ use App\Models\Hall;
 use App\Models\User;
 use App\Services\BookingDraftService;
 use App\Services\BookingDraftReviewService;
+use App\Services\CustomerProfileService;
 use App\Services\TenantAccess;
 use BackedEnum;
 use DateTimeImmutable;
@@ -81,6 +82,40 @@ final class BookingProposals extends Page
     #[Locked]
     public string $selectedStatus = '';
 
+    // Internal owner/admin intake: customer + proposal + optional review, atomic.
+    public string $intakeCustomerId = '';
+    public string $intakeName = '';
+    public string $intakeEmail = '';
+    public string $intakePhone = '';
+    public string $intakeHallId = '';
+    public string $intakeDate = '';
+    public string $intakeProgram = 'evening';
+    public string $intakeGuests = '';
+    public string $intakeReason = '';
+    public bool $intakeSubmitReview = false;
+
+    #[Locked]
+    public string $intakeCustomerKey = '';
+
+    #[Locked]
+    public string $intakeProposalKey = '';
+
+    private function resetIntake(): void
+    {
+        $this->intakeCustomerId = '';
+        $this->intakeName = '';
+        $this->intakeEmail = '';
+        $this->intakePhone = '';
+        $this->intakeHallId = '';
+        $this->intakeDate = '';
+        $this->intakeProgram = 'evening';
+        $this->intakeGuests = '';
+        $this->intakeReason = '';
+        $this->intakeSubmitReview = false;
+        $this->intakeCustomerKey = (string) Str::uuid();
+        $this->intakeProposalKey = (string) Str::uuid();
+    }
+
     public string $editHallId = '';
 
     public string $editDate = '';
@@ -152,6 +187,7 @@ final class BookingProposals extends Page
         abort_unless($requested === null || (is_string($requested)
             && array_key_exists($requested, $options)), 403);
         $this->companyId = $requested ?? array_key_first($options);
+        $this->resetIntake();
         $this->refreshResults();
     }
 
@@ -163,6 +199,7 @@ final class BookingProposals extends Page
 
     public function updatedCompanyId(): void
     {
+        $this->resetIntake();
         $this->clearSelection();
         // A reference/status filter from another authorized company must not
         // silently hide the newly selected company's proposal review list.
@@ -229,6 +266,69 @@ final class BookingProposals extends Page
         $this->editProgram = $record['program'];
         $this->editGuests = (string) $record['guests'];
         $this->editReason = '';
+    }
+
+    /** All-or-nothing owner/admin intake. Does not claim any physical venue slot. */
+    public function createIntake(): void
+    {
+        $this->authorizeLoaded();
+        $actor = Filament::auth()->user();
+        abort_unless($actor instanceof User, 403);
+        $this->validate([
+            'intakeCustomerId' => ['nullable', 'uuid'],
+            'intakeName' => [\Illuminate\Validation\Rule::requiredIf($this->intakeCustomerId === ''), 'nullable', 'string', 'min:2', 'max:120'],
+            'intakeEmail' => ['nullable', 'email', 'max:254'],
+            'intakePhone' => ['nullable', 'string', 'max:32'],
+            'intakeHallId' => ['required', 'uuid'],
+            'intakeDate' => ['required', 'date_format:Y-m-d'],
+            'intakeProgram' => ['required', 'in:morning,noon,evening'],
+            'intakeGuests' => ['required', 'integer', 'min:1', 'max:200000'],
+            'intakeReason' => ['required', 'string', 'min:3', 'max:500'],
+            'intakeSubmitReview' => ['boolean'],
+        ]);
+        abort_unless(array_key_exists($this->intakeHallId, $this->hallOptions()), 403);
+
+        $customerId = $this->intakeCustomerId !== ''
+            ? $this->intakeCustomerId : $this->intakeCustomerKey;
+        if ($this->intakeCustomerId !== '') {
+            // Do not leak an existing contact or accept another tenant's ID.
+            abort_unless(DB::table('customer_profiles')->where('company_id', $this->companyId)
+                ->where('id', $customerId)->where('is_active', true)->exists(), 403);
+        }
+        try {
+            DB::transaction(function () use ($actor, $customerId): void {
+                if ($this->intakeCustomerId === '') {
+                    app(CustomerProfileService::class)->create(
+                        $actor, $this->companyId, $customerId, $this->intakeName,
+                        $this->intakeEmail !== '' ? $this->intakeEmail : null,
+                        $this->intakePhone !== '' ? $this->intakePhone : null,
+                        $this->intakeReason
+                    );
+                }
+                app(BookingDraftService::class)->create(
+                    $actor, $this->companyId, $this->intakeProposalKey,
+                    $this->intakeHallId, $customerId, $this->intakeDate,
+                    $this->intakeProgram, (int) $this->intakeGuests, $this->intakeReason
+                );
+                if ($this->intakeSubmitReview) {
+                    app(BookingDraftReviewService::class)->submit(
+                        $actor, $this->companyId, $this->intakeProposalKey, 1,
+                        $this->intakeReason
+                    );
+                }
+            }, 3);
+        } catch (InvalidArgumentException | ConflictHttpException $error) {
+            throw ValidationException::withMessages(['intakeReason' => $error->getMessage()]);
+        }
+        $proposalId = $this->intakeProposalKey;
+        $this->resetIntake();
+        $this->referenceSearch = $proposalId;
+        $this->statusFilter = '';
+        $this->hallId = null;
+        $this->programFilter = '';
+        $this->fromDate = '';
+        $this->toDate = '';
+        $this->refreshResults();
     }
 
     public function saveDraft(): void
