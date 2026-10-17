@@ -36,6 +36,12 @@ final class OperationsPlanning extends Page
     public array $tasks = [];
 
     #[Locked]
+    public int $taskPage = 1;
+
+    #[Locked]
+    public bool $hasMoreTasks = false;
+
+    #[Locked]
     public ?string $historyTaskId = null;
 
     #[Locked]
@@ -52,6 +58,10 @@ final class OperationsPlanning extends Page
     public string $reviewReason = '';
     #[Url(as: 'status')]
     public string $statusFilter = 'all';
+    #[Url(as: 'hall')]
+    public string $hallFilter = '';
+    #[Url(as: 'taskSearch')]
+    public string $taskSearch = '';
 
     private static function currentAccountAllowed(User $actor): bool
     {
@@ -121,6 +131,22 @@ final class OperationsPlanning extends Page
         $this->authorizeCompany();
     }
 
+    public function hallOptions(): array
+    {
+        $actor = $this->authorizeCompany();
+        $member = CompanyMembership::query()->where('company_id', $this->companyId)
+            ->where('user_id', $actor->getKey())->where('is_active', true)->first();
+        abort_unless($member !== null, 403);
+        $query = DB::table('halls')->where('company_id', $this->companyId)
+            ->where('is_active', true);
+        if (in_array($member->role, ['manager', 'operations'], true)) {
+            $assigned = DB::table('hall_assignments')->where('company_id', $this->companyId)
+                ->where('membership_id', $member->id)->pluck('hall_id')->all();
+            $query->whereIn('id', $assigned);
+        }
+        return $query->orderBy('name')->pluck('name', 'id')->all();
+    }
+
     public function updatedCompanyId(): void
     {
         // Changing tenants invalidates every unsent planning/review note,
@@ -130,6 +156,9 @@ final class OperationsPlanning extends Page
         $this->reason = '';
         $this->reviewReason = '';
         $this->statusFilter = 'all';
+        $this->hallFilter = '';
+        $this->taskSearch = '';
+        $this->taskPage = 1;
         $this->createRequestKey = (string) Str::uuid();
         $this->refresh();
     }
@@ -147,8 +176,14 @@ final class OperationsPlanning extends Page
                 ->where('membership_id', $member->id)->pluck('hall_id')->all();
             $q->whereIn('hall_id', $halls);
         }
-        $options = $q->orderBy('event_date')->limit(50)->get(['id', 'event_date', 'program'])
-            ->mapWithKeys(fn ($row) => [$row->id => $row->event_date.' '.$row->program])->all();
+        $rows = $q->orderBy('event_date')->limit(50)
+            ->get(['id', 'hall_id', 'event_date', 'program']);
+        $hallNames = DB::table('halls')->where('company_id', $this->companyId)
+            ->whereIn('id', $rows->pluck('hall_id')->all())
+            ->pluck('name', 'id')->all();
+        $options = $rows->mapWithKeys(fn ($row) => [$row->id =>
+            ($hallNames[$row->hall_id] ?? 'Hall').' | '.$row->event_date.' '.ucfirst($row->program)
+        ])->all();
 
         // A signed-in staff member may open a valid older proposal by exact
         // reference even when it falls outside the 50-item dropdown window.
@@ -162,17 +197,36 @@ final class OperationsPlanning extends Page
             if ($selected && app(OperationsPlanningPolicy::class)->plan(
                 $actor, $this->companyId, $selected->hall_id
             )) {
-                $options[$selected->id] = $selected->event_date.' '.$selected->program;
+                $hallName = $hallNames[$selected->hall_id]
+                    ?? DB::table('halls')->where('company_id', $this->companyId)
+                        ->where('id', $selected->hall_id)->value('name');
+                $options[$selected->id] = ($hallName ?? 'Hall').' | '
+                    .$selected->event_date.' '.ucfirst($selected->program);
             }
         }
 
         return $options;
     }
 
+    public function updatedTaskSearch(): void
+    {
+        $this->authorizeLoaded();
+        $this->taskPage = 1;
+        $this->refresh();
+    }
+
+    public function updatedHallFilter(): void
+    {
+        $this->authorizeLoaded();
+        $this->taskPage = 1;
+        $this->refresh();
+    }
+
     public function updatedStatusFilter(): void
     {
         $this->authorizeLoaded();
         $this->validate(['statusFilter' => ['required', 'in:all,planned,reviewed']]);
+        $this->taskPage = 1;
         $this->refresh();
     }
 
@@ -188,6 +242,9 @@ final class OperationsPlanning extends Page
         $this->reason = '';
         $this->reviewReason = '';
         $this->createRequestKey = (string) Str::uuid();
+        $this->hallFilter = '';
+        $this->taskSearch = '';
+        $this->taskPage = 1;
         $this->refresh();
     }
 
@@ -195,6 +252,10 @@ final class OperationsPlanning extends Page
     {
         $this->authorizeLoaded();
         $this->bookingId = '';
+        $this->statusFilter = 'all';
+        $this->hallFilter = '';
+        $this->taskSearch = '';
+        $this->taskPage = 1;
         $this->taskTitle = '';
         $this->reason = '';
         $this->reviewReason = '';
@@ -211,12 +272,40 @@ final class OperationsPlanning extends Page
         $this->validate([
             'statusFilter' => ['required', Rule::in(['all', 'planned', 'reviewed'])],
             'bookingId' => ['nullable', 'uuid'],
+            'hallFilter' => ['nullable', 'uuid'],
+            'taskSearch' => ['nullable', 'string', 'max:100'],
         ]);
-        $this->tasks = app(OperationsPlanningService::class)->tasks(
-            $actor, $this->companyId, 30, $this->statusFilter,
-            $this->bookingId !== '' ? $this->bookingId : null
+        abort_unless($this->hallFilter === '' || array_key_exists($this->hallFilter, $this->hallOptions()), 403);
+        abort_unless($this->taskPage >= 1 && $this->taskPage <= 167, 403);
+        $rows = app(OperationsPlanningService::class)->tasks(
+            $actor, $this->companyId, 31, $this->statusFilter,
+            $this->bookingId !== '' ? $this->bookingId : null, ($this->taskPage - 1) * 30,
+            $this->hallFilter !== '' ? $this->hallFilter : null,
+            $this->taskSearch !== '' ? $this->taskSearch : null
         );
+        $this->hasMoreTasks = count($rows) > 30;
+        $this->tasks = array_slice($rows, 0, 30);
         $this->loadedCompanyId = $this->companyId;
+    }
+
+    public function nextTasksPage(): void
+    {
+        $this->authorizeLoaded();
+        if (! $this->hasMoreTasks || $this->taskPage >= 167) {
+            return;
+        }
+        $this->taskPage++;
+        $this->refresh();
+    }
+
+    public function previousTasksPage(): void
+    {
+        $this->authorizeLoaded();
+        if ($this->taskPage <= 1) {
+            return;
+        }
+        $this->taskPage--;
+        $this->refresh();
     }
 
     public function showHistory(string $taskId): void
@@ -246,6 +335,7 @@ final class OperationsPlanning extends Page
         $this->createRequestKey = (string) Str::uuid();
         $this->taskTitle = '';
         $this->reason = '';
+        $this->taskPage = 1;
         $this->refresh();
     }
 

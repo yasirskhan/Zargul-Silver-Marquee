@@ -81,10 +81,12 @@ class OperationsPlanningTest extends TestCase
         [$company, $other, , , , $booking] = $this->fixture();
         Livewire::test(BookingProposals::class)
             ->assertSee('Plan setup');
-        Livewire::withQueryParams(['company' => $company->id, 'proposal' => $booking])
+        $page = Livewire::withQueryParams(['company' => $company->id, 'proposal' => $booking])
             ->test(OperationsPlanning::class)
             ->assertSet('bookingId', $booking)
             ->assertSee('Save nonbinding planning task');
+        $this->assertSame('Test Setup Hall | 2027-03-15 Evening',
+            $page->instance()->proposalOptions()[$booking]);
 
         // A forged or inaccessible UUID is never accepted as a selected task source.
         Livewire::withQueryParams(['company' => $company->id, 'proposal' => (string) Str::uuid()])
@@ -173,8 +175,10 @@ class OperationsPlanningTest extends TestCase
             ->assertSee('Set internal evening chairs')
             ->assertDontSee('Set internal morning tables')
             ->assertSee('Showing tasks for proposal')
+            ->set('statusFilter', 'planned')
             ->call('showAllTasks')
             ->assertSet('bookingId', '')
+            ->assertSet('statusFilter', 'all')
             ->assertSee('Set internal evening chairs')
             ->assertSee('Set internal morning tables');
 
@@ -264,6 +268,125 @@ class OperationsPlanningTest extends TestCase
         $this->assertSame('Test Setup Hall', $managerTasks[0]['hallName']);
         $this->assertSame(0, DB::table('hall_slot_claims')->count());
         $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
+    public function test_planning_pages_keep_all_current_company_tasks_reachable_with_bounded_queries(): void
+    {
+        [$company, , , , $actors, $booking] = $this->fixture();
+        $owner = $actors['owner'][0];
+        $service = app(OperationsPlanningService::class);
+        for ($i = 0; $i < 32; $i++) {
+            $service->create($owner, $company->id, (string) Str::uuid(), $booking,
+                'Synthetic setup item '.($i + 1), 'Company scoped pagination check');
+        }
+
+        $page = Livewire::test(OperationsPlanning::class)
+            ->assertSet('taskPage', 1)
+            ->assertSet('hasMoreTasks', true)
+            ->assertSee('Next 30 tasks');
+        $first = array_column($page->get('tasks'), 'id');
+        $this->assertCount(30, $first);
+        $page->call('nextTasksPage')
+            ->assertSet('taskPage', 2)
+            ->assertSet('hasMoreTasks', false)
+            ->assertSee('Previous 30 tasks');
+        $second = array_column($page->get('tasks'), 'id');
+        $this->assertCount(2, $second);
+        $this->assertCount(32, array_unique(array_merge($first, $second)));
+        $page->call('nextTasksPage')->assertSet('taskPage', 2);
+        $page->call('previousTasksPage')->assertSet('taskPage', 1)
+            ->assertSet('hasMoreTasks', true);
+        $page->set('statusFilter', 'reviewed')
+            ->assertSet('taskPage', 1)
+            ->assertSet('hasMoreTasks', false)
+            ->assertSet('tasks', []);
+        $this->expectException(AuthorizationException::class);
+        $service->tasks($owner, $company->id, 30, 'all', null, 5001);
+    }
+
+    public function test_planning_hall_filter_follows_current_company_and_staff_assignments(): void
+    {
+        [$company, , $hall, $otherHall, $actors, $booking] = $this->fixture();
+        $owner = $actors['owner'][0];
+        $program = static fn (string $start, string $end): array => [
+            'start' => $start, 'end' => $end,
+            'setupMinutes' => 10, 'cleaningMinutes' => 10,
+            'graceMinutes' => 10, 'overtimeIntervalMinutes' => 30,
+            'overtimeRateMinor' => 0, 'rentalRateMinor' => 0,
+        ];
+        app(HallProgramRulesService::class)->configure($owner, $company->id, $otherHall->id, [
+            'morning' => $program('08:00', '11:00'),
+            'noon' => $program('12:00', '15:00'),
+            'evening' => $program('17:00', '22:00'),
+        ], 'PKR', 0, 'Synthetic second hall program rules');
+        $existing = DB::table('booking_drafts')->where('id', $booking)->first();
+        $otherBooking = (string) Str::uuid();
+        app(BookingDraftService::class)->create(
+            $owner, $company->id, $otherBooking, $otherHall->id,
+            $existing->customer_id, '2027-03-19', 'noon', 75, 'Other hall private proposal'
+        );
+        $service = app(OperationsPlanningService::class);
+        $service->create($owner, $company->id, (string) Str::uuid(), $booking,
+            'Plan original hall lights', 'Private original setup notes');
+        $service->create($owner, $company->id, (string) Str::uuid(), $otherBooking,
+            'Plan second hall stage', 'Private second hall notes');
+
+        $panel = Livewire::test(OperationsPlanning::class)
+            ->assertSee('Plan original hall lights')
+            ->assertSee('Plan second hall stage')
+            ->set('hallFilter', $hall->id)
+            ->assertSet('hallFilter', $hall->id)
+            ->assertSee('Plan original hall lights')
+            ->assertDontSee('Plan second hall stage')
+            ->set('hallFilter', $otherHall->id)
+            ->assertSee('Plan second hall stage')
+            ->assertDontSee('Plan original hall lights')
+            ->call('showAllTasks')
+            ->assertSet('hallFilter', '')
+            ->assertSee('Plan original hall lights')
+            ->assertSee('Plan second hall stage');
+        $panel->set('hallFilter', (string) Str::uuid())->assertForbidden();
+
+        $this->be($actors['manager'][0]);
+        $manager = Livewire::test(OperationsPlanning::class);
+        $this->assertArrayHasKey($hall->id, $manager->instance()->hallOptions());
+        $this->assertArrayNotHasKey($otherHall->id, $manager->instance()->hallOptions());
+        $manager->set('hallFilter', $otherHall->id)->assertForbidden();
+        $this->assertSame(2, DB::table('operations_plan_tasks')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
+    public function test_task_title_search_is_literal_case_insensitive_scoped_and_cleared_by_show_all(): void
+    {
+        [$company, , , , $actors, $booking] = $this->fixture();
+        $owner = $actors['owner'][0];
+        $service = app(OperationsPlanningService::class);
+        $service->create($owner, $company->id, (string) Str::uuid(), $booking,
+            'Plan evening stage lights', 'Private stage preparation rationale');
+        $service->create($owner, $company->id, (string) Str::uuid(), $booking,
+            'Arrange chairs for hall', 'Private chair preparation rationale');
+
+        $panel = Livewire::test(OperationsPlanning::class)
+            ->set('taskSearch', 'STAGE')
+            ->assertSet('taskSearch', 'STAGE')
+            ->assertSee('Plan evening stage lights')
+            ->assertDontSee('Arrange chairs for hall')
+            ->set('taskSearch', '%')
+            ->assertSet('tasks', [])
+            ->set('taskSearch', '')
+            ->assertSee('Plan evening stage lights')
+            ->assertSee('Arrange chairs for hall')
+            ->set('taskSearch', 'stage')
+            ->call('showAllTasks')
+            ->assertSet('taskSearch', '')
+            ->assertSee('Arrange chairs for hall');
+        $this->assertSame(2, DB::table('operations_plan_tasks')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+        $this->expectException(InvalidArgumentException::class);
+        $service->tasks($owner, $company->id, 30, 'all', null, 0, null,
+            str_repeat('x', 101));
     }
 
     public function test_planning_status_filter_is_validated_for_company_scoped_links(): void

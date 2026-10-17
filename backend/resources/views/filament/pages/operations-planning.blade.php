@@ -50,6 +50,23 @@
                     @error('statusFilter') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
                 </label>
                 <label class="block space-y-1">
+                    <span class="text-sm">Hall filter</span>
+                    <select wire:model.live="hallFilter" class="w-full rounded-lg border p-3 text-gray-900">
+                        <option value="">All permitted halls</option>
+                        @foreach ($this->hallOptions() as $id => $name)
+                            <option value="{{ $id }}">{{ $name }}</option>
+                        @endforeach
+                    </select>
+                    @error('hallFilter') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                </label>
+                <label class="block space-y-1">
+                    <span class="text-sm">Find task by description</span>
+                    <input type="search" maxlength="100" wire:model.live.debounce.500ms="taskSearch"
+                        placeholder="Search this authorized planning checklist"
+                        class="w-full rounded-lg border p-3 text-gray-900">
+                    @error('taskSearch') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                </label>
+                <label class="block space-y-1">
                     <span class="text-sm">Review/change reason (required for each transition)</span>
                     <textarea wire:model="reviewReason" rows="2" maxlength="500" class="w-full rounded-lg border p-3 text-gray-900"></textarea>
                 </label>
@@ -75,6 +92,17 @@
                 @empty
                     <p class="rounded-lg border p-4 text-sm">No internal planning tasks in your assigned halls.</p>
                 @endforelse
+                <nav aria-label="Planning task pages" class="flex flex-wrap items-center gap-3 text-sm">
+                    @if ($taskPage > 1)
+                        <button type="button" wire:click="previousTasksPage"
+                            class="rounded-lg border px-3 py-2">Previous 30 tasks</button>
+                    @endif
+                    <span>Task page {{ $taskPage }} (up to 30 per page)</span>
+                    @if ($hasMoreTasks)
+                        <button type="button" wire:click="nextTasksPage"
+                            class="rounded-lg border px-3 py-2">Next 30 tasks</button>
+                    @endif
+                </nav>
                 @if ($historyTaskId)
                     <section aria-label="Immutable planning review history" class="space-y-2 rounded-xl border p-4 text-sm">
                         <h3 class="font-semibold">Planning review history</h3>

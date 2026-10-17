@@ -59,10 +59,10 @@ final class OperationsPlanningService
             'status' => $row->status, 'revision' => (int) $row->revision];
     }
 
-    public function tasks(User $actor, string $companyId, int $limit = 30, string $status = 'all', ?string $bookingId = null): array
+    public function tasks(User $actor, string $companyId, int $limit = 30, string $status = 'all', ?string $bookingId = null, int $offset = 0, ?string $hallId = null, ?string $search = null): array
     {
         $member = $this->policy->membership($actor, $companyId);
-        if (! $member || $limit < 1 || $limit > 50) {
+        if (! $member || $limit < 1 || $limit > 50 || $offset < 0 || $offset > 5000) {
             throw new AuthorizationException('Company operations planning is inaccessible.');
         }
         if (! in_array($status, ['all', 'planned', 'reviewed'], true)) {
@@ -70,6 +70,12 @@ final class OperationsPlanningService
         }
         if ($bookingId !== null && ! Str::isUuid($bookingId)) {
             throw new InvalidArgumentException('Invalid planning proposal reference.');
+        }
+        if ($hallId !== null && ! Str::isUuid($hallId)) {
+            throw new InvalidArgumentException('Invalid planning hall filter.');
+        }
+        if ($search !== null && mb_strlen(trim($search)) > 100) {
+            throw new InvalidArgumentException('Planning task search is too long.');
         }
         // Only link booking and hall metadata through the same company as
         // the already policy-scoped task. Never expose customer/contact fields.
@@ -82,6 +88,15 @@ final class OperationsPlanningService
         if ($bookingId !== null) {
             $q->where('t.booking_id', $bookingId);
         }
+        if ($hallId !== null) {
+            $q->where('t.hall_id', $hallId);
+        }
+        if ($search !== null && trim($search) !== '') {
+            // Treat user search literally: PostgreSQL wildcard characters must
+            // never turn an exact text query into a cross-task match-all.
+            $escaped = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], trim($search));
+            $q->whereRaw("t.title ILIKE ? ESCAPE '!'", ['%'.$escaped.'%']);
+        }
         if ($status !== 'all') {
             $q->where('t.status', $status);
         }
@@ -91,7 +106,7 @@ final class OperationsPlanningService
                 ->pluck('hall_id')->all();
             $q->whereIn('t.hall_id', $halls);
         }
-        return $q->orderByDesc('t.created_at')->orderByDesc('t.id')->limit($limit)
+        return $q->orderByDesc('t.created_at')->orderByDesc('t.id')->offset($offset)->limit($limit)
             ->get(['t.id', 't.booking_id', 't.hall_id', 't.title', 't.status',
                 't.revision', 'h.name as hall_name', 'b.event_date', 'b.program'])
             ->map(fn ($row) => array_merge($this->snapshot($row), [
