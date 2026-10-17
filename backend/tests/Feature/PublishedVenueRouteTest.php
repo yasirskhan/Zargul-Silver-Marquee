@@ -100,6 +100,48 @@ class PublishedVenueRouteTest extends TestCase
             ->assertSee('Approved Hall Opening');
     }
 
+    public function test_owner_dns_revocation_closes_previously_published_pages_and_crawler_endpoints(): void
+    {
+        [$company, $owner, $site, $page] = $this->fixture();
+        $this->publish($company, $owner, $site, $page);
+        $this->enable($company->id, $site);
+        config([
+            'public_site.host' => 'venue.example.org',
+            'public_site.require_verified_domain' => true,
+            'public_site.indexing_enabled' => true,
+        ]);
+        DB::table('site_domain_claims')->insert([
+            'id' => (string) Str::uuid(), 'company_id' => $company->id,
+            'website_id' => $site, 'domain' => 'venue.example.org',
+            'token_hash' => str_repeat('a', 64), 'status' => 'verified',
+            'requested_by' => $owner->id, 'verified_by' => $owner->id,
+            'verified_at' => now(), 'expires_at' => now()->addDays(7),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $public = 'https://venue.example.org';
+        $this->get($public.'/')->assertOk()->assertSee('Approved Hall Opening');
+        $this->get($public.'/robots.txt')->assertOk()->assertSee('Allow: /');
+        $this->get($public.'/sitemap.xml')->assertOk()
+            ->assertSee('https://venue.example.org/');
+
+        app(\App\Services\SiteDomainOwnershipService::class)->revoke(
+            $owner, $company->id, $site, 'venue.example.org',
+            'Owner emergency domain disconnect'
+        );
+
+        foreach (['/', '/robots.txt', '/sitemap.xml',
+            '/_venue-media/home/'.Str::uuid().'.webp'] as $path) {
+            $this->get($public.$path)->assertStatus(503);
+        }
+        $this->assertNotNull(DB::table('site_pages')->where('id', $page)
+            ->value('published_revision_id'));
+        $this->assertSame('pending', DB::table('site_domain_claims')->value('status'));
+        $this->assertSame(1, DB::table('audit_events')
+            ->where('action', 'website.domain_ownership_revoked')->count());
+        $this->assertTrue((bool) config('public_site.enabled'));
+        $this->assertTrue((bool) config('public_site.indexing_enabled'));
+    }
+
     public function test_robots_and_indexing_require_separate_opt_in_and_approved_home(): void
     {
         [$company, $owner, $site, $page] = $this->fixture();
