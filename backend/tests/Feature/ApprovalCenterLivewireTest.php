@@ -306,7 +306,9 @@ class ApprovalCenterLivewireTest extends TestCase
         DB::table('users')->where('id', $owner->id)
             ->update(['is_active' => true, 'email_verified_at' => null]);
         $this->assertNotNull($owner->email_verified_at);
-        $this->assertSame([], $component->instance()->companyOptions());
+        // The first forbidden Livewire action destroys the test component;
+        // recheck the persisted account gate without a stale component instance.
+        $this->assertFalse(ApprovalCenter::canAccess());
         $component->call('refreshInbox')->assertForbidden();
         Livewire::test(ApprovalCenter::class)->assertForbidden();
         $this->assertSame(0, DB::table('approval_requests')->count());
