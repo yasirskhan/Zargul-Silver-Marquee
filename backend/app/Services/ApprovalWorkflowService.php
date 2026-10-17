@@ -373,6 +373,7 @@ final class ApprovalWorkflowService
                 'hall.name as proposed_hall'])
             ->map(fn ($row) => array_merge($this->summary($row), [
                 'requesterName' => (string) ($row->requester_name ?? ''),
+                'requestedAt' => (string) $row->created_at,
                 'proposal' => $row->proposed_date !== null && $row->proposed_hall !== null
                     ? ['date' => $row->proposed_date, 'program' => $row->proposed_program,
                         'hallName' => $row->proposed_hall] : null,
