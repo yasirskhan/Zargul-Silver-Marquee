@@ -11,6 +11,7 @@ use App\Services\TenantAccess;
 use Filament\Panel;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class TenantAccessTest extends TestCase
@@ -36,7 +37,10 @@ class TenantAccessTest extends TestCase
 
     private function user(string $email): User
     {
-        return User::create(['name' => $email, 'email' => $email, 'password' => 'testing-only-not-a-real-credential']);
+        $user = User::create(['name' => $email, 'email' => $email, 'password' => 'testing-only-not-a-real-credential']);
+        $user->markEmailAsVerified();
+
+        return $user;
     }
 
     private function membership(User $user, Company $company, string $role, array $rights = []): CompanyMembership
@@ -90,6 +94,39 @@ class TenantAccessTest extends TestCase
         $access = app(TenantAccess::class);
         $this->assertTrue($access->canEditWebsite($editor, $company->id));
         $this->assertFalse($access->canPublishWebsite($editor, $company->id));
+    }
+
+    public function test_unverified_owner_with_active_membership_cannot_access_hall_or_website(): void
+    {
+        $company = $this->company('zargul');
+        $hall = $this->hall($company, 'grand');
+        $owner = $this->user('unverified@example.test');
+        $this->membership($owner, $company, 'owner');
+        $owner->forceFill(['email_verified_at' => null])->save();
+
+        $access = app(TenantAccess::class);
+
+        $this->assertFalse($access->canViewHall($owner, $hall));
+        $this->assertFalse($access->canPublishWebsite($owner, $company->id));
+        $this->assertFalse($access->canConfigureHall($owner, $hall));
+    }
+
+    public function test_cached_verified_user_loses_access_after_persisted_email_verification_reset(): void
+    {
+        $company = $this->company('zargul');
+        $hall = $this->hall($company, 'grand');
+        $owner = $this->user('revoked-verification@example.test');
+        $this->membership($owner, $company, 'owner');
+        $access = app(TenantAccess::class);
+
+        $this->assertTrue($access->canViewHall($owner, $hall));
+        DB::table('users')->where('id', $owner->id)->update(['email_verified_at' => null]);
+
+        // The cached User still looks verified, but the persisted authorization must win.
+        $this->assertTrue($owner->hasVerifiedEmail());
+        $this->assertFalse($access->canViewHall($owner, $hall));
+        $this->assertFalse($access->canPublishWebsite($owner, $company->id));
+        $this->assertFalse($access->canConfigureHall($owner, $hall));
     }
 
     public function test_disabled_staff_cannot_enter_panel_or_access_hall(): void
