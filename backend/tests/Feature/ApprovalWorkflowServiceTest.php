@@ -77,6 +77,34 @@ class ApprovalWorkflowServiceTest extends TestCase
         return [$company, $foreign, $hall, $people, $bookingId];
     }
 
+    public function test_cached_owner_account_revocation_blocks_inbox_and_attention(): void
+    {
+        [$company, , , $people] = $this->fixture();
+        $owner = $people['owner'][0];
+        $service = app(ApprovalWorkflowService::class);
+        $this->assertIsArray($service->inbox($owner, $company->id));
+        $this->assertIsArray($service->ownerPendingAttention($owner));
+
+        foreach ([
+            ['is_active' => false],
+            ['is_active' => true, 'email_verified_at' => null],
+        ] as $newState) {
+            DB::table('users')->where('id', $owner->id)->update($newState);
+            foreach ([
+                fn () => $service->inbox($owner, $company->id),
+                fn () => $service->ownerPendingAttention($owner),
+            ] as $read) {
+                try {
+                    $read();
+                    $this->fail('Stale authenticated owner bypassed account revocation.');
+                } catch (AuthorizationException) {
+                    $this->assertTrue(true);
+                }
+            }
+        }
+        $this->assertSame(0, DB::table('approval_decisions')->count());
+    }
+
     public function test_manager_requests_owner_decides_once_and_no_business_money_changes(): void
     {
         [$company, , , $people, $booking] = $this->fixture();

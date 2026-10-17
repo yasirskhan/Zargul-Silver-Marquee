@@ -26,7 +26,9 @@ final class ApprovalWorkflowService
     private function member(User $actor, string $companyId): CompanyMembership
     {
         if (! Auth::check() || (int) Auth::id() !== (int) $actor->getKey()
-            || ! $actor->is_active || ! $actor->hasVerifiedEmail()) {
+            || ! $actor->is_active || ! $actor->hasVerifiedEmail()
+            || ! User::query()->whereKey($actor->getKey())
+                ->where('is_active', true)->whereNotNull('email_verified_at')->exists()) {
             throw new AuthorizationException('An active verified staff session is required.');
         }
         $membership = CompanyMembership::query()
@@ -369,7 +371,9 @@ final class ApprovalWorkflowService
     public function ownerPendingAttention(User $actor): array
     {
         if (! Auth::check() || (int) Auth::id() !== (int) $actor->getKey()
-            || ! $actor->is_active || ! $actor->hasVerifiedEmail()) {
+            || ! $actor->is_active || ! $actor->hasVerifiedEmail()
+            || ! User::query()->whereKey($actor->getKey())
+                ->where('is_active', true)->whereNotNull('email_verified_at')->exists()) {
             throw new AuthorizationException('An active verified owner session is required.');
         }
 
