@@ -77,7 +77,7 @@
                             <p>{{ $entry['currency'] }} minor units: {{ $entry['amountMinor'] }}</p>
                         </div>
                         <p>Requested by {{ ($entry['requesterName'] ?? '') !== '' ? $entry['requesterName'] : 'staff member' }}
-                            (staff ID {{ $entry['requestedBy'] }}) | requested at {{ $entry['requestedAt'] }} UTC
+                            (staff ID {{ $entry['requestedBy'] }}) | requested at {{ $entry['requestedAt'] }}
                             | revision {{ $entry['revision'] }}</p>
                         <p class="break-words">{{ $entry['reason'] }}</p>
                         <p class="break-all text-xs">ID: {{ $entry['id'] }} | proposal: {{ $entry['bookingId'] ?? 'none' }}</p>

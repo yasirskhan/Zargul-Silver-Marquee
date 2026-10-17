@@ -369,8 +369,9 @@ class ApprovalWorkflowServiceTest extends TestCase
         $mine = $service->inbox($manager, $company->id, 30, $id);
         $this->assertCount(1, $mine);
         $this->assertSame('Manager', $mine[0]['requesterName']);
-        $this->assertSame((string) DB::table('approval_requests')->where('id', $id)
-            ->value('created_at'), $mine[0]['requestedAt']);
+        $this->assertSame(Carbon::parse((string) DB::table('approval_requests')
+            ->where('id', $id)->value('created_at'))->utc()->format('Y-m-d H:i:s').' UTC',
+            $mine[0]['requestedAt']);
         $this->assertSame([
             'date' => '2027-01-02', 'program' => 'evening', 'hallName' => 'Grand',
         ], $mine[0]['proposal']);
