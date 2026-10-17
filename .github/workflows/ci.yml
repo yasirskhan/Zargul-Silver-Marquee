@@ -104,6 +104,16 @@ jobs:
         run: php artisan migrate --force --no-interaction
       - name: Run tenant-isolation backend tests
         run: php artisan test --no-ansi
+      - name: Verify separately isolated HAFZATECH central identity API and PostgreSQL tests
+        env:
+          CENTRAL_DB_DSN: "pgsql:host=127.0.0.1;port=5432;dbname=hafzatech_central_test"
+          CENTRAL_DB_USERNAME: venue
+          CENTRAL_DB_PASSWORD: venue
+        run: |
+          php -r '$db = new PDO("pgsql:host=127.0.0.1;port=5432;dbname=postgres", "venue", "venue", [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]); $db->exec("CREATE DATABASE hafzatech_central_test");'
+          find ../central -name '*.php' -print0 | xargs -0 -n1 php -l
+          php ../central/bin/migrate.php
+          php ../central/tests/installation_identity.php
       - name: Verify CMS, MFA and shared cache/session migration rollback and replay
         env:
           DB_CONNECTION: pgsql
