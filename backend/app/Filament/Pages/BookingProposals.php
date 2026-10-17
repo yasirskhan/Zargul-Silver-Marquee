@@ -164,7 +164,11 @@ final class BookingProposals extends Page
     public function updatedCompanyId(): void
     {
         $this->clearSelection();
+        // A reference/status filter from another authorized company must not
+        // silently hide the newly selected company's proposal review list.
         $this->hallId = null;
+        $this->referenceSearch = '';
+        $this->statusFilter = '';
         $this->fromDate = '';
         $this->toDate = '';
         $this->programFilter = '';

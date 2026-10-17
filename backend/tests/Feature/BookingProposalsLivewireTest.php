@@ -269,6 +269,43 @@ class BookingProposalsLivewireTest extends TestCase
             ->call('refreshResults')->assertHasErrors(['fromDate']);
     }
 
+
+    public function test_switching_between_owned_companies_clears_old_status_and_reference_filters(): void
+    {
+        [$company, $other, $hall, $otherHall, $owner, , $customer, $otherCustomer] = $this->fixture();
+        CompanyMembership::create([
+            'company_id' => $other->id, 'user_id' => $owner->id, 'role' => 'admin',
+        ]);
+
+        $first = $this->proposal($company->id, $hall->id, $customer,
+            $owner->id, '2026-12-15', 'under_review');
+        $second = $this->proposal($other->id, $otherHall->id, $otherCustomer,
+            $owner->id, '2026-12-16', 'draft');
+
+        $component = Livewire::test(BookingProposals::class)
+            ->set('statusFilter', 'under_review')
+            ->set('referenceSearch', $first)
+            ->call('refreshResults')
+            ->assertSet('loadedCompanyId', $company->id)
+            ->assertSee($first)
+            ->assertDontSee($second);
+
+        $component->set('companyId', $other->id)
+            ->assertSet('loadedCompanyId', $other->id)
+            ->assertSet('statusFilter', '')
+            ->assertSet('referenceSearch', '')
+            ->assertSet('hallId', null)
+            ->assertSet('offset', 0)
+            ->assertSee($second)
+            ->assertDontSee($first)
+            ->assertDontSee('Secret Customer Name')
+            ->assertDontSee('Foreign Secret Contact');
+
+        $this->assertSame([$second], array_column($component->get('entries'), 'id'));
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
     public function test_owner_authorized_for_two_companies_can_switch_without_cross_tenant_cache(): void
     {
         [$company, $foreign, $hall, $foreignHall, $owner, , $customer, $foreignCustomer] = $this->fixture();
