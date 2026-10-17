@@ -293,7 +293,8 @@ class VenueReservationServiceTest extends TestCase
             ->test(VenueReservations::class)->assertForbidden();
 
         config()->set('booking_controls.confirmation_enabled', false);
-        Livewire::test(VenueReservations::class)
+        Livewire::withQueryParams(['company' => $company->id])
+            ->test(VenueReservations::class)
             ->assertSee('Live reservation confirmation is disabled')
             ->set('draftId', $draft)
             ->set('reason', 'Cannot bypass release gate')

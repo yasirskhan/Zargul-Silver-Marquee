@@ -1,7 +1,7 @@
 <x-filament-panels::page>
     <div class="space-y-6">
         <p class="text-sm text-gray-600 dark:text-gray-300">
-            Internal hall occupancy. Three programs per date. A confirmed slot is physically reserved.
+            Internal, read-only hall occupancy. Three programs per date. A confirmed slot is physically reserved.
             Expired holds may require audited cleanup. No public availability or customer information is displayed.
         </p>
 
