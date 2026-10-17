@@ -176,14 +176,27 @@ final class OperationsPlanning extends Page
         $this->refresh();
     }
 
+    public function showAllTasks(): void
+    {
+        $this->authorizeLoaded();
+        $this->bookingId = '';
+        $this->refresh();
+    }
+
     public function refresh(): void
     {
         // Prevent stale history from surviving tenant/filter/task transitions.
         $this->historyTaskId = null;
         $this->historyEvents = [];
         $actor = $this->authorizeCompany();
-        $this->validate(['statusFilter' => ['required', Rule::in(['all', 'planned', 'reviewed'])]]);
-        $this->tasks = app(OperationsPlanningService::class)->tasks($actor, $this->companyId, 30, $this->statusFilter);
+        $this->validate([
+            'statusFilter' => ['required', Rule::in(['all', 'planned', 'reviewed'])],
+            'bookingId' => ['nullable', 'uuid'],
+        ]);
+        $this->tasks = app(OperationsPlanningService::class)->tasks(
+            $actor, $this->companyId, 30, $this->statusFilter,
+            $this->bookingId !== '' ? $this->bookingId : null
+        );
         $this->loadedCompanyId = $this->companyId;
     }
 

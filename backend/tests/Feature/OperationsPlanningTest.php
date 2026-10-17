@@ -147,6 +147,45 @@ class OperationsPlanningTest extends TestCase
         $this->assertSame(0, DB::table('finance_journals')->count());
     }
 
+
+    public function test_proposal_deep_link_filters_planning_tasks_and_show_all_recovers_company_list(): void
+    {
+        [$company, , $hall, , $actors, $booking] = $this->fixture();
+        $owner = $actors['owner'][0];
+        $original = DB::table('booking_drafts')->where('id', $booking)->first();
+        $second = (string) Str::uuid();
+        app(BookingDraftService::class)->create(
+            $owner, $company->id, $second, $hall->id, $original->customer_id,
+            '2027-03-16', 'morning', 80, 'Separate unconfirmed internal proposal'
+        );
+        $service = app(OperationsPlanningService::class);
+        $firstTask = (string) Str::uuid();
+        $secondTask = (string) Str::uuid();
+        $service->create($owner, $company->id, $firstTask, $booking,
+            'Set internal evening chairs', 'Only for original proposal');
+        $service->create($owner, $company->id, $secondTask, $second,
+            'Set internal morning tables', 'Only for second proposal');
+
+        $panel = Livewire::withQueryParams([
+            'company' => $company->id, 'proposal' => $booking,
+        ])->test(OperationsPlanning::class)
+            ->assertSet('bookingId', $booking)
+            ->assertSee('Set internal evening chairs')
+            ->assertDontSee('Set internal morning tables')
+            ->assertSee('Showing tasks for proposal')
+            ->call('showAllTasks')
+            ->assertSet('bookingId', '')
+            ->assertSee('Set internal evening chairs')
+            ->assertSee('Set internal morning tables');
+
+        $this->assertCount(2, $panel->get('tasks'));
+        $filtered = $service->tasks($owner, $company->id, 30, 'all', $booking);
+        $this->assertSame([$firstTask], array_column($filtered, 'id'));
+        $this->assertSame(2, DB::table('operations_plan_tasks')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
     public function test_planning_status_filter_is_validated_for_company_scoped_links(): void
     {
         [$company, , , , $actors, $booking] = $this->fixture();

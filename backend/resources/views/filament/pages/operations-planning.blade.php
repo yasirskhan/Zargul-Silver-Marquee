@@ -35,6 +35,11 @@
             </section>
             <section aria-label="Authorized internal planning tasks" class="space-y-3">
                 <h2 class="text-lg font-semibold">Planning checklist</h2>
+                @if ($bookingId !== '')
+                    <p class="break-all text-xs">Showing tasks for proposal {{ $bookingId }} only.</p>
+                    <button type="button" wire:click="showAllTasks"
+                        class="rounded-lg border px-3 py-2 text-sm underline">Show all company planning tasks</button>
+                @endif
                 <label class="block space-y-1">
                     <span class="text-sm">Planning status</span>
                     <select wire:model.live="statusFilter" class="w-full rounded-lg border p-3 text-gray-900">

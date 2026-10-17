@@ -59,7 +59,7 @@ final class OperationsPlanningService
             'status' => $row->status, 'revision' => (int) $row->revision];
     }
 
-    public function tasks(User $actor, string $companyId, int $limit = 30, string $status = 'all'): array
+    public function tasks(User $actor, string $companyId, int $limit = 30, string $status = 'all', ?string $bookingId = null): array
     {
         $member = $this->policy->membership($actor, $companyId);
         if (! $member || $limit < 1 || $limit > 50) {
@@ -68,7 +68,13 @@ final class OperationsPlanningService
         if (! in_array($status, ['all', 'planned', 'reviewed'], true)) {
             throw new InvalidArgumentException('Invalid planning status filter.');
         }
+        if ($bookingId !== null && ! Str::isUuid($bookingId)) {
+            throw new InvalidArgumentException('Invalid planning proposal reference.');
+        }
         $q = DB::table('operations_plan_tasks')->where('company_id', $companyId);
+        if ($bookingId !== null) {
+            $q->where('booking_id', $bookingId);
+        }
         if ($status !== 'all') {
             $q->where('status', $status);
         }
