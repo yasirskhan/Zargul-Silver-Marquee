@@ -13,6 +13,23 @@
             </select>
         </label>
 
+        <section class="space-y-2 rounded-xl border p-4" aria-label="Find a private approval by reference">
+            <label class="block space-y-1">
+                <span class="text-sm font-medium">Approval request reference (optional exact UUID)</span>
+                <input type="text" wire:model="requestReference" maxlength="36" autocomplete="off"
+                    class="w-full rounded-lg border p-3 font-mono text-sm text-gray-900"
+                    placeholder="Paste the full internal reference">
+            </label>
+            @error('requestReference') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+            <div class="flex flex-wrap gap-2">
+                <button type="button" wire:click="refreshInbox" class="rounded-lg border px-3 py-2">Find request</button>
+                <button type="button" wire:click="clearRequestReference" class="rounded-lg border px-3 py-2">Show recent requests</button>
+            </div>
+            @if ($requestReference !== '')
+                <p class="break-all text-xs">Filtered exact request: {{ $requestReference }}</p>
+            @endif
+        </section>
+
         <section class="space-y-3 rounded-xl border p-4" aria-label="Create exception request">
             <h2 class="font-semibold">Request approval</h2>
             <div class="grid gap-3 md:grid-cols-2">

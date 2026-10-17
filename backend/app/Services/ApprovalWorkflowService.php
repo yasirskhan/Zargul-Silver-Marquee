@@ -337,14 +337,20 @@ final class ApprovalWorkflowService
     }
 
     /** Tenant-authorized inbox contains IDs and non-PII proposal metadata only. */
-    public function inbox(User $actor, string $companyId, int $limit = 30): array
+    public function inbox(User $actor, string $companyId, int $limit = 30, ?string $referenceId = null): array
     {
         $membership = $this->member($actor, $companyId);
         if (! in_array($membership->role, ['owner', 'admin', 'manager'], true)
             || $limit < 1 || $limit > 50) {
             throw new AuthorizationException('Approval inbox is not accessible.');
         }
+        if ($referenceId !== null && ! Str::isUuid($referenceId)) {
+            throw new InvalidArgumentException('Invalid approval reference.');
+        }
         $q = DB::table('approval_requests')->where('company_id', $companyId);
+        if ($referenceId !== null) {
+            $q->where('id', $referenceId);
+        }
         if ($membership->role === 'manager') {
             $q->where('requested_by', $actor->getKey());
         }

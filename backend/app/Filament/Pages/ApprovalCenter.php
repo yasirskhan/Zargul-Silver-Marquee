@@ -30,6 +30,10 @@ final class ApprovalCenter extends Page
     #[Url(as: 'company')]
     public ?string $companyId = null;
 
+    /** Exact private request reference from scoped search, not a client-owned decision. */
+    #[Url(as: 'request')]
+    public string $requestReference = '';
+
     #[Locked]
     public ?string $loadedCompanyId = null;
 
@@ -239,6 +243,7 @@ final class ApprovalCenter extends Page
 
     public function updatedCompanyId(): void
     {
+        $this->requestReference = '';
         $this->selectedId = null;
         $this->selectedRevision = 0;
         $this->telegramPairingUrl = null;
@@ -246,10 +251,24 @@ final class ApprovalCenter extends Page
         $this->refreshInbox();
     }
 
+    public function clearRequestReference(): void
+    {
+        $this->requestReference = '';
+        $this->refreshInbox();
+    }
+
     public function refreshInbox(): void
     {
         $actor = $this->authorizeCompany();
-        $this->entries = app(ApprovalWorkflowService::class)->inbox($actor, $this->companyId);
+        if ($this->requestReference !== '' && ! Str::isUuid($this->requestReference)) {
+            throw ValidationException::withMessages([
+                'requestReference' => 'Enter a valid full approval request reference.',
+            ]);
+        }
+        $this->entries = app(ApprovalWorkflowService::class)->inbox(
+            $actor, $this->companyId, 30,
+            $this->requestReference === '' ? null : $this->requestReference,
+        );
         $this->loadedCompanyId = $this->companyId;
         $this->selectedId = null;
         $this->selectedRevision = 0;

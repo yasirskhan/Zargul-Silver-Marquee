@@ -65,6 +65,32 @@ class ApprovalCenterLivewireTest extends TestCase
         $this->assertSame(2, DB::table('approval_alert_outbox')->count());
     }
 
+    public function test_private_approval_reference_link_opens_only_current_company_request(): void
+    {
+        [$company, $foreign, $members] = $this->fixture();
+        $admin = $members['admin'][0];
+        $this->be($admin);
+        $service = app(\App\Services\ApprovalWorkflowService::class);
+        $first = (string) \Illuminate\Support\Str::uuid();
+        $second = (string) \Illuminate\Support\Str::uuid();
+        $service->request($admin, $company->id, $first, 'expense', 100, 'PKR', null, 'First synthetic request');
+        $service->request($admin, $company->id, $second, 'expense', 150, 'PKR', null, 'Second synthetic request');
+        $this->be($members['owner'][0]);
+        $component = Livewire::withQueryParams(['company' => $company->id, 'request' => $second])
+            ->test(ApprovalCenter::class)
+            ->assertSet('requestReference', $second)
+            ->assertSee('Second synthetic request')
+            ->assertDontSee('First synthetic request');
+        $this->assertCount(1, $component->get('entries'));
+        $component->call('clearRequestReference')->assertSet('requestReference', '')
+            ->assertSee('First synthetic request')->assertSee('Second synthetic request');
+        Livewire::withQueryParams(['company' => $company->id, 'request' => (string) \Illuminate\Support\Str::uuid()])
+            ->test(ApprovalCenter::class)->assertSet('entries', []);
+        Livewire::withQueryParams(['company' => $foreign->id, 'request' => $second])
+            ->test(ApprovalCenter::class)->assertForbidden();
+        $this->assertSame(0, DB::table('approval_decisions')->count());
+    }
+
     public function test_approval_livewire_request_key_rotates_only_after_server_success(): void
     {
         [$company, , $members] = $this->fixture();

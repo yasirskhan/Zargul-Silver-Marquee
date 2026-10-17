@@ -109,7 +109,9 @@ final class InternalQuickSearchService
                     'status' => $source['status'] ? $row->status : 'internal',
                     'path' => $source['path'].'?company='.rawurlencode($companyId)
                         .($source['kind'] === 'proposal'
-                            ? '&proposal='.rawurlencode($row->id) : ''),
+                            ? '&proposal='.rawurlencode($row->id) : '')
+                        .($source['kind'] === 'approval'
+                            ? '&request='.rawurlencode($row->id) : ''),
                 ];
             }
         }

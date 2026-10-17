@@ -267,7 +267,8 @@ class InternalQuickSearchTest extends TestCase
         $this->assertSame('/admin/operations-planning?company='.$company->id, $planning['path']);
         $approval = collect($service->search($members['owner'][0], $company->id, 'expense'))
             ->firstWhere('kind', 'approval');
-        $this->assertSame('/admin/approval-center?company='.$company->id, $approval['path']);
+        $this->assertSame('/admin/approval-center?company='.$company->id
+            .'&request='.$approval['id'], $approval['path']);
         $this->be($members['operations'][0]);
         $staffPlanning = collect($service->search($members['operations'][0], $company->id, 'stage'))
             ->firstWhere('id', $task);
@@ -318,7 +319,8 @@ class InternalQuickSearchTest extends TestCase
             $company->id, 'discount', 20, 'approval');
         $this->assertContains($mine, array_column($ownResults, 'id'));
         $this->assertSame(['approval'], array_values(array_unique(array_column($ownResults, 'kind'))));
-        $this->assertSame('/admin/approval-center?company='.$company->id, $ownResults[0]['path']);
+        $this->assertSame('/admin/approval-center?company='.$company->id
+            .'&request='.$mine, $ownResults[0]['path']);
         $this->assertSame([], $service->search($members['manager'][0],
             $company->id, 'expense', 20, 'approval'));
         Livewire::test(InternalQuickSearch::class)
