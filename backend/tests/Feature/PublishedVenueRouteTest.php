@@ -79,6 +79,10 @@ class PublishedVenueRouteTest extends TestCase
             ->assertHeader('Cache-Control', 'no-store, private');
         $response->assertSee('Approved Hall Opening');
         $response->assertSee('https://venue.example.test/');
+        $response->assertSee('property="og:title" content="Approved venue home | Zargul Approved Site"', false)
+            ->assertSee('property="og:description" content="Real venue pending launch review"', false)
+            ->assertSee('property="og:url" content="https://venue.example.test/"', false)
+            ->assertSee('property="og:type" content="website"', false);
         $response->assertSee('content="noindex, nofollow"', false);
         $response->assertSee('Zargul Approved Site');
         $response->assertDontSee('site-media/private/');

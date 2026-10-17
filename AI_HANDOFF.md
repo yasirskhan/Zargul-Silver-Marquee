@@ -1,3 +1,8 @@
+## 2026-10-16 CMS-005 APPROVED OPEN GRAPH SHARING METADATA — EXACT SHA CI PENDING
+- Base a1aa7a4c6dc94b6c04a144f4ca228e4827f38f45; domain owner revocation UI CI pending. Prior favicon and mobile SEO-title sources verified all four CI jobs.
+- Published template computes one escaped search title and description from immutable approved page metadata and published branding. It emits Open Graph type/title/description/canonical URL ONLY on explicitly operator-routed public domain requests. Internal rendering without canonical never exposes OG; indexing stays separately controlled and no real site is launched.
+- PostgreSQL public HTML tests verify approved canonical OG and internal rendering omits OG; no user-supplied arbitrary URL or public form. Feature register and handoff in same commit; verify exact SHA four hosted CI jobs.
+
 ## 2026-10-16 CMS-005 OWNER-WORKSPACE VERIFIED DNS REVOCATION — EXACT SHA CI PENDING
 - Base 12eda28bd75b081d62a2aadaf8ec1a0902fdabba DNS claim revocation service (hosted CI pending). Add private publisher-only domain revocation control to existing owner Website Workspace, with exact hostname and required audited reason, explicit confirmation, challenge UI cleared after success, and real domain verified status refresh.
 - PostgreSQL Livewire regression issues and verifies synthetic DNS owner proof with injected TXT resolver, revokes via mounted owner component, checks status/audit, re-verifies after fresh request, demotes publisher to editor and asserts explicit service/UI publisher denial, zero extra revocation audits. Not a site launch; operator public host gate and indexing remain independent, no booking/customer PII.

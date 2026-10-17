@@ -190,6 +190,7 @@ class SitePublishedHtmlTest extends TestCase
         $this->assertStringContainsString('content="Weddings &amp; receptions at the marquee"', $published);
         $this->assertStringNotContainsString('content="Events &amp; celebrations"', $published);
         $this->assertStringContainsString('content="noindex, nofollow"', $published);
+        $this->assertStringNotContainsString('property="og:title"', $published);
         $content['seoDescription'] = '';
         $pages->saveDraft($owner, $company->id, $page, $content, 2, 'Remove page search override');
         $this->assertSame($published, $reader->render($company->id, $site, '/'));

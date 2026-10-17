@@ -22,9 +22,16 @@
             'about', 'contact', 'privacy', 'terms'];
         $mediaBase = $canonicalUrl !== null && in_array($mediaPageSlug, $allowedMediaPages, true)
             ? '/_venue-media/'.$mediaPageSlug.'/' : null;
+        $searchTitle = ($snapshot['page']['seoTitle'] ?? '') !== ''
+            ? $snapshot['page']['seoTitle'] : $snapshot['page']['title'].' | '.$branding['siteName'];
+        $searchDescription = ($snapshot['page']['seoDescription'] ?? '') !== ''
+            ? $snapshot['page']['seoDescription']
+            : (($branding['seoDescription'] ?? '') !== ''
+                ? $branding['seoDescription']
+                : ($branding['tagline'] !== '' ? $branding['tagline'] : $branding['siteName']));
     @endphp
-    <title>{{ ($snapshot['page']['seoTitle'] ?? '') !== '' ? $snapshot['page']['seoTitle'] : $snapshot['page']['title'].' | '.$branding['siteName'] }}</title>
-    <meta name="description" content="{{ ($snapshot['page']['seoDescription'] ?? '') !== '' ? $snapshot['page']['seoDescription'] : (($branding['seoDescription'] ?? '') !== '' ? $branding['seoDescription'] : ($branding['tagline'] !== '' ? $branding['tagline'] : $branding['siteName'])) }}">
+    <title>{{ $searchTitle }}</title>
+    <meta name="description" content="{{ $searchDescription }}">
     {{-- Only a published, integrity-checked venue favicon may be exposed. --}}
     @if ($mediaBase !== null && $branding['faviconMediaId'] !== null
         && isset($snapshot['media'][$branding['faviconMediaId']]))
@@ -32,6 +39,11 @@
     @endif
     @if ($canonicalUrl !== null)
         <link rel="canonical" href="{{ $canonicalUrl }}">
+        {{-- Only publish social preview metadata for operator-released canonical pages. --}}
+        <meta property="og:type" content="website">
+        <meta property="og:title" content="{{ $searchTitle }}">
+        <meta property="og:description" content="{{ $searchDescription }}">
+        <meta property="og:url" content="{{ $canonicalUrl }}">
         <meta name="robots" content="{{ config('public_site.indexing_enabled') === true ? 'index, follow' : 'noindex, nofollow' }}">
     @else
         <meta name="robots" content="noindex, nofollow">
