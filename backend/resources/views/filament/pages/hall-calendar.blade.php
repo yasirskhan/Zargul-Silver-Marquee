@@ -38,6 +38,7 @@
         </div>
         <div class="flex flex-wrap items-center gap-3" aria-label="Calendar navigation">
             <button type="button" wire:click="stepPeriod(-1)" class="rounded-lg border px-4 py-2 text-sm">Previous</button>
+            <button type="button" wire:click="jumpToToday" class="rounded-lg border px-4 py-2 text-sm">Today</button>
             <button type="button" wire:click="reloadCalendar" class="rounded-lg border px-4 py-2 text-sm">Go to date / refresh</button>
             <button type="button" wire:click="stepPeriod(1)" class="rounded-lg border px-4 py-2 text-sm">Next</button>
             @error('viewMode') <span role="alert" class="text-sm text-red-600">{{ $message }}</span> @enderror
@@ -106,11 +107,12 @@
                                                 <span class="mt-1 block text-xs">Expires: {{ $slot['expiresAt'] }}</span>
                                             @endif
                                             @if ($canViewDrafts && ($proposalCounts[$day['date']][$program] ?? 0) > 0)
-                                                <span class="mt-1 block text-xs">
+                                                <a class="mt-1 block text-xs underline"
+                                                    href="{{ \App\Filament\Pages\BookingProposals::getUrl(['company' => $companyId, 'hall' => $hallId, 'from' => $day['date'], 'to' => $day['date'], 'program' => $program]) }}">
                                                     {{ $proposalCounts[$day['date']][$program] }} unconfirmed
                                                     {{ ($proposalCounts[$day['date']][$program] === 1) ? 'draft' : 'drafts' }}
-                                                    (not reserved)
-                                                </span>
+                                                    (not reserved) · review
+                                                </a>
                                             @endif
                                         </td>
                                     @endforeach

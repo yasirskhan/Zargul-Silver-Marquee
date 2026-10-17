@@ -160,6 +160,12 @@ final class HallCalendar extends Page
         $this->reloadCalendar();
     }
 
+    public function jumpToToday(): void
+    {
+        $this->anchorDate = now()->toDateString();
+        $this->reloadCalendar();
+    }
+
     public function stepPeriod(int $direction): void
     {
         abort_unless(in_array($direction, [-1, 1], true), 403);

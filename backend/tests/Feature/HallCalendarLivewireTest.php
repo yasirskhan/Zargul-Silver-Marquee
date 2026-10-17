@@ -78,6 +78,25 @@ class HallCalendarLivewireTest extends TestCase
         $this->assertSame(0, DB::table('hall_slot_claim_events')->count());
     }
 
+    public function test_today_button_returns_to_current_calendar_date_without_writing_claims(): void
+    {
+        [$company, $hall] = $this->fixture();
+        $this->travelTo(\Carbon\Carbon::parse('2026-11-18 13:00:00', 'UTC'));
+        try {
+            Livewire::test(HallCalendar::class)
+                ->set('viewMode', 'day')
+                ->set('anchorDate', '2027-01-09')
+                ->call('jumpToToday')
+                ->assertSet('anchorDate', '2026-11-18')
+                ->assertSet('projection.fromDate', '2026-11-18')
+                ->assertSet('projection.toDate', '2026-11-18')
+                ->assertSee('Today');
+            $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        } finally {
+            $this->travelBack();
+        }
+    }
+
     public function test_owner_sees_active_draft_counts_by_program_without_treating_drafts_as_holds(): void
     {
         [$company, $hall, $owner] = $this->fixture();
