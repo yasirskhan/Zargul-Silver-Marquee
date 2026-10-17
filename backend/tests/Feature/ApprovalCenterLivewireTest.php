@@ -303,13 +303,16 @@ class ApprovalCenterLivewireTest extends TestCase
         $component->call('refreshInbox')->assertForbidden();
         Livewire::test(ApprovalCenter::class)->assertForbidden();
 
+        // Restore eligibility and mount a NEW authorized component so the
+        // second case independently tests revocation during a live session.
+        DB::table('users')->where('id', $owner->id)->update(['is_active' => true]);
+        $verifiedComponent = Livewire::test(ApprovalCenter::class)
+            ->assertSee('Request approval');
         DB::table('users')->where('id', $owner->id)
-            ->update(['is_active' => true, 'email_verified_at' => null]);
+            ->update(['email_verified_at' => null]);
         $this->assertNotNull($owner->email_verified_at);
-        // The first forbidden Livewire action destroys the test component;
-        // recheck the persisted account gate without a stale component instance.
         $this->assertFalse(ApprovalCenter::canAccess());
-        $component->call('refreshInbox')->assertForbidden();
+        $verifiedComponent->call('refreshInbox')->assertForbidden();
         Livewire::test(ApprovalCenter::class)->assertForbidden();
         $this->assertSame(0, DB::table('approval_requests')->count());
         $this->assertSame(0, DB::table('approval_decisions')->count());
