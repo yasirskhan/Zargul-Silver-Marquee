@@ -160,6 +160,44 @@ class SitePublishedWebpTest extends TestCase
         $this->get($url)->assertNotFound();
     }
 
+    public function test_published_branding_favicon_is_private_until_approved_and_is_served_only_on_approved_host(): void
+    {
+        [$company, $owner, $site, $page] = $this->fixture();
+        $favicon = $this->uploadApproved($owner, $company->id);
+        $hero = $this->uploadApproved($owner, $company->id);
+        $this->publish($owner, $company->id, $site, $page, $hero);
+        config()->set('public_site.enabled', true);
+        config()->set('public_site.host', 'venue.example.test');
+        config()->set('public_site.company_id', $company->id);
+        config()->set('public_site.website_id', $site);
+
+        $iconHref = '/_venue-media/home/'.$favicon.'.webp';
+        $this->get('http://venue.example.test/')->assertOk()
+            ->assertDontSee($iconHref);
+        $this->get('http://venue.example.test'.$iconHref)->assertNotFound();
+
+        $brand = app(SiteBrandingService::class);
+        $approved = [
+            'siteName' => 'WebP Venue', 'tagline' => '',
+            'themePreset' => 'silver', 'fontPreset' => 'classic',
+            'logoMediaId' => null, 'faviconMediaId' => $favicon,
+        ];
+        $brand->saveDraft($owner, $company->id, $site, $approved, 1,
+            'Prepare approved favicon revision');
+        $this->get('http://venue.example.test/')->assertOk()
+            ->assertDontSee($iconHref);
+        $brand->publish($owner, $company->id, $site, 2, 'Approve venue favicon');
+
+        $this->get('http://venue.example.test/')->assertOk()
+            ->assertSee('<link rel="icon" type="image/webp" href="'.$iconHref.'">', false)
+            ->assertDontSee('site-media/private/');
+        $this->get('http://venue.example.test'.$iconHref)
+            ->assertOk()->assertHeader('Content-Type', 'image/webp');
+        $this->get('http://wrong.example.test'.$iconHref)->assertNotFound();
+        $this->assertStringNotContainsString($iconHref, app(\App\Services\SitePublishedHtmlService::class)
+            ->render($company->id, $site, '/'));
+    }
+
     public function test_public_media_http_refuses_tampered_current_published_webp(): void
     {
         [$company, $owner, $site, $page] = $this->fixture();

@@ -25,6 +25,11 @@
     @endphp
     <title>{{ ($snapshot['page']['seoTitle'] ?? '') !== '' ? $snapshot['page']['seoTitle'] : $snapshot['page']['title'].' | '.$branding['siteName'] }}</title>
     <meta name="description" content="{{ ($branding['seoDescription'] ?? '') !== '' ? $branding['seoDescription'] : ($branding['tagline'] !== '' ? $branding['tagline'] : $branding['siteName']) }}">
+    {{-- Only a published, integrity-checked venue favicon may be exposed. --}}
+    @if ($mediaBase !== null && $branding['faviconMediaId'] !== null
+        && isset($snapshot['media'][$branding['faviconMediaId']]))
+        <link rel="icon" type="image/webp" href="{{ $mediaBase.$branding['faviconMediaId'].'.webp' }}">
+    @endif
     @if ($canonicalUrl !== null)
         <link rel="canonical" href="{{ $canonicalUrl }}">
         <meta name="robots" content="{{ config('public_site.indexing_enabled') === true ? 'index, follow' : 'noindex, nofollow' }}">

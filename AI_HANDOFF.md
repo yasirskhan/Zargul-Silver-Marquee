@@ -1,3 +1,9 @@
+## 2026-10-16 CMS-006 OWNER-APPROVED WEBP FAVICON PUBLIC RENDERING — EXACT SHA CI PENDING
+- Base 1a3387d386475f278482da4a6e4b187d70729824, public image CSP consistency commit, hosted CI 38989191173 was running at preparation (no green claim).
+- Published-page Blade now emits a same-origin WebP favicon link ONLY for published branding faviconMediaId in the integrity-checked current approved snapshot, and ONLY when the request is for operator-authorized public canonical rendering. Internal preview remains non-network placeholder with no favicon URL.
+- PostgreSQL HTTP acceptance exercises separate private favicon approval, branding draft isolation before publisher action, explicit publish, render URL, approved WebP HTTP read, hostile Host 404, no private object key and internal preview cannot leak public asset link. Release and DNS controls unchanged. CMS-006 register/handoff updated atomically.
+- Hosted exact SHA must pass all four jobs before VERIFIED. Continue next CMS/WEB work without enabling external domain, PII forms or bookings.
+
 ## 2026-10-16 CMS-006 APPROVED WEBP PUBLIC IMAGE CSP CONSISTENCY — HOSTED CI PENDING
 - Starting live HEAD ab3aef9c4a0f291b6de1c3691416b4ec7a440343; hosted GitHub Actions 38988732518 SUCCESS all four jobs verified. Operator-disabled launch and verified DNS production gate remain in effect.
 - Correct PublishedVenuePageController Content-Security-Policy image source from img-src 'none' (which prevented the browser from displaying already-approved same-origin WebP URLs) to img-src 'self'. All other restrictions remain (default/script/object/form/base/frame none, inline theme styles only). Public page's /_venue-media/ route still requires exact operator host, verified DNS in production, current published revision referencing approved digest-checked same-company WebP; no arbitrary media or remote host authorized.
