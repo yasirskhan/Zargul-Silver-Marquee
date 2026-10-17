@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lichall.hafzatech.com/contracts/signed-license-grant-v1",
+  "title": "HAFZATECH signed VenueDesk grant envelope v1",
+  "description": "Contract only. No private signing keys or live issuance endpoint are present. The payload is raw UTF-8 JSON encoded as unpadded base64url and signed over literal HAFZATECH-LICENSE-GRANT-V1 followed by LF and the raw JSON bytes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "key_id",
+    "payload",
+    "signature"
+  ],
+  "properties": {
+    "key_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,64}$"
+    },
+    "payload": {
+      "type": "string",
+      "minLength": 20,
+      "maxLength": 22000,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{86}$"
+    }
+  },
+  "x-payload-required-fields": [
+    "api_version",
+    "issuer",
+    "product",
+    "license_id",
+    "customer_id",
+    "installation_id",
+    "revision",
+    "term_months",
+    "edition",
+    "approved_domains",
+    "not_before",
+    "expires_at",
+    "limits",
+    "features"
+  ],
+  "x-grant-semantics": {
+    "issuer": "HAFZATECH",
+    "product": "VenueDesk",
+    "api_version": "v1",
+    "term_months": [
+      6,
+      12
+    ],
+    "timestamps": "UTC YYYY-MM-DDTHH:MM:SSZ",
+    "revision": "monotonic per stable license_id",
+    "limits": "positive integer max_halls and max_staff",
+    "features": "boolean keyed module identifiers",
+    "signature": "Ed25519 with pinned vendor public key; full license validity also requires time, domain, customer, installation and revision checks"
+  }
+}
