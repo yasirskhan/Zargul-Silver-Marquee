@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\Hall;
 use App\Models\User;
+use App\Filament\Pages\VenueReservations;
 use App\Services\BookingDraftReviewService;
 use App\Services\BookingDraftService;
 use App\Services\CustomerProfileService;
@@ -132,6 +133,26 @@ class VenueQuoteServiceTest extends TestCase
         $this->be($outsider);
         $this->expectException(AuthorizationException::class);
         $service->list($outsider, $company->id, $reservation['id']);
+    }
+
+    public function test_owner_can_build_hall_seating_music_and_catering_quote_in_reservations_panel(): void
+    {
+        [$company, , $owner, $outsider, $reservation] = $this->setupBooking();
+        $panel = \Livewire\Livewire::test(VenueReservations::class)
+            ->call('selectReservation', $reservation['id'])
+            ->assertSee('Build complete internal rental price snapshot')
+            ->assertSee('Live Music')
+            ->set('quoteExtraChairs', '10')
+            ->set('quoteExtraTables', '3')
+            ->set('quoteAddonQuantities', ['music' => '1', 'catering' => '1'])
+            ->set('quoteReason', 'Full synthetic owner price build')
+            ->call('freezeQuote')->assertHasNoErrors()
+            ->assertSee('278000')->assertSee('hall_rental');
+        $this->assertCount(1, $panel->get('quoteSnapshots'));
+        $this->assertSame(278000, DB::table('venue_quote_snapshots')->value('subtotal_minor'));
+        $this->assertSame(0, DB::table('finance_journals')->count());
+        $this->be($outsider);
+        \Livewire\Livewire::test(VenueReservations::class)->assertForbidden();
     }
 
     public function test_immutable_quote_cannot_be_silently_edited(): void

@@ -7,6 +7,7 @@ use App\Models\Hall;
 use App\Models\User;
 use App\Services\TenantAccess;
 use App\Services\VenueReservationService;
+use App\Services\VenueQuoteService;
 use BackedEnum;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
@@ -40,6 +41,17 @@ final class VenueReservations extends Page
 
     #[Locked]
     public array $customerReservations = [];
+
+    #[Locked]
+    public array $quoteSnapshots = [];
+
+    #[Locked]
+    public string $quoteRequestKey = '';
+
+    public string $quoteExtraChairs = '0';
+    public string $quoteExtraTables = '0';
+    public array $quoteAddonQuantities = [];
+    public string $quoteReason = '';
 
     #[Locked]
     public string $selectedCustomerId = '';
@@ -165,6 +177,7 @@ final class VenueReservations extends Page
     {
         $this->reservationRequestKey = (string) Str::uuid();
         $this->claimRequestKey = (string) Str::uuid();
+        $this->quoteRequestKey = (string) Str::uuid();
     }
 
     public function mount(): void
@@ -201,6 +214,7 @@ final class VenueReservations extends Page
         $this->selectedRevision = 0;
         $this->selectedCustomerId = '';
         $this->customerReservations = [];
+        $this->resetQuoteForm();
         $this->reason = '';
         $this->newDate = '';
         $this->newProgram = 'evening';
@@ -231,6 +245,77 @@ final class VenueReservations extends Page
         $this->authorizeLoaded();
         $this->selectedCustomerId = '';
         $this->customerReservations = [];
+    }
+
+    private function resetQuoteForm(): void
+    {
+        $this->quoteSnapshots = [];
+        $this->quoteExtraChairs = '0';
+        $this->quoteExtraTables = '0';
+        $this->quoteAddonQuantities = [];
+        $this->quoteReason = '';
+        $this->quoteRequestKey = (string) Str::uuid();
+    }
+
+    /** Only the current owner/admin may price a confirmed private reservation. */
+    public function quoteAddons(): array
+    {
+        $actor = $this->authorizeLoaded();
+        if (! $this->mayViewCustomerHistory() || $this->selectedReservationId === null) {
+            return [];
+        }
+        $selected = collect($this->reservations)->firstWhere('id', $this->selectedReservationId);
+        abort_unless(is_array($selected), 403);
+        $hall = Hall::query()->where('company_id', $this->companyId)
+            ->where('id', $selected['hallId'])->where('is_active', true)->firstOrFail();
+        abort_unless(app(TenantAccess::class)->canManageBookings($actor, $hall), 403);
+        if ((int) $hall->addon_catalog_revision < 1) {
+            return [];
+        }
+        $catalog = DB::table('hall_addon_catalog_revisions')->where('company_id', $this->companyId)
+            ->where('hall_id', $hall->id)
+            ->where('revision_number', $hall->addon_catalog_revision)->first();
+        abort_unless($catalog !== null, 409);
+        return array_values(array_filter(json_decode($catalog->items, true, 512, JSON_THROW_ON_ERROR),
+            fn (array $item): bool => $item['enabled'] === true));
+    }
+
+    public function freezeQuote(): void
+    {
+        $actor = $this->authorizeLoaded();
+        abort_unless($this->mayViewCustomerHistory() && $this->selectedReservationId !== null, 403);
+        $this->validate([
+            'quoteExtraChairs' => ['required', 'integer', 'min:0', 'max:100000'],
+            'quoteExtraTables' => ['required', 'integer', 'min:0', 'max:100000'],
+            'quoteReason' => ['required', 'string', 'min:3', 'max:500'],
+            'quoteAddonQuantities' => ['array', 'max:100'],
+            'quoteAddonQuantities.*' => ['integer', 'min:0', 'max:100000'],
+        ]);
+        $selected = collect($this->reservations)->firstWhere('id', $this->selectedReservationId);
+        abort_unless(is_array($selected) && $selected['status'] === 'confirmed', 403);
+        $allowed = array_column($this->quoteAddons(), 'code');
+        $requested = [];
+        foreach ($this->quoteAddonQuantities as $code => $quantity) {
+            abort_unless(in_array($code, $allowed, true), 403);
+            if ((int) $quantity > 0) {
+                $requested[] = ['code' => $code, 'quantity' => (int) $quantity];
+            }
+        }
+        try {
+            app(VenueQuoteService::class)->create(
+                $actor, $this->companyId, $this->selectedReservationId,
+                $this->quoteRequestKey, $this->selectedRevision,
+                (int) $this->quoteExtraChairs, (int) $this->quoteExtraTables,
+                $requested, $this->quoteReason,
+            );
+        } catch (ConflictHttpException | InvalidArgumentException $e) {
+            throw ValidationException::withMessages(['quoteReason' => $e->getMessage()]);
+        }
+        $this->quoteRequestKey = (string) Str::uuid();
+        $this->quoteReason = '';
+        $this->quoteSnapshots = app(VenueQuoteService::class)->list(
+            $actor, $this->companyId, $this->selectedReservationId,
+        );
     }
 
     public function confirmSelected(): void
@@ -273,6 +358,12 @@ final class VenueReservations extends Page
         $this->newHallId = $selected['hallId'];
         $this->reason = '';
         $this->claimRequestKey = (string) Str::uuid();
+        $this->resetQuoteForm();
+        if ($this->mayViewCustomerHistory()) {
+            $this->quoteSnapshots = app(VenueQuoteService::class)->list(
+                $this->authorizeLoaded(), $this->companyId, $reservationId,
+            );
+        }
     }
 
     public function rescheduleSelected(): void
@@ -317,6 +408,7 @@ final class VenueReservations extends Page
         $this->selectedReservationId = null;
         $this->selectedRevision = 0;
         $this->reason = '';
+        $this->resetQuoteForm();
         $this->refresh();
     }
 }

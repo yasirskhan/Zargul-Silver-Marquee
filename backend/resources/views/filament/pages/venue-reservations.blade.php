@@ -82,6 +82,48 @@
                     @endforelse
                 </section>
             @endif
+            @if ($selectedReservationId !== null && $this->mayViewCustomerHistory())
+                <section class="space-y-3 rounded-xl border p-4" aria-label="Frozen internal reservation price builder">
+                    <h2 class="text-lg font-semibold">Build complete internal rental price snapshot</h2>
+                    <p class="text-xs">Owner/admin only. A frozen snapshot is NOT a customer quote, tax invoice, payment request or receipt.</p>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <label class="space-y-1"><span>Additional chairs</span>
+                            <input wire:model="quoteExtraChairs" type="number" min="0" max="100000" class="w-full rounded-lg border p-3 text-gray-900">
+                        </label>
+                        <label class="space-y-1"><span>Additional tables</span>
+                            <input wire:model="quoteExtraTables" type="number" min="0" max="100000" class="w-full rounded-lg border p-3 text-gray-900">
+                        </label>
+                    </div>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        @foreach ($this->quoteAddons() as $item)
+                            <label wire:key="quote-addon-{{ $item['code'] }}" class="space-y-1">
+                                <span>{{ $item['name'] }} ({{ $item['chargeUnit'] }}; {{ $item['rateMinor'] }} minor units)</span>
+                                <input wire:model="quoteAddonQuantities.{{ $item['code'] }}" type="number" min="0" max="100000"
+                                    class="w-full rounded-lg border p-3 text-gray-900" placeholder="0">
+                            </label>
+                        @endforeach
+                    </div>
+                    <label class="block space-y-1"><span>Internal pricing purpose</span>
+                        <textarea wire:model="quoteReason" rows="2" maxlength="500" class="w-full rounded-lg border p-3 text-gray-900"></textarea>
+                    </label>
+                    @error('quoteReason') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                    @error('quoteExtraChairs') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                    @error('quoteExtraTables') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                    <button type="button" wire:click="freezeQuote" wire:loading.attr="disabled"
+                        class="rounded-lg border px-4 py-2 font-semibold">Freeze nonbinding complete internal price</button>
+                    @forelse ($quoteSnapshots as $quote)
+                        <article wire:key="venue-quote-{{ $quote['id'] }}" class="space-y-1 rounded-lg border p-3 text-sm">
+                            <p><strong>{{ $quote['currency'] }} {{ $quote['subtotalMinor'] }} minor units</strong> · frozen at reservation revision {{ $quote['reservationRevision'] }}</p>
+                            @foreach ($quote['lines'] as $line)
+                                <p>{{ $line['code'] }}: {{ $line['quantity'] }} × {{ $line['rateMinor'] }} = {{ $line['amountMinor'] }} minor units</p>
+                            @endforeach
+                            <p class="break-all text-xs">Immutable internal snapshot {{ $quote['id'] }}</p>
+                        </article>
+                    @empty
+                        <p class="text-xs">No price snapshots yet for this reservation.</p>
+                    @endforelse
+                </section>
+            @endif
             @if ($selectedReservationId !== null)
                 <section class="space-y-3 rounded-xl border p-4" aria-label="Change confirmed hall reservation">
                     <h2 class="font-semibold">Manage selected reservation</h2>
