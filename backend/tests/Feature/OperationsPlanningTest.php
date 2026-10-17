@@ -186,6 +186,54 @@ class OperationsPlanningTest extends TestCase
         $this->assertSame(0, DB::table('finance_journals')->count());
     }
 
+    public function test_changing_selected_proposal_filters_tasks_immediately_and_clears_unsent_notes(): void
+    {
+        [$company, , $hall, , $actors, $booking] = $this->fixture();
+        $owner = $actors['owner'][0];
+        $saved = DB::table('booking_drafts')->where('id', $booking)->first();
+        $second = (string) Str::uuid();
+        app(BookingDraftService::class)->create(
+            $owner, $company->id, $second, $hall->id, $saved->customer_id,
+            '2027-03-17', 'noon', 90, 'Alternative internal planning proposal'
+        );
+        $service = app(OperationsPlanningService::class);
+        $service->create($owner, $company->id, (string) Str::uuid(), $booking,
+            'Plan original evening stage', 'Keep original internal plan private');
+        $service->create($owner, $company->id, (string) Str::uuid(), $second,
+            'Plan alternative noon stage', 'Keep alternative internal plan private');
+
+        $component = Livewire::test(OperationsPlanning::class)
+            ->assertSee('Plan original evening stage')
+            ->assertSee('Plan alternative noon stage')
+            ->set('bookingId', $booking)
+            ->assertSee('Plan original evening stage')
+            ->assertDontSee('Plan alternative noon stage')
+            ->set('taskTitle', 'Unsent original stage notes')
+            ->set('reason', 'Original private setup rationale')
+            ->set('reviewReason', 'Original private review rationale');
+        $oldKey = $component->get('createRequestKey');
+
+        $component->set('bookingId', $second)
+            ->assertSet('bookingId', $second)
+            ->assertSet('taskTitle', '')
+            ->assertSet('reason', '')
+            ->assertSet('reviewReason', '')
+            ->assertSet('historyEvents', [])
+            ->assertSee('Plan alternative noon stage')
+            ->assertDontSee('Plan original evening stage');
+        $this->assertNotSame($oldKey, $component->get('createRequestKey'));
+
+        $component->set('bookingId', '')
+            ->assertSee('Plan original evening stage')
+            ->assertSee('Plan alternative noon stage')
+            ->set('bookingId', (string) Str::uuid())->assertForbidden();
+
+        $this->assertSame(2, DB::table('operations_plan_tasks')->count());
+        $this->assertSame(2, DB::table('operations_plan_events')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
     public function test_planning_status_filter_is_validated_for_company_scoped_links(): void
     {
         [$company, , , , $actors, $booking] = $this->fixture();

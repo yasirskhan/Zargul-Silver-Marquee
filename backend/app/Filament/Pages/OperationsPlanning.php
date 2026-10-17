@@ -176,10 +176,29 @@ final class OperationsPlanning extends Page
         $this->refresh();
     }
 
+    /** Switching proposals must immediately refresh the visible scoped checklist. */
+    public function updatedBookingId(): void
+    {
+        $this->authorizeLoaded();
+        abort_unless($this->bookingId === '' || (Str::isUuid($this->bookingId)
+            && array_key_exists($this->bookingId, $this->proposalOptions())), 403);
+
+        // Unsent notes and idempotency keys belong to the previously selected proposal.
+        $this->taskTitle = '';
+        $this->reason = '';
+        $this->reviewReason = '';
+        $this->createRequestKey = (string) Str::uuid();
+        $this->refresh();
+    }
+
     public function showAllTasks(): void
     {
         $this->authorizeLoaded();
         $this->bookingId = '';
+        $this->taskTitle = '';
+        $this->reason = '';
+        $this->reviewReason = '';
+        $this->createRequestKey = (string) Str::uuid();
         $this->refresh();
     }
 

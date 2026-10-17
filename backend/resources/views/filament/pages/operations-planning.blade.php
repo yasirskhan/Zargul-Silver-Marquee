@@ -15,7 +15,7 @@
                 <h2 class="text-lg font-semibold">Create internal planning task</h2>
                 <label class="block space-y-1">
                     <span class="text-sm">Unconfirmed event proposal</span>
-                    <select wire:model="bookingId" class="w-full rounded-lg border p-3 text-gray-900">
+                    <select wire:model.live="bookingId" class="w-full rounded-lg border p-3 text-gray-900">
                         <option value="">Select permitted proposal</option>
                         @foreach ($this->proposalOptions() as $id => $label)
                             <option value="{{ $id }}">{{ $label }}</option>
