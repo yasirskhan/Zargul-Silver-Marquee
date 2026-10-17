@@ -79,6 +79,7 @@ class WebsiteWorkspaceLivewireTest extends TestCase
         $editor = Livewire::test(WebsiteWorkspace::class)
             ->assertSee('Search title override (optional)')
             ->assertSee('Page search description override (optional)')
+            ->assertSee('Private search preview (not published)')
             ->call('addSection', 'text')
             ->set('sections.0.data.title', 'Approved public introduction')
             ->set('reason', 'Prepare original page content')
@@ -89,12 +90,14 @@ class WebsiteWorkspaceLivewireTest extends TestCase
         $this->assertArrayNotHasKey('seoDescription', json_decode($savedOriginal, true, 512, JSON_THROW_ON_ERROR));
 
         $editor->set('pageSeoTitle', 'Private draft-only title')
+            ->assertSee('Private draft-only title')
             ->set('reason', 'Reject unsaved search title')
             ->call('publishDraft')->assertHasErrors(['pageSeoTitle']);
         $this->assertNull(DB::table('site_pages')->where('id', $pageId)->value('published_revision_id'));
 
         $editor->set('pageSeoTitle', '')
             ->set('pageSeoDescription', 'Private page-level description')
+            ->assertSee('Private page-level description')
             ->set('reason', 'Reject unsaved search description')
             ->call('publishDraft')->assertHasErrors(['pageSeoDescription']);
         $this->assertNull(DB::table('site_pages')->where('id', $pageId)->value('published_revision_id'));

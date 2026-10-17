@@ -64,7 +64,7 @@
                 <h2 class="text-lg font-semibold">Page search title</h2>
                 <label class="block space-y-1">
                     <span class="text-sm font-medium">Search title override (optional)</span>
-                    <input type="text" wire:model="pageSeoTitle" maxlength="120"
+                    <input type="text" wire:model.live.debounce.400ms="pageSeoTitle" maxlength="120"
                         class="w-full rounded border p-2 text-gray-900"
                         placeholder="Leave blank to use the approved page title and venue name">
                 </label>
@@ -72,11 +72,17 @@
                 @error('pageSeoTitle') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
                 <label class="block space-y-1">
                     <span class="text-sm font-medium">Page search description override (optional)</span>
-                    <textarea wire:model="pageSeoDescription" maxlength="160" rows="2"
+                    <textarea wire:model.live.debounce.400ms="pageSeoDescription" maxlength="160" rows="2"
                         class="w-full rounded border p-2 text-gray-900"
                         placeholder="Leave blank to use published venue-wide search description"></textarea>
                 </label>
                 @error('pageSeoDescription') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                <div class="space-y-2 rounded-lg border bg-white p-3 text-gray-900" aria-label="Private page search preview">
+                    <p class="text-xs font-semibold">Private search preview (not published)</p>
+                    <p class="font-semibold text-blue-700">{{ $pageSeoTitle !== '' ? $pageSeoTitle : $page->title.' | '.($branding['siteName'] ?? $page->title) }}</p>
+                    <p class="text-sm text-gray-700">{{ $pageSeoDescription !== '' ? $pageSeoDescription : (($branding['seoDescription'] ?? '') !== '' ? $branding['seoDescription'] : (($branding['tagline'] ?? '') !== '' ? $branding['tagline'] : ($branding['siteName'] ?? $page->title))) }}</p>
+                    <p class="text-xs">This draft preview is private. Save and separately publish to change website metadata; indexing still requires operator approval.</p>
+                </div>
             </section>
 
             <section class="space-y-4 rounded-xl border p-4" aria-label="Website branding">

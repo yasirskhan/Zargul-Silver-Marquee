@@ -1,3 +1,7 @@
+## 2026-10-16 CMS-005 RESPONSIVE PRIVATE SEARCH RESULT PREVIEW — EXACT SHA CI PENDING
+- Base 846aa432f5a24dceab8bab836e348a5123b17746 public website keyboard skip link (CI pending). Owner Website Workspace adds private live preview with current unsaved page search title/description and only private branding fields/fallback, distinctly labeled not published. Both metadata inputs use debounced Livewire updates; text remains escaped, no guessed external URLs, no tenant data publishing, no operator gate changes. Existing draft save and explicit publisher approval remain mandatory.
+- PostgreSQL-backed Livewire search-metadata test asserts preview presence and safe current editing values, while existing no-public-before-save/publish guards are retained. Feature register and handoff same commit; verify hosted four-job CI exact SHA before VERIFIED.
+
 ## 2026-10-16 CMS-006 KEYBOARD SKIP LINK IN RESPONSIVE PUBLISHED SITE — EXACT SHA CI PENDING
 - Base e1c34ac26e8ea8c6844b67486000405e78049da6 strict crawler X-Robots-Tag noindex release, hosted CI pending. Add keyboard focusable skip-to-main-content link to public and private preview templates, visually surfaced on focus with approved palette tokens, and main landmark tabindex=-1 target; keep page structure, CSP, image/media and publish pointers unchanged.
 - PostgreSQL public route and internal approved-only HTML tests confirm link, anchor and landmark exist; no external URLs/JS. Register/handoff updated atomically. Verify all four new hosted jobs at exact SHA, repair actual failures before VERIFIED.
