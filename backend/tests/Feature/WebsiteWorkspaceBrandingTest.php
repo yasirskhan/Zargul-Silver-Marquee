@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -117,8 +118,23 @@ class WebsiteWorkspaceBrandingTest extends TestCase
                 'can_edit_site' => true,
                 'role' => 'manager',
             ]);
-        $owner->call('verifyDomainOwnership')->assertForbidden();
+        // The SitePagePolicy deliberately conceals unauthorized
+        // publisher-only page actions with denyAsNotFound() (404). Prove
+        // that UI denial and the service-level 403 separately.
+        $owner->call('verifyDomainOwnership')->assertNotFound();
+        $actor = User::findOrFail($actorId);
+        try {
+            app(\App\Services\SiteDomainOwnershipService::class)->verify(
+                $actor, $company->id, $site, 'owner.marquee.org',
+                'Reject editor-only domain verification'
+            );
+            $this->fail('An editor with revoked publisher privileges verified a domain.');
+        } catch (AuthorizationException) {
+            $this->assertTrue(true);
+        }
         $this->assertSame('pending', DB::table('site_domain_claims')->where('website_id', $site)->value('status'));
+        $this->assertSame(0, DB::table('audit_events')
+            ->where('action', 'website.domain_ownership_verified')->count());
     }
 
     public function test_owner_cannot_publish_unsaved_branding_form_changes(): void
