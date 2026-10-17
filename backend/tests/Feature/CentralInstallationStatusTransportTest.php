@@ -95,6 +95,85 @@ class CentralInstallationStatusTransportTest extends TestCase
         }
     }
 
+    public function test_optional_signed_receipt_must_match_vendor_key_identity_nonce_and_report(): void
+    {
+        [$local, $customer] = $this->enrolled();
+        $pair = sodium_crypto_sign_keypair();
+        config()->set('central_control.trusted_signing_public_keys', [
+            'status-test' => self::encode(sodium_crypto_sign_publickey($pair)),
+        ]);
+        Http::fake(['https://lichall.hafzatech.com/api/v1/installations/status' =>
+            function (Request $request) use ($local, $customer, $pair) {
+                $nonce=$request['nonce'];
+                $data=[
+                    'api_version'=>'v1', 'issuer'=>'HAFZATECH',
+                    'installation_id'=>$local['installation_id'],
+                    'customer_id'=>$customer,
+                    'nonce'=>$nonce, 'status'=>'signed_revision_pending_delivery',
+                    'revision'=>4, 'issued_at'=>gmdate('Y-m-d\TH:i:s\Z'),
+                ];
+                $raw=json_encode($data,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);
+                return Http::response([
+                    'api_version'=>'v1', 'registered_installation_id'=>$local['installation_id'],
+                    'nonce'=>$nonce, 'status'=>'signed_revision_pending_delivery',
+                    'revision'=>4,
+                    'signed_receipt'=>[
+                        'key_id'=>'status-test',
+                        'payload'=>self::encode($raw),
+                        'signature'=>self::encode(sodium_crypto_sign_detached(
+                            'HAFZATECH-INSTALL-STATUS-RECEIPT-V1'."\n".$raw,
+                            sodium_crypto_sign_secretkey($pair))),
+                    ],
+                ],200);
+            },
+        ]);
+        $result=app(CentralInstallationStatusTransport::class)->check(new DateTimeImmutable('now'));
+        $this->assertTrue($result['vendor_signed']);
+        $this->assertSame(4,$result['revision_available']);
+        $this->assertFalse($result['licensed']);
+        $this->assertDatabaseCount('central_signed_license_cache',0);
+        $this->assertDatabaseCount('central_license_check_state',0);
+    }
+
+    public function test_conflicting_signed_receipt_never_authenticates_unsigned_status(): void
+    {
+        [$local, $customer] = $this->enrolled();
+        $pair=sodium_crypto_sign_keypair();
+        config()->set('central_control.trusted_signing_public_keys',[
+            'status-test'=>self::encode(sodium_crypto_sign_publickey($pair)),
+        ]);
+        Http::fake(['https://lichall.hafzatech.com/api/v1/installations/status' =>
+            function(Request $request)use($local,$customer,$pair){
+                $payload=[
+                    'api_version'=>'v1','issuer'=>'HAFZATECH',
+                    'installation_id'=>$local['installation_id'],
+                    'customer_id'=>$customer,'nonce'=>$request['nonce'],
+                    'status'=>'signed_revision_pending_delivery','revision'=>7,
+                    'issued_at'=>gmdate('Y-m-d\TH:i:s\Z'),
+                ];
+                $raw=json_encode($payload,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);
+                return Http::response([
+                    'api_version'=>'v1','registered_installation_id'=>$local['installation_id'],
+                    'nonce'=>$request['nonce'],
+                    'status'=>'signed_revision_pending_delivery','revision'=>8,
+                    'signed_receipt'=>[
+                        'key_id'=>'status-test','payload'=>self::encode($raw),
+                        'signature'=>self::encode(sodium_crypto_sign_detached(
+                            'HAFZATECH-INSTALL-STATUS-RECEIPT-V1'."\n".$raw,
+                            sodium_crypto_sign_secretkey($pair))),
+                    ],
+                ],200);
+            },
+        ]);
+        $this->expectException(InvalidArgumentException::class);
+        try{
+            app(CentralInstallationStatusTransport::class)->check(new DateTimeImmutable('now'));
+        }finally{
+            $this->assertDatabaseCount('central_license_check_state',0);
+            $this->assertDatabaseCount('central_signed_license_cache',0);
+        }
+    }
+
     public function test_redirect_does_not_disclose_identity_to_untrusted_host(): void
     {
         $this->enrolled();

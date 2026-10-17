@@ -18,6 +18,8 @@ use InvalidArgumentException;
  */
 final class CentralInstallationStatusTransport
 {
+    public function __construct(private readonly CentralSignedStatusReceiptVerifier $receiptVerifier) {}
+
     public function check(DateTimeImmutable $now): array
     {
         if (config('central_control.activation_enabled') !== true) {
@@ -69,13 +71,31 @@ final class CentralInstallationStatusTransport
             ($body['status'] === 'registered_pending_license') !== ($body['revision'] === 0)) {
             throw new InvalidArgumentException('Central status response failed nonce or identity validation.');
         }
-        // Never claim this is a signed or renewed license, even if central
-        // reports an unsigned/deliverable revision number.
-        return [
+        // The optional signed receipt authenticates the vendor's report,
+        // but NOT a paid grant. Never change last-online-license-verified,
+        // central license cache or tenant release gates on this path.
+        $result = [
             'status' => $body['status'],
             'revision_available' => $body['revision'],
             'licensed' => false,
         ];
+        if (array_key_exists('signed_receipt', $body)) {
+            if (! is_array($body['signed_receipt'])) {
+                throw new InvalidArgumentException('Malformed signed status receipt.');
+            }
+            $signed = $this->receiptVerifier->verify(
+                $body['signed_receipt'], $identity->installation_id,
+                $binding->customer_id, $nonce, $now
+            );
+            if ($signed['status'] !== $body['status'] ||
+                $signed['revision'] !== $body['revision']) {
+                throw new InvalidArgumentException('Signed receipt disagrees with central status.');
+            }
+            $result['vendor_signed'] = true;
+            $result['receipt_issued_at'] = $signed['verified_at'];
+        }
+
+        return $result;
     }
 
     private static function b64(string $bytes): string

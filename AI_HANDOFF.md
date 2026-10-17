@@ -119,6 +119,11 @@
 - This test is not a live signed receipt API; central key custody and public endpoint integration remain unimplemented. Existing `VENUE_CENTRAL_ACTIVATION_ENABLED` and vendor API remain default OFF.
 - Previous `323cf8a` and `fdc6345` have exact six-job SUCCESS; `9fc1760` and `f989e23` focused tests green with full CI conclusion to verify before marking VERIFIED.
 
+## OPTIONAL VENDOR-SIGNED STATUS TRANSPORT — PENDING EXACT CI
+- Client status transport now verifies optional pinned vendor-signed Ed25519 receipt against the exact HTTPS request nonce, installation/customer binding and body status/revision before identifying vendor receipt authenticity. Rejects conflicting, altered or untrusted receipts. Test uses synthetic keys and Laravel HTTP fakes; no external URL overrides or secrets.
+- **Important**: An authenticated signed status receipt is still NOT a signed license grant. Transport returns `licensed=false` and does NOT mark last license-central-verified, post funds, activate site or change locally signed entitlement. The central public API does not yet deliver these receipts. Activation remains OFF.
+- Next: enable signed receipt delivery only through independently secured central signer worker with operator-provisioned key custody, then signed license grant retrieval and controlled renewal after separately verified payment, along with tenant owner Verify UI.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`
