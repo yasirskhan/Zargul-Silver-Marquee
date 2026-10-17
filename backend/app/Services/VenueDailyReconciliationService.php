@@ -52,6 +52,24 @@ final class VenueDailyReconciliationService
                 ];
             }
         };
+        $linesMatch = static function (string $id, int $amount, string $method,
+            bool $refund, string $company): bool {
+            $account = $method === 'cash' ? 'cash_on_hand' : 'bank_clearing';
+            $actual = DB::table('finance_journal_lines')
+                ->where('company_id', $company)->where('journal_id', $id)
+                ->get(['account_code', 'side', 'amount_minor'])
+                ->map(static fn ($line): array => [
+                    $line->account_code, $line->side, (int) $line->amount_minor,
+                ])->all();
+            $expected = $refund
+                ? [[$account, 'credit', $amount],
+                    ['customer_deposit_liability', 'debit', $amount]]
+                : [[$account, 'debit', $amount],
+                    ['customer_deposit_liability', 'credit', $amount]];
+            sort($actual);
+            sort($expected);
+            return $actual === $expected;
+        };
         // Compare immutable finance_journals against each recorded receipt/refund,
         // not merely totals, so missing or wrongly typed journal lines fail visibly.
         foreach ($payments as $row) {
@@ -65,6 +83,8 @@ final class VenueDailyReconciliationService
                 ->where('currency_code', $row->currency_code)
                 ->where('amount_minor', $row->amount_minor)->exists();
             $buckets[$row->currency_code]['ledgerMatched'] = $journal
+                && $linesMatch($row->journal_id, (int) $row->amount_minor,
+                    $row->method, false, $companyId)
                 && $buckets[$row->currency_code]['ledgerMatched'];
         }
         foreach ($refunds as $row) {
@@ -78,6 +98,8 @@ final class VenueDailyReconciliationService
                 ->where('currency_code', $row->currency_code)
                 ->where('amount_minor', $row->amount_minor)->exists();
             $buckets[$row->currency_code]['ledgerMatched'] = $journal
+                && $linesMatch($row->journal_id, (int) $row->amount_minor,
+                    $row->method, true, $companyId)
                 && $buckets[$row->currency_code]['ledgerMatched'];
         }
         foreach ($buckets as &$row) {
@@ -88,6 +110,16 @@ final class VenueDailyReconciliationService
         ksort($buckets);
         return ['utcDate' => $utcDate, 'currencies' => array_values($buckets),
             'receiptCount' => count($payments), 'refundCount' => count($refunds),
+            'cashCloseouts' => DB::table('finance_cash_closeouts')
+                ->where('company_id', $companyId)->where('close_date', $utcDate)
+                ->orderBy('currency_code')
+                ->get(['id', 'currency_code', 'expected_minor', 'counted_minor', 'variance_minor'])
+                ->map(static fn ($row): array => [
+                    'id' => $row->id, 'currency' => $row->currency_code,
+                    'expectedMinor' => (int) $row->expected_minor,
+                    'countedMinor' => (int) $row->counted_minor,
+                    'varianceMinor' => (int) $row->variance_minor,
+                ])->all(),
             'readOnly' => true];
     }
 }

@@ -379,11 +379,15 @@ class VenueInvoiceServiceTest extends TestCase
         $this->assertSame(0, $day['currencies'][0]['netCashMinor']);
         $this->assertSame(30000, $day['currencies'][0]['netBankMinor']);
         $this->assertTrue($day['currencies'][0]['ledgerMatched']);
+        $this->assertSame(2, $day['currencies'][0]['receiptCount']);
+        $this->assertSame(1, $day['currencies'][0]['refundCount']);
         $yesterday = now('UTC')->subDay()->toDateString();
         $this->assertSame([], $service->forDate($owner, $company->id, $yesterday)['currencies']);
         Livewire::test(VenueReservations::class)->assertSee('Reservations');
         $this->assertSame(3, DB::table('finance_journals')->count());
         $this->assertSame(6, DB::table('finance_journal_lines')->count());
+        $this->assertSame([], $day['cashCloseouts']);
+        $this->assertSame($today, $day['utcDate']);
 
         $this->be($manager);
         $this->expectException(AuthorizationException::class);

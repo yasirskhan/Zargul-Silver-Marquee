@@ -88,6 +88,17 @@
                     @empty
                         <p class="text-sm">No customer receipts or approved refunds recorded on this UTC date.</p>
                     @endforelse
+                    @if (count($dailyReconciliation['cashCloseouts'] ?? []) > 0)
+                        <h3 class="font-semibold">Recorded UTC cash-drawer closeouts (independent of deposit net)</h3>
+                        @foreach ($dailyReconciliation['cashCloseouts'] as $closeout)
+                            <p class="rounded-lg border p-3 text-sm">
+                                {{ $closeout['currency'] }}: expected {{ $closeout['expectedMinor'] }},
+                                physically counted {{ $closeout['countedMinor'] }},
+                                variance {{ $closeout['varianceMinor'] }} minor units.
+                                This historical count is not automatically adjusted.
+                            </p>
+                        @endforeach
+                    @endif
                 @endif
             </section>
             <section aria-label="Controlled cash ledger and daily reconciliation" class="space-y-3 rounded-xl border p-4">
