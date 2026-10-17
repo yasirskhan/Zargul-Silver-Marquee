@@ -104,7 +104,18 @@ final class InternalQuickSearchService
             if ($source['status']) {
                 $columns[] = 'status';
             }
+            if ($source['kind'] === 'planning') {
+                $columns[] = 'booking_id';
+            }
             foreach ($query->orderBy('id')->limit(min(10, $limit))->get($columns) as $row) {
+                // The planning workspace only accepts exact active proposal links.
+                // Preserve access to historical/withdrawn task search by falling
+                // back to the company's generic planning worklist.
+                $planningProposal = $source['kind'] === 'planning'
+                    && DB::table('booking_drafts')->where('company_id', $companyId)
+                        ->where('id', $row->booking_id)
+                        ->whereIn('status', ['draft', 'under_review'])->exists()
+                    ? $row->booking_id : null;
                 $matches[] = [
                     'kind' => $source['kind'], 'id' => $row->id,
                     'label' => $row->result_label,
@@ -112,6 +123,8 @@ final class InternalQuickSearchService
                     'path' => $source['path'].'?company='.rawurlencode($companyId)
                         .($source['kind'] === 'proposal'
                             ? '&proposal='.rawurlencode($row->id) : '')
+                        .($planningProposal !== null
+                            ? '&proposal='.rawurlencode($planningProposal) : '')
                         .($source['kind'] === 'approval'
                             ? '&request='.rawurlencode($row->id) : ''),
                 ];

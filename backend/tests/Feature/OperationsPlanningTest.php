@@ -413,6 +413,35 @@ class OperationsPlanningTest extends TestCase
         $this->assertSame(0, DB::table('finance_journals')->count());
     }
 
+    public function test_reset_filters_button_is_visible_for_status_hall_or_task_search_without_proposal_selector(): void
+    {
+        [$company, , $hall, , $actors, $booking] = $this->fixture();
+        app(OperationsPlanningService::class)->create($actors['owner'][0],
+            $company->id, (string) Str::uuid(), $booking,
+            'Synthetic setup lighting notes', 'Private staff planning test');
+
+        $panel = Livewire::test(OperationsPlanning::class)
+            ->assertDontSee('Clear filters · show all permitted planning tasks')
+            ->set('statusFilter', 'reviewed')
+            ->assertSee('Clear filters · show all permitted planning tasks')
+            ->call('showAllTasks')
+            ->assertSet('statusFilter', 'all')
+            ->assertDontSee('Clear filters · show all permitted planning tasks')
+            ->set('hallFilter', $hall->id)
+            ->assertSee('Clear filters · show all permitted planning tasks')
+            ->call('showAllTasks')
+            ->assertSet('hallFilter', '')
+            ->set('taskSearch', 'lighting')
+            ->assertSee('Clear filters · show all permitted planning tasks')
+            ->call('showAllTasks')
+            ->assertSet('taskSearch', '')
+            ->assertSee('Synthetic setup lighting notes')
+            ->assertDontSee('Clear filters · show all permitted planning tasks');
+        $this->assertSame(1, DB::table('operations_plan_tasks')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
     public function test_planning_status_filter_is_validated_for_company_scoped_links(): void
     {
         [$company, , , , $actors, $booking] = $this->fixture();

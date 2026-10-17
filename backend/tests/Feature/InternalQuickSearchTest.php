@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Filament\Pages\InternalQuickSearch;
+use App\Filament\Pages\OperationsPlanning;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\Hall;
@@ -355,11 +356,16 @@ class InternalQuickSearchTest extends TestCase
 
     public function test_search_workspace_links_preserve_company_for_authorized_destinations(): void
     {
-        [$company, , $members, , $task] = $this->fixture();
+        [$company, , $members, $booking, $task] = $this->fixture();
         $service = app(InternalQuickSearchService::class);
         $planning = collect($service->search($members['owner'][0], $company->id, 'stage'))
             ->firstWhere('id', $task);
-        $this->assertSame('/admin/operations-planning?company='.$company->id, $planning['path']);
+        $this->assertSame('/admin/operations-planning?company='.$company->id
+            .'&proposal='.$booking, $planning['path']);
+        Livewire::withQueryParams(['company' => $company->id, 'proposal' => $booking])
+            ->test(OperationsPlanning::class)
+            ->assertSet('bookingId', $booking)
+            ->assertSee('Arrange stage light cables');
         $approval = collect($service->search($members['owner'][0], $company->id, 'expense'))
             ->firstWhere('kind', 'approval');
         $this->assertSame('/admin/approval-center?company='.$company->id
@@ -368,6 +374,29 @@ class InternalQuickSearchTest extends TestCase
         $staffPlanning = collect($service->search($members['operations'][0], $company->id, 'stage'))
             ->firstWhere('id', $task);
         $this->assertSame($planning['path'], $staffPlanning['path']);
+        Livewire::withQueryParams(['company' => $company->id, 'proposal' => $booking])
+            ->test(OperationsPlanning::class)
+            ->assertSet('bookingId', $booking)
+            ->assertSee('Arrange stage light cables');
+    }
+
+    public function test_withdrawn_planning_search_falls_back_to_company_worklist_instead_of_broken_deep_link(): void
+    {
+        [$company, , $members, $booking, $task] = $this->fixture();
+        $owner = $members['owner'][0];
+        app(BookingDraftReviewService::class)->withdraw(
+            $owner, $company->id, $booking, 2, 'Synthetic proposal is withdrawn'
+        );
+        $row = collect(app(InternalQuickSearchService::class)
+            ->search($owner, $company->id, 'stage', 20, 'planning'))
+            ->firstWhere('id', $task);
+        $this->assertNotNull($row);
+        $this->assertSame('/admin/operations-planning?company='.$company->id,
+            $row['path']);
+        Livewire::test(OperationsPlanning::class)
+            ->assertSee('Arrange stage light cables');
+        $this->assertSame(0, \Illuminate\Support\Facades\DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, \Illuminate\Support\Facades\DB::table('finance_journals')->count());
     }
 
     public function test_record_type_filters_are_server_authorized_and_reset_stale_results(): void
