@@ -243,6 +243,18 @@ final class ApprovalCenter extends Page
 
     public function updatedCompanyId(): void
     {
+        // Never carry an unsent request or grant between operating companies.
+        $this->newBookingId = '';
+        $this->newReason = '';
+        $this->newAmount = '';
+        $this->decisionReason = '';
+        $this->grantAdminId = '';
+        $this->grantCategories = [];
+        $this->grantCeiling = '';
+        $this->grantStarts = '';
+        $this->grantEnds = '';
+        $this->grantReason = '';
+        $this->revokeReason = '';
         $this->requestReference = '';
         $this->selectedId = null;
         $this->selectedRevision = 0;

@@ -130,6 +130,33 @@ class ApprovalCenterLivewireTest extends TestCase
         $this->assertSame('pending', DB::table('approval_requests')->where('id', $key)->value('status'));
     }
 
+    public function test_switching_owner_company_clears_old_company_unsent_approval_and_grant_forms(): void
+    {
+        [$company, , $members] = $this->fixture();
+        $other = Company::create(['name' => 'Second owned hall', 'slug' => 'approval-switch-owned']);
+        CompanyMembership::create(['company_id' => $other->id,
+            'user_id' => $members['owner'][0]->id, 'role' => 'owner']);
+        Livewire::test(ApprovalCenter::class)
+            ->set('newBookingId', (string) \Illuminate\Support\Str::uuid())
+            ->set('newReason', 'Company specific reason')
+            ->set('newAmount', '500')
+            ->set('grantAdminId', (string) $members['admin'][0]->id)
+            ->set('grantCategories', ['expense'])
+            ->set('grantCeiling', '1000')
+            ->set('grantReason', 'Prior company grant')
+            ->set('companyId', $other->id)
+            ->assertSet('newBookingId', '')
+            ->assertSet('newReason', '')
+            ->assertSet('newAmount', '')
+            ->assertSet('grantAdminId', '')
+            ->assertSet('grantCategories', [])
+            ->assertSet('grantCeiling', '')
+            ->assertSet('grantReason', '')
+            ->assertSet('loadedCompanyId', $other->id);
+        $this->assertSame(0, DB::table('approval_requests')->count());
+        $this->assertSame(0, DB::table('approval_delegations')->count());
+    }
+
     public function test_approval_livewire_request_key_rotates_only_after_server_success(): void
     {
         [$company, , $members] = $this->fixture();
