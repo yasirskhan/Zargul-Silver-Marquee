@@ -314,6 +314,12 @@ class VenueInvoiceServiceTest extends TestCase
         $this->assertSame($refund, $service->record($owner, $company->id,
             $payment, $refundId, $approval, 'Synthetic verified refund handover'));
         $history = $payments->history($owner, $company->id, $invoice);
+        $document = app(\App\Services\VenueDocumentPdfService::class)
+            ->refund($owner, $company->id, $invoice, $refundId);
+        $this->assertStringStartsWith('%PDF-1.4', $document);
+        $this->assertStringContainsString('RF-000000001', $document);
+        $this->assertStringContainsString('NOT AUTHORIZED FOR CUSTOMER DELIVERY', $document);
+        $this->assertStringContainsString('%%EOF', $document);
         $this->assertSame(40000, $history['refundedMinor']);
         $this->assertSame(0, $history['paidMinor']);
         $this->assertSame(150000, $history['dueMinor']);
@@ -325,6 +331,7 @@ class VenueInvoiceServiceTest extends TestCase
         Livewire::test(VenueReservations::class)
             ->call('selectReservation', $reservation)
             ->assertSee('RF-000000001')
+            ->assertSee('Download internal approved-refund PDF')
             ->assertSee('remaining balance 150000');
         $this->expectException(ConflictHttpException::class);
         $service->record($owner, $company->id, $payment, (string) Str::uuid(),
@@ -392,6 +399,43 @@ class VenueInvoiceServiceTest extends TestCase
         $this->be($manager);
         $this->expectException(AuthorizationException::class);
         $service->forDate($manager, $company->id, $today);
+    }
+
+    public function test_internal_invoice_and_receipt_pdf_are_valid_private_read_only_documents(): void
+    {
+        [$company, $owner, $manager, $reservation, $quote] = $this->fixture();
+        config()->set('invoice_controls.issuance_enabled', true);
+        config()->set('invoice_controls.tax_rate_bps', 0);
+        $invoice = (string) Str::uuid();
+        app(VenueInvoiceService::class)->issue($owner, $company->id, $quote, $invoice,
+            'Synthetic internal PDF export invoice');
+        config()->set('payment_controls.enabled', true);
+        config()->set('finance_controls.posting_enabled', true);
+        $receipt = (string) Str::uuid();
+        app(VenueInvoicePaymentService::class)->record($owner, $company->id,
+            $invoice, $receipt, 'bank', 15000, 'BANK-PDF-TEST',
+            'Synthetic bank receipt internal document');
+        $pdf = app(\App\Services\VenueDocumentPdfService::class);
+        $invoiceBytes = $pdf->invoice($owner, $company->id, $invoice);
+        $receiptBytes = $pdf->receipt($owner, $company->id, $invoice, $receipt);
+        foreach ([$invoiceBytes, $receiptBytes] as $bytes) {
+            $this->assertStringStartsWith('%PDF-1.4', $bytes);
+            $this->assertStringContainsString('startxref', $bytes);
+            $this->assertStringContainsString('%%EOF', $bytes);
+            $this->assertStringContainsString('NOT AUTHORIZED FOR CUSTOMER DELIVERY', $bytes);
+            $this->assertStringNotContainsString('invoice-owner@example.test', $bytes);
+        }
+        $this->assertStringContainsString('INV-000000001', $invoiceBytes);
+        $this->assertStringContainsString('RCT-000000001', $receiptBytes);
+        Livewire::test(VenueReservations::class)->call('selectReservation', $reservation)
+            ->assertSee('Download internal invoice PDF')
+            ->assertSee('Download internal receipt PDF');
+        $this->assertSame(1, DB::table('venue_invoice_payments')->count());
+        $this->assertSame(1, DB::table('finance_journals')->count());
+
+        $this->be($manager);
+        $this->expectException(AuthorizationException::class);
+        $pdf->invoice($manager, $company->id, $invoice);
     }
 
     public function test_manager_denied_and_stale_reservation_prevents_invoice(): void

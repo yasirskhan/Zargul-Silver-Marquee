@@ -205,6 +205,10 @@
                         <article wire:key="issued-invoice-{{ $invoice['id'] }}" class="space-y-1 rounded-lg border p-3 text-sm"
                             aria-label="Immutable numbered invoice record">
                             <strong>Invoice {{ $invoice['invoiceNumber'] }}</strong>
+                            <button type="button" wire:click="downloadInvoicePdf('{{ $invoice['id'] }}')"
+                                class="rounded-lg border px-3 py-2 text-sm underline">
+                                Download internal invoice PDF
+                            </button>
                             <p>{{ $invoice['currency'] }} subtotal {{ $invoice['subtotalMinor'] }} +
                                 frozen tax {{ $invoice['taxMinor'] }} = total {{ $invoice['totalMinor'] }} minor units</p>
                             @foreach ($invoice['lines'] as $line)
@@ -216,9 +220,17 @@
                                 <p>Controlled refunds recorded: {{ $paymentBalances[$invoice['id']]['refundedMinor'] }} minor units</p>
                                 @foreach ($paymentBalances[$invoice['id']]['refunds'] as $refund)
                                     <p>Immutable reversal {{ $refund['refundNumber'] }} · {{ $refund['amountMinor'] }} minor units · approval {{ $refund['approvalId'] }}</p>
+                                    <button type="button" wire:click="downloadRefundPdf('{{ $invoice['id'] }}', '{{ $refund['id'] }}')"
+                                        class="rounded-lg border px-3 py-2 text-sm underline">
+                                        Download internal approved-refund PDF
+                                    </button>
                                 @endforeach
                                 @foreach ($paymentBalances[$invoice['id']]['payments'] as $paid)
                                     <p>Immutable receipt {{ $paid['receiptNumber'] }} · {{ $paid['method'] }} · {{ $paid['amountMinor'] }} minor units</p>
+                                    <button type="button" wire:click="downloadReceiptPdf('{{ $invoice['id'] }}', '{{ $paid['id'] }}')"
+                                        class="rounded-lg border px-3 py-2 text-sm underline">
+                                        Download internal receipt PDF
+                                    </button>
                                     @if ($this->refundPostingEnabled() &&
                                         ! collect($paymentBalances[$invoice['id']]['refunds'])->contains('paymentId', $paid['id']))
                                         <button type="button" wire:click="applyApprovedRefund('{{ $paid['id'] }}')"

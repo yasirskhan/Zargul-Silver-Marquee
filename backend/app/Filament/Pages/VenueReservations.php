@@ -535,6 +535,49 @@ final class VenueReservations extends Page
         $this->selectReservation($result['id']);
     }
 
+    /** Filament-authenticated download; never expose an anonymous document URL. */
+    public function downloadInvoicePdf(string $invoiceId): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $actor = $this->authorizeLoaded();
+        abort_unless($this->mayViewCustomerHistory() && Str::isUuid($invoiceId)
+            && collect($this->issuedInvoices)->contains('id', $invoiceId), 403);
+        $bytes = app(\App\Services\VenueDocumentPdfService::class)
+            ->invoice($actor, $this->companyId, $invoiceId);
+        return response()->streamDownload(static function () use ($bytes): void {
+            echo $bytes;
+        }, 'internal-invoice-'.$invoiceId.'.pdf', ['Content-Type' => 'application/pdf']);
+    }
+
+    public function downloadReceiptPdf(string $invoiceId, string $receiptId): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $actor = $this->authorizeLoaded();
+        abort_unless($this->mayViewCustomerHistory() && Str::isUuid($invoiceId)
+            && Str::isUuid($receiptId)
+            && collect($this->issuedInvoices)->contains('id', $invoiceId)
+            && isset($this->paymentBalances[$invoiceId])
+            && collect($this->paymentBalances[$invoiceId]['payments'])->contains('id', $receiptId), 403);
+        $bytes = app(\App\Services\VenueDocumentPdfService::class)
+            ->receipt($actor, $this->companyId, $invoiceId, $receiptId);
+        return response()->streamDownload(static function () use ($bytes): void {
+            echo $bytes;
+        }, 'internal-receipt-'.$receiptId.'.pdf', ['Content-Type' => 'application/pdf']);
+    }
+
+    public function downloadRefundPdf(string $invoiceId, string $refundId): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $actor = $this->authorizeLoaded();
+        abort_unless($this->mayViewCustomerHistory() && Str::isUuid($invoiceId)
+            && Str::isUuid($refundId)
+            && collect($this->issuedInvoices)->contains('id', $invoiceId)
+            && isset($this->paymentBalances[$invoiceId])
+            && collect($this->paymentBalances[$invoiceId]['refunds'])->contains('id', $refundId), 403);
+        $bytes = app(\App\Services\VenueDocumentPdfService::class)
+            ->refund($actor, $this->companyId, $invoiceId, $refundId);
+        return response()->streamDownload(static function () use ($bytes): void {
+            echo $bytes;
+        }, 'internal-refund-'.$refundId.'.pdf', ['Content-Type' => 'application/pdf']);
+    }
+
     public function selectReservation(string $reservationId): void
     {
         $this->authorizeLoaded();
