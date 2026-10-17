@@ -91,6 +91,28 @@ class ApprovalCenterLivewireTest extends TestCase
         $this->assertSame(0, DB::table('approval_decisions')->count());
     }
 
+    public function test_changing_request_reference_clears_previously_selected_approval_decision(): void
+    {
+        [$company, , $members] = $this->fixture();
+        $admin = $members['admin'][0];
+        $this->be($admin);
+        $id = (string) \Illuminate\Support\Str::uuid();
+        app(\App\Services\ApprovalWorkflowService::class)->request(
+            $admin, $company->id, $id, 'expense', 200, 'PKR', null,
+            'Nonapplying synthetic approval request'
+        );
+        $this->be($members['owner'][0]);
+        $component = Livewire::test(ApprovalCenter::class)
+            ->call('selectRequest', $id)->assertSet('selectedId', $id)
+            ->set('requestReference', (string) \Illuminate\Support\Str::uuid())
+            ->assertSet('selectedId', null)
+            ->assertSet('selectedRevision', 0);
+        $component->set('decisionReason', 'Must not decide an old selection')
+            ->call('approve')->assertNotFound();
+        $this->assertSame(0, DB::table('approval_decisions')->count());
+        $this->assertSame('pending', DB::table('approval_requests')->where('id', $id)->value('status'));
+    }
+
     public function test_approval_livewire_request_key_rotates_only_after_server_success(): void
     {
         [$company, , $members] = $this->fixture();

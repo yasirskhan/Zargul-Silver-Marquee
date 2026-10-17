@@ -251,6 +251,14 @@ final class ApprovalCenter extends Page
         $this->refreshInbox();
     }
 
+    public function updatedRequestReference(): void
+    {
+        // A changed lookup must never leave an unrelated pending decision selected.
+        $this->selectedId = null;
+        $this->selectedRevision = 0;
+        $this->decisionReason = '';
+    }
+
     public function clearRequestReference(): void
     {
         $this->requestReference = '';
