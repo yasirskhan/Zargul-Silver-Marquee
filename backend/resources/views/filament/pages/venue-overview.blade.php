@@ -48,6 +48,12 @@
                             <p class="text-sm">Setup planning tasks to review</p>
                             <p class="text-3xl font-semibold">{{ $summary['plannedTasks'] }}</p>
                             <p class="text-xs">Only your accessible halls · planning, not actual event readiness</p>
+                            @if ($summary['plannedTasks'] > 0)
+                                <a class="text-xs underline"
+                                    href="{{ \App\Filament\Pages\OperationsPlanning::getUrl(['company' => $companyId, 'status' => 'planned']) }}">
+                                    Review planned tasks
+                                </a>
+                            @endif
                         </div>
                     @endif
                     @if ($summary['canReadApprovals'])

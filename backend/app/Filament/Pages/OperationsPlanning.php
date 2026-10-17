@@ -11,6 +11,7 @@ use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Livewire\Attributes\Locked;
@@ -46,6 +47,7 @@ final class OperationsPlanning extends Page
     public string $taskTitle = '';
     public string $reason = '';
     public string $reviewReason = '';
+    #[Url(as: 'status')]
     public string $statusFilter = 'all';
 
     private static function currentAccountAllowed(User $actor): bool
@@ -155,6 +157,7 @@ final class OperationsPlanning extends Page
         $this->historyTaskId = null;
         $this->historyEvents = [];
         $actor = $this->authorizeCompany();
+        $this->validate(['statusFilter' => ['required', Rule::in(['all', 'planned', 'reviewed'])]]);
         $this->tasks = app(OperationsPlanningService::class)->tasks($actor, $this->companyId, 30, $this->statusFilter);
         $this->loadedCompanyId = $this->companyId;
     }

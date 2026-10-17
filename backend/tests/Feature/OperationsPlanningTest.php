@@ -74,6 +74,26 @@ class OperationsPlanningTest extends TestCase
     }
 
 
+    public function test_planning_status_filter_is_validated_for_company_scoped_links(): void
+    {
+        [$company, , , , $actors, $booking] = $this->fixture();
+        $service = app(OperationsPlanningService::class);
+        $id = (string) Str::uuid();
+        $service->create($actors['owner'][0], $company->id, $id, $booking,
+            'Plan internal stage support', 'Synthetic preparation for private venue');
+
+        Livewire::test(OperationsPlanning::class)
+            ->set('statusFilter', 'planned')->call('refresh')
+            ->assertHasNoErrors()
+            ->assertSet('statusFilter', 'planned')
+            ->assertSee('Plan internal stage support')
+            ->set('statusFilter', 'forged-status')->call('refresh')
+            ->assertHasErrors(['statusFilter']);
+        $this->assertSame('planned', DB::table('operations_plan_tasks')
+            ->where('id', $id)->value('status'));
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+    }
+
     public function test_company_switch_clears_unsent_planning_notes_and_regenerates_request_key(): void
     {
         [$company, $other, , , $actors, $booking] = $this->fixture();
