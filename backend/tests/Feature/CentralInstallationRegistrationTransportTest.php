@@ -74,10 +74,27 @@ class CentralInstallationRegistrationTransportTest extends TestCase
         $this->assertTrue($receivedSignedProof);
         $this->assertSame('registered_pending_license', $result['status']);
         $this->assertDatabaseCount('central_installation_identity', 1);
+        $this->assertDatabaseCount('central_installation_activation', 1);
+        $binding = \Illuminate\Support\Facades\DB::table('central_installation_activation')->first();
+        $this->assertSame($customer, $binding->customer_id);
+        $this->assertSame('licensed.example.test', $binding->approved_domain);
+        $this->assertSame('registered_pending_license', $binding->status);
         $this->assertDatabaseCount('finance_journals', 0);
         Http::assertSentCount(2);
         Http::assertSent(fn (Request $request) => $request->url() === $challenge);
         Http::assertSent(fn (Request $request) => $request->url() === $registration);
+        $again = app(CentralInstallationRegistrationTransport::class)->register(
+            $enrollment, $token, $customer, 'licensed.example.test');
+        $this->assertSame($result, $again);
+        Http::assertSentCount(2);
+        $this->assertDatabaseCount('central_installation_activation', 1);
+        try {
+            app(CentralInstallationRegistrationTransport::class)->register(
+                $enrollment, $token, (string) Str::uuid(), 'licensed.example.test');
+            $this->fail('Foreign customer rebound registered installation.');
+        } catch (InvalidArgumentException) {}
+        Http::assertSentCount(2);
+
     }
 
     public function test_no_following_redirects_or_false_success_on_wrong_central_response(): void
@@ -98,5 +115,6 @@ class CentralInstallationRegistrationTransportTest extends TestCase
             str_contains($request->url(), 'phishing.example.test'));
         $this->assertDatabaseCount('central_installation_identity', 1);
         $this->assertDatabaseCount('central_signed_license_cache', 0);
+        $this->assertDatabaseCount('central_installation_activation', 0);
     }
 }

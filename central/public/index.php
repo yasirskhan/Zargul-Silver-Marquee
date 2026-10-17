@@ -3,8 +3,10 @@ declare(strict_types=1);
 
 use Hafzatech\Central\InstallationRegistry;
 use Hafzatech\Central\RegistrationError;
+use Hafzatech\Central\InstallationStatusService;
 
 require dirname(__DIR__).'/src/InstallationRegistry.php';
+require dirname(__DIR__).'/src/InstallationStatusService.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, private');
@@ -26,7 +28,7 @@ $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
 if (!$secure) reply(403, ['api_version' => 'v1', 'error' => 'https_required']);
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') reply(405, ['api_version' => 'v1', 'error' => 'method_not_allowed']);
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
-if (!in_array($path, ['/api/v1/installations/challenge', '/api/v1/installations/register'], true)) {
+if (!in_array($path, ['/api/v1/installations/challenge', '/api/v1/installations/register', '/api/v1/installations/status'], true)) {
     reply(404, ['api_version' => 'v1', 'error' => 'not_found']);
 }
 if (!str_starts_with(strtolower($_SERVER['CONTENT_TYPE'] ?? ''), 'application/json')) {
@@ -48,6 +50,9 @@ try {
             throw new RegistrationError('invalid_request', 422);
         }
         reply(200, $registry->challenge($request['enrollment_id'], $request['enrollment_token']));
+    }
+    if ($path === '/api/v1/installations/status') {
+        reply(200, (new InstallationStatusService($db))->check($request));
     }
     reply(201, $registry->register($request));
 } catch (RegistrationError $e) {

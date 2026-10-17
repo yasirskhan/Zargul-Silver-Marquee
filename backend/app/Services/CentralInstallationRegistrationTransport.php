@@ -3,8 +3,8 @@
 namespace App\Services;
 
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
@@ -26,6 +26,20 @@ final class CentralInstallationRegistrationTransport
 
         // Persistent local installation ID never changes on network retry.
         $local = $this->identity->initialize();
+        // Registration survives repeated wizard requests and cannot silently
+        // transfer this self-hosted installation to another vendor customer.
+        $existing = DB::table('central_installation_activation')
+            ->where('singleton_id', 1)->first();
+        if ($existing) {
+            if ($existing->installation_id !== $local['installation_id'] ||
+                $existing->customer_id !== $customerId ||
+                $existing->approved_domain !== $verifiedDomain) {
+                throw new InvalidArgumentException('Existing central installation binding is immutable.');
+            }
+
+            return ['installation_id' => $local['installation_id'],
+                'customer_id' => $customerId, 'status' => 'registered_pending_license'];
+        }
         $challengeUrl = $this->identity->trustedEndpoint('challenge');
         $registerUrl = $this->identity->trustedEndpoint('register');
         $request = static fn () => Http::acceptJson()->asJson()
@@ -61,6 +75,30 @@ final class CentralInstallationRegistrationTransport
             ($result['status'] ?? null) !== 'registered_pending_license') {
             throw new InvalidArgumentException('Untrusted central registration acknowledgment.');
         }
+
+        DB::transaction(function () use ($local, $customerId, $verifiedDomain): void {
+            DB::select('SELECT pg_advisory_xact_lock(708116, 1114)');
+            $bound = DB::table('central_installation_activation')
+                ->where('singleton_id', 1)->lockForUpdate()->first();
+            if ($bound) {
+                if ($bound->installation_id !== $local['installation_id'] ||
+                    $bound->customer_id !== $customerId ||
+                    $bound->approved_domain !== $verifiedDomain) {
+                    throw new InvalidArgumentException('Conflicting HAFZATECH customer enrollment.');
+                }
+                return;
+            }
+            DB::table('central_installation_activation')->insert([
+                'singleton_id'=>1,
+                'installation_id'=>$local['installation_id'],
+                'customer_id'=>$customerId,
+                'approved_domain'=>$verifiedDomain,
+                'status'=>'registered_pending_license',
+                'central_registered_at'=>now(),
+                'created_at'=>now(),
+                'updated_at'=>now(),
+            ]);
+        });
 
         return [
             'installation_id' => $local['installation_id'],

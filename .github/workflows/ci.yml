@@ -91,6 +91,42 @@ jobs:
           php central/tests/license_term_calendar.php
           php central/tests/grant_signature_codec.php
           php central/tests/paid_license_preparation.php
+          php central/tests/installation_status.php
+
+  licensing-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: venue
+          POSTGRES_PASSWORD: venue
+          POSTGRES_DB: venue_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U venue -d venue_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_pgsql, pgsql, intl, zip, bcmath, gd
+          coverage: none
+          tools: composer:v2
+      - name: Install locked dependencies and isolated test key
+        run: |
+          composer install --no-interaction --no-progress --prefer-dist
+          cp .env.example .env
+          php artisan key:generate --force --no-interaction
+      - name: Run focused signed-license and central client regressions
+        run: php artisan test --no-ansi --filter='Central.*Test'
 
   laravel-postgres:
     runs-on: ubuntu-latest
