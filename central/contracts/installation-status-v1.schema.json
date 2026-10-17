@@ -57,7 +57,9 @@
       "status": {
         "enum": [
           "registered_pending_license",
-          "signed_revision_pending_delivery"
+          "signed_revision_pending_delivery",
+          "suspended",
+          "revoked"
         ]
       },
       "registered_installation_id": {
@@ -71,8 +73,53 @@
         "type": "integer",
         "minimum": 0,
         "maximum": 2147483647
+      },
+      "signed_receipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "key_id",
+          "payload",
+          "signature"
+        ],
+        "properties": {
+          "key_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$"
+          },
+          "payload": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$"
+          },
+          "signature": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{86}$"
+          }
+        }
       }
-    }
+    },
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "status": {
+              "enum": [
+                "suspended",
+                "revoked"
+              ]
+            }
+          },
+          "required": [
+            "status"
+          ]
+        },
+        "then": {
+          "required": [
+            "signed_receipt"
+          ]
+        }
+      }
+    ]
   },
   "$defs": {
     "uuidV4": {
@@ -87,5 +134,6 @@
     "nonce": "cryptographically random 32 bytes, base64url without padding"
   },
   "x-response-security": "Authenticated by the vendor HTTPS channel and request nonce echo only. It cannot authorize license renewal or check-in success until an independently vendor-signed grant/status response has been verified.",
-  "x-rate-limit": "At most 60 accepted signed check requests per installation per rolling hour; requests over limit return status_rate_limited."
+  "x-rate-limit": "At most 60 accepted signed check requests per installation per rolling hour; requests over limit return status_rate_limited.",
+  "x-revocation-note": "Unsigned revoked/suspended response MUST be rejected. Signed status is read-only attention reporting until separately approved durable revocation enforcement is deployed; never infer a signed paid grant from this receipt."
 }

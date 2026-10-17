@@ -42,13 +42,22 @@ final class CentralSignedStatusReceiptVerifier
         )) {
             throw new InvalidArgumentException('Status receipt signature invalid.');
         }
+        // Signed field allowlist prevents future consumers from silently
+        // interpreting unrecognized claims such as "paid" or "unrestricted".
         $data=json_decode($payload, true, 12, JSON_THROW_ON_ERROR);
-        if (! is_array($data) || array_is_list($data) ||
+        $fields = is_array($data) ? array_keys($data) : [];
+        sort($fields);
+        if ($fields !== ['api_version', 'customer_id', 'installation_id',
+                          'issued_at', 'issuer', 'nonce', 'revision', 'status'] ||
+            ! is_array($data) || array_is_list($data) ||
             ($data['api_version'] ?? null) !== 'v1' ||
             ($data['issuer'] ?? null) !== 'HAFZATECH' ||
             ($data['installation_id'] ?? null) !== $installationId ||
             ($data['customer_id'] ?? null) !== $customerId ||
             ($data['nonce'] ?? null) !== $nonce ||
+            ! is_string($nonce) ||
+            ! preg_match('/^[A-Za-z0-9_-]{43}$/D', $nonce) ||
+            strlen(self::decode($nonce, null)) !== 32 ||
             ! is_int($data['revision'] ?? null) ||
             $data['revision'] < 0 || $data['revision'] > 2147483647 ||
             ! in_array($data['status'] ?? null,

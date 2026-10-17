@@ -139,6 +139,11 @@
 - Previous cache enrollment binding `4a0403cc650999e1ac9dceee88e1e457053bac6f` passed focused licensing, central, prototype/browser tests; full Laravel backend CI may still be running. Confirm exact CI result and repair regressions if needed.
 - Next work: authenticated vendor signer boundary + distributed signed grant delivery, followed by manual Verify and 15-day scheduler integration. No central KMS keys/HTTPS host have been provisioned.
 
+## SIGNED STATUS FIELD ALLOWLIST / API CONTRACT — PENDING HOSTED CI
+- Read-only Ed25519 receipt verifier now rejects any extra/unrecognized signed fields and any nonce that isn't exactly canonical 32-byte base64url, even if someone possesses a signing key. This prevents ambiguous future fields such as `unrestricted` from being inadvertently trusted. Negative tests added. Shared `central/contracts/installation-status-v1.schema.json` lists `suspended`/`revoked` only with a required signed receipt and clarifies that a receipt is NOT paid entitlement.
+- No public signing API, secret key, live access cut-off or release-gate change. Require exact SHA six-job hosted CI; previous `835dd1e` had central/licensing/prototype/editor tests green while full suite still running when batch prepared.
+- Next: operator-controlled protected signer credentials, strongly authenticated license-grant retrieval and customer-facing Verify License with 15-day scheduled checks. Keep refunds, billing collection, issuance, and public-enforcement gates OFF.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`

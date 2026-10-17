@@ -58,6 +58,43 @@ class CentralSignedStatusReceiptVerifierTest extends TestCase
         $checker->verify($changed,$data['installation_id'],$data['customer_id'],$data['nonce'],$now);
     }
 
+    public function test_pinned_receipt_rejects_extra_claim_fields_and_malformed_nonces(): void
+    {
+        $pair=sodium_crypto_sign_keypair();
+        config()->set('central_control.trusted_signing_public_keys', [
+            'synthetic'=>self::b64(sodium_crypto_sign_publickey($pair)),
+        ]);
+        $base=[
+            'api_version'=>'v1','issuer'=>'HAFZATECH',
+            'installation_id'=>'c6815111-7ea3-4345-b513-01cbfda55412',
+            'customer_id'=>'b86bdadc-afbd-4ffd-823d-bcd47d0d06a7',
+            'nonce'=>self::b64(random_bytes(32)),
+            'status'=>'registered_pending_license','revision'=>0,
+            'issued_at'=>'2026-10-17T23:00:00Z',
+        ];
+        $sign=function(array $data)use($pair):array{
+            $raw=json_encode($data,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);
+            return [
+                'key_id'=>'synthetic','payload'=>self::b64($raw),
+                'signature'=>self::b64(sodium_crypto_sign_detached(
+                    'HAFZATECH-INSTALL-STATUS-RECEIPT-V1'."\n".$raw,
+                    sodium_crypto_sign_secretkey($pair))),
+            ];
+        };
+        $checker=app(CentralSignedStatusReceiptVerifier::class);
+        $now=new DateTimeImmutable('2026-10-17T23:00:01Z');
+        foreach ([
+            $base+['unrestricted'=>true],
+            array_replace($base,['nonce'=>'invalid-nonce']),
+        ] as $candidate) {
+            try {
+                $checker->verify($sign($candidate),$base['installation_id'],
+                    $base['customer_id'],$candidate['nonce'],$now);
+                $this->fail('Unknown signed field or malformed nonce was accepted.');
+            } catch (InvalidArgumentException) {}
+        }
+    }
+
     public function test_unpinned_status_signer_is_always_denied(): void
     {
         config()->set('central_control.trusted_signing_public_keys', []);
