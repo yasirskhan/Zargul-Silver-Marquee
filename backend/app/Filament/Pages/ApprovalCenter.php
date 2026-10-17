@@ -170,6 +170,16 @@ final class ApprovalCenter extends Page
             ->mapWithKeys(fn ($m) => [$m->user_id => $m->user->name])->all();
     }
 
+    public function requestCategoryOptions(): array
+    {
+        $role = $this->role();
+        if (! in_array($role, ['owner', 'admin', 'manager'], true)) {
+            return [];
+        }
+        return array_values(array_filter(ApprovalWorkflowService::CATEGORIES,
+            fn (string $category): bool => $role !== 'manager' || $category !== 'expense'));
+    }
+
     public function proposalOptions(): array
     {
         if (! $this->companyId || ! in_array($this->role(), ['owner', 'admin', 'manager'], true)) {

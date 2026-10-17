@@ -35,7 +35,7 @@
             <div class="grid gap-3 md:grid-cols-2">
                 <label class="block space-y-1"><span class="text-sm">Exception category</span>
                     <select wire:model="newCategory" class="w-full rounded-lg border p-3 text-gray-900">
-                        @foreach (\App\Services\ApprovalWorkflowService::CATEGORIES as $category)
+                        @foreach ($this->requestCategoryOptions() as $category)
                             <option value="{{ $category }}">{{ str_replace('_', ' ', ucfirst($category)) }}</option>
                         @endforeach
                     </select>

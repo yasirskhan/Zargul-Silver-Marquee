@@ -177,6 +177,19 @@ class ApprovalCenterLivewireTest extends TestCase
         $this->assertSame(1, DB::table('approval_requests')->count());
     }
 
+    public function test_manager_request_form_excludes_company_wide_expense_category(): void
+    {
+        [, , $members] = $this->fixture();
+        $this->be($members['manager'][0]);
+        $component = Livewire::test(ApprovalCenter::class);
+        $this->assertNotContains('expense', $component->instance()->requestCategoryOptions());
+        $this->assertContains('discount', $component->instance()->requestCategoryOptions());
+        $this->be($members['owner'][0]);
+        $this->assertContains('expense', Livewire::test(ApprovalCenter::class)
+            ->instance()->requestCategoryOptions());
+        $this->assertSame(0, DB::table('approval_requests')->count());
+    }
+
     public function test_manager_cannot_view_other_staff_approval_or_other_company(): void
     {
         [$company, $foreign, $members] = $this->fixture();
