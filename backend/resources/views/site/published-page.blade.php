@@ -44,6 +44,13 @@
         <meta property="og:title" content="{{ $searchTitle }}">
         <meta property="og:description" content="{{ $searchDescription }}">
         <meta property="og:url" content="{{ $canonicalUrl }}">
+        @if ($mediaBase !== null && $branding['logoMediaId'] !== null
+            && isset($snapshot['media'][$branding['logoMediaId']]))
+            {{-- Exact operator-approved host and current published WebP only. --}}
+            <meta property="og:image" content="{{ 'https://'.parse_url($canonicalUrl, PHP_URL_HOST).$mediaBase.$branding['logoMediaId'].'.webp' }}">
+            <meta property="og:image:type" content="image/webp">
+            <meta property="og:image:alt" content="{{ $snapshot['media'][$branding['logoMediaId']]['alt'] }}">
+        @endif
         <meta name="robots" content="{{ config('public_site.indexing_enabled') === true ? 'index, follow' : 'noindex, nofollow' }}">
     @else
         <meta name="robots" content="noindex, nofollow">

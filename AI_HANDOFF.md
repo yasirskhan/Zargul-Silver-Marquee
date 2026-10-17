@@ -1,3 +1,7 @@
+## 2026-10-16 CMS-005 APPROVED WEBP LOGO SOCIAL PREVIEW — EXACT SHA CI PENDING
+- Base e2fd9ef6474829f5523eb9fff398801087af486a canonical Open Graph title, description and URL (CI pending). Adds optional Open Graph image, type and alternative text ONLY if currently published branding references a company-approved, integrity-checked WebP logo already in current page's published media manifest. Absolute URL is derived from trusted operator canonical host and allowlisted page-media route; no private path, staged file or new public asset endpoint.
+- Backend HTTP regression extends existing separate private favicon/logo staging workflow: draft is invisible, publisher approves branding, then operator-gated HTTP returns favicon and approved og:image while raw/internal HTML never does; all external Host and site release guards unchanged. No real uploads or launch. Feature register updated same commit. Exact SHA four-job hosted CI required.
+
 ## 2026-10-16 CMS-005 APPROVED OPEN GRAPH SHARING METADATA — EXACT SHA CI PENDING
 - Base a1aa7a4c6dc94b6c04a144f4ca228e4827f38f45; domain owner revocation UI CI pending. Prior favicon and mobile SEO-title sources verified all four CI jobs.
 - Published template computes one escaped search title and description from immutable approved page metadata and published branding. It emits Open Graph type/title/description/canonical URL ONLY on explicitly operator-routed public domain requests. Internal rendering without canonical never exposes OG; indexing stays separately controlled and no real site is launched.

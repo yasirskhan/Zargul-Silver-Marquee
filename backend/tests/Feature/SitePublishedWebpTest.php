@@ -175,12 +175,14 @@ class SitePublishedWebpTest extends TestCase
         $this->get('http://venue.example.test/')->assertOk()
             ->assertDontSee($iconHref);
         $this->get('http://venue.example.test'.$iconHref)->assertNotFound();
+        $this->get('http://venue.example.test/')->assertOk()
+            ->assertDontSee('property="og:image"', false);
 
         $brand = app(SiteBrandingService::class);
         $approved = [
             'siteName' => 'WebP Venue', 'tagline' => '',
             'themePreset' => 'silver', 'fontPreset' => 'classic',
-            'logoMediaId' => null, 'faviconMediaId' => $favicon,
+            'logoMediaId' => $hero, 'faviconMediaId' => $favicon,
         ];
         $brand->saveDraft($owner, $company->id, $site, $approved, 1,
             'Prepare approved favicon revision');
@@ -190,10 +192,15 @@ class SitePublishedWebpTest extends TestCase
 
         $this->get('http://venue.example.test/')->assertOk()
             ->assertSee('<link rel="icon" type="image/webp" href="'.$iconHref.'">', false)
+            ->assertSee('property="og:image" content="https://venue.example.test/_venue-media/home/'.$hero.'.webp"', false)
+            ->assertSee('property="og:image:type" content="image/webp"', false)
+            ->assertSee('property="og:image:alt" content="Verified real venue image"', false)
             ->assertDontSee('site-media/private/');
         $this->get('http://venue.example.test'.$iconHref)
             ->assertOk()->assertHeader('Content-Type', 'image/webp');
         $this->get('http://wrong.example.test'.$iconHref)->assertNotFound();
+        $this->assertStringNotContainsString('property="og:image"', app(\App\Services\SitePublishedHtmlService::class)
+            ->render($company->id, $site, '/'));
         $this->assertStringNotContainsString($iconHref, app(\App\Services\SitePublishedHtmlService::class)
             ->render($company->id, $site, '/'));
     }
