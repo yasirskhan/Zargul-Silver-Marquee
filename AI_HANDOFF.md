@@ -1,3 +1,6 @@
+## 2026-10-16 CMS SEARCH DESCRIPTION REGRESSION FIX — EXACT SHA CI PENDING
+- Correct the new page-description rejection fixture to use an actual newline via chr(10), not escaped backslash text. Existing validator remains unchanged. Parent source 653483ba732f31ac07780a869ffa4fd3809c8369; verify CI all four at exact SHA.
+
 ## 2026-10-16 CMS-005 OWNER PER-PAGE SEARCH DESCRIPTION WITH DRAFT/PUBLISH — HOSTED CI PENDING
 - Base 773e744aa6a1a7c91cccc6ed24340b19f8a77b10 mobile title acceptance; hosted CI 38989296472 queued at preparation; earlier favicon and CSP image batches 38989249753 and 38989191173 running; green baseline ab3aef9... run 38988732518 SUCCESS all four.
 - Extend approved page immutable content with optional seoDescription bounded to 160 safe plain-text characters. Legacy page revisions unchanged and valid. Owner Site Workspace exposes editable per-page description, resets it on switching pages, includes it in draft save, and rejects publishing when locally edited metadata differs from actually saved revision, matching existing SEO title and sections controls.

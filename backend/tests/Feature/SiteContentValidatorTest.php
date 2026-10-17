@@ -102,7 +102,7 @@ class SiteContentValidatorTest extends TestCase
         $withDescription['seoDescription'] = '';
         $validator->validate($withDescription);
         foreach (['<b>Bad</b>', 'javascript:alert(1)',
-            "Not\\nplain", str_repeat('d', 161), ['invalid']] as $unsafe) {
+            "Not".chr(10)."plain", str_repeat('d', 161), ['invalid']] as $unsafe) {
             $bad = $legacy;
             $bad['seoDescription'] = $unsafe;
             $this->expectValidationFailure($bad);
