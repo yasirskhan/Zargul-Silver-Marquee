@@ -56,8 +56,8 @@ final class CentralSignedStatusReceiptVerifier
                  'suspended', 'revoked'], true)) {
             throw new InvalidArgumentException('Status receipt identity or contract mismatch.');
         }
-        if (($data['status'] === 'registered_pending_license') !==
-            ($data['revision'] === 0)) {
+        if (($data['status'] === 'registered_pending_license' && $data['revision'] !== 0) ||
+            ($data['status'] === 'signed_revision_pending_delivery' && $data['revision'] < 1)) {
             throw new InvalidArgumentException('Inconsistent signed status revision.');
         }
         $issued=$data['issued_at'] ?? null;

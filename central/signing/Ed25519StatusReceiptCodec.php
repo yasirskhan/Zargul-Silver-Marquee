@@ -35,7 +35,8 @@ final class Ed25519StatusReceiptCodec
                 'suspended','revoked'],true) ||
             !is_int($payload['revision']??null) ||
             $payload['revision']<0 || $payload['revision']>2147483647 ||
-            (($payload['status']==='registered_pending_license')!==($payload['revision']===0))) {
+            ($payload['status']==='registered_pending_license' && $payload['revision']!==0) ||
+            ($payload['status']==='signed_revision_pending_delivery' && $payload['revision']<1)) {
             throw new InvalidArgumentException('Unexpected signed status semantics.');
         }
         foreach(['installation_id','customer_id'] as $key) {

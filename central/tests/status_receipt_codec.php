@@ -36,4 +36,9 @@ try {
     Ed25519StatusReceiptCodec::sign($payload,'test',sodium_crypto_sign_secretkey($pair));
     throw new RuntimeException('FAIL inconsistent revision semantics');
 } catch(InvalidArgumentException $expected) {}
+// A revoked never-licensed installation may have zero signed revisions.
+$payload['status']='revoked';
+$payload['revision']=0;
+$revoke=Ed25519StatusReceiptCodec::sign($payload,'test',sodium_crypto_sign_secretkey($pair));
+receiptAssert(isset($revoke['signature']),'revocation with no paid revision can be authenticated');
 echo "PASS: isolated vendor status receipt primitive, strict fields and signature authenticity\n";

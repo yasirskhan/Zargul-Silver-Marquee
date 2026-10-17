@@ -133,6 +133,12 @@
 - No new endpoint, production key or release switch. Live signer/grant delivery and operator provisioning remain absent. Exact SHA hosted CI must pass before this is marked VERIFIED.
 - Previous `1f70d59` fixed the optional status transport test helper. Confirm its full six-job CI and keep status receipts separate from paid entitlement.
 
+## SIGNED SUSPENSION/REVOCATION STATUS PARITY — NEW BOUNDED BATCH
+- A client status response saying `revoked` or `suspended` is **never accepted unsigned**. If present with a valid pinned Ed25519 vendor receipt, client reports `requires_license_attention` with `licensed=false`, no cache writes, no automatic renewed/revoked access, and no invented successful license check timestamp. Pending vs signed-delivery revision semantics are strict; signed revocation for a never-licensed installation can use revision zero. Vendor isolated pure signer and client verifier use the same status contract. PostgreSQL + synthetic HTTP tests cover forged unsigned and signed reports.
+- This is a preparatory, default-OFF transport, NOT deployed central revocation policy or tenant public-site blocking. Exact SHA hosted CI is required before marking it VERIFIED.
+- Previous cache enrollment binding `4a0403cc650999e1ac9dceee88e1e457053bac6f` passed focused licensing, central, prototype/browser tests; full Laravel backend CI may still be running. Confirm exact CI result and repair regressions if needed.
+- Next work: authenticated vendor signer boundary + distributed signed grant delivery, followed by manual Verify and 15-day scheduler integration. No central KMS keys/HTTPS host have been provisioned.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`

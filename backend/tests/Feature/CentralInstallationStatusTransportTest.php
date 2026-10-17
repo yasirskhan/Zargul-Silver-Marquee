@@ -179,6 +179,53 @@ class CentralInstallationStatusTransportTest extends TestCase
         }
     }
 
+    public function test_unsigned_revocation_is_rejected_and_signed_revocation_is_reported_only(): void
+    {
+        [$local, $customer] = $this->enrolled();
+        $pair = sodium_crypto_sign_keypair();
+        config()->set('central_control.trusted_signing_public_keys', [
+            'vendor-test' => self::encode(sodium_crypto_sign_publickey($pair)),
+        ]);
+        $useSignedReceipt = false;
+        Http::fake(['https://lichall.hafzatech.com/api/v1/installations/status' =>
+            function(Request $request) use ($local, $customer, $pair, &$useSignedReceipt) {
+                $reply = [
+                    'api_version'=>'v1','registered_installation_id'=>$local['installation_id'],
+                    'nonce'=>$request['nonce'], 'status'=>'revoked','revision'=>0,
+                ];
+                if ($useSignedReceipt) {
+                    $payload=[
+                        'api_version'=>'v1','issuer'=>'HAFZATECH',
+                        'installation_id'=>$local['installation_id'],'customer_id'=>$customer,
+                        'nonce'=>$request['nonce'],'status'=>'revoked','revision'=>0,
+                        'issued_at'=>gmdate('Y-m-d\TH:i:s\Z'),
+                    ];
+                    $raw=json_encode($payload,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);
+                    $reply['signed_receipt']=[
+                        'key_id'=>'vendor-test',
+                        'payload'=>self::encode($raw),
+                        'signature'=>self::encode(sodium_crypto_sign_detached(
+                            'HAFZATECH-INSTALL-STATUS-RECEIPT-V1'."\n".$raw,
+                            sodium_crypto_sign_secretkey($pair))),
+                    ];
+                }
+                return Http::response($reply,200);
+            },
+        ]);
+        try {
+            app(CentralInstallationStatusTransport::class)->check(new DateTimeImmutable('now'));
+            $this->fail('Unsigned revocation response was trusted.');
+        } catch (InvalidArgumentException) {}
+        $useSignedReceipt = true;
+        $result=app(CentralInstallationStatusTransport::class)->check(new DateTimeImmutable('now'));
+        $this->assertSame('revoked',$result['status']);
+        $this->assertTrue($result['vendor_signed']);
+        $this->assertTrue($result['requires_license_attention']);
+        $this->assertFalse($result['licensed']);
+        $this->assertDatabaseCount('central_license_check_state',0);
+        $this->assertDatabaseCount('central_signed_license_cache',0);
+    }
+
     public function test_redirect_does_not_disclose_identity_to_untrusted_host(): void
     {
         $this->enrolled();

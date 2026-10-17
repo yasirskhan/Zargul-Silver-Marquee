@@ -67,8 +67,12 @@ final class CentralInstallationStatusTransport
             ! is_int($body['revision'] ?? null) || $body['revision'] < 0 ||
             $body['revision'] > 2147483647 ||
             ! in_array($body['status'] ?? null,
-                ['registered_pending_license', 'signed_revision_pending_delivery'], true) ||
-            ($body['status'] === 'registered_pending_license') !== ($body['revision'] === 0)) {
+                ['registered_pending_license', 'signed_revision_pending_delivery',
+                 'suspended', 'revoked'], true) ||
+            ($body['status'] === 'registered_pending_license' && $body['revision'] !== 0) ||
+            ($body['status'] === 'signed_revision_pending_delivery' && $body['revision'] < 1) ||
+            (in_array($body['status'], ['suspended', 'revoked'], true) &&
+             ! array_key_exists('signed_receipt', $body))) {
             throw new InvalidArgumentException('Central status response failed nonce or identity validation.');
         }
         // The optional signed receipt authenticates the vendor's report,
@@ -93,6 +97,12 @@ final class CentralInstallationStatusTransport
             }
             $result['vendor_signed'] = true;
             $result['receipt_issued_at'] = $signed['verified_at'];
+            if (in_array($signed['status'], ['suspended', 'revoked'], true)) {
+                // Inform future authorized UI without mutating entitlements.
+                // Public/operations gates must enforce only AFTER a separately
+                // implemented durable signed revocation state is verified.
+                $result['requires_license_attention'] = true;
+            }
         }
 
         return $result;
