@@ -78,6 +78,11 @@
                         <p>Requested by staff ID {{ $entry['requestedBy'] }} | revision {{ $entry['revision'] }}</p>
                         <p class="break-words">{{ $entry['reason'] }}</p>
                         <p class="break-all text-xs">ID: {{ $entry['id'] }} | proposal: {{ $entry['bookingId'] ?? 'none' }}</p>
+                        @if ($entry['bookingId'] !== null && in_array($this->role(), ['owner', 'admin'], true))
+                            <a class="inline-block underline" href="{{ '/admin/booking-proposals?company='.rawurlencode($companyId).'&proposal='.rawurlencode($entry['bookingId']) }}">
+                                View linked internal proposal
+                            </a>
+                        @endif
                         @if ($entry['status'] === 'pending' && $this->canReviewRequest($entry))
                             <button type="button" wire:click="selectRequest('{{ $entry['id'] }}')" class="rounded-lg border px-3 py-2">Review decision</button>
                         @endif

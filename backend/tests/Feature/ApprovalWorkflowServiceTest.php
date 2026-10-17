@@ -7,11 +7,14 @@ use App\Models\CompanyMembership;
 use App\Models\Hall;
 use App\Models\HallAssignment;
 use App\Models\User;
+use App\Filament\Pages\ApprovalCenter;
 use App\Services\ApprovalWorkflowService;
 use App\Services\BookingDraftReviewService;
 use App\Services\BookingDraftService;
 use App\Services\CustomerProfileService;
 use App\Services\HallProgramRulesService;
+use Filament\Facades\Filament;
+use Livewire\Livewire;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
@@ -141,6 +144,29 @@ class ApprovalWorkflowServiceTest extends TestCase
         $this->assertSame(1, DB::table('approval_requests')->count());
         $this->assertSame('pending', DB::table('approval_requests')->where('id', $pending)->value('status'));
         $this->assertSame(0, DB::table('approval_decisions')->count());
+    }
+
+    public function test_linked_proposal_navigation_is_owner_only_not_manager(): void
+    {
+        [$company, , , $people, $booking] = $this->fixture();
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $manager = $people['manager'][0];
+        $this->be($manager);
+        $id = (string) Str::uuid();
+        app(ApprovalWorkflowService::class)->request(
+            $manager, $company->id, $id, 'discount', 100, 'PKR', $booking,
+            'Internal discount consideration'
+        );
+        Livewire::test(ApprovalCenter::class)
+            ->assertSee('Internal discount consideration')
+            ->assertDontSee('View linked internal proposal');
+        $this->be($people['owner'][0]);
+        Livewire::test(ApprovalCenter::class)
+            ->assertSee('View linked internal proposal')
+            ->assertSee('proposal='.$booking, false)
+            ->assertDontSee('fake-fixture@example.test');
+        $this->assertSame(0, DB::table('approval_decisions')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
     }
 
     public function test_manager_requests_owner_decides_once_and_no_business_money_changes(): void

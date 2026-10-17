@@ -1,3 +1,7 @@
+## 2026-10-16 APR-001 OWNER LINK FROM APPROVAL TO EXACT INTERNAL BOOKING PROPOSAL — EXACT SHA CI PENDING
+- Base 30e07e34f75cdcf7032f85be1f030cdefff2c5ff, stale owner request/decision tests queued in CI. Pending/decided approval card with an internal proposal reference now offers an owner/admin-only URL to the exact tenant-scoped BookingProposals view. Managers may still see their own authorized approval history but not the owner-only proposal detail navigation. Target screen separately reauthorizes the company and UUID. No automatic booking confirmation, invoice, financial posting, public customer intake, or exposed customer contact.
+- PostgreSQL Livewire regression checks owner link, manager absence and no decision/slot mutations. Verify four GitHub jobs against exact commit SHA, fix failures and continue.
+
 ## 2026-10-16 APR-001 REVOKED STALE OWNER CANNOT MUTATE APPROVALS — EXACT SHA CI PENDING
 - Base ad076228d7231ea7862ed4b56ac753aa670bc2a0 pending hosted CI 38992847903. Add independent PostgreSQL mutation tests covering disabled account and lost verified email against approval request creation, owner decision, and emergency grant reads while authenticated owner instance is deliberately stale. An admin's prior valid pending request must survive unmodified, with no recorded decisions.
 - Builds upon persisted account check in ApprovalWorkflowService::member; no new booking, payment or Telegram delivery. Require all four jobs green at this commit's exact SHA before verifying; update handoff.
