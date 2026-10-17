@@ -48,10 +48,16 @@ final class OperationsPlanning extends Page
     public string $reviewReason = '';
     public string $statusFilter = 'all';
 
+    private static function currentAccountAllowed(User $actor): bool
+    {
+        return DB::table('users')->where('id', $actor->getKey())
+            ->where('is_active', true)->whereNotNull('email_verified_at')->exists();
+    }
+
     public static function canAccess(): bool
     {
         $actor = Filament::auth()->user();
-        return $actor instanceof User && $actor->is_active && $actor->hasVerifiedEmail()
+        return $actor instanceof User && self::currentAccountAllowed($actor)
             && self::companiesFor($actor) !== [];
     }
 
@@ -68,7 +74,7 @@ final class OperationsPlanning extends Page
     public function companyOptions(): array
     {
         $actor = Filament::auth()->user();
-        return $actor instanceof User && $actor->is_active && $actor->hasVerifiedEmail()
+        return $actor instanceof User && self::currentAccountAllowed($actor)
             ? self::companiesFor($actor) : [];
     }
 
@@ -108,7 +114,12 @@ final class OperationsPlanning extends Page
 
     public function updatedCompanyId(): void
     {
+        // Changing tenants invalidates every unsent planning/review note,
+        // not just the selected proposal and request idempotency key.
         $this->bookingId = '';
+        $this->taskTitle = '';
+        $this->reason = '';
+        $this->reviewReason = '';
         $this->statusFilter = 'all';
         $this->createRequestKey = (string) Str::uuid();
         $this->refresh();

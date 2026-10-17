@@ -73,6 +73,58 @@ class OperationsPlanningTest extends TestCase
         return [$company, $other, $hall, $otherHall, $actors, $booking];
     }
 
+
+    public function test_company_switch_clears_unsent_planning_notes_and_regenerates_request_key(): void
+    {
+        [$company, $other, , , $actors, $booking] = $this->fixture();
+        CompanyMembership::create([
+            'company_id' => $other->id, 'user_id' => $actors['owner'][0]->id,
+            'role' => 'owner',
+        ]);
+        $component = Livewire::test(OperationsPlanning::class)
+            ->set('bookingId', $booking)
+            ->set('taskTitle', 'Unsent private Company A setup')
+            ->set('reason', 'Company A operational notes')
+            ->set('reviewReason', 'Company A review rationale')
+            ->set('statusFilter', 'planned');
+        $oldKey = $component->get('createRequestKey');
+
+        $component->set('companyId', $other->id)
+            ->assertSet('loadedCompanyId', $other->id)
+            ->assertSet('bookingId', '')
+            ->assertSet('taskTitle', '')
+            ->assertSet('reason', '')
+            ->assertSet('reviewReason', '')
+            ->assertSet('statusFilter', 'all')
+            ->assertSet('historyTaskId', null)
+            ->assertSet('historyEvents', [])
+            ->assertSet('tasks', []);
+        $this->assertTrue(Str::isUuid($component->get('createRequestKey')));
+        $this->assertNotSame($oldKey, $component->get('createRequestKey'));
+        $this->assertSame(0, DB::table('operations_plan_tasks')->count());
+        $this->assertSame(0, DB::table('operations_plan_events')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+    }
+
+    public function test_persisted_account_revocation_blocks_private_planning_page_with_cached_auth(): void
+    {
+        [, , , , $actors] = $this->fixture();
+        $owner = $actors['owner'][0];
+        $this->assertTrue(OperationsPlanning::canAccess());
+        DB::table('users')->where('id', $owner->id)->update(['is_active' => false]);
+        $this->assertTrue($owner->is_active);
+        $this->assertFalse(OperationsPlanning::canAccess());
+        Livewire::test(OperationsPlanning::class)->assertForbidden();
+
+        DB::table('users')->where('id', $owner->id)
+            ->update(['is_active' => true, 'email_verified_at' => null]);
+        $this->assertNotNull($owner->email_verified_at);
+        $this->assertFalse(OperationsPlanning::canAccess());
+        Livewire::test(OperationsPlanning::class)->assertForbidden();
+        $this->assertSame(0, DB::table('operations_plan_tasks')->count());
+        $this->assertSame(0, DB::table('operations_plan_events')->count());
+    }
+
     public function test_internal_task_create_is_idempotent_and_review_is_atomic_audited_and_revision_guarded(): void
     {
         [$company, , , , $actors, $booking] = $this->fixture();
