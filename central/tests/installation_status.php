@@ -72,8 +72,11 @@ $forged=$sign($c);$forged['signature']=InstallationRegistry::base64Url(random_by
 statusDenied(fn()=>$service->check($forged),'invalid_installation_proof');
 $old=$sign($c,gmdate('Y-m-d\TH:i:s\Z',time()-3600));
 statusDenied(fn()=>$service->check($old),'invalid_timestamp');
-requireStatus((int)$db->query('SELECT count(*) FROM central_installation_status_checks')->fetchColumn()===1,
-    'Only successfully authenticated unique check-in recorded');
+$count=$db->prepare("SELECT count(*) FROM central_installation_status_checks
+    WHERE installation_id=:installation AND customer_id=:customer");
+$count->execute(['installation'=>$installation,'customer'=>$c]);
+requireStatus((int)$count->fetchColumn()===1,
+    'Only fixture installation unique check-in recorded');
 // Add 59 more synthetic distinct nonce events after the first validated
 // check-in, then require the 61st authenticated request to be throttled.
 $insert=$db->prepare(
