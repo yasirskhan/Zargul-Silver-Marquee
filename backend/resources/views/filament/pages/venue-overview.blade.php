@@ -41,6 +41,19 @@
                     @endif
                     @if ($summary['canSeeCompanyProposals'])
                         <div class="rounded-xl border p-4">
+                            <p class="text-sm">Proposals awaiting internal review</p>
+                            <p class="text-3xl font-semibold">{{ $summary['reviewDrafts'] }}</p>
+                            <p class="text-xs">Submitted draft requests only · not confirmed reservations</p>
+                            @if ($summary['reviewDrafts'] > 0)
+                                <a class="text-xs underline"
+                                    href="{{ \App\Filament\Pages\BookingProposals::getUrl(['company' => $companyId, 'status' => 'under_review']) }}">
+                                    Open internal proposal review queue
+                                </a>
+                            @endif
+                        </div>
+                    @endif
+                    @if ($summary['canSeeCompanyProposals'])
+                        <div class="rounded-xl border p-4">
                             <p class="text-sm">Next 7 days · unconfirmed proposals</p>
                             <p class="text-3xl font-semibold">{{ $summary['upcomingDrafts'] }}</p>
                             <a class="text-xs underline"

@@ -39,6 +39,8 @@ final class BookingProposals extends Page
     #[Url(as: 'hall')]
     public ?string $hallId = null;
 
+    /** Existing validated owner-only status filter can be safely deep-linked. */
+    #[Url(as: 'status')]
     public string $statusFilter = '';
 
     /** Three configured programs per hall/date; read-only table filter only. */

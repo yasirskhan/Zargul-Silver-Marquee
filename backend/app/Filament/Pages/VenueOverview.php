@@ -135,6 +135,9 @@ final class VenueOverview extends Page
                     ->whereIn('id', $visibleHallIds)
                     ->where('is_active', true)
                     ->where('program_rules_revision', '<', 1)->count() : null,
+            'reviewDrafts' => $canSeeCompanyProposals
+                ? DB::table('booking_drafts')->where('company_id', $this->companyId)
+                    ->where('status', 'under_review')->count() : null,
             'drafts' => $canSeeCompanyProposals
                 ? DB::table('booking_drafts')->where('company_id', $this->companyId)
                     ->whereIn('status', ['draft', 'under_review'])->count() : null,
