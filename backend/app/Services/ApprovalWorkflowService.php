@@ -363,6 +363,11 @@ final class ApprovalWorkflowService
         }
         $q = DB::table('approval_requests as req')
             ->leftJoin('users as requester', 'requester.id', '=', 'req.requested_by')
+            ->leftJoin('approval_decisions as decision', function ($join): void {
+                $join->on('decision.approval_id', '=', 'req.id')
+                    ->on('decision.company_id', '=', 'req.company_id');
+            })
+            ->leftJoin('users as decider', 'decider.id', '=', 'decision.decided_by')
             ->leftJoin('booking_drafts as booking', function ($join): void {
                 $join->on('booking.id', '=', 'req.booking_id')
                     ->on('booking.company_id', '=', 'req.company_id');
@@ -394,10 +399,22 @@ final class ApprovalWorkflowService
             ->get(['req.id', 'req.category', 'req.status', 'req.revision', 'req.amount_minor',
                 'req.currency', 'req.reason', 'req.booking_id', 'req.requested_by', 'req.created_at',
                 'requester.name as requester_name', 'booking.event_date as proposed_date', 'booking.program as proposed_program',
-                'hall.name as proposed_hall'])
+                'hall.name as proposed_hall',
+                'decision.decision as decision_outcome', 'decision.decided_by as decision_actor_id',
+                'decision.reason as decision_reason', 'decision.created_at as decision_at',
+                'decision.delegation_id as decision_delegation_id',
+                'decider.name as decider_name'])
             ->map(fn ($row) => array_merge($this->summary($row), [
                 'requesterName' => (string) ($row->requester_name ?? ''),
                 'requestedAt' => CarbonImmutable::parse($row->created_at)->utc()->format('Y-m-d H:i:s').' UTC',
+                'decisionRecord' => $row->decision_outcome !== null
+                    ? ['outcome' => $row->decision_outcome,
+                        'staffId' => (int) $row->decision_actor_id,
+                        'staffName' => (string) ($row->decider_name ?? ''),
+                        'reason' => $row->decision_reason,
+                        'at' => CarbonImmutable::parse($row->decision_at)->utc()->format('Y-m-d H:i:s').' UTC',
+                        'delegationId' => $row->decision_delegation_id]
+                    : null,
                 'proposal' => $row->proposed_date !== null && $row->proposed_hall !== null
                     ? ['date' => $row->proposed_date, 'program' => $row->proposed_program,
                         'hallName' => $row->proposed_hall] : null,

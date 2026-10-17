@@ -579,4 +579,34 @@ SQL);
         }
         $this->assertSame(1, DB::table('approval_decisions')->count());
     }
+    public function test_resolved_manager_request_projects_same_immutable_decision_for_owner_and_requester(): void
+    {
+        [$company, , , $people, $booking] = $this->fixture();
+        $service = app(ApprovalWorkflowService::class);
+        $manager = $people['manager'][0];
+        $owner = $people['owner'][0];
+        $this->be($manager);
+        $id = (string) Str::uuid();
+        $service->request($manager, $company->id, $id, 'discount', 200,
+            'PKR', $booking, 'Manager requests event adjustment');
+        $this->assertNull($service->inbox($manager, $company->id, 30, $id)[0]['decisionRecord']);
+        $this->be($owner);
+        $service->decide($owner, $company->id, $id, 1, 'rejected',
+            'Owner declined unapproved adjustment');
+        $record = $service->inbox($owner, $company->id, 30, $id)[0]['decisionRecord'];
+        $this->assertSame('rejected', $record['outcome']);
+        $this->assertSame($owner->id, $record['staffId']);
+        $this->assertSame('Owner', $record['staffName']);
+        $this->assertSame('Owner declined unapproved adjustment', $record['reason']);
+        $this->assertNull($record['delegationId']);
+        $this->assertStringEndsWith(' UTC', $record['at']);
+        $this->be($manager);
+        $this->assertSame($record, $service->inbox($manager, $company->id, 30, $id)[0]['decisionRecord']);
+        $this->assertSame(1, DB::table('approval_decisions')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertStringNotContainsString('fake-fixture@example.test',
+            json_encode($service->inbox($manager, $company->id, 30, $id), JSON_THROW_ON_ERROR));
+    }
+
 }

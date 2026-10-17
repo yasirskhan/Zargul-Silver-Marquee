@@ -569,4 +569,27 @@ class ApprovalCenterLivewireTest extends TestCase
         $this->assertSame(1, DB::table('telegram_pair_challenges')->count());
     }
 
+    public function test_owner_reads_approved_private_decision_history_without_reapplying(): void
+    {
+        [$company, , $members] = $this->fixture();
+        $admin = $members['admin'][0];
+        $owner = $members['owner'][0];
+        $service = app(\App\Services\ApprovalWorkflowService::class);
+        $this->be($admin);
+        $id = (string) \Illuminate\Support\Str::uuid();
+        $service->request($admin, $company->id, $id, 'expense', 650,
+            'PKR', null, 'Synthetic staff supplies expense');
+        $this->be($owner);
+        $service->decide($owner, $company->id, $id, 1, 'approved',
+            'Owner accepted proposed supplies');
+        Livewire::test(ApprovalCenter::class)
+            ->set('statusFilter', 'approved')
+            ->assertSee('Recorded approval decision')
+            ->assertSee('Decision: approved by')
+            ->assertSee('Owner accepted proposed supplies')
+            ->assertSee('Synthetic staff supplies expense');
+        $this->assertSame(1, DB::table('approval_decisions')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+    }
+
 }

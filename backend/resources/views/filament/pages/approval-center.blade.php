@@ -100,6 +100,18 @@
                             (staff ID {{ $entry['requestedBy'] }}) | requested at {{ $entry['requestedAt'] }}
                             | revision {{ $entry['revision'] }}</p>
                         <p class="break-words">{{ $entry['reason'] }}</p>
+                        @if (is_array($entry['decisionRecord'] ?? null))
+                            <div class="space-y-1 rounded-lg border p-3 text-sm" aria-label="Recorded approval decision">
+                                <p>Decision: {{ $entry['decisionRecord']['outcome'] }} by
+                                    {{ $entry['decisionRecord']['staffName'] !== '' ? $entry['decisionRecord']['staffName'] : 'Staff member' }}
+                                    (staff ID {{ $entry['decisionRecord']['staffId'] }})
+                                    at {{ $entry['decisionRecord']['at'] }}</p>
+                                <p class="break-words">Decision reason: {{ $entry['decisionRecord']['reason'] }}</p>
+                                @if ($entry['decisionRecord']['delegationId'] !== null)
+                                    <p class="break-all text-xs">Delegated authority reference: {{ $entry['decisionRecord']['delegationId'] }}</p>
+                                @endif
+                            </div>
+                        @endif
                         <p class="break-all text-xs">ID: {{ $entry['id'] }} | proposal: {{ $entry['bookingId'] ?? 'none' }}</p>
                         @if (is_array($entry['proposal'] ?? null))
                             <p class="text-sm">Proposed event: {{ $entry['proposal']['date'] }}
