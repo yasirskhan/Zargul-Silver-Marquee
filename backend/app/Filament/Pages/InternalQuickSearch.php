@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Url;
 
 final class InternalQuickSearch extends Page
 {
@@ -21,6 +22,7 @@ final class InternalQuickSearch extends Page
     protected static ?string $navigationLabel = 'Internal search';
     protected static ?string $slug = 'internal-search';
 
+    #[Url(as: 'company')]
     public ?string $companyId = null;
     public string $searchTerm = '';
     public string $searchKind = 'all';
@@ -64,7 +66,12 @@ final class InternalQuickSearch extends Page
     public function mount(): void
     {
         abort_unless(static::canAccess(), 403);
-        $this->companyId = array_key_first($this->companyOptions());
+        $companies = $this->companyOptions();
+        $requested = $this->companyId ?? request()->query('company');
+        // A deep link must select only a company the current account can access.
+        abort_unless($requested === null || (is_string($requested)
+            && array_key_exists($requested, $companies)), 403);
+        $this->companyId = $requested ?? array_key_first($companies);
         $this->loadedCompanyId = $this->companyId;
     }
 

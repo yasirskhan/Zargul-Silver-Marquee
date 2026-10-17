@@ -127,6 +127,40 @@ class InternalQuickSearchTest extends TestCase
             ->assertDontSee('contact-hidden@example.test');
     }
 
+    public function test_search_company_deep_link_preserves_authorized_company_and_denies_foreign_selection(): void
+    {
+        [$company, $foreign, $members, $booking] = $this->fixture();
+        $owner = $members['owner'][0];
+        // A single staff member may operate several authorized companies.
+        CompanyMembership::create([
+            'company_id' => $foreign->id, 'user_id' => $owner->id,
+            'role' => 'owner',
+        ]);
+        Livewire::withQueryParams(['company' => $foreign->id])
+            ->test(InternalQuickSearch::class)
+            ->assertSet('companyId', $foreign->id)
+            ->assertSet('loadedCompanyId', $foreign->id)
+            ->set('searchTerm', 'stage')->call('runSearch')
+            ->assertHasNoErrors()->assertDontSee('Arrange stage light cables');
+
+        Livewire::withQueryParams(['company' => $company->id])
+            ->test(InternalQuickSearch::class)
+            ->assertSet('companyId', $company->id)
+            ->set('searchTerm', 'stage')->call('runSearch')
+            ->assertHasNoErrors()->assertSee('Arrange stage light cables');
+
+        Livewire::withQueryParams(['company' => (string) Str::uuid()])
+            ->test(InternalQuickSearch::class)->assertForbidden();
+
+        // Revoked membership must also reject a former authorized deep link.
+        CompanyMembership::query()->where('company_id', $foreign->id)
+            ->where('user_id', $owner->id)->update(['is_active' => false]);
+        Livewire::withQueryParams(['company' => $foreign->id])
+            ->test(InternalQuickSearch::class)->assertForbidden();
+        $this->assertSame(0, \Illuminate\Support\Facades\DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, \Illuminate\Support\Facades\DB::table('finance_journals')->count());
+    }
+
     public function test_cross_tenant_manager_and_revoked_owner_search_denied(): void
     {
         [$company, $foreign, $members] = $this->fixture();
