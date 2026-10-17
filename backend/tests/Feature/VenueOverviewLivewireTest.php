@@ -135,23 +135,30 @@ class VenueOverviewLivewireTest extends TestCase
             ]);
         }
 
-        Livewire::test(VenueOverview::class)
+        $ownerPanel = Livewire::test(VenueOverview::class)
             ->assertSet('summary.role', 'owner')
             ->assertSet('summary.plannedTasks', 2)
+            ->assertSee('Recent internal setup plans')
+            ->assertSee('Owner only hall')
+            ->assertSee('Open this proposal')
             ->assertSee('Setup planning tasks to review')
             ->assertDontSee('Hidden customer');
+        $this->assertCount(3, $ownerPanel->get('summary')['recentPlans']);
         $this->be($people['manager']);
-        Livewire::test(VenueOverview::class)
+        $managerPanel = Livewire::test(VenueOverview::class)
             ->assertSet('summary.visibleHalls', 1)
             ->assertSet('summary.plannedTasks', 1)
+            ->assertSee('Recent internal setup plans')
             ->assertSee('Setup planning tasks to review')
             ->assertDontSee('Owner only hall')
             ->assertDontSee('Hidden customer');
+        $this->assertCount(2, $managerPanel->get('summary')['recentPlans']);
 
         $this->be($people['operations']);
-        Livewire::test(VenueOverview::class)
+        $operationsPanel = Livewire::test(VenueOverview::class)
             ->assertSet('summary.visibleHalls', 1)
             ->assertSet('summary.plannedTasks', 1);
+        $this->assertCount(2, $operationsPanel->get('summary')['recentPlans']);
         $this->assertSame(0, DB::table('hall_slot_claims')->count());
         $this->assertSame(0, DB::table('finance_journals')->count());
     }
@@ -188,7 +195,10 @@ class VenueOverviewLivewireTest extends TestCase
                 ->assertSet('summary.upcomingThrough', '2026-11-16')
                 ->assertSee('Next 7 days')
                 ->assertSee('Review upcoming drafts (not reserved)')
+                ->assertSee('Recent unconfirmed proposals')
+                ->assertSee('Review this unconfirmed proposal')
                 ->assertDontSee('Synthetic Private Name');
+            $this->assertCount(3, $panel->get('summary')['recentProposals']);
             $this->assertSame(0, DB::table('hall_slot_claims')->count());
             $this->assertSame(0, DB::table('finance_journals')->count());
 
@@ -196,6 +206,8 @@ class VenueOverviewLivewireTest extends TestCase
             Livewire::test(VenueOverview::class)
                 ->assertSet('summary.upcomingDrafts', null)
                 ->assertSet('summary.upcomingFrom', null)
+                ->assertSet('summary.recentProposals', [])
+                ->assertDontSee('Recent unconfirmed proposals')
                 ->assertDontSee('Review upcoming drafts (not reserved)');
         } finally {
             $this->travelBack();

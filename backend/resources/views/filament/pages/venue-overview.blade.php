@@ -92,6 +92,44 @@
                 <button type="button" wire:click="refreshSummary"
                     class="rounded-lg border px-4 py-2 text-sm">Refresh overview</button>
             </section>
+            @if ($summary['canSeeCompanyProposals'] && count($summary['recentProposals']) > 0)
+                <section class="space-y-3" aria-label="Recent unconfirmed booking proposals">
+                    <h2 class="font-semibold">Recent unconfirmed proposals</h2>
+                    <p class="text-xs">Owner/admin only · internal requests, not held or confirmed reservations.</p>
+                    <div class="grid gap-3 md:grid-cols-3">
+                        @foreach ($summary['recentProposals'] as $proposal)
+                            <article wire:key="recent-proposal-{{ $proposal['id'] }}" class="space-y-2 rounded-xl border p-4 text-sm">
+                                <strong>{{ $proposal['hallName'] }}</strong>
+                                <p>{{ $proposal['eventDate'] }} {{ ucfirst($proposal['program']) }}</p>
+                                <p class="text-xs">Request state: {{ str_replace('_', ' ', $proposal['status']) }}</p>
+                                <a class="underline"
+                                    href="{{ \App\Filament\Pages\BookingProposals::getUrl(['company' => $companyId, 'proposal' => $proposal['id']]) }}">
+                                    Review this unconfirmed proposal
+                                </a>
+                            </article>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+            @if ($summary['canPlan'] && count($summary['recentPlans']) > 0)
+                <section class="space-y-3" aria-label="Recent internal planning tasks">
+                    <h2 class="font-semibold">Recent internal setup plans</h2>
+                    <p class="text-xs">Only your permitted halls. Planning never confirms a booking or records actual setup.</p>
+                    <div class="grid gap-3 md:grid-cols-3">
+                        @foreach ($summary['recentPlans'] as $plan)
+                            <article wire:key="recent-plan-{{ $plan['id'] }}" class="space-y-2 rounded-xl border p-4 text-sm">
+                                <strong>{{ $plan['title'] }}</strong>
+                                <p>{{ $plan['hallName'] }} · {{ $plan['eventDate'] }} {{ ucfirst($plan['program']) }}</p>
+                                <p class="text-xs">Internal status: {{ $plan['status'] }}</p>
+                                <a class="underline"
+                                    href="{{ \App\Filament\Pages\OperationsPlanning::getUrl(['company' => $companyId, 'proposal' => $plan['bookingId']]) }}">
+                                    Open this proposal's planning tasks
+                                </a>
+                            </article>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
             <section class="space-y-3" aria-label="Daily staff quick navigation">
                 <h2 class="font-semibold">Go directly to your work</h2>
                 <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

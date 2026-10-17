@@ -149,6 +149,20 @@ final class VenueOverview extends Page
             'upcomingThrough' => $canSeeCompanyProposals ? $weekThrough : null,
             'pendingApprovals' => $canReadApprovals
                 ? app(ApprovalWorkflowService::class)->inboxCounts($actor, $this->companyId)['pending'] : null,
+            'recentProposals' => $canSeeCompanyProposals
+                ? DB::table('booking_drafts as b')
+                    ->join('halls as h', fn ($join) => $join
+                        ->on('h.id', '=', 'b.hall_id')->on('h.company_id', '=', 'b.company_id'))
+                    ->where('b.company_id', $this->companyId)
+                    ->whereIn('b.hall_id', $visibleHallIds)
+                    ->whereIn('b.status', ['draft', 'under_review'])
+                    ->orderByDesc('b.created_at')->orderByDesc('b.id')->limit(3)
+                    ->get(['b.id', 'b.status', 'b.event_date', 'b.program', 'h.name as hall_name'])
+                    ->map(fn ($row) => [
+                        'id' => $row->id, 'status' => $row->status,
+                        'eventDate' => $row->event_date, 'program' => $row->program,
+                        'hallName' => $row->hall_name,
+                    ])->all() : [],
             'canSeeCompanyProposals' => $canSeeCompanyProposals,
             'canReadApprovals' => $canReadApprovals,
             'canReviewFinance' => $canSeeCompanyProposals,
@@ -158,6 +172,24 @@ final class VenueOverview extends Page
                 ? DB::table('operations_plan_tasks')->where('company_id', $this->companyId)
                     ->where('status', 'planned')
                     ->whereIn('hall_id', $visibleHallIds)->count() : null,
+            'recentPlans' => $canPlan
+                ? DB::table('operations_plan_tasks as t')
+                    ->join('booking_drafts as b', fn ($join) => $join
+                        ->on('b.id', '=', 't.booking_id')->on('b.company_id', '=', 't.company_id'))
+                    ->join('halls as h', fn ($join) => $join
+                        ->on('h.id', '=', 't.hall_id')->on('h.company_id', '=', 't.company_id'))
+                    ->where('t.company_id', $this->companyId)
+                    ->whereIn('t.hall_id', $visibleHallIds)
+                    ->whereIn('b.status', ['draft', 'under_review'])
+                    ->orderByDesc('t.created_at')->orderByDesc('t.id')->limit(3)
+                    ->get(['t.id', 't.booking_id', 't.title', 't.status',
+                        'h.name as hall_name', 'b.event_date', 'b.program'])
+                    ->map(fn ($row) => [
+                        'id' => $row->id, 'bookingId' => $row->booking_id,
+                        'title' => $row->title, 'status' => $row->status,
+                        'hallName' => $row->hall_name,
+                        'eventDate' => $row->event_date, 'program' => $row->program,
+                    ])->all() : [],
             'canManageHallRules' => $halls > 0 && in_array($role, ['owner', 'admin'], true),
             'canEditWebsite' => (bool) $access->canEditWebsite($actor, $this->companyId),
             'canReadAudit' => (bool) $access->canReadAuditHistory($actor, $this->companyId),
