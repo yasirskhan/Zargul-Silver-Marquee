@@ -122,6 +122,23 @@ final class HallCalendar extends Page
         return $options;
     }
 
+    /**
+     * The occupancy table is available to scoped operations staff, whereas
+     * internal proposal review must remain owner/admin-only for this company.
+     */
+    public function canOpenDraftProposals(): bool
+    {
+        $actor = Filament::auth()->user();
+        return $actor instanceof User && self::currentAccountAllowed($actor)
+            && $this->companyId !== null && $this->hallId !== null
+            && $this->loadedCompanyId === $this->companyId
+            && $this->loadedHallId === $this->hallId
+            && array_key_exists($this->hallId, $this->hallOptions())
+            && CompanyMembership::query()->where('company_id', $this->companyId)
+                ->where('user_id', $actor->getKey())->where('is_active', true)
+                ->whereIn('role', ['owner', 'admin'])->exists();
+    }
+
     public function updatedCompanyId(): void
     {
         abort_unless(array_key_exists((string) $this->companyId, $this->companyOptions()), 403);

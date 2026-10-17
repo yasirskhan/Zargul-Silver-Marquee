@@ -78,6 +78,39 @@ class HallCalendarLivewireTest extends TestCase
         $this->assertSame(0, DB::table('hall_slot_claim_events')->count());
     }
 
+    public function test_owner_calendar_links_day_to_private_proposals_but_manager_cannot_open_drafts(): void
+    {
+        [$company, $hall, $owner] = $this->fixture();
+        Livewire::test(HallCalendar::class)
+            ->set('anchorDate', '2026-12-15')
+            ->set('viewMode', 'day')
+            ->assertSee('View draft proposals')
+            ->assertSee('Draft proposals are separate from physical slot claims');
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+
+        $manager = User::create([
+            'name' => 'Calendar manager',
+            'email' => 'calendar-link-manager@example.test',
+            'password' => 'synthetic-only',
+        ]);
+        $manager->markEmailAsVerified();
+        $membership = CompanyMembership::create([
+            'company_id' => $company->id, 'user_id' => $manager->id,
+            'role' => 'manager',
+        ]);
+        HallAssignment::create([
+            'company_id' => $company->id, 'hall_id' => $hall->id,
+            'membership_id' => $membership->id,
+        ]);
+        $this->be($manager);
+        Livewire::test(HallCalendar::class)
+            ->set('anchorDate', '2026-12-15')
+            ->set('viewMode', 'day')
+            ->assertSee('Internal, read-only hall occupancy')
+            ->assertDontSee('View draft proposals');
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+    }
+
     public function test_owner_can_switch_day_week_month_and_navigate_without_mutation(): void
     {
         [$company, $hall] = $this->fixture();

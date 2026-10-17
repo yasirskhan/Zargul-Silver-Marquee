@@ -36,6 +36,7 @@ final class BookingProposals extends Page
     #[Url(as: 'company')]
     public ?string $companyId = null;
 
+    #[Url(as: 'hall')]
     public ?string $hallId = null;
 
     public string $statusFilter = '';
@@ -44,8 +45,10 @@ final class BookingProposals extends Page
     #[Url(as: 'proposal')]
     public string $referenceSearch = '';
 
+    #[Url(as: 'from')]
     public string $fromDate = '';
 
+    #[Url(as: 'to')]
     public string $toDate = '';
 
     #[Locked]
@@ -156,6 +159,8 @@ final class BookingProposals extends Page
     {
         $this->clearSelection();
         $this->hallId = null;
+        $this->fromDate = '';
+        $this->toDate = '';
         $this->refreshResults();
     }
 

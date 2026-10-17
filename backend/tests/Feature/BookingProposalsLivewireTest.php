@@ -163,6 +163,28 @@ class BookingProposalsLivewireTest extends TestCase
         $this->assertSame(0, DB::table('hall_slot_claims')->count());
     }
 
+    public function test_calendar_filters_scope_existing_drafts_to_exact_hall_and_day(): void
+    {
+        [$company, $foreign, $hall, $foreignHall, $owner, , $customer, $otherCustomer] = $this->fixture();
+        $target = $this->proposal($company->id, $hall->id, $customer, $owner->id, '2026-12-15');
+        $second = $this->proposal($company->id, $hall->id, $customer, $owner->id, '2026-12-16');
+        $other = $this->proposal($foreign->id, $foreignHall->id, $otherCustomer, $owner->id, '2026-12-15');
+
+        $component = Livewire::test(BookingProposals::class)
+            ->set('hallId', $hall->id)
+            ->set('fromDate', '2026-12-15')
+            ->set('toDate', '2026-12-15')
+            ->call('refreshResults')->assertHasNoErrors()
+            ->assertSee($target)
+            ->assertDontSee($second)
+            ->assertDontSee($other);
+        $this->assertSame([$target], array_column($component->get('entries'), 'id'));
+        $component->set('hallId', $foreignHall->id)
+            ->call('refreshResults')->assertForbidden();
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, DB::table('approval_decisions')->count());
+    }
+
     public function test_filters_and_pagination_do_not_mutate_proposal_records(): void
     {
         [$company, , $hall, , $owner, , $customer] = $this->fixture();

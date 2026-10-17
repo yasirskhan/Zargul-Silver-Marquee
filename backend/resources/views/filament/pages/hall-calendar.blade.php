@@ -69,7 +69,15 @@
                         <tbody>
                             @foreach ($projection['days'] as $day)
                                 <tr class="border-t" wire:key="hall-day-{{ $day['date'] }}">
-                                    <th scope="row" class="p-3 font-medium">{{ $day['date'] }}</th>
+                                    <th scope="row" class="p-3 font-medium">
+                                        <span class="block">{{ $day['date'] }}</span>
+                                        @if ($this->canOpenDraftProposals())
+                                            <a class="mt-1 block text-xs underline"
+                                                href="{{ AppFilamentPagesBookingProposals::getUrl(['company' => $companyId, 'hall' => $hallId, 'from' => $day['date'], 'to' => $day['date']]) }}">
+                                                View draft proposals
+                                            </a>
+                                        @endif
+                                    </th>
                                     @foreach (['morning', 'noon', 'evening'] as $program)
                                         @php
                                             $slot = $day['programs'][$program];
@@ -104,6 +112,7 @@
                     </table>
                 </div>
                 <p class="text-xs">
+                    Draft proposals are separate from physical slot claims and do not reserve this hall.
                     The displayed snapshot can change immediately after refresh. Do not promise a reservation based on this table.
                     Timezone, hold duration and booking approval policy require venue signoff.
                 </p>
