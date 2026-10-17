@@ -125,14 +125,20 @@ final class FinanceControlService
         }, 3);
     }
 
-    public function previews(User $actor, string $companyId, int $limit = 30): array
+    public function previews(User $actor, string $companyId, int $limit = 30, ?string $previewId = null): array
     {
         $this->authorize($actor, $companyId);
         if ($limit < 1 || $limit > 50) {
             throw new InvalidArgumentException('Invalid preview page size.');
         }
-        return DB::table('finance_quote_previews')->where('company_id', $companyId)
-            ->orderByDesc('created_at')->orderByDesc('id')->limit($limit)
+        if ($previewId !== null && ! Str::isUuid($previewId)) {
+            throw new InvalidArgumentException('Invalid frozen preview reference.');
+        }
+        $q = DB::table('finance_quote_previews')->where('company_id', $companyId);
+        if ($previewId !== null) {
+            $q->where('id', $previewId);
+        }
+        return $q->orderByDesc('created_at')->orderByDesc('id')->limit($limit)
             ->get()->map(fn ($row) => $this->previewSummary($row))->all();
     }
 
@@ -167,7 +173,14 @@ final class FinanceControlService
         return ['id' => $row->id, 'status' => 'internal_nonbinding',
             'bookingId' => $row->booking_id, 'bookingRevision' => (int) $row->booking_revision,
             'subtotalMinor' => (int) $row->subtotal_minor, 'currency' => $row->currency_code,
-            'sourceRevision' => (int) $row->program_rules_revision];
+            'sourceRevision' => (int) $row->program_rules_revision,
+            'lines' => array_map(static fn (array $line): array => [
+                'code' => (string) ($line['code'] ?? ''),
+                'program' => (string) ($line['program'] ?? ''),
+                'quantity' => (int) ($line['quantity'] ?? 0),
+                'rateMinor' => (int) ($line['rateMinor'] ?? 0),
+                'amountMinor' => (int) ($line['amountMinor'] ?? 0),
+            ], json_decode($row->frozen_lines, true, 512, JSON_THROW_ON_ERROR))];
     }
 
     /**

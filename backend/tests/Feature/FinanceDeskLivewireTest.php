@@ -8,6 +8,7 @@ use App\Models\CompanyMembership;
 use App\Models\Hall;
 use App\Models\User;
 use App\Services\BookingDraftReviewService;
+use App\Services\FinanceControlService;
 use App\Services\BookingDraftService;
 use App\Services\CustomerProfileService;
 use App\Services\HallProgramRulesService;
@@ -106,11 +107,57 @@ class FinanceDeskLivewireTest extends TestCase
             ->set('previewReason', 'Synthetic venue rate review')
             ->call('createPreview')->assertHasNoErrors()
             ->assertSee('3000')
+            ->assertSee('Hall Rental')
+            ->assertSee('Evening')
+            ->assertSee('rate 3000')
             ->assertDontSee('private-test@example.test');
         $this->assertSame(1, DB::table('finance_quote_previews')->where('company_id', $company->id)->count());
+        $this->assertSame([[
+            'code' => 'hall_rental', 'program' => 'evening',
+            'quantity' => 1, 'rateMinor' => 3000, 'amountMinor' => 3000,
+        ]], app(FinanceControlService::class)
+            ->previews(\App\Models\User::findOrFail(auth()->id()), $company->id)[0]['lines']);
         $this->assertSame(0, DB::table('finance_journals')->count());
     }
 
+
+    public function test_authorized_frozen_preview_reference_filters_exact_record_and_rejects_cross_tenant(): void
+    {
+        [$company, $other, $people, $booking] = $this->fixture();
+        $actor = $people['owner'][0];
+        $service = app(FinanceControlService::class);
+        $first = (string) Str::uuid();
+        $second = (string) Str::uuid();
+        $service->preview($actor, $company->id, $first, $booking, 2,
+            'First nonbinding synthetic price freeze');
+        $service->preview($actor, $company->id, $second, $booking, 2,
+            'Second nonbinding synthetic price freeze');
+
+        $panel = Livewire::withQueryParams([
+            'company' => $company->id, 'preview' => $first,
+        ])->test(FinanceDesk::class)
+            ->assertSet('previewId', $first)
+            ->assertSee('Showing only selected frozen preview')
+            ->assertSee('Show all company rental previews')
+            ->assertSee('Preview '.$first)
+            ->assertDontSee('Preview '.$second)
+            ->assertDontSee('private-test@example.test');
+        $this->assertSame([$first], array_column($panel->get('previews'), 'id'));
+        $panel->call('showAllPreviews')->assertSet('previewId', '')
+            ->assertSee('Preview '.$first)->assertSee('Preview '.$second);
+        $this->assertCount(2, $panel->get('previews'));
+
+        Livewire::withQueryParams(['company' => $company->id,
+            'preview' => (string) Str::uuid()])
+            ->test(FinanceDesk::class)->assertForbidden();
+        Livewire::withQueryParams(['company' => $other->id, 'preview' => $first])
+            ->test(FinanceDesk::class)->assertForbidden();
+        $this->be($people['manager'][0]);
+        Livewire::withQueryParams(['company' => $company->id, 'preview' => $first])
+            ->test(FinanceDesk::class)->assertForbidden();
+        $this->assertSame(0, DB::table('finance_journals')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+    }
 
     public function test_company_switch_discards_unsent_private_finance_fields_and_rotates_keys(): void
     {

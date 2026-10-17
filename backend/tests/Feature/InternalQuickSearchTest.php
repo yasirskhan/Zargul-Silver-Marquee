@@ -475,7 +475,8 @@ class InternalQuickSearchTest extends TestCase
                 ->firstWhere('kind', $item['kind']);
             $this->assertNotNull($row);
             $expected = $item['path'].'?company='.$company->id
-                .($item['kind'] === 'proposal' ? '&proposal='.$booking : '');
+                .($item['kind'] === 'proposal' ? '&proposal='.$booking : '')
+                .($item['kind'] === 'finance' ? '&preview='.$preview : '');
             $this->assertSame($expected, $row['path']);
         }
     }

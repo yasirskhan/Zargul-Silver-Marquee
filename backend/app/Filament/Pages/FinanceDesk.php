@@ -30,6 +30,10 @@ final class FinanceDesk extends Page
     #[Url(as: 'company')]
     public ?string $companyId = null;
 
+    /** Exact private frozen-preview deep link from authorized internal search. */
+    #[Url(as: 'preview')]
+    public string $previewId = '';
+
     #[Locked]
     public ?string $loadedCompanyId = null;
 
@@ -182,6 +186,7 @@ final class FinanceDesk extends Page
     {
         // Never carry private preview instructions, cash values or audit
         // justifications from a different authorized operating company.
+        $this->previewId = '';
         $this->draftBookingId = '';
         $this->previewReason = '';
         $this->currency = '';
@@ -199,10 +204,21 @@ final class FinanceDesk extends Page
     public function refresh(): void
     {
         $actor = $this->authorizeCompany();
-        $this->previews = app(FinanceControlService::class)->previews($actor, $this->companyId);
+        $this->validate(['previewId' => ['nullable', 'uuid']]);
+        $this->previews = app(FinanceControlService::class)->previews(
+            $actor, $this->companyId, 30, $this->previewId !== '' ? $this->previewId : null
+        );
+        abort_unless($this->previewId === '' || count($this->previews) === 1, 403);
         $this->journals = app(FinanceControlService::class)->journals($actor, $this->companyId);
         $this->closeouts = app(FinanceControlService::class)->closeouts($actor, $this->companyId);
         $this->loadedCompanyId = $this->companyId;
+    }
+
+    public function showAllPreviews(): void
+    {
+        $this->authorizeLoaded();
+        $this->previewId = '';
+        $this->refresh();
     }
 
     public function createPreview(): void
@@ -224,6 +240,7 @@ final class FinanceDesk extends Page
         } catch (InvalidArgumentException | ConflictHttpException $error) {
             throw ValidationException::withMessages(['previewReason' => $error->getMessage()]);
         }
+        $this->previewId = '';
         $this->previewReason = '';
         $this->previewRequestKey = (string) Str::uuid();
         $this->refresh();

@@ -126,7 +126,9 @@ final class InternalQuickSearchService
                         .($planningProposal !== null
                             ? '&proposal='.rawurlencode($planningProposal) : '')
                         .($source['kind'] === 'approval'
-                            ? '&request='.rawurlencode($row->id) : ''),
+                            ? '&request='.rawurlencode($row->id) : '')
+                        .($source['kind'] === 'finance'
+                            ? '&preview='.rawurlencode($row->id) : ''),
                 ];
             }
         }

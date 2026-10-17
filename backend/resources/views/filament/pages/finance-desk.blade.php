@@ -34,11 +34,26 @@
                     Save immutable internal preview
                 </button>
                 <h3 class="font-semibold">Private frozen previews</h3>
+                @if ($previewId !== '')
+                    <p class="break-all text-xs">Showing only selected frozen preview {{ $previewId }}.</p>
+                    <button type="button" wire:click="showAllPreviews"
+                        class="rounded-lg border px-3 py-2 text-sm underline">Show all company rental previews</button>
+                @endif
                 <div class="space-y-2">
                     @forelse ($previews as $item)
                         <article wire:key="preview-{{ $item['id'] }}" class="rounded-lg border p-3 text-sm">
                             <p class="font-medium">Nonbinding {{ $item['currency'] }} {{ $item['subtotalMinor'] }} minor units</p>
                             <p>Proposal revision {{ $item['bookingRevision'] }}, approved program rules {{ $item['sourceRevision'] }}</p>
+                            <ul class="space-y-1 text-xs" aria-label="Immutable rental preview line items">
+                                @foreach ($item['lines'] as $line)
+                                    <li>
+                                        {{ ucwords(str_replace('_', ' ', $line['code'])) }}
+                                        ({{ ucfirst($line['program']) }}):
+                                        {{ $line['quantity'] }} × rate {{ $line['rateMinor'] }}
+                                        = {{ $line['amountMinor'] }} minor units
+                                    </li>
+                                @endforeach
+                            </ul>
                             <p class="break-all text-xs">Preview {{ $item['id'] }} | Proposal {{ $item['bookingId'] }}</p>
                         </article>
                     @empty
