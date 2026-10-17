@@ -331,6 +331,65 @@ class VenueInvoiceServiceTest extends TestCase
             $approval, 'Another invalid synthetic full refund');
     }
 
+    public function test_daily_customer_receipt_reconciliation_tracks_refund_and_existing_ledger_per_currency(): void
+    {
+        [$company, $owner, $manager, $reservation, $quote] = $this->fixture();
+        config()->set('invoice_controls.issuance_enabled', true);
+        config()->set('invoice_controls.tax_rate_bps', 0);
+        $invoice = (string) Str::uuid();
+        app(VenueInvoiceService::class)->issue($owner, $company->id, $quote, $invoice,
+            'Synthetic day reconciliation invoice');
+        config()->set('payment_controls.enabled', true);
+        config()->set('finance_controls.posting_enabled', true);
+        $cash = (string) Str::uuid();
+        $bank = (string) Str::uuid();
+        $payments = app(VenueInvoicePaymentService::class);
+        $payments->record($owner, $company->id, $invoice, $cash,
+            'cash', 20000, null, 'Synthetic daily cash deposit');
+        $payments->record($owner, $company->id, $invoice, $bank,
+            'bank', 30000, 'REF-TEST-100', 'Synthetic daily bank deposit');
+        $service = app(\App\Services\VenueDailyReconciliationService::class);
+        $today = now('UTC')->toDateString();
+        $initial = $service->forDate($owner, $company->id, $today);
+        $this->assertSame(2, $initial['receiptCount']);
+        $this->assertSame(20000, $initial['currencies'][0]['netCashMinor']);
+        $this->assertSame(30000, $initial['currencies'][0]['netBankMinor']);
+        $this->assertTrue($initial['currencies'][0]['ledgerMatched']);
+
+        $row = DB::table('venue_reservations')->where('id', $reservation)->first();
+        $member = CompanyMembership::query()->where('company_id', $company->id)
+            ->where('user_id', $manager->id)->firstOrFail();
+        HallAssignment::create(['company_id' => $company->id,
+            'hall_id' => $row->hall_id, 'membership_id' => $member->id]);
+        $this->be($manager);
+        $approvalId = (string) Str::uuid();
+        app(ApprovalWorkflowService::class)->request($manager, $company->id,
+            $approvalId, 'refund', 20000, 'PKR', $row->source_draft_id,
+            'Synthetic manager cash refund approval');
+        $this->be($owner);
+        app(ApprovalWorkflowService::class)->decide($owner, $company->id,
+            $approvalId, 1, 'approved', 'Synthetic owner refund authority');
+        config()->set('refund_controls.enabled', true);
+        app(VenueInvoiceRefundService::class)->record($owner, $company->id,
+            $cash, (string) Str::uuid(), $approvalId, 'Verified synthetic refund correction');
+
+        $day = $service->forDate($owner, $company->id, $today);
+        $this->assertSame(1, $day['refundCount']);
+        $this->assertSame(20000, $day['currencies'][0]['cashRefundedMinor']);
+        $this->assertSame(0, $day['currencies'][0]['netCashMinor']);
+        $this->assertSame(30000, $day['currencies'][0]['netBankMinor']);
+        $this->assertTrue($day['currencies'][0]['ledgerMatched']);
+        $yesterday = now('UTC')->subDay()->toDateString();
+        $this->assertSame([], $service->forDate($owner, $company->id, $yesterday)['currencies']);
+        Livewire::test(VenueReservations::class)->assertSee('Reservations');
+        $this->assertSame(3, DB::table('finance_journals')->count());
+        $this->assertSame(6, DB::table('finance_journal_lines')->count());
+
+        $this->be($manager);
+        $this->expectException(AuthorizationException::class);
+        $service->forDate($manager, $company->id, $today);
+    }
+
     public function test_manager_denied_and_stale_reservation_prevents_invoice(): void
     {
         [$company, $owner, $manager, $reservation, $quote] = $this->fixture();

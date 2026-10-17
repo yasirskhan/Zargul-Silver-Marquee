@@ -46,6 +46,12 @@ final class FinanceDesk extends Page
     #[Locked]
     public array $closeouts = [];
 
+    /** Read-only, per-currency daily customer deposit and refund reconciliation. */
+    #[Locked]
+    public array $dailyReconciliation = [];
+
+    public string $reconciliationDate = '';
+
     #[Locked]
     public ?array $lastCloseResult = null;
 
@@ -173,6 +179,7 @@ final class FinanceDesk extends Page
             && array_key_exists($requested, $options)), 403);
         $this->companyId = $requested ?? array_key_first($options);
         $this->closeDate = now('UTC')->toDateString();
+        $this->reconciliationDate = now('UTC')->toDateString();
         $this->initializeKeys();
         $this->refresh();
         if ($this->draftBookingId !== '') {
@@ -213,6 +220,8 @@ final class FinanceDesk extends Page
         $this->openingMinor = '';
         $this->journalReason = '';
         $this->closeDate = now('UTC')->toDateString();
+        $this->reconciliationDate = now('UTC')->toDateString();
+        $this->dailyReconciliation = [];
         $this->countedMinor = '';
         $this->closeReason = '';
         $this->reversalReason = '';
@@ -231,6 +240,7 @@ final class FinanceDesk extends Page
         abort_unless($this->previewId === '' || count($this->previews) === 1, 403);
         $this->journals = app(FinanceControlService::class)->journals($actor, $this->companyId);
         $this->closeouts = app(FinanceControlService::class)->closeouts($actor, $this->companyId);
+        $this->refreshReconciliation();
         $this->loadedCompanyId = $this->companyId;
     }
 
@@ -239,6 +249,14 @@ final class FinanceDesk extends Page
         $this->authorizeLoaded();
         $this->previewId = '';
         $this->refresh();
+    }
+
+    public function refreshReconciliation(): void
+    {
+        $actor = $this->authorizeCompany();
+        $this->validate(['reconciliationDate' => ['required', 'date_format:Y-m-d']]);
+        $this->dailyReconciliation = app(\App\Services\VenueDailyReconciliationService::class)
+            ->forDate($actor, $this->companyId, $this->reconciliationDate);
     }
 
     public function createPreview(): void
