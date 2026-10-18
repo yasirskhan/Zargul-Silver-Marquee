@@ -16,6 +16,7 @@ use App\Filament\Pages\HallInventory;
 use App\Filament\Pages\HallPrograms;
 use App\Filament\Pages\WebsiteWorkspace;
 use App\Filament\Pages\Licensing;
+use App\Filament\Pages\HistoricalInvoices;
 use App\Filament\Pages\InstallationSetup;
 use App\Filament\Pages\SupportInbox;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
@@ -50,7 +51,7 @@ class AdminPanelProvider extends PanelProvider
             ->multiFactorAuthentication([
                 AppAuthentication::make()->recoverable(),
             ], isRequired: true)
-            ->pages([VenueOverview::class, InternalQuickSearch::class, OperationsPlanning::class, ApprovalCenter::class, FinanceDesk::class, AuditHistory::class, BookingProposals::class, VenueReservations::class, EventOperations::class, HallCalendar::class, HallInventory::class, HallPrograms::class, WebsiteWorkspace::class, Licensing::class, InstallationSetup::class, SupportInbox::class])
+            ->pages([VenueOverview::class, InternalQuickSearch::class, OperationsPlanning::class, ApprovalCenter::class, FinanceDesk::class, AuditHistory::class, BookingProposals::class, VenueReservations::class, EventOperations::class, HallCalendar::class, HallInventory::class, HallPrograms::class, WebsiteWorkspace::class, Licensing::class, HistoricalInvoices::class, InstallationSetup::class, SupportInbox::class])
             ->renderHook(
                 PanelsRenderHook::PAGE_START,
                 fn (): \Illuminate\Contracts\View\View => view('filament.hooks.owner-approval-attention'),
