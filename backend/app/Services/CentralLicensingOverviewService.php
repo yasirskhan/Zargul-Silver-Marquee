@@ -50,6 +50,8 @@ final class CentralLicensingOverviewService
                 'online_check_due'=>false,
                 'expires_at'=>null,
                 'grace_ends_at'=>null,
+                'renewal_expires_at'=>null,
+                'renewal_revision'=>null,
                 'revision'=>null,
                 'license_id'=>null,
                 'edition'=>null,
@@ -81,11 +83,17 @@ final class CentralLicensingOverviewService
                 ($state['dashboard']==='restricted' ? 'expired_or_not_yet_valid' : 'licensed'),
             'public_policy'=>$state['public'],
             'dashboard_policy'=>$state['dashboard'],
-            'expiry_warning'=>$state['expiry_warning'],
+            'expiry_warning'=>$state['expiry_warning'] &&
+                ! isset($verified['scheduled_renewal']),
             'online_check_due'=>$due,
             'expires_at'=>$state['expires_at'],
             'grace_ends_at'=>(new DateTimeImmutable($state['expires_at']))
                 ->add(new DateInterval('P7D'))->format('Y-m-d\\TH:i:s\\Z'),
+            // A future signed renewal is shown separately. The currently
+            // active previous paid grant still governs real operations until
+            // the precise signed renewal effective instant.
+            'renewal_expires_at'=>$verified['scheduled_renewal']['expires_at'] ?? null,
+            'renewal_revision'=>$verified['scheduled_renewal']['revision'] ?? null,
             'revision'=>(int)$verified['grant']['revision'],
             'license_id'=>$verified['grant']['license_id'],
             'edition'=>$verified['grant']['edition'],
@@ -105,6 +113,8 @@ final class CentralLicensingOverviewService
             'online_check_due'=>$due,
             'expires_at'=>null,
                 'grace_ends_at'=>null,
+            'renewal_expires_at'=>null,
+            'renewal_revision'=>null,
             'revision'=>null,
             'license_id'=>null,
             'edition'=>null,
