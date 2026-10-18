@@ -23,7 +23,8 @@ final class CentralInstallationSignedStatusResponse
         private readonly InstallationStatusService $statusService,
         private readonly Closure $isolatedSigner,
         private readonly array $trustedPublicKeys,
-        private readonly bool $enabled=false
+        private readonly bool $enabled=false,
+        private readonly ?SignedGrantDeliveryService $grantDelivery=null
     ) {}
 
     /** @param array<string,mixed> $request
@@ -41,7 +42,14 @@ final class CentralInstallationSignedStatusResponse
         // Exactly one identity, clock-skew, nonce replay, customer-scope and
         // rate-limit check. The signed receipt cannot authenticate a forged
         // or previously used installation request.
-        $status=$this->statusService->check($request);
+        // If a separate operator-approved sealed-grant reader is configured,
+        // it verifies the installation request exactly once before returning
+        // an already signed revision. Never call statusService twice: doing
+        // so would replay the same nonce and invalidate the renewal check.
+        // The delivery service has its own default-OFF release gate.
+        $status=$this->grantDelivery===null
+            ? $this->statusService->check($request)
+            : $this->grantDelivery->fetch($request);
         $claim=[
             'api_version'=>'v1','issuer'=>'HAFZATECH',
             'installation_id'=>$status['registered_installation_id'],
