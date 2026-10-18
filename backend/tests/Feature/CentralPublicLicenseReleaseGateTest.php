@@ -9,6 +9,8 @@ use App\Models\User;
 use App\Services\TenantAccess;
 use App\Services\ApprovalWorkflowService;
 use App\Policies\FinanceAccessPolicy;
+use App\Policies\OperationsPlanningPolicy;
+use App\Services\InternalQuickSearchService;
 use Illuminate\Auth\Access\AuthorizationException;
 use App\Services\CentralInstallationIdentity;
 use App\Services\CentralInstallationCompanyScope;
@@ -56,6 +58,13 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
         $tenant=app(TenantAccess::class);
         $this->assertTrue($tenant->canManageCustomerProfiles($owner,$company->id),
             'Default-OFF licensing preserves management permissions');
+        $this->be($owner);
+        $planning=app(OperationsPlanningPolicy::class);
+        $search=app(InternalQuickSearchService::class);
+        $this->assertNotNull($planning->membership($owner,$company->id),
+            'Unreleased licensing leaves operations planning membership unchanged');
+        $this->assertSame([], $search->search($owner,$company->id,'missing-fixture'),
+            'Unreleased licensing leaves private search available');
         $finance=app(FinanceAccessPolicy::class);
         $this->assertTrue($finance->view($owner,$company->id),
             'Default-OFF licensing preserves owner finance access');
@@ -80,6 +89,13 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
         $this->assertBlocked();
         $this->assertFalse($tenant->canManageCustomerProfiles($owner,$company->id),
             'Commercial release cannot authorize company before signed enrollment');
+        $this->assertNull($planning->membership($owner,$company->id));
+        try {
+            $search->search($owner,$company->id,'missing-fixture');
+            $this->fail('Unsigned private record search was allowed.');
+        } catch (AuthorizationException) {
+            $this->assertTrue(true);
+        }
         $identity=app(CentralInstallationIdentity::class)->initialize();
         $customer=(string)Str::uuid();
         DB::table('central_installation_activation')->insert([
@@ -135,6 +151,9 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
                 'Active vendor-signed license permits company operations');
             $this->assertTrue($finance->view($owner,$company->id),
                 'Active vendor-signed license permits scoped finance');
+            $this->assertNotNull($planning->membership($owner,$company->id),
+                'Signed license permits scoped operations planning');
+            $this->assertSame([], $search->search($owner,$company->id,'missing-fixture'));
             config()->set('public_site.company_id',(string)Str::uuid());
             $this->assertBlocked();
             config()->set('public_site.company_id',$company->id);
@@ -178,6 +197,14 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
                 'Normal operations stop precisely at signed expiry plus seven days');
             $this->assertFalse($finance->view($owner,$company->id),
                 'Expired grace cannot bypass finance authorization');
+            $this->assertNull($planning->membership($owner,$company->id),
+                'Post-grace planning membership is rejected');
+            try {
+                $search->search($owner,$company->id,'missing-fixture');
+                $this->fail('Expired license allowed private record search.');
+            } catch (AuthorizationException) {
+                $this->assertTrue(true);
+            }
             $this->be($owner);
             try {
                 app(ApprovalWorkflowService::class)->request(
