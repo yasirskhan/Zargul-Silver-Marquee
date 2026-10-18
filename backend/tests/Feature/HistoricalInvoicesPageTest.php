@@ -56,6 +56,9 @@ class HistoricalInvoicesPageTest extends TestCase
         $view=Livewire::test(HistoricalInvoices::class)
             ->assertSet('companyId',$company->id)
             ->assertSet('invoices',[])
+            ->assertSet('offset',0)
+            ->assertSet('hasMore',false)
+            ->call('nextPage')->assertSet('offset',0)
             ->assertSee('Past invoices and payment history')
             ->assertSee('No existing invoices found')
             ->assertDontSee('Other Company');
@@ -158,6 +161,8 @@ class HistoricalInvoicesPageTest extends TestCase
             ->assertSee('INV-000000001')
             ->assertDontSee('Private Historic Client')
             ->assertSet('invoices.0.id',$invoiceId)
+            ->assertSet('offset',0)
+            ->assertSet('hasMore',false)
             ->set('selectedInvoiceId',$invoiceId)
             ->call('viewStatement')
             ->assertSet('statement.invoiceId',$invoiceId)
