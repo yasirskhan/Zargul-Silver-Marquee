@@ -33,7 +33,9 @@ foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
     'CentralStaffInvoicePaymentOverview','CentralStaffPaymentEvidenceReviewService',
     'CentralStaffPaymentEvidenceHttpAdapter','CentralStaffBillingDashboardRenderer',
     'CentralStaffPortalHttpRouter','CentralStaffPortalPrivateResponse',
-    'CentralStaffLicenseQueueHtmlRenderer'
+    'CentralStaffLicenseQueueHtmlRenderer','CentralStaffCustomerLookup',
+    'CentralStaffPortalDashboard','CentralStaffSupportTicketQueue',
+    'CentralStaffSupportQueueHtmlRenderer'
 ] as $name) {
     require dirname(__DIR__).'/src/'.$name.'.php';
 }
@@ -328,6 +330,239 @@ paidSessionAssert(str_contains($malicious,'&lt;script&gt;') &&
  !str_contains($malicious,'<img'),
  'license queue escapes untrusted invoice and approved domain fields');
 
+// Exact customer-id vendor lookup has NO arbitrary search/enumeration and uses
+// current MFA/scoped permissions independently at the data and HTTP layers.
+$customerReader=new \Hafzatech\Central\CentralStaffCustomerLookup(
+ $db,$queueAuth);
+$customerPortal=new \Hafzatech\Central\CentralStaffPortalHttpRouter(
+ $queueBoundary,$unusedBilling,true,$queue,$customerReader);
+$lookupRequest=$queueRequest;
+$lookupRequest['REQUEST_URI']='/staff/customers/lookup';
+$companyRecord=$customerPortal->dispatch(
+ $lookupRequest,$issuerCookie,['customer_id'=>$company],$issuerCsrf);
+paidSessionAssert($companyRecord['kind']==='private_customer_html' &&
+ str_contains($companyRecord['html'],'License Session Venue') &&
+ str_contains($companyRecord['html'],$company) &&
+ !str_contains($companyRecord['html'],$issuer) &&
+ !str_contains($companyRecord['html'],$issuerCsrf),
+ 'license officer receives only scoped active business identity, not secrets');
+$customerWire=(new \Hafzatech\Central\CentralStaffPortalPrivateResponse(true))
+ ->compose($companyRecord);
+paidSessionAssert($customerWire['cookies']===[] &&
+ $customerWire['headers']['Cache-Control']==='no-store, private',
+ 'customer lookup stays private, uncached and cookie-free');
+$billingLookup=$customerPortal->dispatch(
+ $lookupRequest,$billingCookie,['customer_id'=>$company],$billingCsrf);
+paidSessionAssert(str_contains($billingLookup['html'],'License Session Venue'),
+ 'billing officer can view only authorized read-only customer identity');
+paidSessionDeny(fn()=>$customerPortal->dispatch(
+ $lookupRequest,$foreignCookie,['customer_id'=>$company],$foreignCsrf),
+ 'staff_portal_denied');
+$foreignCustomer=$customerPortal->dispatch(
+ $lookupRequest,$issuerCookie,['customer_id'=>$other],$issuerCsrf);
+paidSessionAssert(str_contains($foreignCustomer['html'],'Foreign License Session Venue') &&
+ !str_contains($foreignCustomer['html'],'<dd>License Session Venue</dd>'),
+ 'global license officer receives only requested foreign active customer identity');
+paidSessionDeny(fn()=>$customerPortal->dispatch(
+ $lookupRequest,$issuerCookie,['customer_id'=>paidSessionUuid()],$issuerCsrf),
+ 'customer_not_found');
+paidSessionDeny(fn()=>$customerPortal->dispatch(
+ $lookupRequest,$issuerCookie,['customer_id'=>'invalid'],$issuerCsrf),
+ 'invalid_customer_lookup');
+paidSessionDeny(fn()=>$customerPortal->dispatch(
+ $lookupRequest,$issuerCookie,
+ ['customer_id'=>$company,'select'=>'all'],$issuerCsrf),
+ 'invalid_customer_lookup');
+paidSessionDeny(fn()=>$customerPortal->dispatch(
+ $lookupRequest,$issuerCookie,['customer_id'=>$company],str_repeat('0',64)),
+ 'staff_portal_denied');
+$wrongLookupOrigin=$lookupRequest;
+$wrongLookupOrigin['HTTP_ORIGIN']='https://evil.example';
+paidSessionDeny(fn()=>$customerPortal->dispatch(
+ $wrongLookupOrigin,$issuerCookie,['customer_id'=>$company],$issuerCsrf),
+ 'staff_portal_denied');
+$hostileCustomer=\Hafzatech\Central\CentralStaffCustomerLookup::html([
+ 'id'=>$company,
+ 'legal_name'=>'<script>alert(1)</script><img src=x onerror=alert(2)>',
+ 'status'=>'active'
+]);
+paidSessionAssert(str_contains($hostileCustomer,'&lt;script&gt;') &&
+ str_contains($hostileCustomer,'&lt;img') &&
+ !str_contains($hostileCustomer,'<script>') &&
+ !str_contains($hostileCustomer,'<img'),
+ 'customer display escapes all owner-supplied registered business text');
+
+// Read-only role-specific dashboard derives permissions from CURRENT central
+// MFA grants rather than any user-supplied role or privilege assertion.
+$dashboardService=new \Hafzatech\Central\CentralStaffPortalDashboard(
+ $queueAuth,$customerReader);
+$dashboardRouter=new \Hafzatech\Central\CentralStaffPortalHttpRouter(
+ $queueBoundary,$unusedBilling,true,$queue,$customerReader,$dashboardService);
+$dashboardHttp=$queueRequest;$dashboardHttp['REQUEST_URI']='/staff/dashboard';
+$issuerDashboard=$dashboardRouter->dispatch(
+ $dashboardHttp,$issuerCookie,['customer_id'=>$company],$issuerCsrf);
+paidSessionAssert($issuerDashboard['kind']==='private_dashboard_html' &&
+ str_contains($issuerDashboard['html'],'License Officer') &&
+ !str_contains($issuerDashboard['html'],'Billing Officer') &&
+ !str_contains($issuerDashboard['html'],$issuer),
+ 'current License Officer sees only assigned licensing module');
+$billingDashboard=$dashboardRouter->dispatch(
+ $dashboardHttp,$billingCookie,['customer_id'=>$company],$billingCsrf);
+paidSessionAssert(str_contains($billingDashboard['html'],'Billing Officer') &&
+ !str_contains($billingDashboard['html'],'<h2>License Officer</h2>'),
+ 'current Billing Officer sees only billing module and no license signing');
+$dashboardWire=(new \Hafzatech\Central\CentralStaffPortalPrivateResponse(true))
+ ->compose($billingDashboard);
+paidSessionAssert($dashboardWire['cookies']===[] &&
+ $dashboardWire['headers']['Cache-Control']==='no-store, private' &&
+ $dashboardWire['status']===200,
+ 'private role dashboard remains uncached and credential-free');
+paidSessionDeny(fn()=>$dashboardRouter->dispatch(
+ $dashboardHttp,$foreignCookie,['customer_id'=>$company],$foreignCsrf),
+ 'staff_portal_denied');
+paidSessionDeny(fn()=>$dashboardRouter->dispatch(
+ $dashboardHttp,$issuerCookie,['customer_id'=>'invalid'],$issuerCsrf),
+ 'invalid_customer_lookup');
+paidSessionDeny(fn()=>$dashboardRouter->dispatch(
+ $dashboardHttp,$issuerCookie,['customer_id'=>$company,'role'=>'billing_officer'],
+ $issuerCsrf),'invalid_customer_lookup');
+paidSessionDeny(fn()=>$dashboardRouter->dispatch(
+ $dashboardHttp,$issuerCookie,['customer_id'=>$company],str_repeat('0',64)),
+ 'staff_portal_denied');
+$wrongDashboardHost=$dashboardHttp;
+$wrongDashboardHost['HTTP_HOST']='attacker.example';
+paidSessionDeny(fn()=>$dashboardRouter->dispatch(
+ $wrongDashboardHost,$issuerCookie,['customer_id'=>$company],$issuerCsrf),
+ 'staff_portal_denied');
+$forgedNameDashboard=$dashboardService->render($issuer,$other);
+paidSessionAssert(str_contains($forgedNameDashboard,'Foreign License Session Venue') &&
+ !str_contains($forgedNameDashboard,'<h2>Billing Officer</h2>'),
+ 'global read session renders correct target customer under live grant');
+
+// Separate support staff inbox can read ONLY allowlisted ticket metadata.
+// This test uses real MFA sessions and an encrypted-subject PostgreSQL ticket;
+// customer subject, reply body and vendor signing keys are never decrypted.
+$supportStaff=paidSessionUuid();
+$makeUser->execute(['id'=>$supportStaff,
+ 'email'=>'paid-session-support@example.test',
+ 'hash'=>password_hash($password,PASSWORD_ARGON2ID),
+ 'seed'=>bin2hex($seed)]);
+$grant->execute(['id'=>paidSessionUuid(),'staff'=>$supportStaff,
+ 'role'=>'support_agent','scope'=>$company]);
+$supportBearer=$sessions->login(
+ 'paid-session-support@example.test',$password,paidSessionTotp($seed),
+ '192.0.2.145');
+paidSessionAssert(is_string($supportBearer),'real scoped support agent MFA');
+$ticket=paidSessionUuid();
+$db->prepare("INSERT INTO vendor_support_tickets
+ (id,customer_id,installation_id,client_ticket_id,
+  subject_ciphertext,content_sha256,status)
+ VALUES(:id,:customer,:installation,:client,decode(:cipher,'hex'),
+ :digest,'new')")
+ ->execute(['id'=>$ticket,'customer'=>$company,'installation'=>$installation,
+ 'client'=>paidSessionUuid(),'cipher'=>bin2hex(random_bytes(32)),
+ 'digest'=>hash('sha256','Encrypted support fixture')]);
+$supportReader=new \Hafzatech\Central\CentralStaffSupportTicketQueue(
+ $db,$queueAuth);
+paidSessionDeny(fn()=>$supportReader->listForCustomer(
+ $issuer,$company),'support_scope_denied');
+paidSessionDeny(fn()=>$supportReader->listForCustomer(
+ $billingSession,$company),'support_scope_denied');
+paidSessionDeny(fn()=>$supportReader->listForCustomer(
+ $supportBearer,$other),'support_scope_denied');
+paidSessionDeny(fn()=>$supportReader->listForCustomer(
+ $supportBearer,'invalid'),'invalid_support_queue_request');
+paidSessionDeny(fn()=>$supportReader->listForCustomer(
+ $supportBearer,$company,0,26),'invalid_support_queue_request');
+$ticketRows=$supportReader->listForCustomer($supportBearer,$company);
+paidSessionAssert(count($ticketRows)===1 &&
+ array_keys($ticketRows[0])===['ticket_number','status','created_at'] &&
+ $ticketRows[0]['status']==='new',
+ 'support staff reads only authorized ticket number, status and creation time');
+paidSessionAssert($supportReader->listForCustomer(
+ $supportBearer,$company,1)===[],
+ 'strict support metadata pagination');
+$ticketHtml=\Hafzatech\Central\CentralStaffSupportQueueHtmlRenderer::render(
+ $ticketRows);
+paidSessionAssert(str_contains($ticketHtml,'HAF-') &&
+ str_contains($ticketHtml,'new') &&
+ !str_contains($ticketHtml,$ticket) &&
+ !str_contains($ticketHtml,$supportBearer) &&
+ !str_contains($ticketHtml,$company),
+ 'private support HTML omits ticket UUID, customer ID, secrets and ciphertext');
+$hostile=\Hafzatech\Central\CentralStaffSupportQueueHtmlRenderer::render([[
+ 'ticket_number'=>1,
+ 'status'=>'<img src=x onerror=alert(1)>',
+ 'created_at'=>'<script>bad()</script>'
+]]);
+paidSessionAssert(str_contains($hostile,'&lt;img') &&
+ str_contains($hostile,'&lt;script&gt;') &&
+ !str_contains($hostile,'<img') &&
+ !str_contains($hostile,'<script>'),
+ 'hostile support metadata is escaped before private display');
+// Support Agent's metadata-only page through exact, default-disabled
+// portal routing: live role, customer scope, trusted origin and session CSRF.
+$supportCsrf=$queueCsrfTokens->issue($supportBearer);
+paidSessionAssert(is_string($supportCsrf),'support agent live CSRF proof');
+$supportRouter=new \Hafzatech\Central\CentralStaffPortalHttpRouter(
+ $queueBoundary,$unusedBilling,true,$queue,$customerReader,
+ $dashboardService,$supportReader);
+$supportHttp=$queueRequest;
+$supportHttp['REQUEST_URI']='/staff/support/tickets';
+$supportCookie=[
+ \Hafzatech\Central\CentralStaffHttpPolicy::COOKIE_NAME=>$supportBearer
+];
+$supportPage=$supportRouter->dispatch(
+ $supportHttp,$supportCookie,['customer_id'=>$company],$supportCsrf);
+paidSessionAssert($supportPage['kind']==='private_support_html' &&
+ str_contains($supportPage['html'],'HAF-') &&
+ !str_contains($supportPage['html'],$ticket) &&
+ !str_contains($supportPage['html'],$supportBearer),
+ 'support portal reveals only permitted ticket metadata');
+$supportWire=(new \Hafzatech\Central\CentralStaffPortalPrivateResponse(true))
+ ->compose($supportPage);
+paidSessionAssert($supportWire['cookies']===[] &&
+ $supportWire['headers']['Cache-Control']==='no-store, private',
+ 'support portal response private and cache-disabled');
+$agentDashboardHttp=$queueRequest;
+$agentDashboardHttp['REQUEST_URI']='/staff/dashboard';
+$agentDash=$supportRouter->dispatch(
+ $agentDashboardHttp,$supportCookie,['customer_id'=>$company],$supportCsrf);
+paidSessionAssert(str_contains($agentDash['html'],'<h2>Support Agent</h2>') &&
+ !str_contains($agentDash['html'],'<h2>License Officer</h2>') &&
+ !str_contains($agentDash['html'],'<h2>Billing Officer</h2>'),
+ 'support-only session has no billing or signing dashboard module');
+$agentLookupHttp=$queueRequest;
+$agentLookupHttp['REQUEST_URI']='/staff/customers/lookup';
+$agentLookup=$supportRouter->dispatch(
+ $agentLookupHttp,$supportCookie,['customer_id'=>$company],$supportCsrf);
+paidSessionAssert(str_contains($agentLookup['html'],'License Session Venue'),
+ 'support agent may read its own registered business identity only');
+paidSessionDeny(fn()=>$supportRouter->dispatch(
+ $supportHttp,$billingCookie,['customer_id'=>$company],$billingCsrf),
+ 'staff_portal_denied');
+paidSessionDeny(fn()=>$supportRouter->dispatch(
+ $supportHttp,$supportCookie,['customer_id'=>$other],$supportCsrf),
+ 'staff_portal_denied');
+paidSessionDeny(fn()=>$supportRouter->dispatch(
+ $supportHttp,$supportCookie,
+ ['customer_id'=>$company,'ticket_id'=>$ticket],$supportCsrf),
+ 'invalid_support_queue_request');
+paidSessionDeny(fn()=>$supportRouter->dispatch(
+ $supportHttp,$supportCookie,['customer_id'=>$company],str_repeat('0',64)),
+ 'staff_portal_denied');
+$supportWrongOrigin=$supportHttp;
+$supportWrongOrigin['HTTP_ORIGIN']='https://evil.example.test';
+paidSessionDeny(fn()=>$supportRouter->dispatch(
+ $supportWrongOrigin,$supportCookie,['customer_id'=>$company],$supportCsrf),
+ 'staff_portal_denied');
+$db->prepare("UPDATE central_staff_users SET status='suspended' WHERE id=:staff")
+ ->execute(['staff'=>$supportStaff]);
+paidSessionDeny(fn()=>$supportReader->listForCustomer(
+ $supportBearer,$company),'support_scope_denied');
+paidSessionDeny(fn()=>$supportRouter->dispatch(
+ $supportHttp,$supportCookie,['customer_id'=>$company],$supportCsrf),
+ 'staff_portal_denied');
 $manifest=new CentralStaffSignedGrantManifest($db,$sessions,
     new CentralStaffSessionAuthorization($sessions,$access),
     new PaidInvoiceEligibility($db));

@@ -19,7 +19,10 @@ final class CentralStaffPortalHttpRouter
         private readonly CentralStaffProtectedHttpBoundary $boundary,
         private readonly CentralStaffPaymentEvidenceHttpAdapter $billing,
         private readonly bool $enabled = false,
-        private readonly ?CentralStaffLicenseSigningQueue $licenseQueue = null
+        private readonly ?CentralStaffLicenseSigningQueue $licenseQueue = null,
+        private readonly ?CentralStaffCustomerLookup $customers = null,
+        private readonly ?CentralStaffPortalDashboard $dashboard = null,
+        private readonly ?CentralStaffSupportTicketQueue $supportQueue = null
     ) {}
 
     /**
@@ -123,6 +126,62 @@ final class CentralStaffPortalHttpRouter
                 'kind'=>'private_license_html',
                 'html'=>CentralStaffLicenseQueueHtmlRenderer::render($rows)
             ];
+        }
+        if ($uri==='/staff/customers/lookup' && $this->customers!==null) {
+            if (!$this->exactFields($fields,['customer_id']) ||
+                !is_string($fields['customer_id']) ||
+                !self::uuid($fields['customer_id'])) {
+                throw new RegistrationError('invalid_customer_lookup',422);
+            }
+            $customerId=$fields['customer_id'];
+            if (!$this->boundary->permitsMutation(
+                    $server,$bearer,$csrfHeader,'license.read_status',$customerId) &&
+                !$this->boundary->permitsMutation(
+                    $server,$bearer,$csrfHeader,'billing.invoice.read',$customerId) &&
+                !$this->boundary->permitsMutation(
+                    $server,$bearer,$csrfHeader,'support.ticket.read',$customerId)) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            $record=$this->customers->find($bearer,$customerId);
+            if ($record===null) {
+                throw new RegistrationError('customer_not_found');
+            }
+            return ['kind'=>'private_customer_html',
+                'html'=>CentralStaffCustomerLookup::html($record)];
+        }
+        if ($uri==='/staff/dashboard' && $this->dashboard!==null) {
+            if (!$this->exactFields($fields,['customer_id']) ||
+                !is_string($fields['customer_id']) ||
+                !self::uuid($fields['customer_id'])) {
+                throw new RegistrationError('invalid_customer_lookup',422);
+            }
+            $customerId=$fields['customer_id'];
+            if (!$this->boundary->permitsMutation(
+                    $server,$bearer,$csrfHeader,'license.read_status',$customerId) &&
+                !$this->boundary->permitsMutation(
+                    $server,$bearer,$csrfHeader,'billing.invoice.read',$customerId) &&
+                !$this->boundary->permitsMutation(
+                    $server,$bearer,$csrfHeader,'support.ticket.read',$customerId)) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            return ['kind'=>'private_dashboard_html',
+                'html'=>$this->dashboard->render($bearer,$customerId)];
+        }
+        if ($uri==='/staff/support/tickets' && $this->supportQueue!==null) {
+            if (!$this->exactFields($fields,['customer_id']) ||
+                !is_string($fields['customer_id']) ||
+                !self::uuid($fields['customer_id'])) {
+                throw new RegistrationError('invalid_support_queue_request',422);
+            }
+            if (!$this->boundary->permitsMutation(
+                    $server,$bearer,$csrfHeader,'support.ticket.read',
+                    $fields['customer_id'])) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            $rows=$this->supportQueue->listForCustomer(
+                $bearer,$fields['customer_id'],0,25);
+            return ['kind'=>'private_support_html',
+                'html'=>CentralStaffSupportQueueHtmlRenderer::render($rows)];
         }
         throw new RegistrationError('staff_route_not_found',404);
     }
