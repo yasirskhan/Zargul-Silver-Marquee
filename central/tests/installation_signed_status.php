@@ -325,6 +325,26 @@ try {
         (new CentralInstallationSignedStatusResponse(
             $status,$untrusted,$keys,true))->check($makeRequest($customer)),
         'untrusted_status_signer');
+    // A malicious or broken isolated worker must not return arbitrary
+    // oversized signed status data even if its signing key is pinned.
+    $oversized=static fn(array $claim):array=>
+        Ed25519StatusReceiptCodec::sign($claim,'worker-test-key',
+            sodium_crypto_sign_secretkey($receiptKeys));
+    $oversizedEnvelope=static function(array $claim)use($receiptKeys):array {
+        $bytes=str_repeat('X',4097);
+        return [
+            'key_id'=>'worker-test-key',
+            'payload'=>InstallationRegistry::base64Url($bytes),
+            'signature'=>InstallationRegistry::base64Url(
+                sodium_crypto_sign_detached(
+                    'HAFZATECH-INSTALL-STATUS-RECEIPT-V1'."\\n".$bytes,
+                    sodium_crypto_sign_secretkey($receiptKeys)))
+        ];
+    };
+    signedCheckDeny(fn()=>
+        (new CentralInstallationSignedStatusResponse(
+            $status,$oversizedEnvelope,$keys,true))->check($makeRequest($customer)),
+        'invalid_signed_status_receipt');
     $wrongSig=static fn(array $claim):array=>
         Ed25519StatusReceiptCodec::sign($claim,'worker-test-key',
             sodium_crypto_sign_secretkey($wrongKey));
@@ -333,8 +353,8 @@ try {
             $status,$wrongSig,$keys,true))->check($makeRequest($customer)),
         'invalid_signed_status_receipt');
     $recorded->execute(['installation'=>$installation]);
-    signedCheckAssert((int)$recorded->fetchColumn()===10,
-        'ten authenticated status probes consume exactly one nonce each');
+    signedCheckAssert((int)$recorded->fetchColumn()===11,
+        'eleven authenticated status probes consume exactly one nonce each');
 } finally {
     putenv('CENTRAL_SIGNED_STATUS_ENABLED=false');
     putenv('CENTRAL_GRANT_DELIVERY_ENABLED=false');
