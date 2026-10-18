@@ -21,6 +21,17 @@
                         <p class="text-3xl font-semibold">{{ $summary['visibleHalls'] }}</p>
                         <p class="text-xs">Based on current hall assignments and membership</p>
                     </div>
+                    @if (($summary['hafzatechSupportUnread'] ?? null) !== null)
+                        <div class="rounded-xl border p-4" aria-label="Private HAFZATECH support inbox">
+                            <p class="text-sm">HAFZATECH support replies</p>
+                            <p class="text-3xl font-semibold">{{ $summary['hafzatechSupportUnread'] }}</p>
+                            <p class="text-xs">Unread messages for your enrolled company</p>
+                            <a class="text-xs underline"
+                                href="{{ \App\Filament\Pages\SupportInbox::getUrl(['company' => $companyId]) }}">
+                                Open your support inbox
+                            </a>
+                        </div>
+                    @endif
                     @if ($summary['canSeeCompanyProposals'])
                         <div class="rounded-xl border p-4">
                             <p class="text-sm">Halls needing program setup</p>

@@ -163,6 +163,12 @@ final class VenueOverview extends Page
                         'eventDate' => $row->event_date, 'program' => $row->program,
                         'hallName' => $row->hall_name,
                     ])->all() : [],
+            'hafzatechSupportUnread' => $canSeeCompanyProposals &&
+                DB::table('central_installation_activation')
+                    ->where('company_id',$this->companyId)
+                    ->where('status','registered_pending_license')->exists()
+                ? app(\App\Services\CentralSupportReplyInboxReader::class)
+                    ->unreadCount($actor,$this->companyId) : null,
             'canSeeCompanyProposals' => $canSeeCompanyProposals,
             'canReadApprovals' => $canReadApprovals,
             'canReviewFinance' => $canSeeCompanyProposals,

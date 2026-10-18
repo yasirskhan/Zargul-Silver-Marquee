@@ -306,6 +306,10 @@
 - Added synthetic, real PostgreSQL transport acceptance: enrolled owner creates a support ticket, mocked exact HAFZATECH HTTPS endpoint cryptographically validates BOTH Ed25519 installation check and signed cursor proof, vendor signs ordered ticket reply page with independent key, client verifies and atomically stores one encrypted message/cursor, with no licensing or financial mutations. Synthetic signing credentials never leave tests. Hosted exact SHA six-job CI pending; remains default OFF and public central reply route still NOT deployed.
 - Continue with operator-backed central reply signing and customer notification bell only after safe CI, staffing/MFA/KMS and deployment review.
 
+## SUPPORT REPLIES DISCOVERABILITY ON OVERVIEW — NEW SOURCE
+- Private owner/admin VenueOverview now shows a company-scoped HAFZATECH unread count and link to `SupportInbox` only when the exact company has an enrolled installation. No count or link for foreign/unbound managers or unrelated tenants. Computed from encrypted local inbox, never from vendor network or licensing. Existing full Laravel/Blade/browser CI required; no vendor support API deployment implied.
+- Next: verify exact SHA CI and finish authenticated vendor reply HTTP bridge only after isolated signer/KMS and HAFZATECH operator account readiness.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`
