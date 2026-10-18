@@ -118,6 +118,20 @@ final class CentralInstallationStatusTransport
                 $result['license_revision_accepted'] = $accepted['revision'];
                 $result['license_changed'] = $accepted['changed'];
             }
+            if (! isset($body['signed_grant']) &&
+                $signed['status'] === 'signed_revision_pending_delivery' &&
+                $signed['revision'] === $revision) {
+                // Vendor attests the very same existing revision. Re-verify
+                // the encrypted locally signed grant before recording a
+                // successful check; never issue or amend that revision.
+                $checked=$this->licenseDelivery->verifyExisting(
+                    $body['signed_receipt'],$binding->customer_id,
+                    $binding->approved_domain,$nonce,$now
+                );
+                $result['licensed']=$checked['active'];
+                $result['license_changed']=false;
+                $result['license_revision_accepted']=$checked['revision'];
+            }
             if (in_array($signed['status'], ['suspended', 'revoked'], true)) {
                 // Inform future authorized UI without mutating entitlements.
                 // Public/operations gates must enforce only AFTER a separately

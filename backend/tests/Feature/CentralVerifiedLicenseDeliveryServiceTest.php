@@ -117,6 +117,60 @@ class CentralVerifiedLicenseDeliveryServiceTest extends TestCase
         $this->assertDatabaseCount('central_signed_license_cache',0);
     }
 
+    public function test_exact_same_revision_signed_status_refreshes_verification_without_renewing_license(): void
+    {
+        [$pair,$customer,$installation]=$this->enroll();
+        $nonce=self::encode(random_bytes(32));
+        [$grant,$receipt]=$this->evidence($pair,$customer,$installation,$nonce);
+        // Require immutable bound owner company for a scheduled/manual
+        // check to count, never merely a copied license cache.
+        $company=(string)Str::uuid();
+        DB::table('companies')->insert([
+            'id'=>$company,'name'=>'Test License Company','slug'=>'signed-existing-venue',
+            'is_active'=>true,'created_at'=>now(),'updated_at'=>now()
+        ]);
+        DB::table('central_installation_activation')->where('singleton_id',1)
+            ->update(['company_id'=>$company]);
+        $service=app(CentralVerifiedLicenseDeliveryService::class);
+        $first=new DateTimeImmutable('2026-10-17T23:00:01Z');
+        $service->accept($grant,$receipt,$customer,'hall.example.test',$nonce,$first);
+        $next=new DateTimeImmutable('2026-10-17T23:00:30Z');
+        $freshNonce=self::encode(random_bytes(32));
+        [, $newReceipt]=$this->evidence($pair,$customer,$installation,$freshNonce);
+        $result=$service->verifyExisting($newReceipt,$customer,'hall.example.test',
+            $freshNonce,$next);
+        $this->assertSame(['revision'=>1,'active'=>true,'changed'=>false],$result);
+        $this->assertDatabaseCount('central_signed_license_cache',1);
+        $this->assertSame('2026-10-17T23:00:30Z',
+            (new DateTimeImmutable(DB::table('central_license_check_state')
+                ->value('last_online_verified_at')))->format('Y-m-d\TH:i:s\Z'));
+        $before=DB::table('central_signed_license_cache')->value('envelope_sha256');
+        try {
+            $service->verifyExisting($newReceipt,$customer,'hall.example.test',
+                self::encode(random_bytes(32)),new DateTimeImmutable('2026-10-17T23:00:40Z'));
+            $this->fail('Unrelated server nonce was accepted.');
+        }catch(InvalidArgumentException){}
+        $this->assertSame($before,DB::table('central_signed_license_cache')->value('envelope_sha256'));
+        $this->assertSame('2026-10-17T23:00:30Z',
+            (new DateTimeImmutable(DB::table('central_license_check_state')
+                ->value('last_online_verified_at')))->format('Y-m-d\TH:i:s\Z'));
+        $this->assertDatabaseCount('finance_journals',0);
+    }
+
+    public function test_unenrolled_company_cannot_mark_signed_same_revision_online_success(): void
+    {
+        [$pair,$customer,$installation]=$this->enroll();
+        $nonce=self::encode(random_bytes(32));
+        [, $receipt]=$this->evidence($pair,$customer,$installation,$nonce);
+        try{
+            app(CentralVerifiedLicenseDeliveryService::class)->verifyExisting(
+                $receipt,$customer,'hall.example.test',$nonce,
+                new DateTimeImmutable('2026-10-17T23:00:01Z'));
+            $this->fail('Unbound company was allowed to refresh online status.');
+        }catch(InvalidArgumentException){}
+        $this->assertDatabaseCount('central_license_check_state',0);
+    }
+
     public function test_default_off_blocks_delivery_even_when_valid_crypto_exists(): void
     {
         [$pair,$customer,$installation]=$this->enroll();
