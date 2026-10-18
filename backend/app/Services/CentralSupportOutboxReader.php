@@ -16,10 +16,17 @@ final class CentralSupportOutboxReader
 {
     public function __construct(private readonly CentralInstallationCompanyScope $scope) {}
 
-    public function list(User $actor,string $companyId,int $limit=20):array
+    public function list(User $actor,string $companyId,int $limit=20,?string $beforeTime=null,?string $beforeId=null):array
     {
         if($limit<1 || $limit>50)
             throw new InvalidArgumentException('Invalid support request history limit.');
+        if(($beforeTime===null)!==($beforeId===null) ||
+           ($beforeTime!==null && (!preg_match(
+               '/^\d{4}-\d\d-\d\d[ T]\d\d:\d\d:\d\d(?:\.\d{1,6})?(?:Z|[+-]\d\d(?::?\d\d)?)?$/D',
+               $beforeTime) ||
+               !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/D',$beforeId)))) {
+            throw new InvalidArgumentException('Invalid support request history cursor.');
+        }
         $this->scope->assertCanRead($actor,$companyId);
         $binding=DB::table('central_installation_activation')
             ->where('singleton_id',1)->first();
@@ -28,6 +35,15 @@ final class CentralSupportOutboxReader
         $rows=DB::table('central_support_outbox')
             ->where('company_id',$companyId)
             ->where('installation_id',$binding->installation_id)
+            ->when($beforeTime!==null,function($q)use($beforeTime,$beforeId){
+                $q->where(function($cursor)use($beforeTime,$beforeId){
+                    $cursor->where('created_at','<',$beforeTime)
+                        ->orWhere(function($same)use($beforeTime,$beforeId){
+                            $same->where('created_at','=',$beforeTime)
+                                ->where('id','<',$beforeId);
+                        });
+                });
+            })
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->limit($limit)

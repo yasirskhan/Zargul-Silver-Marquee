@@ -27,6 +27,12 @@ final class SupportInbox extends Page
     #[Locked]
     public array $requests = [];
     #[Locked]
+    public ?string $olderRequestTime = null;
+    #[Locked]
+    public ?string $olderRequestId = null;
+    #[Locked]
+    public bool $hasOlderRequests = false;
+    #[Locked]
     public int $unread = 0;
     #[Locked]
     public ?int $olderBeforeEvent = null;
@@ -86,6 +92,8 @@ final class SupportInbox extends Page
 
     public function updatedCompanyId():void
     {
+        $this->olderRequestTime=null;
+        $this->olderRequestId=null;
         $this->olderBeforeEvent=null;
         $this->refreshMessages();
     }
@@ -101,8 +109,26 @@ final class SupportInbox extends Page
         $this->hasOlderMessages=count($rows)>25;
         $this->messages=array_slice($rows,0,25);
         $this->unread=$reader->unreadCount($actor,$this->companyId);
-        $this->requests=app(\App\Services\CentralSupportOutboxReader::class)
-            ->list($actor,$this->companyId,20);
+        $requestRows=app(\App\Services\CentralSupportOutboxReader::class)
+            ->list($actor,$this->companyId,21,$this->olderRequestTime,$this->olderRequestId);
+        $this->hasOlderRequests=count($requestRows)>20;
+        $this->requests=array_slice($requestRows,0,20);
+    }
+
+    public function loadOlderRequests():void
+    {
+        if(!$this->hasOlderRequests || $this->requests===[])return;
+        $last=end($this->requests);
+        $this->olderRequestTime=(string)$last['created_at'];
+        $this->olderRequestId=(string)$last['id'];
+        $this->refreshMessages();
+    }
+
+    public function showRecentRequests():void
+    {
+        $this->olderRequestTime=null;
+        $this->olderRequestId=null;
+        $this->refreshMessages();
     }
 
     public function toggleUnreadOnly():void

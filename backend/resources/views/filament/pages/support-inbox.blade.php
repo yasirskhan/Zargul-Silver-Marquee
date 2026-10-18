@@ -46,6 +46,16 @@
             @empty
                 <p class="text-sm">No support requests created for this company.</p>
             @endforelse
+            <nav class="flex flex-wrap gap-3" aria-label="Support request history pages">
+                @if($olderRequestId !== null)
+                    <button type="button" wire:click="showRecentRequests"
+                        class="rounded-lg border px-3 py-2 text-sm">Newest requests</button>
+                @endif
+                @if($hasOlderRequests)
+                    <button type="button" wire:click="loadOlderRequests"
+                        class="rounded-lg border px-3 py-2 text-sm">Older requests</button>
+                @endif
+            </nav>
         </section>
         <p role="status" aria-live="polite">{{ $unread }} unread {{ $unread === 1 ? 'reply' : 'replies' }}</p>
         <button type="button" wire:click="refreshMessages" class="rounded-lg border px-4 py-2 text-sm">Refresh local inbox</button>

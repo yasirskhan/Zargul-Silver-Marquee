@@ -384,6 +384,11 @@
 - Previous scoped history pagination `2cd2fb7` exact [CI 39090143063](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39090143063) SUCCESS all six jobs. `d91a302` unread-only filter focused suite five jobs PASS, full backend still running before this new batch. All vendor APIs / operator signing secrets / staff MFA remain unprovisioned/default OFF.
 - Next: safely provide client-owned ticket delivery retry status and signed HAFZATECH secure support API only after production operator key custody and authenticated staff workflows. This batch itself requires exact SHA hosted six-job SUCCESS.
 
+## FULL SUPPORT REQUEST HISTORY KEYSET PAGING — NEW SOURCE
+- Owner/admin private HAFZATECH Support page adds Older requests / Newest requests history navigation using company-and-installation-scoped created_at plus UUID keyset. Page 20 requests plus a 21st has-more sentinel. Cursor stays server-controlled, with validated timestamp and UUID and mandatory company reauthorization.
+- Livewire/PostgreSQL regression seeds 45 encrypted local queued requests and pages from event 45→26, 25→6, 5→1 then returns to newest. Gate disabled/offline reading is preserved; no licensing or finance changes. Foreign and malformed cursor denials tested.
+- Parent 8e86d68c773f6f8e089835982b7c3179aa51877f added local honest queued-vs-delivered history. CI on this source must be confirmed all six jobs before VERIFIED. Vendor staff MFA, central API and signing KMS remain offline, all release gates default OFF.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`
