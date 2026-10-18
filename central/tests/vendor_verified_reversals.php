@@ -181,9 +181,9 @@ $httpBoundary=new CentralStaffProtectedHttpBoundary(
  $sessions,$csrfTokens,
  new CentralStaffSessionAuthorization($sessions,new CentralStaffAccess($db)),true);
 $httpOff=new CentralStaffPaymentEvidenceHttpAdapter(
- $db,$httpBoundary,$evidence,$review);
+ $db,$httpBoundary,$evidence,$review,$overview);
 $httpOn=new CentralStaffPaymentEvidenceHttpAdapter(
- $db,$httpBoundary,$evidence,$review,true);
+ $db,$httpBoundary,$evidence,$review,$overview,true);
 $httpRequest=[
  'HTTPS'=>'on','SERVER_PORT'=>'443',
  'HTTP_HOST'=>'lichall.hafzatech.com',
@@ -215,6 +215,26 @@ reverseDeny(fn()=>$httpOn->pending($httpRequest,$billingBearer,str_repeat('0',64
  'staff_http_denied');
 reverseDeny(fn()=>$httpOn->pending($httpRequest,str_repeat('0',64),$csrfToken,$customer),
  'staff_http_denied');
+$invoiceHttp=$httpRequest;
+$invoiceHttp['REQUEST_URI']='/staff/billing/invoice/status';
+reverseDeny(fn()=>$httpOff->invoiceStatus($invoiceHttp,$billingBearer,
+ $csrfToken,$customer,$invoice),'staff_http_not_enabled');
+$invoiceSnapshot=$httpOn->invoiceStatus($invoiceHttp,$billingBearer,
+ $csrfToken,$customer,$invoice);
+reverseCheck($invoiceSnapshot['invoice_id']===$invoice &&
+ $invoiceSnapshot['verified_minor']==='10000' &&
+ $invoiceSnapshot['reversed_minor']==='2500' &&
+ $invoiceSnapshot['net_minor']==='7500' &&
+ $invoiceSnapshot['net_covered']===false,
+ 'billing staff portal reports net independent settlement not uploaded claims');
+reverseDeny(fn()=>$httpOn->invoiceStatus($invoiceHttp,$billingBearer,
+ $csrfToken,$foreign,$invoice),'invoice_not_found');
+reverseDeny(fn()=>$httpOn->invoiceStatus($httpRequest,$billingBearer,
+ $csrfToken,$customer,$invoice),'staff_http_denied');
+reverseDeny(fn()=>$httpOn->invoiceStatus($invoiceHttp,$foreignBearer,
+ $csrfToken,$customer,$invoice),'staff_http_denied');
+reverseDeny(fn()=>$httpOn->invoiceStatus($invoiceHttp,$billingBearer,
+ str_repeat('0',64),$customer,$invoice),'staff_http_denied');
 $decisionHttp=$httpRequest;
 $decisionHttp['REQUEST_URI']='/staff/billing/payment-evidence/decide';
 reverseDeny(fn()=>$httpOff->decide($decisionHttp,$billingBearer,$csrfToken,
