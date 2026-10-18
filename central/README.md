@@ -44,3 +44,6 @@ Use `CentralStaffAuthenticatedMfaHistory` for any future protected staff portal 
 
 ### Scoped immutable vendor account action history
 `CentralStaffAccountActionReader` grants bounded safe suspension-event history solely to an active, centrally MFA-authenticated staff auditor with current `audit.read`; it rejects forged actors and revoked roles. No HTTP endpoint or private staff credentials are included.
+
+### Staff self-password rotation (internal only)
+The trusted current vendor MFA session and old password are both required to rotate its OWN secret. The new password is stored as Argon2id; all that staff member's live sessions are revoked atomically with immutable metadata-only audit. This is a private service, not a registered staff or customer API endpoint, and does not bypass operator KMS/HTTPS release gates.

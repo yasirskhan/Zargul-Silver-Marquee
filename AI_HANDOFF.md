@@ -510,3 +510,16 @@ Append only concise current milestones (commit SHA, exact CI job result, code fi
 - Central PostgreSQL `staff_account_action_reader.php` acceptance checks actual password+TOTP auditor session, paginated record order, safe allowlist, role/forged token/invalid pagination denial and live auditor revocation.
 - Depends on exact six-job CI for precursor suspension action journal and protected MFA audit reader; verify this new commit separately, maintain production staff host, signing and payment gates OFF.
 - NEXT: mature protected HAFZATECH staff operator portal and credentials, licensing issuance and protected support APIs as operator setup permits.
+
+## HAFZATECH STAFF SELF-SERVICE PASSWORD ROTATION — INTERNAL BATCH PENDING CI
+- Added independent central PostgreSQL `central_staff_password_change_events` immutable success journal with staff identity, outcome and UTC timestamp. Trigger rejects UPDATE/DELETE. No raw old/new password, TOTP, session, IP or customer records in journal.
+- Internal `CentralStaffOwnPasswordChange` can update ONLY the current MFA-authenticated vendor staff account, not a caller-specified target. Requires its CURRENT password and a different new password of length 12–1024; rejects unknown/expired/forged sessions. Under PostgreSQL transaction and account/session locks, rechecks current session, persists Argon2id password hash, revokes its active vendor sessions and writes immutable session invalidation and password-change events atomically.
+- New standalone central PostgreSQL regression `staff_own_password_change.php` covers correct vendor login, wrong current password, weak/reused password, forged bearer, password hash change, immediate old-session revocation, another vendor account unaffected, journal immutability.
+- This remains an INTERNAL primitive with no HTTP route. A live staff portal also needs CSRF/origin/cookie enforcement, KMS/MFA recovery, breach-password policy, operator procedures and external throttling. Do not claim production readiness or turn on public flags.
+- Publish only after predecessor audit-account reader and preceding security commits have all six hosted jobs passing; this batch needs its own exact hosted CI.
+
+## VERIFIED CENTRAL SECURITY CHECKPOINTS — 2026-10-18
+- Staff second-party suspension and atomic live-session revocation at `c0f14ab01bc4a42c58ef53ee7f88a04cc80ce4ae`: hosted [39119564993](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39119564993) **SUCCESS all six jobs**.
+- Real central staff MFA session-bound security history reader at `0da9a5a0d18df90c6b084e9e9e9e2115ee819169`: hosted [39119931236](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39119931236) **SUCCESS all six jobs**.
+- Account-action reader commit `82a3cba24ffb082608291cfa0b318e4b44082878`: hosted [39120378278](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39120378278) ran central/5 focused jobs successfully; exact full Laravel job pending when written, not yet VERIFIED.
+- All these are vendor INTERNAL foundations; production HAFZATECH staff host, KMS, HTTPS/cookie delivery, official signers, verified settlement and customer release remain unapproved/OFF.
