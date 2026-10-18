@@ -36,6 +36,11 @@
         @endif
         <p role="status" aria-live="polite">{{ $unread }} unread {{ $unread === 1 ? 'reply' : 'replies' }}</p>
         <button type="button" wire:click="refreshMessages" class="rounded-lg border px-4 py-2 text-sm">Refresh local inbox</button>
+        <button type="button" wire:click="toggleUnreadOnly"
+            aria-pressed="{{ $unreadOnly ? 'true' : 'false' }}"
+            class="rounded-lg border px-4 py-2 text-sm">
+            {{ $unreadOnly ? 'Show all replies' : 'Unread only' }}
+        </button>
         @forelse($messages as $message)
             <article class="rounded-lg border p-4 space-y-3">
                 <h3 class="font-semibold">Ticket {{ $message['ticket_number'] }}</h3>

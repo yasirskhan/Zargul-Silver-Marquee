@@ -80,7 +80,19 @@ class CentralSupportInboxPaginationTest extends TestCase
             ->assertSet('olderBeforeEvent',null)
             ->assertSet('hasOlderMessages',true);
         $this->assertSame(55,$view->get('messages')[0]['vendor_event_id']);
-        $this->assertSame(55,app(CentralSupportReplyInboxReader::class)->unreadCount($owner,$company->id));
+        $view->call('toggleUnreadOnly')
+            ->assertSet('unreadOnly',true)
+            ->assertSet('olderBeforeEvent',null);
+        $this->assertSame(55,$view->get('messages')[0]['vendor_event_id']);
+        $unreadMessage=$view->get('messages')[0]['id'];
+        $view->call('markMessageRead',$unreadMessage)->assertSet('unread',54);
+        $this->assertSame(54,$view->get('messages')[0]['vendor_event_id']);
+        $this->assertDatabaseCount('central_support_reply_read_events',1);
+        $view->call('toggleUnreadOnly')
+            ->assertSet('unreadOnly',false)
+            ->assertSet('olderBeforeEvent',null);
+        $this->assertSame(55,$view->get('messages')[0]['vendor_event_id']);
+        $this->assertSame(54,app(CentralSupportReplyInboxReader::class)->unreadCount($owner,$company->id));
         $this->assertDatabaseCount('central_license_check_state',0);
         $this->assertDatabaseCount('finance_journals',0);
     }

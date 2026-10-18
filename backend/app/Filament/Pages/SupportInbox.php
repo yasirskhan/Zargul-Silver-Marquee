@@ -30,6 +30,8 @@ final class SupportInbox extends Page
     public ?int $olderBeforeEvent = null;
     #[Locked]
     public bool $hasOlderMessages = false;
+    #[Locked]
+    public bool $unreadOnly = false;
 
     public string $newSubject = '';
     public string $newMessage = '';
@@ -93,10 +95,19 @@ final class SupportInbox extends Page
             $this->companyId!==null &&
             array_key_exists($this->companyId,$this->companyOptions()),403);
         $reader=app(CentralSupportReplyInboxReader::class);
-        $rows=$reader->list($actor,$this->companyId,26,$this->olderBeforeEvent);
+        $rows=$reader->list($actor,$this->companyId,26,$this->olderBeforeEvent,$this->unreadOnly);
         $this->hasOlderMessages=count($rows)>25;
         $this->messages=array_slice($rows,0,25);
         $this->unread=$reader->unreadCount($actor,$this->companyId);
+    }
+
+    public function toggleUnreadOnly():void
+    {
+        // Action operates on server-controlled state. Hydration and refresh
+        // both enforce the latest authenticated company membership.
+        $this->unreadOnly=!$this->unreadOnly;
+        $this->olderBeforeEvent=null;
+        $this->refreshMessages();
     }
 
     public function loadOlderReplies():void

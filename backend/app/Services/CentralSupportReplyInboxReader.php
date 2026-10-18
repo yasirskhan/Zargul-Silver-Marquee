@@ -23,7 +23,7 @@ final class CentralSupportReplyInboxReader
             ->where('company_id',$companyId)->whereNull('read_at')->count();
     }
 
-    public function list(User $actor,string $companyId,int $limit=25,?int $beforeEventId=null):array
+    public function list(User $actor,string $companyId,int $limit=25,?int $beforeEventId=null,bool $unreadOnly=false):array
     {
         if($limit<1||$limit>50||($beforeEventId!==null && $beforeEventId<1))
             throw new InvalidArgumentException('Invalid support inbox page limit or cursor.');
@@ -36,6 +36,7 @@ final class CentralSupportReplyInboxReader
                 })
             ->leftJoin('users as read_actor','read_actor.id','=','receipt.actor_user_id')
             ->where('inbox.company_id',$companyId)
+            ->when($unreadOnly,fn($q)=>$q->whereNull('inbox.read_at'))
             ->when($beforeEventId!==null,fn($q)=>$q->where('inbox.vendor_event_id','<',$beforeEventId))
             ->orderByDesc('inbox.vendor_event_id')->limit($limit)
             ->select('inbox.*','read_actor.name as read_by')->get();
