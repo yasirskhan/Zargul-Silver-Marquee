@@ -96,7 +96,7 @@ $db->prepare('UPDATE central_staff_users SET password_hash=:hash WHERE id=:id')
         'hash'=>password_hash('reset-synthetic-password',PASSWORD_DEFAULT)]);
 sessCheck($service->staffFor($other['password'])===null,'password reset invalidates session');
 $db->prepare("UPDATE central_staff_sessions
- SET idle_until=now()-interval '1 second' WHERE staff_id=:id")
+ SET idle_until=created_at+interval '1 millisecond' WHERE staff_id=:id")
     ->execute(['id'=>$ids['idle']]);
 sessCheck($service->staffFor($other['idle'])===null,'expired idle window denied');
 sessCheck($service->staffFor('malformed')===null,'malformed bearer denied');
