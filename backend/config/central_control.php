@@ -7,6 +7,9 @@ return [
     // Separate release gate; no activation/central calls during normal operation.
     'activation_enabled' => (bool) env('VENUE_CENTRAL_ACTIVATION_ENABLED', false),
     'check_interval_days' => 15,
+    // Distinct operator release gate; cron command is inert until production
+    // signing keys, HTTPS service and enrollment are approved and provisioned.
+    'scheduled_checks_enabled' => (bool) env('VENUE_CENTRAL_SCHEDULED_CHECKS_ENABLED', false),
     // Populate ONLY in the vendor-built installer with audited pinned Ed25519
     // public keys. Never trust keys downloaded from an unauthenticated host.
     'trusted_signing_public_keys' => [],

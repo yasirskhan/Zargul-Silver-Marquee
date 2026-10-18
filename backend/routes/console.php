@@ -158,3 +158,20 @@ Artisan::command('venuedesk:deliver-approval-alerts', function (): int {
     $this->info('Private approval delivery: '.json_encode($result));
     return 0;
 })->purpose('Send bounded opt-in owner Telegram alerts; never act on decisions');
+
+
+/**
+ * This command may be invoked hourly by Laravel's scheduler but only sends an
+ * HTTPS request when its independent operator gate is ON and the last
+ * cryptographically verified central license check is at least 15 days old
+ * (or a bounded retry is due). The command is inert on unprovisioned systems.
+ */
+Artisan::command('venuedesk:check-central-license', function (): int {
+    $result=app(\App\Services\CentralScheduledLicenseCheckService::class)
+        ->run(now()->toDateTimeImmutable());
+    $this->info('HAFZATECH license check: '.$result['state']);
+    return $result['state']==='error' ? 1 : 0;
+})->purpose('Run gated, due-only signed central license verification');
+
+\Illuminate\Support\Facades\Schedule::command('venuedesk:check-central-license')
+    ->hourly()->withoutOverlapping(15);
