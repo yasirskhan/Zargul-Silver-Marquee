@@ -86,6 +86,7 @@ jobs:
           php central/tests/staff_permissions.php
           php central/tests/staff_access.php
           php central/tests/staff_totp.php
+          php central/tests/staff_mfa_state.php
           php central/tests/vendor_receiving_directory.php
           php central/tests/payment_eligibility.php
           php central/tests/domain_ownership.php
