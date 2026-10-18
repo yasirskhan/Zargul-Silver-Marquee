@@ -85,7 +85,7 @@ class CentralSupportInboxComposePageTest extends TestCase
         $this->assertSame('queued',$row->delivery_state);
         $this->assertStringNotContainsString('morning session',$row->encrypted_body);
         $this->assertSame('Please explain where I can edit my morning session.',
-            \Illuminate\Support\\Facades\\Crypt::decryptString($row->encrypted_body));
+            \Illuminate\Support\Facades\Crypt::decryptString($row->encrypted_body));
         $this->assertDatabaseCount('central_license_check_state',0);
         $this->assertDatabaseCount('finance_journals',0);
         Http::assertNothingSent();
