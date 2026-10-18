@@ -47,8 +47,9 @@ final class InternalQuickSearchService
             || ! $actor->is_active || ! $actor->hasVerifiedEmail()
             || ! User::query()->whereKey($actor->getKey())
                 ->where('is_active', true)->whereNotNull('email_verified_at')->exists()
-            || ! $membership) {
-            throw new AuthorizationException('An active verified company staff session is required.');
+            || ! $membership
+            || ! app(CentralVenueOperationsAccessGate::class)->allowsCompany($companyId)) {
+            throw new AuthorizationException('An active, licensed company staff session is required.');
         }
         $restricted = in_array($membership->role, ['manager', 'operations'], true);
         if (! in_array($kind, ['all', 'proposal', 'planning', 'approval', 'finance', 'audit'], true)) {
