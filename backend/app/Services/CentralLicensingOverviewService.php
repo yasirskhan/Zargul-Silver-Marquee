@@ -87,7 +87,8 @@ final class CentralLicensingOverviewService
                 ! isset($verified['scheduled_renewal']),
             'online_check_due'=>$due,
             'expires_at'=>$state['expires_at'],
-            'grace_ends_at'=>(new DateTimeImmutable($state['expires_at']))
+            'grace_ends_at'=>(new DateTimeImmutable(
+                $verified['scheduled_renewal']['expires_at'] ?? $state['expires_at']))
                 ->add(new DateInterval('P7D'))->format('Y-m-d\\TH:i:s\\Z'),
             // A future signed renewal is shown separately. The currently
             // active previous paid grant still governs real operations until
