@@ -16,6 +16,8 @@ return [
     'support_enabled' => (bool) env('VENUE_CENTRAL_SUPPORT_ENABLED', false),
     // Dedicated HTTPS support outbox worker release; OFF independently.
     'support_delivery_enabled' => (bool) env('VENUE_CENTRAL_SUPPORT_DELIVERY_ENABLED', false),
+    // Separate reply inbox/pull rollout; defaults OFF, independent of license checks.
+    'support_reply_pull_enabled' => (bool) env('VENUE_CENTRAL_SUPPORT_REPLY_PULL_ENABLED', false),
     // Populate ONLY in the vendor-built installer with audited pinned Ed25519
     // public keys. Never trust keys downloaded from an unauthenticated host.
     'trusted_signing_public_keys' => [],
