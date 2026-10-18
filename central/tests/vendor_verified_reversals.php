@@ -14,6 +14,7 @@ use Hafzatech\Central\CentralStaffPaymentEvidenceReviewService;
 use Hafzatech\Central\CentralStaffCsrfTokenService;
 use Hafzatech\Central\CentralStaffProtectedHttpBoundary;
 use Hafzatech\Central\CentralStaffPaymentEvidenceHttpAdapter;
+use Hafzatech\Central\CentralStaffBillingDashboardRenderer;
 use Hafzatech\Central\PaidInvoiceEligibility;
 use Hafzatech\Central\RegistrationError;
 foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
@@ -24,7 +25,8 @@ foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
     'CentralStaffInvoicePaymentOverview','CentralStaffPaymentEvidenceQueue',
     'CentralStaffPaymentEvidenceReviewService','CentralStaffCsrfTokenService',
     'CentralStaffHttpPolicy','CentralStaffProtectedHttpBoundary',
-    'CentralStaffPaymentEvidenceHttpAdapter'] as $name) {
+    'CentralStaffPaymentEvidenceHttpAdapter',
+    'CentralStaffBillingDashboardRenderer'] as $name) {
     require dirname(__DIR__).'/src/'.$name.'.php';
 }
 function reverseCheck(bool $v,string $msg):void{
@@ -237,6 +239,41 @@ reverseDeny(fn()=>$httpOn->invoiceStatus($invoiceHttp,$foreignBearer,
  $csrfToken,$customer,$invoice),'staff_http_denied');
 reverseDeny(fn()=>$httpOn->invoiceStatus($invoiceHttp,$billingBearer,
  str_repeat('0',64),$customer,$invoice),'staff_http_denied');
+// Owner/provider amounts and an unverified customer claim must remain
+// visually distinct. The private renderer escapes hostile input and never
+// outputs attachment object keys, verifier identities or session secrets.
+$dashboardRequest=$httpRequest;
+$dashboardRequest['REQUEST_URI']='/staff/billing/overview';
+reverseDeny(fn()=>$httpOff->billingDashboard($dashboardRequest,
+ $billingBearer,$csrfToken,$customer,$invoice),'staff_http_not_enabled');
+$html=$httpOn->billingDashboard($dashboardRequest,
+ $billingBearer,$csrfToken,$customer,$invoice);
+reverseCheck(str_contains($html,'Net verified (minor units)') &&
+ str_contains($html,'7500') &&
+ str_contains($html,'Not fully covered by independently verified net settlement') &&
+ str_contains($html,'Unverified customer claim') &&
+ !str_contains($html,'private/vendor-evidence/') &&
+ !str_contains($html,$billingBearer) &&
+ !str_contains($html,$csrfToken),
+ 'private dashboard shows ONLY verified net and unverified claims without secrets');
+reverseDeny(fn()=>$httpOn->billingDashboard($invoiceHttp,
+ $billingBearer,$csrfToken,$customer,$invoice),'staff_http_denied');
+reverseDeny(fn()=>$httpOn->billingDashboard($dashboardRequest,
+ $officerBearer,$csrfToken,$customer,$invoice),'staff_http_denied');
+reverseDeny(fn()=>$httpOn->billingDashboard($dashboardRequest,
+ $billingBearer,str_repeat('0',64),$customer,$invoice),'staff_http_denied');
+reverseDeny(fn()=>$httpOn->billingDashboard($dashboardRequest,
+ $billingBearer,$csrfToken,$foreign,$invoice),'invoice_not_found');
+$injected=CentralStaffBillingDashboardRenderer::render(
+ $invoiceSnapshot,[['invoice_number'=>'Invoice <script>','claimed_reference'=>
+ '<img src=x onerror=alert(1)>', 'attachment_private_object_key'=>'hidden-vault-key']]);
+reverseCheck(str_contains($injected,'&lt;script&gt;') &&
+ str_contains($injected,'&lt;img') &&
+ !str_contains($injected,'<script>') &&
+ !str_contains($injected,'<img') &&
+ !str_contains($injected,'hidden-vault-key'),
+ 'malicious customer claim and invoice fields HTML-escaped, private keys not projected');
+
 $decisionHttp=$httpRequest;
 $decisionHttp['REQUEST_URI']='/staff/billing/payment-evidence/decide';
 reverseDeny(fn()=>$httpOff->decide($decisionHttp,$billingBearer,$csrfToken,
