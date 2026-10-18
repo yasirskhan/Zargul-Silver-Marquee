@@ -573,3 +573,11 @@ Append only concise current milestones (commit SHA, exact CI job result, code fi
 ## EXACT-HOST REGRESSION TEST FIX — SOURCE REQUIRES HOSTED CI
 - On source `9efe0bfef75953c1bce6487ce3c9b383a6e5bed1`, [run 39125093445](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39125093445) central-postgres rejected only `installation_http_policy.php`: the new NEGATIVE test incorrectly expected an empty HTTPS flag with a trusted port 443 to fail, while the owner-required server-provided port fallback is explicitly allowed.
 - Corrected **test-only** fixture to set untrusted port 80 for the empty HTTPS denial. The separate valid server-port-443 fallback assertion remains. Canonical host gate, public default-OFF API, vendor sessions, schema, migrations and entitlement behavior are unchanged; require exact new SHA all-six hosted CI.
+
+## VERIFIED CENTRAL INSTALLATION CANONICAL HTTPS HOST — 2026-10-18
+- Source `e93c9273d64aa20af8171e11062cc9f8901fd712` hosted [39125192758](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39125192758) **SUCCESS all six jobs**, including PostgreSQL and the actual central host guard regression. Registration/status remain `CENTRAL_API_ENABLED` default OFF. This does not validate external DNS/TLS/operator deployment.
+
+## VENDOR STAFF EXPLICIT PLAINTEXT TLS DENIAL — NEW SOURCE / CI REQUIRED
+- Hardened `CentralStaffHttpPolicy::secureHost` to reject `HTTPS=off` or `0` even when server port misleadingly claims 443. Exact approved `lichall.hafzatech.com` Host validation remains; only actual trusted server HTTPS on/1 or an absent HTTPS value with trusted server port 443 is allowed. Arbitrary X-Forwarded headers remain untrusted.
+- Existing staff HTTP policy central test now covers contradictory plaintext server signals, HTTP_HOST with explicit port/suffixed/case variants, and a legitimate trusted 443 fallback. The earlier protected login/session+CSRF composition remains internal and default OFF.
+- New source needs six-job exact hosted CI. Next after GREEN: continue protected session-derived paid license signing-manifest and isolated KMS finalization foundation, not production activation. All central public staff and signer release gates OFF.
