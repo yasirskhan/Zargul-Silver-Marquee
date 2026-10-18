@@ -53,7 +53,8 @@ class CentralSupportInboxPageTest extends TestCase
         $view->call('refreshMessages')->assertForbidden();
         $this->be($other);
         $this->assertFalse(SupportInbox::canAccess());
-        Livewire::test(SupportInbox::class)->assertForbidden();
+        // Filament hides pages inaccessible to the current actor as 404.
+        Livewire::test(SupportInbox::class)->assertNotFound();
         $this->assertDatabaseCount('finance_journals',0);
     }
 }
