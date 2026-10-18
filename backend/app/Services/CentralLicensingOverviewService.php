@@ -51,6 +51,7 @@ final class CentralLicensingOverviewService
                 'expires_at'=>null,
                 'grace_ends_at'=>null,
                 'renewal_expires_at'=>null,
+                'renewal_starts_at'=>null,
                 'renewal_revision'=>null,
                 'revision'=>null,
                 'license_id'=>null,
@@ -94,6 +95,7 @@ final class CentralLicensingOverviewService
             // active previous paid grant still governs real operations until
             // the precise signed renewal effective instant.
             'renewal_expires_at'=>$verified['scheduled_renewal']['expires_at'] ?? null,
+            'renewal_starts_at'=>$verified['scheduled_renewal']['effective_at'] ?? null,
             'renewal_revision'=>$verified['scheduled_renewal']['revision'] ?? null,
             'revision'=>(int)$verified['grant']['revision'],
             'license_id'=>$verified['grant']['license_id'],
@@ -115,6 +117,7 @@ final class CentralLicensingOverviewService
             'expires_at'=>null,
                 'grace_ends_at'=>null,
             'renewal_expires_at'=>null,
+            'renewal_starts_at'=>null,
             'renewal_revision'=>null,
             'revision'=>null,
             'license_id'=>null,
