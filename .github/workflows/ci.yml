@@ -114,6 +114,7 @@ jobs:
           php central/tests/support_reply_page_codec.php
           php central/tests/status_receipt_codec.php
           php central/tests/staff_paid_license_preparation.php
+          php central/tests/vendor_verified_reversals.php
 
   licensing-postgres:
     runs-on: ubuntu-latest

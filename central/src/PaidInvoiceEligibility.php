@@ -7,7 +7,7 @@ use PDO;
 
 /**
  * Read-only eligibility calculation. No signing or invoice mutation occurs.
- * Future paid issuance must lock invoice/settlement rows, verify refunds and
+ * Future paid issuance must lock invoice/settlement rows, verify reversals and
  * chargebacks, authorize actor sessions and audit the signed grant revision.
  */
 final class PaidInvoiceEligibility
@@ -48,7 +48,7 @@ final class PaidInvoiceEligibility
         if (!$issuer->fetchColumn()) return false;
 
         $q=$this->db->prepare(
-            "SELECT COALESCE(SUM(s.amount_minor),0) FROM central_vendor_verified_settlements s
+            "SELECT COALESCE(SUM(s.amount_minor - COALESCE((SELECT SUM(r.amount_minor) FROM central_vendor_settlement_reversals r WHERE r.settlement_id=s.id),0)),0) FROM central_vendor_verified_settlements s
              JOIN central_staff_users verifier ON verifier.id=s.verified_by
                  AND verifier.status='active' AND verifier.mfa_enrolled_at IS NOT NULL
              WHERE s.invoice_id=:invoice AND s.receiving_account_id=:account
