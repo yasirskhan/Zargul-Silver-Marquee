@@ -38,6 +38,9 @@ final class ApprovalWorkflowService
         if (! $membership) {
             throw new AuthorizationException('Company access has been removed.');
         }
+        if (! app(CentralVenueOperationsAccessGate::class)->allowsCompany($companyId)) {
+            throw new AuthorizationException('Venue operations require a current signed license or valid management grace.');
+        }
 
         return $membership;
     }
