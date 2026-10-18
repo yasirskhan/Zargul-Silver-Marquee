@@ -9,6 +9,7 @@ use Hafzatech\Central\CentralStaffSessionAuthorization;
 use Hafzatech\Central\CentralStaffSessionService;
 use Hafzatech\Central\CentralVendorVerifiedReversalService;
 use Hafzatech\Central\CentralStaffInvoicePaymentOverview;
+use Hafzatech\Central\CentralStaffPaymentEvidenceQueue;
 use Hafzatech\Central\PaidInvoiceEligibility;
 use Hafzatech\Central\RegistrationError;
 foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
@@ -16,7 +17,7 @@ foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
     'CentralStaffMfaChallenge','CentralStaffCredentialVerifier',
     'CentralStaffLoginRateLimiter','CentralStaffSessionService',
     'CentralStaffSessionAuthorization','CentralVendorVerifiedReversalService',
-    'CentralStaffInvoicePaymentOverview'] as $name) {
+    'CentralStaffInvoicePaymentOverview','CentralStaffPaymentEvidenceQueue'] as $name) {
     require dirname(__DIR__).'/src/'.$name.'.php';
 }
 function reverseCheck(bool $v,string $msg):void{
@@ -126,6 +127,46 @@ reverseCheck($first['amount_minor']===2500&&$first['kind']==='refund',
  'verified reversal recorded as immutable evidence without sending payment');
 reverseCheck(!$guard->isEligible($invoice,$officer),
  'partial verified reversal reduces future paid license eligibility');
+$claimId=reverseId();
+$db->prepare("INSERT INTO central_vendor_payment_evidence
+ (id,invoice_id,claimed_reference,attachment_private_object_key)
+ VALUES(:id,:invoice,:claim,:private)")
+ ->execute(['id'=>$claimId,'invoice'=>$invoice,
+    'claim'=>str_repeat('CUSTOMER-CLAIM-UNVERIFIED-',12),
+    'private'=>'private/vendor-evidence/never-expose-object-key']);
+$evidence=new CentralStaffPaymentEvidenceQueue($db,
+ new CentralStaffSessionAuthorization($sessions,new CentralStaffAccess($db)));
+reverseDeny(fn()=>$evidence->listPending(str_repeat('0',64),$customer),
+ 'billing_role_required');
+reverseDeny(fn()=>$evidence->listPending($officerBearer,$customer),
+ 'billing_role_required');
+reverseDeny(fn()=>$evidence->listPending($foreignBearer,$customer),
+ 'billing_role_required');
+reverseDeny(fn()=>$evidence->listPending($billingBearer,'bad-customer'),
+ 'invalid_payment_evidence_query');
+reverseDeny(fn()=>$evidence->listPending($billingBearer,$customer,-1),
+ 'invalid_payment_evidence_query');
+reverseDeny(fn()=>$evidence->listPending($billingBearer,$customer,0,101),
+ 'invalid_payment_evidence_query');
+$evidenceRows=$evidence->listPending($billingBearer,$customer,0,1);
+reverseCheck(count($evidenceRows)===1 && $evidenceRows[0]['evidence_id']===$claimId,
+ 'active scoped Billing Officer sees exactly one pending customer claim');
+reverseCheck(array_keys($evidenceRows[0])===[
+ 'evidence_id','invoice_id','invoice_number','currency','total_minor',
+ 'claimed_reference','created_at','verification_state'
+ ],'allowlisted queue fields exclude private attachment and payment account');
+reverseCheck($evidenceRows[0]['verification_state']==='customer_claim_unverified'
+ && strlen($evidenceRows[0]['claimed_reference'])<=160,
+ 'long customer-supplied reference is bounded and explicitly unverified');
+reverseCheck($evidence->listPending($billingBearer,$customer,1,1)===[],
+ 'bounded pagination excludes already read customer claim');
+reverseCheck(!$guard->isEligible($invoice,$officer),
+ 'customer uploaded evidence cannot reverse negative paid-license eligibility');
+$db->prepare("UPDATE central_vendor_payment_evidence SET status='reviewed'
+ WHERE id=:id")->execute(['id'=>$claimId]);
+reverseCheck($evidence->listPending($billingBearer,$customer)===[],
+ 'reviewed customer claim not in pending queue, with no settlement created');
+
 $overview=new CentralStaffInvoicePaymentOverview($db,$sessions,
  new CentralStaffSessionAuthorization($sessions,new CentralStaffAccess($db)));
 $partial=$overview->forInvoice($billingBearer,$invoice);
@@ -214,4 +255,6 @@ reverseDeny(fn()=>$service->record($billingBearer,$newSettlement,1000,
  'refund','BANK-REFUND-AFTER-REVOKE','Verified refund must be refused'),
  'staff_session_required');
 reverseCheck($sessions->staffFor($billingBearer)===null,'revoked staff bearer invalidated');
+reverseDeny(fn()=>$evidence->listPending($billingBearer,$customer),
+ 'billing_role_required');
 echo "PASS: immutable independent vendor refund/chargeback accounting, live vendor MFA scope, exact idempotency, over-reversal guard and net license eligibility\n";
