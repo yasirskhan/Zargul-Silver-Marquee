@@ -45,10 +45,19 @@ final class CentralStaffRoleReviewQueue
                     r.customer_scope_id,r.reason,r.created_at,
                     requester.email AS requester_email,
                     requester.status AS requester_status,
-                    target.email AS target_email,target.status AS target_status
+                    target.email AS target_email,target.status AS target_status,
+                    scoped_customer.status AS scoped_customer_status,
+                    COALESCE((SELECT jsonb_agg(g.role)
+                      FROM central_staff_role_grants g
+                      WHERE g.staff_id=r.actor_staff_id
+                        AND g.customer_scope_id IS NULL
+                        AND g.revoked_at IS NULL),'[]'::jsonb)
+                      AS issuer_global_roles
              FROM central_staff_role_requests r
              JOIN central_staff_users requester ON requester.id=r.actor_staff_id
              JOIN central_staff_users target ON target.id=r.target_staff_id
+             LEFT JOIN vendor_customers scoped_customer
+                ON scoped_customer.id=r.customer_scope_id
              LEFT JOIN central_staff_role_decisions d
                 ON d.request_id=r.id
              WHERE d.id IS NULL
@@ -62,13 +71,29 @@ final class CentralStaffRoleReviewQueue
         $rows=$q->fetchAll(PDO::FETCH_ASSOC);
         foreach($rows as &$row) {
             $row['can_decide']=false;
+            $issuerRoles=json_decode((string)$row['issuer_global_roles'],true);
+            unset($row['issuer_global_roles']);
             // A stale or disabled participant must never receive an
             // actionable review form. The decision service rechecks the
             // same identities under lock independently of this UI guard.
             if($row['requester_status']!=='active' ||
-                !in_array($row['target_status'],['pending_mfa','active'],true)) {
+                !in_array($row['target_status'],['pending_mfa','active'],true) ||
+                ($row['customer_scope_id']!==null &&
+                    $row['scoped_customer_status']!=='active')) {
                 continue;
             }
+            // A live, globally empowered issuer is required by the locked
+            // decision transaction. Never offer an action for revoked issuers.
+            $issuerCapable=false;
+            if(is_array($issuerRoles)) {
+                foreach($issuerRoles as $role) {
+                    if(is_string($role) && StaffRolePermissions::mayGrantRole(
+                        $role,$row['role'],false,true)) {
+                        $issuerCapable=true;break;
+                    }
+                }
+            }
+            if(!$issuerCapable)continue;
             foreach($globalRoles as $role) {
                 if(StaffRolePermissions::mayGrantRole(
                     $role,$row['role'],false,true)) {

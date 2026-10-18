@@ -175,6 +175,24 @@ try {
   'plan_administrator',null,'Independent plan role review required');
  $futureIntent=$on->request($adminBearer,rolesUuid(),$staff['target'],
   'support_supervisor',null,'Later independent review after stale grants');
+ $scopedIntent=$on->request($adminBearer,rolesUuid(),$staff['target'],
+  'support_agent',$scopeId,'Scoped role requires active customer');
+ $scopedCustomer=$db->prepare('UPDATE vendor_customers SET status=:status WHERE id=:id');
+ $scopedCustomer->execute(['status'=>'suspended','id'=>$scopeId]);
+ $scopedQueue=new CentralStaffRoleReviewQueue($db,$sessions,
+  new CentralStaffSessionAuthorization($sessions,$access));
+ $scopedRows=array_values(array_filter($scopedQueue->listPending($approverBearer),
+  static fn(array $row):bool=>$row['request_id']===$scopedIntent['request_id']));
+ rolesCheck(count($scopedRows)===1 &&
+  $scopedRows[0]['scoped_customer_status']==='suspended' &&
+  $scopedRows[0]['can_decide']===false,
+  'suspended customer scoped role stays review-only');
+ $scopedCustomer->execute(['status'=>'active','id'=>$scopeId]);
+ $scopedRows=array_values(array_filter($scopedQueue->listPending($approverBearer),
+  static fn(array $row):bool=>$row['request_id']===$scopedIntent['request_id']));
+ rolesCheck(count($scopedRows)===1 &&
+  $scopedRows[0]['can_decide']===true,
+  'restored active customer permits only eligible two-person review');
  $decisionId=rolesUuid();
  putenv('CENTRAL_STAFF_ROLE_DECISIONS_ENABLED=false');
  rolesDeny(fn()=>$decisionOn->decide($approverBearer,$id,$decisionId,
@@ -492,6 +510,14 @@ try {
  rolesDeny(fn()=>$on->request($adminBearer,rolesUuid(),$staff['target'],
   'support_agent',null,'Revoked admin cannot request roles'),
   'staff_role_request_denied');
+ $revokedIssuerPending=array_values(array_filter(
+  $queue->listPending($approverBearer),
+  static fn(array $row):bool=>$row['request_id']===$futureIntent['request_id']));
+ rolesCheck(count($revokedIssuerPending)===1 &&
+  $revokedIssuerPending[0]['requester_status']==='active' &&
+  $revokedIssuerPending[0]['can_decide']===false &&
+  !array_key_exists('issuer_global_roles',$revokedIssuerPending[0]),
+  'review cannot offer role approval after original staff issuer grant revocation');
  rolesDeny(fn()=>$decisionOn->decide($approverBearer,
   $futureIntent['request_id'],rolesUuid(),'approved',
   'Revoked requester can no longer authorize grants'),

@@ -1021,3 +1021,13 @@ Append only concise current milestones (commit SHA, exact CI job result, code fi
 
 ## STAFF ROLE REVIEW STALE-ACCOUNT ACTION GUARD — OCTOBER 18, 2026
 - Prepared bounded follow-on regression based on `ac3a2633fb7359815f0d38bf9d6d646fb0208090` (its own hosted workflow [39175411452](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39175411452) must independently be green before verified). MFA-independent role review queue now treats issuer not currently active, and recipient disabled/suspended, as REVIEW-ONLY even if the reviewer has role-grant authority; it still shows stale requests for audit context. Transactional decision service continues to enforce live under-lock checks. Synthetic PostgreSQL tests temporarily suspend issuer/disable target and confirm no approval form while their identity is invalid. No actual staff status mutation or production switch added to product. This change itself must receive its own exact hosted CI before VERIFIED.
+
+
+## CUSTOMER-SCOPED STAFF ROLE REVIEW ELIGIBILITY — OCTOBER 18, 2026
+- FOLLOW-ON prepared on independent stale-account guard. The read-only role review inbox additionally prevents approving role proposals scoped to a suspended or unresolvable customer; independent transactional grant approval already rejects inactive customers, so the form mirrors that live source-of-truth. Synthetic central PostgreSQL regression creates a real scoped request, suspends customer to verify review-only, then restores customer and proves reviewer eligibility returns. No account activation, license/payment issuance or production switches. Needs exact parent CI success and its own all-six hosted CI.
+
+- Review-only UI also evaluates the original issuer's CURRENT globally-scoped role authority for the particular proposed role, preventing actionable controls after issuer grant revocation even while their account remains active. PostgreSQL fixture revokes issuer grant and checks the remaining immutable pending proposal becomes review-only; internal grant list is not returned to the browser. The independent transaction remains the final authority.
+
+
+## STALE-ACCOUNT ROLE REVIEW GUARD VERIFIED — OCTOBER 18, 2026
+- Exact `39a4a641768db79d89c32f213f0ec388dd5b6789` [CI 39176702607](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39176702607) **VERIFIED SUCCESS all six hosted jobs**. Rejected stale request actions for inactive issuer/recipient already protected by independent transactional checks and now read-only in reviewer interface. This successor role reviewer scope/current issuer authority safety improvement is PUBLISHED SUBJECT TO ITS OWN hosted all-six exact SHA CI. No real operator or license signing activation.
