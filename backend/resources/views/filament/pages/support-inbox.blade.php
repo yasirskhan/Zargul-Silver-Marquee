@@ -47,7 +47,7 @@
                     <button type="button" wire:click="markMessageRead(@js($message['id']))"
                         class="rounded-lg border px-3 py-2 text-sm">Mark as read</button>
                 @else
-                    <span class="text-xs">Read</span>
+                    <span class="text-xs">Read{{ $message['read_by'] ? ' by '.$message['read_by'] : '' }}{{ $message['read_at'] ? ' at '.$message['read_at'] : '' }}</span>
                 @endif
             </article>
         @empty

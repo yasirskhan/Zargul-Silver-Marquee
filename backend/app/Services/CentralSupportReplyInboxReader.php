@@ -27,15 +27,22 @@ final class CentralSupportReplyInboxReader
     {
         if($limit<1||$limit>50)throw new InvalidArgumentException('Invalid support inbox page limit.');
         $this->scope->assertCanRead($actor,$companyId);
-        $rows=DB::table('central_support_reply_inbox')
-            ->where('company_id',$companyId)
-            ->orderByDesc('vendor_event_id')->limit($limit)->get();
+        $rows=DB::table('central_support_reply_inbox as inbox')
+            ->leftJoin('central_support_reply_read_events as receipt',
+                function($join) {
+                    $join->on('receipt.message_id','=','inbox.id')
+                        ->on('receipt.company_id','=','inbox.company_id');
+                })
+            ->leftJoin('users as read_actor','read_actor.id','=','receipt.actor_user_id')
+            ->where('inbox.company_id',$companyId)
+            ->orderByDesc('inbox.vendor_event_id')->limit($limit)
+            ->select('inbox.*','read_actor.name as read_by')->get();
         return $rows->map(static fn($r)=>[
             'id'=>$r->id, 'client_ticket_id'=>$r->client_ticket_id,
             'ticket_number'=>$r->vendor_ticket_number,
             'body'=>Crypt::decryptString($r->encrypted_body),
             'received_at'=>$r->created_at,
-            'read_at'=>$r->read_at
+            'read_at'=>$r->read_at, 'read_by'=>$r->read_by
         ])->all();
     }
 

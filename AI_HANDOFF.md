@@ -355,6 +355,10 @@
 - This protects the first-read actor/time record from accidental/malicious application writes, not from privileged DBA operations. The migration is unverified until all six hosted CI jobs PASS; release gates remain OFF.
 - Next: protected central support replies and authorized vendor staff/KMS, then optional visible audit reporting. Avoid touching main or property-platform.
 
+## SCOPED SUPPORT READ-RECEIPT VISIBILITY — NEW SOURCE
+- Owner/admin `SupportInbox` now lists the first verified read actor name and read timestamp alongside previously read support messages. Reader joins the immutable `central_support_reply_read_events` only on matching company AND message; company scope authorization remains required, message bodies still encrypted at rest, no vendor network. PostgreSQL roundtrip asserts displayed audit actor/time, existing unauthorized scope tests retained.
+- Requires exact six-job hosted CI. Prior read audit trigger `9a46d7f` five focused/browser/central jobs PASS and full backend currently running; confirm before marking fully verified. Do not claim live vendor support, KMS or hosting. Gates OFF.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`

@@ -79,6 +79,10 @@ class CentralSupportReplyInboxRoundtripTest extends TestCase
         $this->assertSame($owner->id,$readAudit->actor_user_id);
         $this->assertSame($company->id,$readAudit->company_id);
         $this->assertSame($row->id,$readAudit->message_id);
+        $viewed=$reader->list($owner,$company->id)[0];
+        $this->assertSame('Inbox Owner',$viewed['read_by']);
+        $this->assertNotNull($viewed['read_at']);
+
         // A replayed or adversarial application write cannot rewrite the
         // identity or delete the immutable read receipt.
         foreach (['rewrite','delete'] as $attempt) {
