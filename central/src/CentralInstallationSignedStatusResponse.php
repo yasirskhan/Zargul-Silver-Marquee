@@ -75,6 +75,9 @@ final class CentralInstallationSignedStatusResponse
         $bytes=self::decode($envelope['payload'],null);
         $sig=self::decode($envelope['signature'],64);
         $key=self::decode($this->trustedPublicKeys[$envelope['key_id']],32);
+        if (strlen($bytes)>4096) {
+            throw new RegistrationError('invalid_signed_status_receipt');
+        }
         // Exact-byte equality binds signer to this authenticated request
         // and prevents a callback substituting foreign or stale claims.
         if(!hash_equals($raw,$bytes) ||
