@@ -20,12 +20,22 @@ class TenantAccess
             return null;
         }
 
-        return CompanyMembership::query()
+        $membership = CompanyMembership::query()
             ->where('company_id', $companyId)
             ->where('user_id', $user->getKey())
             ->where('is_active', true)
             ->whereHas('company', fn ($query) => $query->where('is_active', true))
             ->first();
+
+        if ($membership === null) {
+            return null;
+        }
+
+        // Expired/restricted commercial installations cannot grant normal
+        // hall, booking, CMS, inventory or audit actions. The operator gate
+        // defaults OFF; Licensing and Support have separate scopes.
+        return app(CentralVenueOperationsAccessGate::class)->allowsCompany($companyId)
+            ? $membership : null;
     }
 
     public function canViewHall(User $user, Hall $hall): bool
