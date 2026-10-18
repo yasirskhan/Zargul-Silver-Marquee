@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Controllers\PublicSiteRequestGate;
 use App\Models\Company;
 use App\Models\CompanyMembership;
+use App\Models\Hall;
 use App\Models\User;
 use App\Services\TenantAccess;
 use App\Services\ApprovalWorkflowService;
@@ -55,7 +56,24 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
         $owner->markEmailAsVerified();
         CompanyMembership::create([
             'company_id'=>$company->id, 'user_id'=>$owner->id, 'role'=>'owner']);
+        $hall=Hall::create([
+            'company_id'=>$company->id,'name'=>'License Restricted Hall',
+            'slug'=>'restricted-license-hall','capacity'=>200
+        ]);
+        $manager=User::create([
+            'name'=>'Restricted Venue Manager',
+            'email'=>'restricted-license-manager@example.test','password'=>'test-only']);
+        $manager->markEmailAsVerified();
+        CompanyMembership::create([
+            'company_id'=>$company->id,'user_id'=>$manager->id,'role'=>'manager'
+        ]);
         $tenant=app(TenantAccess::class);
+        $this->assertTrue($tenant->canReadAuditHistory($owner,$company->id),
+            'Verified owner historical audit is available when licensing is OFF');
+        $this->assertTrue($tenant->canCorrectExistingApprovedRefund($owner,$hall),
+            'Verified owner existing-payment refund correction is permitted before release');
+        $this->assertFalse($tenant->canReadAuditHistory($manager,$company->id));
+        $this->assertFalse($tenant->canCorrectExistingApprovedRefund($manager,$hall));
         $this->assertTrue($tenant->canManageCustomerProfiles($owner,$company->id),
             'Default-OFF licensing preserves management permissions');
         $this->be($owner);
@@ -89,6 +107,8 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
         $this->assertBlocked();
         $this->assertFalse($tenant->canManageCustomerProfiles($owner,$company->id),
             'Commercial release cannot authorize company before signed enrollment');
+        $this->assertFalse($tenant->canReadAuditHistory($owner,$company->id),
+            'Unbound company has no restricted historical bypass');
         $this->assertNull($planning->membership($owner,$company->id));
         try {
             $search->search($owner,$company->id,'missing-fixture');
@@ -111,6 +131,10 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
         $this->assertBlocked();
         $this->assertFalse($tenant->canManageCustomerProfiles($owner,$company->id),
             'Enrolled but unsigned company remains restricted');
+        $this->assertTrue($tenant->canReadAuditHistory($owner,$company->id),
+            'Bound owner retains rights to existing historical records');
+        $this->assertTrue($tenant->canCorrectExistingApprovedRefund($owner,$hall),
+            'Bound owner may reconcile an independently preapproved existing refund');
         $pair=sodium_crypto_sign_keypair();
         config()->set('central_control.trusted_signing_public_keys',[
             'fixture-test-key'=>self::b64(sodium_crypto_sign_publickey($pair))
@@ -197,6 +221,14 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
                 'Normal operations stop precisely at signed expiry plus seven days');
             $this->assertFalse($finance->view($owner,$company->id),
                 'Expired grace cannot bypass finance authorization');
+            $this->assertFalse($tenant->canManageBookings($owner,$hall),
+                'Business operations remain restricted post-grace');
+            $this->assertTrue($tenant->canReadAuditHistory($owner,$company->id),
+                'Owner must retain read-only historical audits after expiry');
+            $this->assertTrue($tenant->canCorrectExistingApprovedRefund($owner,$hall),
+                'Existing independently approved full-payment refunds remain correctable');
+            $this->assertFalse($tenant->canReadAuditHistory($manager,$company->id));
+            $this->assertFalse($tenant->canCorrectExistingApprovedRefund($manager,$hall));
             $this->assertNull($planning->membership($owner,$company->id),
                 'Post-grace planning membership is rejected');
             try {
