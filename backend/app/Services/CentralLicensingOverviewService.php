@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use DateTimeImmutable;
+use DateInterval;
 use App\Models\User;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\DB;
@@ -48,6 +49,7 @@ final class CentralLicensingOverviewService
                 'expiry_warning'=>false,
                 'online_check_due'=>false,
                 'expires_at'=>null,
+                'grace_ends_at'=>null,
                 'revision'=>null,
                 'license_id'=>null,
                 'edition'=>null,
@@ -82,6 +84,8 @@ final class CentralLicensingOverviewService
             'expiry_warning'=>$state['expiry_warning'],
             'online_check_due'=>$due,
             'expires_at'=>$state['expires_at'],
+            'grace_ends_at'=>(new DateTimeImmutable($state['expires_at']))
+                ->add(new DateInterval('P7D'))->format('Y-m-d\\TH:i:s\\Z'),
             'revision'=>(int)$verified['grant']['revision'],
             'license_id'=>$verified['grant']['license_id'],
             'edition'=>$verified['grant']['edition'],
@@ -100,6 +104,7 @@ final class CentralLicensingOverviewService
             'expiry_warning'=>false,
             'online_check_due'=>$due,
             'expires_at'=>null,
+                'grace_ends_at'=>null,
             'revision'=>null,
             'license_id'=>null,
             'edition'=>null,
