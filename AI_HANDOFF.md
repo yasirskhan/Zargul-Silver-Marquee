@@ -441,3 +441,10 @@ Keep live external payment providers disabled until operator has configured veri
 
 ## HOW TO MAINTAIN THIS HANDOFF
 Append only concise current milestones (commit SHA, exact CI job result, code files, next unfinished objective) to this **active** file. Move superseded lengthy historical paragraphs to archive so startup remains fast. Never erase historical material.
+
+## CENTRAL STAFF VERIFIED SESSION FOUNDATION — NEW SOURCE / CI PENDING
+- Added `central/schema/014_staff_sessions.sql` vendor-isolated PostgreSQL 256-bit bearer digest store with 12-hour hard deadline, 30-minute idle deadline, explicit logout and no plaintext token persistence.
+- Added internal `CentralStaffSessionService`: actual central staff password+replay-protected TOTP precedes issuance; server-owned time; active staff/MFA, password, protected TOTP-seal and exact scoped role-grant fingerprint are rechecked on access. Suspension, reset or role change invalidates a session. Token rotation replaces the prior secret without resetting the hard deadline. Resolving staff identity does not itself authorize an action.
+- Added `central/tests/staff_sessions.php` to central-postgres CI with negative login, MFA replay, token hash, rotation, logout, changed-role/password, account suspension, idle expiry and forged-identity tests.
+- Baseline before this batch was `3bf7f90303b4c165c5f10f8f9794667e1d356314`, six-job PASS in run `39093757134`. NEW source still requires exact six-job hosted CI. No central staff HTTP login or production endpoints have been exposed. KMS custody, HTTPS, CSRF, cookies, request throttling and staff operator login remain unreleased and default OFF.
+- NEXT after verifying/fixing CI: protect vendor HTTP auth controller behind explicit disabled release gate with secure cookies, CSRF and login throttling, then secure central staff portal + audited authorization.
