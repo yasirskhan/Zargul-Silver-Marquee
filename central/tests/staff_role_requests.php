@@ -185,13 +185,15 @@ try {
   static fn(array $row):bool=>$row['request_id']===$scopedIntent['request_id']));
  rolesCheck(count($scopedRows)===1 &&
   $scopedRows[0]['scoped_customer_status']==='suspended' &&
-  $scopedRows[0]['can_decide']===false,
+  $scopedRows[0]['can_decide']===false &&
+  $scopedRows[0]['can_reject']===true,
   'suspended customer scoped role stays review-only');
  $scopedCustomer->execute(['status'=>'active','id'=>$scopeId]);
  $scopedRows=array_values(array_filter($scopedQueue->listPending($approverBearer),
   static fn(array $row):bool=>$row['request_id']===$scopedIntent['request_id']));
  rolesCheck(count($scopedRows)===1 &&
-  $scopedRows[0]['can_decide']===true,
+  $scopedRows[0]['can_decide']===true &&
+  $scopedRows[0]['can_reject']===true,
   'restored active customer permits only eligible two-person review');
  $decisionId=rolesUuid();
  putenv('CENTRAL_STAFF_ROLE_DECISIONS_ENABLED=false');
@@ -259,9 +261,11 @@ try {
   $ordinary[0]['target_status']==='pending_mfa' &&
   $ordinary[0]['reason']==='Assign support after independent approval' &&
   $ordinary[0]['can_decide']===true &&
+  $ordinary[0]['can_reject']===true &&
   count($sensitive)===1 &&
   $sensitive[0]['actor_staff_id']===$staff['super'] &&
-  $sensitive[0]['can_decide']===false,
+  $sensitive[0]['can_decide']===false &&
+  $sensitive[0]['can_reject']===false,
   'review queue shows issuer but restricts second-person actions by role');
  $statusSql=$db->prepare("UPDATE central_staff_users SET status=:state WHERE id=:id");
  $statusSql->execute(['state'=>'disabled','id'=>$staff['target']]);
@@ -269,16 +273,20 @@ try {
   static fn(array $row):bool=>$row['request_id']===$id));
  rolesCheck(count($disabledTarget)===1 &&
   $disabledTarget[0]['can_decide']===false &&
+  $disabledTarget[0]['can_reject']===true &&
   str_contains(CentralStaffRoleReviewQueue::html(
-   $disabledTarget,str_repeat('b',64)),'Review-only'),
-  'disabled recipient remains visible for audit but cannot show approval action');
+   $disabledTarget,str_repeat('b',64)),'Reject only') &&
+  !str_contains(CentralStaffRoleReviewQueue::html(
+   $disabledTarget,str_repeat('b',64)),'<option value="approved">'),
+  'disabled recipient permits rejection but not approval');
  $statusSql->execute(['state'=>'pending_mfa','id'=>$staff['target']]);
  $statusSql->execute(['state'=>'suspended','id'=>$staff['admin']]);
  $disabledIssuer=array_values(array_filter($queue->listPending($approverBearer),
   static fn(array $row):bool=>$row['request_id']===$id));
  rolesCheck(count($disabledIssuer)===1 &&
-  $disabledIssuer[0]['can_decide']===false,
-  'suspended issuer role request is review-only, never actionable');
+  $disabledIssuer[0]['can_decide']===false &&
+  $disabledIssuer[0]['can_reject']===true,
+  'suspended issuer is eligible for rejection only');
  $statusSql->execute(['state'=>'active','id'=>$staff['admin']]);
  $noSuperApproval=CentralStaffRoleReviewQueue::html(
   $sensitive,str_repeat('b',64));
@@ -516,14 +524,29 @@ try {
  rolesCheck(count($revokedIssuerPending)===1 &&
   $revokedIssuerPending[0]['requester_status']==='active' &&
   $revokedIssuerPending[0]['can_decide']===false &&
+  $revokedIssuerPending[0]['can_reject']===true &&
   !array_key_exists('issuer_global_roles',$revokedIssuerPending[0]),
   'review cannot offer role approval after original staff issuer grant revocation');
  rolesDeny(fn()=>$decisionOn->decide($approverBearer,
   $futureIntent['request_id'],rolesUuid(),'approved',
   'Revoked requester can no longer authorize grants'),
   'staff_role_decision_denied');
+ $staleDecisionId=rolesUuid();
+ $stalePayload=['request_id'=>$futureIntent['request_id'],
+  'decision_id'=>$staleDecisionId,'outcome'=>'rejected',
+  'reason'=>'Independent rejection of stale staff request'];
+ $staleMarkup=CentralStaffRoleReviewQueue::html(
+  $revokedIssuerPending,$approvalCsrf);
+ rolesCheck(str_contains($staleMarkup,'name="outcome" value="rejected"') &&
+  !str_contains($staleMarkup,'<option value="approved">'),
+  'stale request presents rejection only, with no approval option');
+ $staleViaRoute=$route->dispatch($decisionHttp,$reviewCookie,
+  $stalePayload,$approvalCsrf);
+ rolesCheck($staleViaRoute['kind']==='private_staff_role_decision_html' &&
+  str_contains($staleViaRoute['html'],'request rejected'),
+  'independent protected HTTP reviewer records rejection for stale issuer');
  $rejectStale=$decisionOn->decide($approverBearer,
-  $futureIntent['request_id'],rolesUuid(),'rejected',
+  $futureIntent['request_id'],$staleDecisionId,'rejected',
   'Independent rejection of stale staff request');
  rolesCheck($rejectStale['outcome']==='rejected' &&
   !$rejectStale['grant_created'],

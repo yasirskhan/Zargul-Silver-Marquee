@@ -71,8 +71,15 @@ final class CentralStaffRoleReviewQueue
         $rows=$q->fetchAll(PDO::FETCH_ASSOC);
         foreach($rows as &$row) {
             $row['can_decide']=false;
+            $row['can_reject']=false;
             $issuerRoles=json_decode((string)$row['issuer_global_roles'],true);
             unset($row['issuer_global_roles']);
+            foreach($globalRoles as $role) {
+                if(StaffRolePermissions::mayGrantRole($role,$row['role'],false,true)) {
+                    $row['can_reject']=true;break;
+                }
+            }
+            if(!$row['can_reject'])continue;
             // A stale or disabled participant must never receive an
             // actionable review form. The decision service rechecks the
             // same identities under lock independently of this UI guard.
@@ -94,13 +101,7 @@ final class CentralStaffRoleReviewQueue
                 }
             }
             if(!$issuerCapable)continue;
-            foreach($globalRoles as $role) {
-                if(StaffRolePermissions::mayGrantRole(
-                    $role,$row['role'],false,true)) {
-                    $row['can_decide']=true;
-                    break;
-                }
-            }
+            $row['can_decide']=true;
         }
         unset($row);
         return $rows;
@@ -142,7 +143,20 @@ final class CentralStaffRoleReviewQueue
                      'name="reason" minlength="5" maxlength="500" required>'.
                      '</label><button type="submit">Record decision</button>'.
                      '</form></td>'
-                    :'<td>Review-only</td>').'</tr>';
+                    :($allowDecision && ($r['can_reject']??false)===true
+                      ?'<td><form method="post" action="/staff/team/role-decisions">'.
+                       '<input type="hidden" name="staff_csrf" value="'.$proof.'">'.
+                       '<input type="hidden" name="request_id" value="'.
+                         $e($r['request_id']??'').'">'.
+                       '<input type="hidden" name="decision_id" value="'.
+                         self::uuidV4().'">'.
+                       '<input type="hidden" name="outcome" value="rejected">'.
+                       '<strong>Reject only: approval no longer permitted</strong>'.
+                       '<label>Decision reason <input type="text" '.
+                       'name="reason" minlength="5" maxlength="500" required>'.
+                       '</label><button type="submit">Reject stale request</button>'.
+                       '</form></td>'
+                      :'<td>Review-only</td>')).'</tr>';
         }
         if($body==='') {
             $body='<tr><td colspan="8">No pending independent reviews</td></tr>';

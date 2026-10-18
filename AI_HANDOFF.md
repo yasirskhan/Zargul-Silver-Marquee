@@ -1035,3 +1035,12 @@ Append only concise current milestones (commit SHA, exact CI job result, code fi
 
 ## CUSTOMER-SCOPE REVIEW CI SYNTAX REPAIR — OCTOBER 18, 2026
 - Run [39177111920](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39177111920) reported central-postgres FAILURE in PHP lint before database tests: a new JSON aggregate's SQL `'[]'::jsonb` literal broke the surrounding PHP single-quoted string in `CentralStaffRoleReviewQueue.php:66`. Replaced with semantically identical PostgreSQL `jsonb_build_array()` with no nested single quotes. No grants/permissions, account status, provider keys or production flags changed. Fixed source requires its OWN exact hosted six-job CI before VERIFIED.
+
+
+## REJECT-ONLY STALE STAFF ROLE REVIEW UI — OCTOBER 18, 2026
+- Prepared follow-on change: existing two-person decision service permits independent REJECTION of stale role requests, but previous UI hid all actions if issuer/recipient/customer scope became ineligible, potentially leaving pending requests stuck. Reviewer queue now computes `can_reject` separately from approval eligibility. An independently authorized reviewer receives a REJECT-only, CSRF-bound and explicit reason/idempotency form for stale requests; approval option is NEVER emitted. Reviewer without role authority remains view-only. Synthetic PostgreSQL tests cover suspended target, issuer, customer and revoked issuer role. The core transactional decision service is unchanged and still denies attempted stale APPROVAL under locks. Both operator release switches remain OFF. Requires exact parent all-six green and its OWN six hosted jobs before VERIFIED.
+
+
+## CUSTOMER-SCOPED REVIEW FIX EXACT VERIFIED — OCTOBER 18, 2026
+- The PHP SQL quoting repair source `46f141094ef33c2e95c0133963e8c10401a7fe35` is **VERIFIED SUCCESS across all six hosted jobs**: [CI 39177246587](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39177246587). Failed lint run 39177111920 is superseded, NOT counted as green. Reviewer actions respect active customer scope and issuer authority without changing any production release toggle.
+- Follow-on reject-only stale-request UI and protected HTTP regression are published SUBJECT TO their own new exact-SHA all-six CI; no real vendor website or staff activation is live.
