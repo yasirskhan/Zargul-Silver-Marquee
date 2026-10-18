@@ -73,7 +73,7 @@
             @endif
             <p class="text-xs">Public-site policy: {{ $summary['public_policy'] }}. Dashboard policy: {{ $summary['dashboard_policy'] }}. These are informational until commercial enforcement is approved.</p>
             <p class="text-sm">Historical invoice statements remain available to authorized owners and administrators even if business operations are restricted after license expiry.</p>
-            <a href="{{ \\App\\Filament\\Pages\\HistoricalInvoices::getUrl(['company'=>$companyId]) }}"
+            <a href="{{ \App\Filament\Pages\HistoricalInvoices::getUrl(['company'=>$companyId]) }}"
                 class="inline-block rounded-lg border px-4 py-2 text-sm font-semibold">
                 View past invoices and refunds
             </a>
