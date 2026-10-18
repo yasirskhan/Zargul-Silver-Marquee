@@ -163,6 +163,17 @@ final class VenueOverview extends Page
                         'eventDate' => $row->event_date, 'program' => $row->program,
                         'hallName' => $row->hall_name,
                     ])->all() : [],
+            'hafzatechSupportQueued' => $canSeeCompanyProposals &&
+                DB::table('central_installation_activation')
+                    ->where('company_id',$this->companyId)
+                    ->where('status','registered_pending_license')->exists()
+                ? DB::table('central_support_outbox as queued')
+                    ->join('central_installation_activation as enrollment',
+                        fn($join) => $join->on('enrollment.installation_id','=','queued.installation_id')
+                            ->on('enrollment.company_id','=','queued.company_id'))
+                    ->where('queued.company_id',$this->companyId)
+                    ->where('enrollment.status','registered_pending_license')
+                    ->where('queued.delivery_state','queued')->count() : null,
             'hafzatechSupportUnread' => $canSeeCompanyProposals &&
                 DB::table('central_installation_activation')
                     ->where('company_id',$this->companyId)

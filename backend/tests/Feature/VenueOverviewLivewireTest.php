@@ -70,6 +70,42 @@ class VenueOverviewLivewireTest extends TestCase
         $this->assertSame(0, DB::table('finance_journals')->count());
     }
 
+    public function test_support_backlog_only_visible_to_enrolled_owner_and_not_manager():void
+    {
+        [$company, , , $people]=$this->fixture();
+        config()->set('central_control.activation_enabled',true);
+        config()->set('central_control.support_enabled',true);
+        $identity=app(\App\Services\CentralInstallationIdentity::class)->initialize();
+        DB::table('central_installation_activation')->insert([
+            'singleton_id'=>1,
+            'installation_id'=>$identity['installation_id'],
+            'customer_id'=>(string)Str::uuid(),
+            'approved_domain'=>'overview-help.example.test',
+            'status'=>'registered_pending_license',
+            'central_registered_at'=>now(),'created_at'=>now(),'updated_at'=>now()
+        ]);
+        app(\App\Services\CentralInstallationCompanyScope::class)
+            ->bind($people['owner'],$company->id);
+        app(\App\Services\CentralSupportOutboxService::class)->queue(
+            $people['owner'],$company->id,(string)Str::uuid(),
+            'Request assistance with calendar',
+            'Can HAFZATECH advise on the session configuration?'
+        );
+        config()->set('central_control.support_enabled',false);
+        $this->be($people['owner']);
+        Livewire::test(VenueOverview::class)
+            ->assertSet('summary.hafzatechSupportQueued',1)
+            ->assertSee('Local support requests awaiting delivery')
+            ->assertSee('Queued locally')
+            ->assertSee('Review queued support requests');
+        $this->be($people['manager']);
+        Livewire::test(VenueOverview::class)
+            ->assertSet('summary.hafzatechSupportQueued',null)
+            ->assertDontSee('Local support requests awaiting delivery');
+        $this->assertDatabaseCount('finance_journals',0);
+        $this->assertDatabaseCount('central_license_check_state',0);
+    }
+
     public function test_owner_hall_program_setup_pulse_changes_after_saved_three_program_rules(): void
     {
         [$company, , $hall, $people] = $this->fixture();

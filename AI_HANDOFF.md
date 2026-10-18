@@ -389,6 +389,11 @@
 - Livewire/PostgreSQL regression seeds 45 encrypted local queued requests and pages from event 45→26, 25→6, 5→1 then returns to newest. Gate disabled/offline reading is preserved; no licensing or finance changes. Foreign and malformed cursor denials tested.
 - Parent 8e86d68c773f6f8e089835982b7c3179aa51877f added local honest queued-vs-delivered history. CI on this source must be confirmed all six jobs before VERIFIED. Vendor staff MFA, central API and signing KMS remain offline, all release gates default OFF.
 
+## PRIVATE OVERVIEW SUPPORT-DELIVERY BACKLOG — PENDING HOSTED CI
+- Owner/admin VenueOverview now displays a company-and-installation-scoped count of locally queued HAFZATECH support requests and a private support inbox link, even when delivery integration is disabled. It explicitly says queued locally does not mean received by HAFZATECH.
+- Count joins matching enrolled installation and support-outbox company IDs; manager/operations/foreign companies see null and no link. PostgreSQL + Livewire positive/negative test covers owner and manager and absence of any finance or license check mutations.
+- Parent 2cf29536f88a2f5b4ba50121af1ee79a8e4ef4e8 introduced keyset request history navigation; focused CI must be checked on its exact SHA and this new implementation too. Vendor support public APIs, staff MFA and cryptographic signing custody remain not deployed, release gates default OFF.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`

@@ -32,6 +32,17 @@
                             </a>
                         </div>
                     @endif
+                    @if (($summary['hafzatechSupportQueued'] ?? null) !== null)
+                        <div class="rounded-xl border p-4" aria-label="Local HAFZATECH support delivery backlog">
+                            <p class="text-sm">Local support requests awaiting delivery</p>
+                            <p class="text-3xl font-semibold">{{ $summary['hafzatechSupportQueued'] }}</p>
+                            <p class="text-xs">Queued locally — not confirmed received by HAFZATECH</p>
+                            <a class="text-xs underline"
+                                href="{{ \App\Filament\Pages\SupportInbox::getUrl(['company' => $companyId]) }}">
+                                Review queued support requests
+                            </a>
+                        </div>
+                    @endif
                     @if ($summary['canSeeCompanyProposals'])
                         <div class="rounded-xl border p-4">
                             <p class="text-sm">Halls needing program setup</p>
