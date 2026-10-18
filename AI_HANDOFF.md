@@ -421,6 +421,10 @@
 - No staff login, credential vault, live central session, signing KMS or HAFZATECH host deployment. New audit does not bypass trusted-password-step check. All release gates remain OFF.
 - Next bounded batch after exact green: scoped vendor auditor query/list pagination of immutable MFA outcomes, subject to trusted staff auth; then real protected staff password/session/KMS operator prerequisites.
 
+## PRIVATE VENDOR MFA AUDIT HISTORY READER — PENDING HOSTED CI
+- Added isolated `CentralStaffMfaAuditReader` backed by immutable MFA outcome journal. Only a centrally authenticated MFA-verified staff member with `audit.read` role can list a specified staff account's MFA event history. Bounded keyset pagination and explicit subject UUID validation, no OTP codes, protected keys or credential bytes in results. PostgreSQL regression tests limit, ordering, cursor, denial without verified session and role denial. No public staff API enabled.
+- Added reader integration test to independent central PostgreSQL job; previous MFA audit source `21a5888` must be checked for exact six-job CI. Release gates OFF and protected operator sessions/KMS remain unimplemented.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`
