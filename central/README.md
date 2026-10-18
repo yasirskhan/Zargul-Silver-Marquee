@@ -35,3 +35,6 @@ The separate central database will maintain append-only session issued, rotated,
 ### Role-scoped session event history reader (not public)
 
 The internal `CentralStaffSessionAuditReader` queries only safe event fields under a live central staff bearer with active `audit.read` permission. Its bounded ID cursor and subject UUID checks prevent unscoped history access. It does not create an HTTP endpoint or reuse a customer venue login. Operator KMS-backed credential handling, trusted HTTPS/proxy, audit/alerting and staff security recovery must be verified before any live staff portal.
+
+### Internal central staff suspension (OFF for public use)
+A centrally MFA-authenticated staff administrator may suspend a different active vendor employee when authorized for `staff.disable`. The independent central database writes a tamper-resistant account-decision record and revokes all that target's sessions in one transaction. Ordinary administrators cannot suspend themselves or a Super Administrator through this primitive. No public vendor staff login, staff suspension HTTP route or central KMS secret is enabled by these changes.
