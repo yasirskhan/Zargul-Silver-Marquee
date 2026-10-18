@@ -16,6 +16,24 @@ use InvalidArgumentException;
  */
 final class CentralInstallationCompanyScope
 {
+    /** Permit only a verified ACTIVE owner to begin a central enrollment.
+     * Rechecked again inside bind() after the trusted vendor round-trip.
+     * No external HTTPS request is allowed before this local preflight.
+     */
+    public function assertCanEnroll(User $actor, string $companyId): void
+    {
+        if (config('central_control.activation_enabled') !== true) {
+            throw new AuthorizationException('Central enrollment is not enabled.');
+        }
+        $this->assertActor($actor,$companyId,['owner']);
+        $existing=DB::table('central_installation_activation')
+            ->where('singleton_id',1)->first();
+        if ($existing && $existing->company_id !== null &&
+            $existing->company_id !== $companyId) {
+            throw new AuthorizationException('Installation is already bound to another company.');
+        }
+    }
+
     /** @return array{company_id:string,installation_id:string} */
     public function bind(User $actor, string $companyId): array
     {
