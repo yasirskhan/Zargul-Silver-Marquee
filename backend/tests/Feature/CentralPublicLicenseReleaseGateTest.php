@@ -8,6 +8,8 @@ use App\Models\CompanyMembership;
 use App\Models\Hall;
 use App\Models\User;
 use App\Services\TenantAccess;
+use App\Services\AuditHistoryService;
+use App\Services\AuditExportService;
 use App\Services\ApprovalWorkflowService;
 use App\Policies\FinanceAccessPolicy;
 use App\Policies\OperationsPlanningPolicy;
@@ -234,6 +236,23 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
             try {
                 $search->search($owner,$company->id,'missing-fixture');
                 $this->fail('Expired license allowed private record search.');
+            } catch (AuthorizationException) {
+                $this->assertTrue(true);
+            }
+            $this->be($owner);
+            $history=app(AuditHistoryService::class)->search($owner,$company->id);
+            $this->assertIsArray($history['entries']);
+            $export=app(AuditExportService::class)->prepare(
+                $owner,$company->id,
+                ['fromDate'=>'2027-10-08','toDate'=>'2027-10-08'],
+                'Historical owner audit export after signed commercial grace');
+            $this->assertIsString($export['encryptedPayload']);
+            $this->assertNotSame('', $export['encryptedPayload']);
+            $this->assertDatabaseCount('audit_export_requests',1);
+            $this->be($manager);
+            try {
+                app(AuditHistoryService::class)->search($manager,$company->id);
+                $this->fail('Manager read owner-only historical records after expiry.');
             } catch (AuthorizationException) {
                 $this->assertTrue(true);
             }
