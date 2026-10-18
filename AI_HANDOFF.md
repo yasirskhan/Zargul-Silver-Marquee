@@ -992,3 +992,5 @@ Append only concise current milestones (commit SHA, exact CI job result, code fi
 
 ## STATED ROLE JUSTIFICATION IN PRIVATE INDEPENDENT REVIEW — OCTOBER 18, 2026
 - Prepared FOLLOW-ON independent reviewer usability/safety slice: after two-person role inbox eligibility tests, display the original bounded immutable requester reason in the reviewer-only MFA-protected queue, never in the submitter's minimal request receipt or public SAPI. Requester/staff, reason and scope are HTML-escaped; malformed script/image/SVG/iframe test fixtures cannot inject HTML. This ensures an independent administrator sees the stated purpose before deciding on a privilege grant. Current live-authorization, separation-of-duties and approval transaction remain unchanged. This needs its OWN exact hosted CI before VERIFIED; no production gates enabled.
+
+- Additional PostgreSQL regression: a customer-scoped Super Administrator with a valid independent MFA session cannot read the global vendor role-review queue even though its role name is powerful. The queue remains global-only and private; central authorization already denies such access.

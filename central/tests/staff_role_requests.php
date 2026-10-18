@@ -205,6 +205,8 @@ try {
  $queue=new CentralStaffRoleReviewQueue($db,$sessions,$auth);
  rolesDeny(fn()=>$queue->listPending($supportBearer),
   'staff_review_queue_denied');
+ rolesDeny(fn()=>$queue->listPending($scopedReviewBearer),
+  'staff_review_queue_denied');
  rolesDeny(fn()=>$queue->listPending($approverBearer,26),
   'invalid_staff_review_queue');
  $pending=$queue->listPending($approverBearer);
