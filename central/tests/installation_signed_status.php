@@ -251,6 +251,60 @@ try {
         $existingResponse['signed_grant']===null &&
         isset($existingResponse['signed_receipt']),
         'same paid revision reports signed status without delivering new grant');
+
+    // Early paid-renewal delivery uses a NEW signed revision and invoice,
+    // but must preserve the original vendor license ID and paid term.
+    // Only delivery is exercised here; settlement and renewal preparation
+    // have independent authorization and exact-price integration tests.
+    $renewInvoice=signedCheckUuid();$renewRevision=signedCheckUuid();
+    $db->prepare("INSERT INTO central_vendor_invoices
+        (id,customer_id,plan_version_id,invoice_number,currency,total_minor,
+        receiving_account_id,encrypted_instructions_snapshot,status,issued_at)
+        VALUES(:id,:customer,:plan,:number,'PKR',12000,:account,
+        decode(:cipher,'hex'),'issued',now())")
+        ->execute(['id'=>$renewInvoice,'customer'=>$customer,'plan'=>$plan,
+            'number'=>'SIGNED-RENEWAL-'.substr($renewInvoice,0,8),
+            'account'=>$account,'cipher'=>bin2hex(random_bytes(32))]);
+    $renewalClaim=array_replace($grantClaim,[
+        'revision'=>2,
+        'not_before'=>'2027-10-01T00:00:00Z',
+        'expires_at'=>'2028-10-01T00:00:00Z'
+    ]);
+    $renewalEnvelope=Ed25519GrantCodec::sign(
+        $renewalClaim,'worker-test-key',sodium_crypto_sign_secretkey($receiptKeys));
+    $renewNonce=random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+    $renewSealed=$renewNonce.sodium_crypto_secretbox(
+        json_encode($renewalEnvelope,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES),
+        $renewNonce,$sealedKey);
+    $db->prepare("INSERT INTO central_paid_license_revisions
+        (id,license_id,invoice_id,revision,term_months,begins_at,expires_at,
+        plan_snapshot,authorized_officer_id,state,signed_envelope_ciphertext)
+        VALUES(:id,:license,:invoice,2,12,'2027-10-01T00:00:00Z',
+        '2028-10-01T00:00:00Z',:snapshot,:officer,'signed',decode(:cipher,'hex'))")
+        ->execute(['id'=>$renewRevision,'license'=>$license,'invoice'=>$renewInvoice,
+            'snapshot'=>json_encode($planSnapshot,JSON_THROW_ON_ERROR),
+            'officer'=>$officer,'cipher'=>bin2hex($renewSealed)]);
+    $db->prepare('UPDATE central_licenses SET current_revision=2 WHERE id=:license')
+        ->execute(['license'=>$license]);
+    $renewRequest=$makeRequest($customer,1);
+    $renewResult=$realCombined->check($renewRequest);
+    signedCheckAssert($renewResult['status']==='signed_revision_pending_delivery' &&
+        $renewResult['revision']===2 &&
+        $renewResult['signed_grant']===$renewalEnvelope &&
+        $renewalClaim['license_id']===$grantClaim['license_id'] &&
+        $renewalClaim['not_before']===$grantClaim['expires_at'],
+        'early renewal delivers revision 2 under original license id without losing paid days');
+    $renewReceiptBytes=base64_decode(
+        strtr($renewResult['signed_receipt']['payload'],'-_','+/'),true);
+    $renewReceipt=json_decode($renewReceiptBytes,true,16,JSON_THROW_ON_ERROR);
+    signedCheckAssert($renewReceipt['revision']===2 &&
+        $renewReceipt['nonce']===$renewRequest['nonce'] &&
+        $renewReceipt['installation_id']===$installation,
+        'new signed receipt binds renewed grant to current installation request');
+    signedCheckDeny(fn()=>$realCombined->check($renewRequest),'replayed_check');
+    $latest=$realCombined->check($makeRequest($customer,2));
+    signedCheckAssert($latest['revision']===2 && $latest['signed_grant']===null,
+        'already-installed renewed revision never redelivered as a new grant');
     putenv('CENTRAL_GRANT_DELIVERY_ENABLED=false');
     signedCheckDeny(fn()=>$realCombined->check($makeRequest($customer)),
         'grant_delivery_not_enabled');
@@ -279,8 +333,8 @@ try {
             $status,$wrongSig,$keys,true))->check($makeRequest($customer)),
         'invalid_signed_status_receipt');
     $recorded->execute(['installation'=>$installation]);
-    signedCheckAssert((int)$recorded->fetchColumn()===8,
-        'eight authenticated status probes consume exactly one nonce each');
+    signedCheckAssert((int)$recorded->fetchColumn()===10,
+        'ten authenticated status probes consume exactly one nonce each');
 } finally {
     putenv('CENTRAL_SIGNED_STATUS_ENABLED=false');
     putenv('CENTRAL_GRANT_DELIVERY_ENABLED=false');
