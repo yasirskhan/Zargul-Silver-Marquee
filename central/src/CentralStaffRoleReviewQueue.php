@@ -42,8 +42,12 @@ final class CentralStaffRoleReviewQueue
         $globalRoles=$rolesQuery->fetchAll(PDO::FETCH_COLUMN);
         $q=$this->db->prepare(
             'SELECT r.id AS request_id,r.actor_staff_id,r.target_staff_id,r.role,
-                    r.customer_scope_id,r.reason,r.created_at
+                    r.customer_scope_id,r.reason,r.created_at,
+                    requester.email AS requester_email,
+                    target.email AS target_email,target.status AS target_status
              FROM central_staff_role_requests r
+             JOIN central_staff_users requester ON requester.id=r.actor_staff_id
+             JOIN central_staff_users target ON target.id=r.target_staff_id
              LEFT JOIN central_staff_role_decisions d
                 ON d.request_id=r.id
              WHERE d.id IS NULL
@@ -81,7 +85,10 @@ final class CentralStaffRoleReviewQueue
         foreach(array_slice($rows,0,25) as $r) {
             $body.='<tr><td>'.$e($r['request_id']??'').
                 '</td><td>'.$e($r['actor_staff_id']??'').
+                '<small> '.$e($r['requester_email']??'').'</small>'.
                 '</td><td>'.$e($r['target_staff_id']??'').
+                '<small> '.$e($r['target_email']??'').
+                ' ('.$e($r['target_status']??'').')</small>'.
                 '</td><td>'.$e($r['role']??'').
                 '</td><td>'.(($r['customer_scope_id']??null)===null
                     ?'Global':$e($r['customer_scope_id'])).

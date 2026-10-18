@@ -226,6 +226,9 @@ try {
   static fn(array $row):bool=>$row['request_id']===$high['request_id']));
  rolesCheck(count($ordinary)===1 &&
   $ordinary[0]['actor_staff_id']===$staff['admin'] &&
+  $ordinary[0]['requester_email']==='role-intent-admin@example.test' &&
+  $ordinary[0]['target_email']==='role-intent-target@example.test' &&
+  $ordinary[0]['target_status']==='pending_mfa' &&
   $ordinary[0]['reason']==='Assign support after independent approval' &&
   $ordinary[0]['can_decide']===true &&
   count($sensitive)===1 &&
@@ -244,6 +247,9 @@ try {
   'request_id'=>$id,'target_staff_id'=>$staff['target'],
   'role'=>'<script>alert(1)</script>',
   'actor_staff_id'=>'<iframe src=evil>',
+  'requester_email'=>'<b>pretend-operator</b>',
+  'target_email'=>'<a href=evil>wrong target</a>',
+  'target_status'=>'<u>active</u>',
   'customer_scope_id'=>'<img src=x onerror=alert(2)>',
   'reason'=>'<svg onload=alert(3)>',
   'created_at'=>'2026-10-18'
@@ -252,10 +258,16 @@ try {
   str_contains($malicious,'&lt;img') &&
   str_contains($malicious,'&lt;svg') &&
   str_contains($malicious,'&lt;iframe') &&
+  str_contains($malicious,'&lt;b&gt;') &&
+  str_contains($malicious,'&lt;a href') &&
+  str_contains($malicious,'&lt;u&gt;') &&
   !str_contains($malicious,'<script>') &&
   !str_contains($malicious,'<img') &&
   !str_contains($malicious,'<svg') &&
-  !str_contains($malicious,'<iframe'),
+  !str_contains($malicious,'<iframe') &&
+  !str_contains($malicious,'<b>') &&
+  !str_contains($malicious,'<a href') &&
+  !str_contains($malicious,'<u>'),
   'untrusted role review metadata HTML escaped');
  $csrf=new CentralStaffCsrfTokenService($db,$sessions);
  $approvalCsrf=$csrf->issue($approverBearer);
@@ -327,6 +339,8 @@ try {
  rolesCheck($reviewPage['kind']==='private_role_review_html' &&
   str_contains($reviewPage['html'],$id) &&
   str_contains($reviewPage['html'],'Assign support after independent approval') &&
+  str_contains($reviewPage['html'],'role-intent-target@example.test') &&
+  str_contains($reviewPage['html'],'pending_mfa') &&
   !str_contains($reviewPage['html'],$approverBearer) &&
   !str_contains($reviewPage['html'],'synthetic-role-request-password'),
   'independent admin sees only metadata with no password/session bearer');
