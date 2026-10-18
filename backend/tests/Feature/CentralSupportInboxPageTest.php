@@ -41,6 +41,7 @@ class CentralSupportInboxPageTest extends TestCase
         app(CentralInstallationCompanyScope::class)->bind($owner,$company->id);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $this->be($owner);
+        $this->assertTrue(\Illuminate\Support\Facades\Route::has('filament.admin.pages.hafzatech-support'));
         $view=Livewire::test(SupportInbox::class)
             ->assertSet('companyId',$company->id)
             ->assertSee('HAFZATECH Support')
