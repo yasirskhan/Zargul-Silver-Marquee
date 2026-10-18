@@ -189,3 +189,16 @@ Artisan::command('venuedesk:send-hafzatech-support', function (): int {
 
 \Illuminate\Support\Facades\Schedule::command('venuedesk:send-hafzatech-support')
     ->everyFiveMinutes()->withoutOverlapping(10);
+
+/**
+ * Replies have a separate five-minute opt-in schedule, not the license
+ * 15-day check schedule. All work and HTTPS access are disabled by default.
+ */
+Artisan::command('venuedesk:pull-hafzatech-support-replies', function (): int {
+    $result=app(\App\Services\CentralSupportReplyPullTransport::class)->poll();
+    $this->info('HAFZATECH support reply sync: '.$result['state']);
+    return $result['state']==='error' ? 1 : 0;
+})->purpose('Pull vendor-signed support replies into the encrypted inbox when approved');
+
+\Illuminate\Support\Facades\Schedule::command('venuedesk:pull-hafzatech-support-replies')
+    ->everyFiveMinutes()->withoutOverlapping(10);
