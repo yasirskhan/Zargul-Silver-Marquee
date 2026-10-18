@@ -143,8 +143,11 @@ paidSessionDeny(fn()=>$service->prepare($issuer,$invoice,paidSessionUuid(),$now)
     'installation_not_eligible');
 paidSessionDeny(fn()=>$service->prepare($issuer,$invoice,$installation,$now),
     'independent_payment_or_officer_required');
-paidSessionAssert((int)$db->query('SELECT count(*) FROM central_licenses')->fetchColumn()===0,
-    'customer evidence cannot activate or stage unpaid entitlement');
+$invoiceCount=$db->prepare('SELECT count(*) FROM central_paid_license_revisions
+    WHERE invoice_id=:invoice');
+$invoiceCount->execute(['invoice'=>$invoice]);
+paidSessionAssert((int)$invoiceCount->fetchColumn()===0,
+    'customer evidence cannot activate or stage THIS unpaid entitlement');
 $db->prepare("INSERT INTO central_vendor_verified_settlements
  (id,invoice_id,receiving_account_id,currency,amount_minor,
  external_settlement_reference,verified_by,verified_at)
@@ -158,10 +161,16 @@ paidSessionAssert($prepared['revision']===1 &&
     'real issuer session prepares exactly a paid unsigned 12-month grant');
 paidSessionAssert($service->prepare($issuer,$invoice,$installation,$now)===$prepared,
     'same authorized staff retry is idempotent');
-paidSessionAssert((int)$db->query('SELECT count(*) FROM central_license_issuance_audit')
-    ->fetchColumn()===1,'exactly one durable vendor license audit event');
-paidSessionAssert((int)$db->query("SELECT count(*) FROM central_paid_license_revisions
-    WHERE state='signed'")->fetchColumn()===0,'no signing or activation occurred');
+$auditCount=$db->prepare('SELECT count(*) FROM central_license_issuance_audit
+    WHERE invoice_id=:invoice');
+$auditCount->execute(['invoice'=>$invoice]);
+paidSessionAssert((int)$auditCount->fetchColumn()===1,
+    'exactly one durable license preparation event for THIS invoice');
+$signedCount=$db->prepare("SELECT count(*) FROM central_paid_license_revisions
+    WHERE invoice_id=:invoice AND state='signed'");
+$signedCount->execute(['invoice'=>$invoice]);
+paidSessionAssert((int)$signedCount->fetchColumn()===0,
+    'THIS invoice remains unsigned; no activation occurred');
 $db->prepare("UPDATE central_staff_role_grants SET revoked_at=now()
     WHERE staff_id=:id AND role='license_officer'")
  ->execute(['id'=>$officer]);
