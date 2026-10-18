@@ -160,6 +160,7 @@ final class CentralSignedLicenseCache
                 'active' => true,
                 'scheduled_renewal' => [
                     'revision' => $verified['grant']['revision'],
+                    'effective_at' => $verified['grant']['not_before'],
                     'expires_at' => $verified['grant']['expires_at'],
                 ],
             ];
