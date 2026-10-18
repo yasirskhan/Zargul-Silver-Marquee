@@ -95,6 +95,10 @@ class VenueOverviewLivewireTest extends TestCase
         $this->be($people['owner']);
         Livewire::test(VenueOverview::class)
             ->assertSet('summary.hafzatechSupportQueued',1)
+            ->assertSet('summary.pendingApprovals',null)
+            ->assertSet('summary.drafts',null)
+            ->assertSet('summary.canReviewFinance',false)
+            ->assertDontSee('Finance review · internal only')
             ->assertSee('Local support requests awaiting delivery')
             ->assertSee('Queued locally')
             ->assertSee('Review queued support requests');
