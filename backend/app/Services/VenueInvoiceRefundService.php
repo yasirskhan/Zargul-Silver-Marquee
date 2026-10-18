@@ -55,8 +55,7 @@ final class VenueInvoiceRefundService
                 ->where('id', $reservation->hall_id)->where('is_active', true)->first() : null;
             if (! $invoice || ! $reservation || ! $hall || ! Auth::check()
                 || (int) Auth::id() !== (int) $actor->getKey()
-                || ! $this->access->canManageCustomerProfiles($actor, $companyId)
-                || ! $this->access->canManageBookings($actor, $hall)) {
+                || ! $this->access->canCorrectExistingApprovedRefund($actor, $hall)) {
                 throw new AuthorizationException('Current owner/admin refund authority required.');
             }
             $approval = DB::table('approval_requests')
