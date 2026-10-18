@@ -16,7 +16,7 @@ final class CentralStaffPortalDashboard
         private readonly CentralStaffCustomerLookup $customers
     ) {}
 
-    public function render(string $sessionBearer,string $customerId): string
+    public function render(string $sessionBearer,string $customerId,?string $csrf=null): string
     {
         $billing=$this->authorization->permits(
             $sessionBearer,'billing.invoice.read',$customerId);
@@ -57,8 +57,42 @@ final class CentralStaffPortalDashboard
                 'messages require separately protected key access. '.
                 'This screen cannot send replies or close cases.</p></section>';
         }
+        $forms='';
+        if(is_string($csrf) && preg_match('/^[0-9a-f]{64}$/D',$csrf)===1) {
+            $safeCsrf=htmlspecialchars($csrf,ENT_QUOTES,'UTF-8');
+            $base='<input type="hidden" name="staff_csrf" value="'.$safeCsrf.'">'.
+                '<input type="hidden" name="customer_id" value="'.$id.'">';
+            $form=static fn(string $path,string $label):string=>
+                '<form method="post" action="'.$path.'">'.$base.
+                '<button type="submit">'.$label.'</button></form>';
+            $forms.=$form('/staff/dashboard','Refresh dashboard');
+            $forms.=$form('/staff/customers/lookup','Customer overview');
+            if($licensing) {
+                $forms.=$form('/staff/licenses/pending','Pending license revisions');
+            }
+            if($support) {
+                $forms.=$form('/staff/support/tickets','Support tickets');
+            }
+            if($billing) {
+                $forms.='<form method="post" action="/staff/billing/overview">'.
+                    $base.'<label>Invoice ID <input type="text" '.
+                    'name="invoice_id" maxlength="36" required></label>'.
+                    '<button type="submit">Billing overview</button></form>';
+            }
+            $forms.='<form method="post" action="/staff/account/password/change">'.
+                '<input type="hidden" name="staff_csrf" value="'.$safeCsrf.'">'.
+                '<label>Current password <input type="password" '.
+                'name="current_password" autocomplete="current-password" required></label>'.
+                '<label>New password <input type="password" name="new_password" '.
+                'autocomplete="new-password" minlength="12" required></label>'.
+                '<button type="submit">Change my password</button></form>';
+            $forms.='<form method="post" action="/staff/session/logout">'.
+                '<input type="hidden" name="staff_csrf" value="'.$safeCsrf.'">'.
+                '<button type="submit">Sign out</button></form>';
+            $forms='<nav aria-label="Authorized staff actions">'.$forms.'</nav>';
+        }
         return '<section aria-label="Private HAFZATECH staff dashboard">'.
             '<h1>HAFZATECH Staff</h1><p>Selected customer: '.$name.
-            ' ('.$id.')</p>'.$sections.'</section>';
+            ' ('.$id.')</p>'.$sections.$forms.'</section>';
     }
 }

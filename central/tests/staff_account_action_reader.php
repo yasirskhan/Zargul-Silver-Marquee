@@ -17,6 +17,7 @@ use Hafzatech\Central\CentralStaffProtectedHttpBoundary;
 use Hafzatech\Central\CentralStaffCsrfTokenService;
 use Hafzatech\Central\CentralStaffPortalHttpRouter;
 use Hafzatech\Central\CentralStaffPortalPrivateResponse;
+use Hafzatech\Central\CentralStaffPortalTeamDashboard;
 use Hafzatech\Central\StaffRolePermissions;
 use Hafzatech\Central\RegistrationError;
 
@@ -31,7 +32,7 @@ foreach(['CentralStaffPasswordVerifier','CentralStaffTotpVerifier',
  'CentralStaffPaymentEvidenceReviewService','CentralStaffInvoicePaymentOverview',
  'CentralStaffHttpPolicy','CentralStaffProtectedHttpBoundary',
  'CentralStaffCsrfTokenService','CentralStaffPortalHttpRouter',
- 'CentralStaffPortalPrivateResponse'] as $class)
+ 'CentralStaffPortalPrivateResponse','CentralStaffPortalTeamDashboard'] as $class)
  require dirname(__DIR__).'/src/'.$class.'.php';
 
 function actionsRequire(bool $yes,string $reason):void {
@@ -138,18 +139,53 @@ actionsRequire(str_contains($unsafe,'&lt;script&gt;') &&
 $csrfService=new CentralStaffCsrfTokenService($db,$sessions);
 $adminCsrf=$csrfService->issue($adminBearer);
 $boundary=new CentralStaffProtectedHttpBoundary($sessions,$csrfService,$auth,true);
+$teamDash=new CentralStaffPortalTeamDashboard($auth);
 $http=new CentralStaffPortalHttpRouter(
  $boundary, new Hafzatech\Central\CentralStaffPaymentEvidenceHttpAdapter(
   $db,$boundary,
   new Hafzatech\Central\CentralStaffPaymentEvidenceQueue($db,$auth),
   new Hafzatech\Central\CentralStaffPaymentEvidenceReviewService($db,$sessions,$auth),
   new Hafzatech\Central\CentralStaffInvoicePaymentOverview($db,$sessions,$auth)),
- true,null,null,null,null,null,$directory,$roleReader);
+ true,null,null,null,null,null,$directory,$roleReader,null,null,$teamDash);
 $server=['HTTPS'=>'on','SERVER_PORT'=>'443','HTTP_HOST'=>'lichall.hafzatech.com',
  'REQUEST_METHOD'=>'POST','REQUEST_URI'=>'/staff/team/accounts',
  'HTTP_ORIGIN'=>'https://lichall.hafzatech.com',
  'HTTP_SEC_FETCH_SITE'=>'same-origin','REMOTE_ADDR'=>'192.0.2.109'];
 $cookie=[CentralStaffHttpPolicy::COOKIE_NAME=>$adminBearer];
+$teamReq=$server;$teamReq['REQUEST_URI']='/staff/team/dashboard';
+$teamPage=$http->dispatch($teamReq,$cookie,[],$adminCsrf);
+actionsRequire($teamPage['kind']==='private_team_dashboard_html' &&
+ str_contains($teamPage['html'],'action="/staff/team/accounts"') &&
+ str_contains($teamPage['html'],'action="/staff/team/roles"') &&
+ str_contains($teamPage['html'],'action="/staff/account/password/change"') &&
+ str_contains($teamPage['html'],'action="/staff/session/logout"') &&
+ str_contains($teamPage['html'],$adminCsrf) &&
+ !str_contains($teamPage['html'],$adminBearer),
+ 'Staff Admin only sees CSRF-protected read-only and self-service POST forms');
+$teamWire=(new CentralStaffPortalPrivateResponse(true))->compose($teamPage);
+actionsRequire($teamWire['headers']['Cache-Control']==='no-store, private' &&
+ $teamWire['cookies']===[],'admin dashboard private response no cookie');
+foreach([
+ [$teamReq,$cookie,['role'=>'billing_officer'],$adminCsrf],
+ [$teamReq,$cookie,[],str_repeat('0',64)],
+ [array_replace($teamReq,['HTTP_ORIGIN'=>'https://evil.example']),$cookie,[],$adminCsrf],
+] as [$srv,$ck,$fields,$proof]) {
+ try{$http->dispatch($srv,$ck,$fields,$proof);
+  throw new RuntimeException('FORGED TEAM DASHBOARD REQUEST');}
+ catch(RegistrationError $error){
+  actionsRequire(in_array($error->errorCode,
+   ['invalid_staff_dashboard','staff_portal_denied'],true),
+   'team dashboard protects origin/CSRF and forbids role overrides');
+ }
+}
+try{$http->dispatch($teamReq,
+ [CentralStaffHttpPolicy::COOKIE_NAME=>$supportBearer],[],$adminCsrf);
+ throw new RuntimeException('SUPPORT ACCESS TEAM DASHBOARD');}
+catch(RegistrationError $error){
+ actionsRequire($error->errorCode==='staff_portal_denied',
+ 'support cannot view staff admin dashboard');
+}
+
 $rolesRequest=$server;$rolesRequest['REQUEST_URI']='/staff/team/roles';
 $rolePage=$http->dispatch($rolesRequest,$cookie,
  ['subject_staff_id'=>$staff['support']],$adminCsrf);

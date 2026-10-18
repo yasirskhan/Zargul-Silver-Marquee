@@ -26,7 +26,9 @@ final class CentralStaffPortalHttpRouter
         private readonly ?CentralStaffPortalAuditHistoryPage $auditHistory = null,
         private readonly ?CentralStaffAccountDirectory $staffDirectory = null,
         private readonly ?CentralStaffRoleGrantDirectory $staffRoles = null,
-        private readonly ?CentralStaffSessionSupportReply $supportReply = null
+        private readonly ?CentralStaffSessionSupportReply $supportReply = null,
+        private readonly ?CentralStaffPortalOwnPassword $ownPassword = null,
+        private readonly ?CentralStaffPortalTeamDashboard $teamDashboard = null
     ) {}
 
     /**
@@ -169,7 +171,7 @@ final class CentralStaffPortalHttpRouter
                 throw new RegistrationError('staff_portal_denied');
             }
             return ['kind'=>'private_dashboard_html',
-                'html'=>$this->dashboard->render($bearer,$customerId)];
+                'html'=>$this->dashboard->render($bearer,$customerId,$csrfHeader)];
         }
         if ($uri==='/staff/support/tickets' && $this->supportQueue!==null) {
             if (!$this->exactFields($fields,['customer_id']) ||
@@ -249,6 +251,36 @@ final class CentralStaffPortalHttpRouter
                 $fields['message_id'],$fields['body']);
             return ['kind'=>'private_support_reply_html',
                 'html'=>CentralStaffSessionSupportReply::html($receipt)];
+        }
+        if ($uri==='/staff/account/password/change' &&
+            $this->ownPassword!==null) {
+            if(!$this->exactFields($fields,['current_password','new_password']) ||
+                !is_string($fields['current_password']) ||
+                !is_string($fields['new_password']) ||
+                !$this->boundary->permitsOwnAccountMutation(
+                    $server,$bearer,$csrfHeader)) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            $this->ownPassword->change(
+                $bearer,$fields['current_password'],$fields['new_password']);
+            // Core password change revokes this AND all other staff sessions.
+            // Emit the existing strictly host-only cookie clear response.
+            return ['kind'=>'internal_logout',
+                'clear_cookie_name'=>CentralStaffHttpPolicy::COOKIE_NAME,
+                'clear_cookie_options'=>array_replace(
+                    CentralStaffHttpPolicy::cookieOptions(time()),['expires'=>1])
+            ];
+        }
+        if ($uri==='/staff/team/dashboard' && $this->teamDashboard!==null) {
+            if($fields!==[]) {
+                throw new RegistrationError('invalid_staff_dashboard',422);
+            }
+            if(!$this->boundary->permitsMutation(
+                $server,$bearer,$csrfHeader,'staff.roles.assign',null)) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            return ['kind'=>'private_team_dashboard_html',
+                'html'=>$this->teamDashboard->render($bearer,$csrfHeader)];
         }
         throw new RegistrationError('staff_route_not_found',404);
     }

@@ -55,6 +55,18 @@ final class CentralStaffProtectedHttpBoundary
             $this->authorization->permits($sessionBearer,$capability,$customerId);
     }
 
+    /** Same-origin, CSRF-bound CURRENT staff session for self-only actions.
+     * No arbitrary business capability is implied or granted by this check.
+     */
+    public function permitsOwnAccountMutation(array $server,string $bearer,
+        string $submittedCsrf):bool
+    {
+        return $this->enabled &&
+            CentralStaffHttpPolicy::staffMutationAllowed($server) &&
+            $this->csrf->accepts($bearer,$submittedCsrf) &&
+            $this->sessions->staffFor($bearer)!==null;
+    }
+
     public function signOut(array $server,string $sessionBearer,string $submittedCsrf): bool
     {
         $path=parse_url((string)($server['REQUEST_URI']??'/'),PHP_URL_PATH);

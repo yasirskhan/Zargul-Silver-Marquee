@@ -403,6 +403,8 @@ $dashboardHttp=$queueRequest;$dashboardHttp['REQUEST_URI']='/staff/dashboard';
 $issuerDashboard=$dashboardRouter->dispatch(
  $dashboardHttp,$issuerCookie,['customer_id'=>$company],$issuerCsrf);
 paidSessionAssert($issuerDashboard['kind']==='private_dashboard_html' &&
+ str_contains($issuerDashboard['html'],'action="/staff/licenses/pending"') &&
+ !str_contains($issuerDashboard['html'],'action="/staff/billing/overview"') &&
  str_contains($issuerDashboard['html'],'License Officer') &&
  !str_contains($issuerDashboard['html'],'Billing Officer') &&
  !str_contains($issuerDashboard['html'],$issuer),
@@ -410,6 +412,8 @@ paidSessionAssert($issuerDashboard['kind']==='private_dashboard_html' &&
 $billingDashboard=$dashboardRouter->dispatch(
  $dashboardHttp,$billingCookie,['customer_id'=>$company],$billingCsrf);
 paidSessionAssert(str_contains($billingDashboard['html'],'Billing Officer') &&
+ str_contains($billingDashboard['html'],'action="/staff/billing/overview"') &&
+ !str_contains($billingDashboard['html'],'action="/staff/licenses/pending"') &&
  !str_contains($billingDashboard['html'],'<h2>License Officer</h2>'),
  'current Billing Officer sees only billing module and no license signing');
 $dashboardWire=(new \Hafzatech\Central\CentralStaffPortalPrivateResponse(true))
@@ -530,6 +534,8 @@ $agentDashboardHttp['REQUEST_URI']='/staff/dashboard';
 $agentDash=$supportRouter->dispatch(
  $agentDashboardHttp,$supportCookie,['customer_id'=>$company],$supportCsrf);
 paidSessionAssert(str_contains($agentDash['html'],'<h2>Support Agent</h2>') &&
+ str_contains($agentDash['html'],'action="/staff/support/tickets"') &&
+ !str_contains($agentDash['html'],'action="/staff/billing/overview"') &&
  !str_contains($agentDash['html'],'<h2>License Officer</h2>') &&
  !str_contains($agentDash['html'],'<h2>Billing Officer</h2>'),
  'support-only session has no billing or signing dashboard module');
