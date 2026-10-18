@@ -13,11 +13,14 @@ final class CentralStaffSessionService
 {
     public function __construct(
         private readonly PDO $db,
-        private readonly CentralStaffCredentialVerifier $credentials
+        private readonly CentralStaffCredentialVerifier $credentials,
+        private readonly CentralStaffLoginRateLimiter $limiter
     ) {}
 
-    public function login(string $email, string $password, string $totp): ?string
+    public function login(string $email, string $password, string $totp,
+        string $trustedClientIp): ?string
     {
+        if(!$this->limiter->reserve($email,$trustedClientIp))return null;
         $staff=$this->credentials->verify($email,$password,$totp,time());
         if($staff===null)return null;
         $snapshot=$this->snapshot($staff);
@@ -31,6 +34,7 @@ final class CentralStaffSessionService
         );
         $q->execute(['id'=>self::uuid(),'staff'=>$staff,
             'digest'=>hash('sha256',$token),'snapshot'=>$snapshot]);
+        $this->limiter->clearSuccessfulAccount($email);
         return $token;
     }
 

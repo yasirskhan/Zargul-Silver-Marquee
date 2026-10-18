@@ -5,10 +5,11 @@ use Hafzatech\Central\CentralStaffTotpVerifier;
 use Hafzatech\Central\CentralStaffMfaChallenge;
 use Hafzatech\Central\CentralStaffCredentialVerifier;
 use Hafzatech\Central\CentralStaffSessionService;
+use Hafzatech\Central\CentralStaffLoginRateLimiter;
 
 foreach(['CentralStaffPasswordVerifier','CentralStaffTotpVerifier',
     'CentralStaffMfaChallenge','CentralStaffCredentialVerifier',
-    'CentralStaffSessionService'] as $name)
+    'CentralStaffSessionService','CentralStaffLoginRateLimiter'] as $name)
     require dirname(__DIR__).'/src/'.$name.'.php';
 
 function sessCheck(bool $ok,string $why):void {
@@ -51,23 +52,25 @@ $service=new CentralStaffSessionService($db,
     new CentralStaffCredentialVerifier(
         new CentralStaffPasswordVerifier($db),
         new CentralStaffMfaChallenge($db,static fn(string $sealed):string=>$sealed)
-    ));
+    ),
+    new CentralStaffLoginRateLimiter($db,str_repeat('s',32))
+);
 $otp=sessCode($secret);
-sessCheck($service->login('vendor-session-rotate@example.test','invalid',$otp)===null,
+sessCheck($service->login('vendor-session-rotate@example.test','invalid',$otp,'127.0.0.1')===null,
     'wrong password cannot mint a session');
-sessCheck($service->login('venue-tenant@example.test','synthetic-vendor-pass',$otp)===null,
+sessCheck($service->login('venue-tenant@example.test','synthetic-vendor-pass',$otp,'127.0.0.1')===null,
     'unknown tenant identity cannot mint a session');
-sessCheck($service->login('vendor-session-rotate@example.test','synthetic-vendor-pass','bad')===null,
+sessCheck($service->login('vendor-session-rotate@example.test','synthetic-vendor-pass','bad','127.0.0.1')===null,
     'malformed second factor cannot mint a session');
 $q=$db->prepare('SELECT count(*) FROM central_staff_sessions WHERE staff_id=:id');
 $q->execute(['id'=>$ids['rotate']]);
 sessCheck((int)$q->fetchColumn()===0,'failed credentials created no session');
-$token=$service->login('vendor-session-rotate@example.test','synthetic-vendor-pass',$otp);
+$token=$service->login('vendor-session-rotate@example.test','synthetic-vendor-pass',$otp,'127.0.0.1');
 sessCheck(is_string($token)&&preg_match('/^[a-f0-9]{64}$/D',$token)===1,
     'correct two factors produce random opaque bearer');
 sessCheck($service->staffFor($token)===$ids['rotate'],'session resolves vendor staff');
 sessCheck($service->staffFor(str_repeat('0',64))===null,'forged token denied');
-sessCheck($service->login('vendor-session-rotate@example.test','synthetic-vendor-pass',$otp)===null,
+sessCheck($service->login('vendor-session-rotate@example.test','synthetic-vendor-pass',$otp,'127.0.0.1')===null,
     'TOTP step replay cannot create another session');
 $q=$db->prepare("SELECT encode(token_hash,'hex') FROM central_staff_sessions WHERE staff_id=:id");
 $q->execute(['id'=>$ids['rotate']]);
@@ -82,7 +85,7 @@ sessCheck($service->staffFor($replacement)===null,'logged-out bearer fails');
 $other=[];
 foreach(['suspend','role','password','idle'] as $which){
     $other[$which]=$service->login('vendor-session-'.$which.'@example.test',
-        'synthetic-vendor-pass',$otp);
+        'synthetic-vendor-pass',$otp,'127.0.0.1');
     sessCheck(is_string($other[$which]),$which.' two-factor authenticated');
 }
 $db->prepare("UPDATE central_staff_users SET status='suspended' WHERE id=:id")
