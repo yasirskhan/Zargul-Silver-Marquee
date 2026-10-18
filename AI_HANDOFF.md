@@ -286,6 +286,10 @@
 ## TEST FIX — SUPPORT INBOX DENIAL FIXTURE
 - CI 39085093605 on `aacacce` failed ONLY the two new `CentralSupportReplyInboxReaderTest` tests because `App\\Models\\User` does not use the Laravel factory trait. Replaced test-only `User::factory()->create()` with `new User()`, an appropriately unregistered identity for authorization denial and pre-query limit validation. Production inbox/authorization code unchanged. Require exact six-job CI on repair SHA.
 
+## SIGNED SUPPORT INBOX END-TO-END REGRESSION
+- Added realistic PostgreSQL-backed positive roundtrip for owner enrollment/company binding, locally authored outbox ticket, synthetic vendor-signed reply page, encrypted inbox, exact cursor and replay rejection, unread display/read-once and no venue finance or 15-day license state modifications. Uses synthetic in-memory signing key only. Hosted six-job CI required; supports release gate remains OFF in production.
+- Previous reader fixture repaired for this repo's User model lacking `factory()`; CI for repair commit `b946db3` must be fully verified. Next: independent HTTPS authenticated reply pull transport, role-scoped UI and central encrypted vault/staff login rollout.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`
