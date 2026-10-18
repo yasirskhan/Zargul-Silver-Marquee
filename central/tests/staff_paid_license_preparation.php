@@ -11,6 +11,7 @@ use Hafzatech\Central\CentralStaffSessionService;
 use Hafzatech\Central\CentralStaffPaidLicensePreparation;
 use Hafzatech\Central\CentralStaffSignedGrantFinalization;
 use Hafzatech\Central\CentralStaffSignedGrantManifest;
+use Hafzatech\Central\CentralStaffLicenseSigningQueue;
 use Hafzatech\Central\InstallationRegistry;
 use Hafzatech\Central\LicenseTermCalendar;
 use Hafzatech\Central\PaidInvoiceEligibility;
@@ -25,7 +26,8 @@ foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
     'CentralStaffLoginRateLimiter','CentralStaffSessionService',
     'CentralStaffSessionAuthorization','CentralStaffPaidLicensePreparation',
     'PreparedSignedGrantValidator','SignedGrantFinalization',
-    'CentralStaffSignedGrantFinalization','CentralStaffSignedGrantManifest'
+    'CentralStaffSignedGrantFinalization','CentralStaffSignedGrantManifest',
+    'CentralStaffLicenseSigningQueue'
 ] as $name) {
     require dirname(__DIR__).'/src/'.$name.'.php';
 }
@@ -198,6 +200,32 @@ $claim=[
     'not_before'=>$prepared['from'],'expires_at'=>$prepared['expiry'],
     'limits'=>['max_halls'=>2,'max_staff'=>12],'features'=>['booking'=>true],
 ];
+$queue=new CentralStaffLicenseSigningQueue(
+    $db,new CentralStaffSessionAuthorization($sessions,$access));
+paidSessionDeny(fn()=>$queue->listPending(str_repeat('0',64),$company),
+    'license_officer_required');
+paidSessionDeny(fn()=>$queue->listPending($billingSession,$company),
+    'license_officer_required');
+paidSessionDeny(fn()=>$queue->listPending($foreignSession,$company),
+    'license_officer_required');
+paidSessionDeny(fn()=>$queue->listPending($issuer,'invalid'),
+    'invalid_license_request');
+paidSessionDeny(fn()=>$queue->listPending($issuer,$company,-1),
+    'invalid_license_request');
+paidSessionDeny(fn()=>$queue->listPending($issuer,$company,0,101),
+    'invalid_license_request');
+$pending=$queue->listPending($issuer,$company,0,1);
+paidSessionAssert(count($pending)===1 &&
+    $pending[0]['revision_id']===$prepared['revision_id'] &&
+    $pending[0]['invoice_number']===('SYNTHETIC-SESSION-'.substr($invoice,0,8)) &&
+    $pending[0]['state']==='awaiting_isolated_signer',
+    'vendor officer sees only a real customer-scoped pending signed revision');
+paidSessionAssert(array_keys($pending[0])===[
+    'revision_id','license_id','revision','state','created_at',
+    'expires_at','invoice_number','approved_domain'
+], 'queue discloses only bounded safe license metadata');
+paidSessionAssert($queue->listPending($issuer,$company,1,1)===[],
+    'pending signing queue has bounded predictable pagination');
 $manifest=new CentralStaffSignedGrantManifest($db,$sessions,
     new CentralStaffSessionAuthorization($sessions,$access),
     new PaidInvoiceEligibility($db));
@@ -242,16 +270,21 @@ try {
 }
 paidSessionDeny(fn()=>$manifest->forRevision($issuer,$prepared['revision_id']),
     'signed_grant_not_eligible');
+paidSessionAssert($queue->listPending($issuer,$company)===[],
+    'already signed revision leaves vendor pending queue');
 $signatureCount=$db->prepare('SELECT count(*) FROM central_license_signature_events
     WHERE revision_id=:rev AND authorized_officer_id=:officer');
 $signatureCount->execute(['rev'=>$prepared['revision_id'],'officer'=>$officer]);
 paidSessionAssert((int)$signatureCount->fetchColumn()===1,
     'exactly one immutable signing audit tied to authenticated vendor officer');
+// A revoked License Officer must also lose the pending queue capability.
 $db->prepare("UPDATE central_staff_role_grants SET revoked_at=now()
     WHERE staff_id=:id AND role='license_officer'")
  ->execute(['id'=>$officer]);
 paidSessionDeny(fn()=>$service->prepare($issuer,$invoice,$installation,$now),
     'staff_session_required');
+paidSessionDeny(fn()=>$queue->listPending($issuer,$company),
+    'license_officer_required');
 paidSessionAssert($sessions->staffFor($issuer)===null,
     'revoked officer role invalidates previously valid bearer');
 echo "PASS: vendor-session-only paid license preparation, independent payment settlement, customer scope, idempotency and live role revocation\n";
