@@ -41,3 +41,6 @@ A centrally MFA-authenticated staff administrator may suspend a different active
 
 ### Live vendor session binding for MFA history
 Use `CentralStaffAuthenticatedMfaHistory` for any future protected staff portal MFA audit display. It derives the actor from current central staff session state and rechecks the existing auditor permission and pagination, never trusting a supplied actor ID or claimed MFA Boolean. No public staff API was added.
+
+### Scoped immutable vendor account action history
+`CentralStaffAccountActionReader` grants bounded safe suspension-event history solely to an active, centrally MFA-authenticated staff auditor with current `audit.read`; it rejects forged actors and revoked roles. No HTTP endpoint or private staff credentials are included.

@@ -503,3 +503,10 @@ Append only concise current milestones (commit SHA, exact CI job result, code fi
 - Added `CentralStaffAuthenticatedMfaHistory`, a private adapter for existing immutable MFA outcome reader. Its actor is derived from an active HAFZATECH password+TOTP-authenticated server session, never from a browser-provided staff UUID or `trustedMfa=true` flag. Current independent `audit.read` authorization and subject/cursor size checks remain enforced.
 - Added isolated PostgreSQL integration `staff_authenticated_mfa_history.php` asserting verified vendor MFA session acceptance, safe audit fields, denial of a support-only actor, forged bearer, malformed subject/cursor/page limit, and live auditor role revocation.
 - Only internal service wiring, no customer/HAFZATECH public route, cookie, KMS key, payment provider or license release. Pending hosted exact six-job CI after independently verified staff suspension batch. Next: protected central staff support and license operations, only with production operator readiness signoff.
+
+## HAFZATECH SECURITY AUDITOR ACCOUNT-ACTION HISTORY — NEW BATCH REQUIRES EXACT CI
+- Internal `CentralStaffAccountActionReader` reads only immutable staff suspension decision metadata (actor, target, action, original status, reason and timestamp), with bounded ID cursor and target UUID validation.
+- Actor identity and current `audit.read` privilege are established through `CentralStaffSessionAuthorization`, never via arbitrary actor ID or caller-supplied MFA assertion. No public API or account action modification is exposed.
+- Central PostgreSQL `staff_account_action_reader.php` acceptance checks actual password+TOTP auditor session, paginated record order, safe allowlist, role/forged token/invalid pagination denial and live auditor revocation.
+- Depends on exact six-job CI for precursor suspension action journal and protected MFA audit reader; verify this new commit separately, maintain production staff host, signing and payment gates OFF.
+- NEXT: mature protected HAFZATECH staff operator portal and credentials, licensing issuance and protected support APIs as operator setup permits.
