@@ -94,6 +94,7 @@ jobs:
           php central/tests/installation_status.php
           php central/tests/support_ticket_ingress.php
           php central/tests/support_agent_reply.php
+          php central/tests/support_reply_pull.php
           php central/tests/status_receipt_codec.php
 
   licensing-postgres:
