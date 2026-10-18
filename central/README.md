@@ -88,3 +88,13 @@ account. There is intentionally NO invitation delivery, MFA enrollment
 completion, staff role grant or public self-registration yet. These require
 a separate operator-approved, audited lifecycle. All production switches
 remain OFF.
+
+### Privileged vendor staff role decisions (internal, default OFF)
+A `central_staff_role_requests` row does not authorize anything. A different live
+MFA-authenticated administrator must independently decide through the separately
+OFF `CENTRAL_STAFF_ROLE_DECISIONS_ENABLED` service, which rechecks current
+actor/reviewer/recipient/grant roles under PostgreSQL locks and atomically writes
+a single effective role grant (approval only) and immutable role decision.
+The internal `/staff/team/role-requests` view and POST decision form are not
+public routes and are not registered in `central/public`. Customer owner and
+VenueDesk tenant sessions cannot approve HAFZATECH staff privileges.

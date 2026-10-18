@@ -47,10 +47,14 @@ final class CentralStaffRoleReviewQueue
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public static function html(array $rows):string
+    public static function html(array $rows,?string $csrf=null):string
     {
         $e=static fn(mixed $v):string=>htmlspecialchars(
             is_scalar($v)?(string)$v:'',ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+        $allowDecision=$csrf!==null &&
+            preg_match('/^[a-f0-9]{64}$/D',$csrf)===1 &&
+            getenv('CENTRAL_STAFF_ROLE_DECISIONS_ENABLED')==='true';
+        $proof=$allowDecision?$e($csrf):'';
         $body='';
         foreach(array_slice($rows,0,25) as $r) {
             $body.='<tr><td>'.$e($r['request_id']??'').
@@ -58,17 +62,43 @@ final class CentralStaffRoleReviewQueue
                 '</td><td>'.$e($r['role']??'').
                 '</td><td>'.(($r['customer_scope_id']??null)===null
                     ?'Global':$e($r['customer_scope_id'])).
-                '</td><td>'.$e($r['created_at']??'').'</td></tr>';
+                '</td><td>'.$e($r['created_at']??'').'</td>'.
+                ($allowDecision
+                    ?'<td><form method="post" action="/staff/team/role-decisions">'.
+                     '<input type="hidden" name="staff_csrf" value="'.$proof.'">'.
+                     '<input type="hidden" name="request_id" value="'.
+                         $e($r['request_id']??'').'">'.
+                     '<input type="hidden" name="decision_id" value="'.
+                         self::uuidV4().'">'.
+                     '<label>Outcome <select name="outcome">'.
+                       '<option value="rejected">Reject</option>'.
+                       '<option value="approved">Approve</option>'.
+                     '</select></label>'.
+                     '<label>Decision reason <input type="text" '.
+                     'name="reason" minlength="5" maxlength="500" required>'.
+                     '</label><button type="submit">Record decision</button>'.
+                     '</form></td>'
+                    :'<td>Review-only</td>').'</tr>';
         }
         if($body==='') {
-            $body='<tr><td colspan="5">No pending independent reviews</td></tr>';
+            $body='<tr><td colspan="6">No pending independent reviews</td></tr>';
         }
         return '<section aria-label="Private HAFZATECH role review queue">'.
             '<h2>Staff role requests awaiting another administrator</h2>'.
             '<p>Read-only. No role becomes active until independent MFA '.
             'review and an audited second decision are completed.</p>'.
             '<table><thead><tr><th>Request ID</th><th>Staff ID</th>'.
-            '<th>Requested role</th><th>Scope</th><th>Created</th>'.
+            '<th>Requested role</th><th>Scope</th><th>Created</th><th>Action</th>'.
             '</tr></thead><tbody>'.$body.'</tbody></table></section>';
+    }
+
+    private static function uuidV4():string
+    {
+        $bytes=random_bytes(16);
+        $bytes[6]=chr((ord($bytes[6])&15)|64);
+        $bytes[8]=chr((ord($bytes[8])&63)|128);
+        $hex=bin2hex($bytes);
+        return substr($hex,0,8).'-'.substr($hex,8,4).'-'.
+            substr($hex,12,4).'-'.substr($hex,16,4).'-'.substr($hex,20);
     }
 }

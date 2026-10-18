@@ -74,16 +74,19 @@ final class CentralStaffRoleDecisionService
                 throw new RegistrationError('staff_role_decision_denied');
             }
             $q=$this->db->prepare(
-                'SELECT staff_id,role FROM central_staff_role_grants
+                'SELECT staff_id,role,customer_scope_id FROM central_staff_role_grants
                  WHERE staff_id IN (:actor,:approver,:target)
                    AND revoked_at IS NULL
                  ORDER BY id FOR SHARE'
             );
             $q->execute(['actor'=>$actor,'approver'=>$approver,'target'=>$target]);
             $all=$q->fetchAll(PDO::FETCH_ASSOC);
-            $roles=[];
+            $roles=[];$globalRoles=[];
             foreach($all as $row) {
                 $roles[$row['staff_id']][]=$row['role'];
+                if($row['customer_scope_id']===null) {
+                    $globalRoles[$row['staff_id']][]=$row['role'];
+                }
             }
             if(!$this->access->permits(
                     $approver,'staff.roles.assign',null,true) ||
@@ -94,7 +97,7 @@ final class CentralStaffRoleDecisionService
             }
             foreach($outcome==='approved'?[$actor,$approver]:[$approver] as $staffId) {
                 $capable=false;
-                foreach($roles[$staffId]??[] as $role) {
+                foreach($globalRoles[$staffId]??[] as $role) {
                     if(StaffRolePermissions::mayGrantRole(
                         $role,$request['role'],false,true)) {
                         $capable=true;break;
@@ -169,6 +172,24 @@ final class CentralStaffRoleDecisionService
             throw $e;
         }
     }
+    /** Receipt only; no staff identity, private reason or privilege metadata. */
+    public static function html(array $result):string
+    {
+        $outcome=$result['outcome']??null;
+        if(!in_array($outcome,['approved','rejected'],true) ||
+            !is_bool($result['grant_created']??null) ||
+            ($result['grant_created']!==($outcome==='approved'))) {
+            throw new RegistrationError('invalid_staff_role_decision_result');
+        }
+        return '<section aria-label="Private HAFZATECH role decision receipt">'.
+            '<h2>Staff role request '.$outcome.'</h2>'.
+            '<p>Decision recorded in the immutable central security journal. '.
+            ($outcome==='approved'
+                ?'Grant is subject to the recipient having an active MFA identity.'
+                :'No new role grant was created.').
+            '</p></section>';
+    }
+
     /** @return array{request_id:string,outcome:string,grant_created:bool} */
     private static function result(string $request,string $decision):array
     {

@@ -25,6 +25,7 @@ foreach([
  'SupportAgentReplyService','CentralStaffSessionSupportReply',
  'CentralStaffOwnPasswordChange','CentralStaffPortalOwnPassword',
  'CentralStaffPortalTeamDashboard','CentralStaffPortalAuditorDashboard','CentralStaffRoleReviewQueue',
+ 'CentralStaffRoleRequestService','CentralStaffRoleDecisionService',
  'CentralStaffPortalHttpRouter',
  'CentralStaffPortalPrivateResponse','CentralStaffPortalFormRequest',
  'CentralStaffPortalOperatorKernel','CentralStaffPortalResponseEmitter',

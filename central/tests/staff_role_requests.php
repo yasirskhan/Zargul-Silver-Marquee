@@ -4,6 +4,7 @@ declare(strict_types=1);
 use Hafzatech\Central\CentralStaffRoleRequestService;
 use Hafzatech\Central\CentralStaffRoleDecisionService;
 use Hafzatech\Central\CentralStaffRoleReviewQueue;
+use Hafzatech\Central\CentralStaffPortalTeamDashboard;
 use Hafzatech\Central\CentralStaffSessionAuthorization;
 use Hafzatech\Central\CentralStaffCsrfTokenService;
 use Hafzatech\Central\CentralStaffHttpPolicy;
@@ -19,6 +20,7 @@ foreach([
  'CentralStaffCredentialVerifier','CentralStaffLoginRateLimiter',
  'CentralStaffSessionService','CentralStaffRoleRequestService',
  'CentralStaffRoleDecisionService','CentralStaffRoleReviewQueue',
+ 'CentralStaffPortalTeamDashboard',
  'CentralStaffSessionAuthorization','CentralStaffCsrfTokenService',
  'CentralStaffHttpPolicy','CentralStaffProtectedHttpBoundary',
  'CentralStaffPortalHttpRouter','CentralStaffPortalPrivateResponse',
@@ -115,6 +117,18 @@ try {
  rolesDeny(fn()=>$on->request($adminBearer,$id,$staff['target'],
   'super_administrator',null,'Unauthorized top level role'),
   'staff_role_request_denied');
+ $scopeId=rolesUuid();
+ $db->prepare("INSERT INTO vendor_customers(id,legal_name)
+  VALUES(:id,'Synthetic scoped vendor role')")->execute(['id'=>$scopeId]);
+ $db->prepare("INSERT INTO central_staff_role_grants
+  (id,staff_id,role,customer_scope_id,reason)
+  VALUES(:id,:staff,'super_administrator',:scope,
+   'Scoped role must not issue global HAFZATECH roles')")
+  ->execute(['id'=>rolesUuid(),'staff'=>$staff['admin'],'scope'=>$scopeId]);
+ rolesDeny(fn()=>$on->request($adminBearer,rolesUuid(),$staff['target'],
+  'super_administrator',null,'Scoped Super Admin cannot request global role'),
+  'staff_role_request_denied');
+
  $res=$on->request($adminBearer,$id,$staff['target'],
   'support_agent',null,'Assign support after independent approval');
  rolesCheck($res===['request_id'=>$id,'target_staff_id'=>$staff['target'],
@@ -150,6 +164,14 @@ try {
   'approved','Separate authenticated permission approval'),
   'staff_role_decisions_not_enabled');
  putenv('CENTRAL_STAFF_ROLE_DECISIONS_ENABLED=true');
+ $openReview=$route->dispatch($http,$reviewCookie,[],$approvalCsrf);
+ rolesCheck(str_contains($openReview['html'],
+   'action="/staff/team/role-decisions"') &&
+  str_contains($openReview['html'],'name="decision_id"') &&
+  str_contains($openReview['html'],$approvalCsrf) &&
+  !str_contains($openReview['html'],$approverBearer),
+  'reviewer gets per-row CSRF-bound decision form only when enabled');
+
  rolesDeny(fn()=>$decisionOff->decide($approverBearer,$id,$decisionId,
   'approved','Separate authenticated permission approval'),
   'staff_role_decisions_not_enabled');
@@ -162,6 +184,15 @@ try {
  rolesDeny(fn()=>$decisionOn->decide($approverBearer,$high['request_id'],
   rolesUuid(),'approved','Only second Super Administrator can approve'),
   'staff_role_decision_denied');
+ $db->prepare("INSERT INTO central_staff_role_grants
+  (id,staff_id,role,customer_scope_id,reason)
+  VALUES(:id,:staff,'super_administrator',:scope,
+   'Scoped reviewer cannot approve global vendor Super Admin')")
+  ->execute(['id'=>rolesUuid(),'staff'=>$staff['approver'],'scope'=>$scopeId]);
+ rolesDeny(fn()=>$decisionOn->decide($approverBearer,$high['request_id'],
+  rolesUuid(),'approved','Scoped reviewer is not authorized for global role'),
+  'staff_role_decision_denied');
+
  $auth=new CentralStaffSessionAuthorization($sessions,$access);
  $queue=new CentralStaffRoleReviewQueue($db,$sessions,$auth);
  rolesDeny(fn()=>$queue->listPending($supportBearer),
@@ -169,6 +200,11 @@ try {
  rolesDeny(fn()=>$queue->listPending($approverBearer,26),
   'invalid_staff_review_queue');
  $pending=$queue->listPending($approverBearer);
+ $hiddenReview=CentralStaffRoleReviewQueue::html($pending,
+  str_repeat('b',64));
+ rolesCheck(!str_contains($hiddenReview,'action="/staff/team/role-decisions"'),
+  'independent decision UI hidden while operator decision gate is OFF');
+
  rolesCheck(in_array($id,array_column($pending,'request_id'),true) &&
   in_array($high['request_id'],array_column($pending,'request_id'),true),
   'independent second administrator sees bounded pending metadata queue');
@@ -200,13 +236,51 @@ try {
    $db,$sessions,$auth));
  $route=new CentralStaffPortalHttpRouter(
   $boundary,$billing,true,null,null,null,null,null,null,null,null,null,
-  null,null,null,$queue);
+  null,null,null,$queue,$decisionOn,$on);
  $http=['HTTPS'=>'on','SERVER_PORT'=>'443',
   'HTTP_HOST'=>'lichall.hafzatech.com','REQUEST_METHOD'=>'POST',
   'REQUEST_URI'=>'/staff/team/role-requests',
   'HTTP_ORIGIN'=>'https://lichall.hafzatech.com',
   'HTTP_SEC_FETCH_SITE'=>'same-origin','REMOTE_ADDR'=>'192.0.2.191'];
  $reviewCookie=[CentralStaffHttpPolicy::COOKIE_NAME=>$approverBearer];
+ $submitHttp=$http;
+ $submitHttp['REQUEST_URI']='/staff/team/role-request';
+ $requesterCookie=[CentralStaffHttpPolicy::COOKIE_NAME=>$adminBearer];
+ $submission=['request_id'=>$id,'target_staff_id'=>$staff['target'],
+  'role'=>'support_agent','customer_scope_id'=>'',
+  'reason'=>'Assign support after independent approval'];
+ $requestReceipt=$route->dispatch(
+  $submitHttp,$requesterCookie,$submission,$requesterCsrf);
+ rolesCheck($requestReceipt['kind']==='private_role_request_receipt_html' &&
+  str_contains($requestReceipt['html'],'not granted') &&
+  str_contains($requestReceipt['html'],$id) &&
+  !str_contains($requestReceipt['html'],$adminBearer) &&
+  !str_contains($requestReceipt['html'],$submission['reason']),
+  'same authorized Staff Administrator can replay exact proposal via protected route');
+ $writeReceipt=(new CentralStaffPortalPrivateResponse(true))->compose(
+  $requestReceipt);
+ rolesCheck($writeReceipt['cookies']===[] &&
+  $writeReceipt['headers']['Cache-Control']==='no-store, private',
+  'proposal receipt cannot reveal session or become public cache');
+ rolesDeny(fn()=>$route->dispatch($submitHttp,$reviewCookie,
+  $submission,$approvalCsrf),'staff_role_request_conflict');
+ rolesDeny(fn()=>$route->dispatch($submitHttp,$requesterCookie,
+  $submission+['staff_id'=>$staff['admin']],$requesterCsrf),
+  'invalid_staff_role_request');
+ rolesDeny(fn()=>$route->dispatch($submitHttp,$requesterCookie,
+  $submission,str_repeat('0',64)),'staff_portal_denied');
+ rolesDeny(fn()=>$route->dispatch(array_replace($submitHttp,[
+  'HTTP_ORIGIN'=>'https://evil.example']),
+  $requesterCookie,$submission,$requesterCsrf),
+  'staff_portal_denied');
+ $team=new CentralStaffPortalTeamDashboard($auth);
+ $newProposalForm=$team->render($adminBearer,$requesterCsrf);
+ rolesCheck(str_contains($newProposalForm,'action="/staff/team/role-request"') &&
+  str_contains($newProposalForm,'Select a role') &&
+  str_contains($newProposalForm,'name="customer_scope_id"') &&
+  str_contains($newProposalForm,'name="request_id"') &&
+  !str_contains($newProposalForm,$adminBearer),
+  'operator-gated Staff Admin role proposal has no preselected privileged role');
  $reviewPage=$route->dispatch($http,$reviewCookie,[],$approvalCsrf);
  rolesCheck($reviewPage['kind']==='private_role_review_html' &&
   str_contains($reviewPage['html'],$id) &&
@@ -232,6 +306,36 @@ try {
   'approved','Separate authenticated permission approval');
  rolesCheck($decision===['request_id'=>$id,'outcome'=>'approved',
   'grant_created'=>true],'independent current MFA approver records grant');
+ $decisionHttp=$http;
+ $decisionHttp['REQUEST_URI']='/staff/team/role-decisions';
+ $decisionFields=['request_id'=>$id,'decision_id'=>$decisionId,
+  'outcome'=>'approved','reason'=>'Separate authenticated permission approval'];
+ $internalReceipt=$route->dispatch(
+  $decisionHttp,$reviewCookie,$decisionFields,$approvalCsrf);
+ rolesCheck($internalReceipt['kind']==='private_staff_role_decision_html' &&
+  str_contains($internalReceipt['html'],'request approved') &&
+  !str_contains($internalReceipt['html'],$approverBearer) &&
+  !str_contains($internalReceipt['html'],$staff['target']) &&
+  !str_contains($internalReceipt['html'],$approvalCsrf),
+  'HTTP route replays exact authorized second decision with safe confirmation');
+ $receipt=(new CentralStaffPortalPrivateResponse(true))->compose($internalReceipt);
+ rolesCheck($receipt['cookies']===[] &&
+  $receipt['headers']['Cache-Control']==='no-store, private',
+  'approved role receipt contains no bearer and cannot be cached');
+ rolesDeny(fn()=>$route->dispatch($decisionHttp,$reviewCookie,
+  $decisionFields+['staff_id'=>$staff['super']],$approvalCsrf),
+  'invalid_staff_role_decision');
+ rolesDeny(fn()=>$route->dispatch($decisionHttp,$reviewCookie,
+  $decisionFields,str_repeat('0',64)),
+  'staff_portal_denied');
+ rolesDeny(fn()=>$route->dispatch(array_replace($decisionHttp,[
+  'HTTP_ORIGIN'=>'https://attacker.example']),
+  $reviewCookie,$decisionFields,$approvalCsrf),
+  'staff_portal_denied');
+ $requesterCookie=[CentralStaffHttpPolicy::COOKIE_NAME=>$adminBearer];
+ rolesDeny(fn()=>$route->dispatch($decisionHttp,$requesterCookie,
+  $decisionFields,$requesterCsrf),'staff_role_decision_denied');
+
  rolesCheck($decisionOn->decide($approverBearer,$id,$decisionId,
   'approved','Separate authenticated permission approval')===$decision,
   'exact approved decision replay is idempotent');

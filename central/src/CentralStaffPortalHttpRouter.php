@@ -31,7 +31,9 @@ final class CentralStaffPortalHttpRouter
         private readonly ?CentralStaffPortalTeamDashboard $teamDashboard = null,
         private readonly ?CentralStaffProvisioningService $provisioner = null,
         private readonly ?CentralStaffPortalAuditorDashboard $auditorHome = null,
-        private readonly ?CentralStaffRoleReviewQueue $roleReviewQueue = null
+        private readonly ?CentralStaffRoleReviewQueue $roleReviewQueue = null,
+        private readonly ?CentralStaffRoleDecisionService $roleDecisions = null,
+        private readonly ?CentralStaffRoleRequestService $roleRequestWriter = null
     ) {}
 
     /**
@@ -326,7 +328,56 @@ final class CentralStaffPortalHttpRouter
             }
             return ['kind'=>'private_role_review_html',
                 'html'=>CentralStaffRoleReviewQueue::html(
-                    $this->roleReviewQueue->listPending($bearer,25))];
+                    $this->roleReviewQueue->listPending($bearer,25),$csrfHeader)];
+        }
+        if($uri==='/staff/team/role-decisions' &&
+            $this->roleDecisions!==null) {
+            if(!$this->exactFields($fields,
+                    ['request_id','decision_id','outcome','reason']) ||
+                !is_string($fields['request_id']) ||
+                !is_string($fields['decision_id']) ||
+                !is_string($fields['outcome']) ||
+                !is_string($fields['reason']) ||
+                !self::uuid($fields['request_id']) ||
+                !self::uuid($fields['decision_id'])) {
+                throw new RegistrationError('invalid_staff_role_decision',422);
+            }
+            if(!$this->boundary->permitsMutation(
+                $server,$bearer,$csrfHeader,'staff.roles.assign',null)) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            $decision=$this->roleDecisions->decide(
+                $bearer,$fields['request_id'],$fields['decision_id'],
+                $fields['outcome'],$fields['reason']);
+            return ['kind'=>'private_staff_role_decision_html',
+                'html'=>CentralStaffRoleDecisionService::html($decision)];
+        }
+        if($uri==='/staff/team/role-request' &&
+            $this->roleRequestWriter!==null) {
+            if(!$this->exactFields($fields,[
+                'request_id','target_staff_id','role',
+                'customer_scope_id','reason']) ||
+                !is_string($fields['request_id']) ||
+                !is_string($fields['target_staff_id']) ||
+                !is_string($fields['role']) ||
+                !is_string($fields['customer_scope_id']) ||
+                !is_string($fields['reason']) ||
+                !self::uuid($fields['request_id']) ||
+                !self::uuid($fields['target_staff_id']) ||
+                ($fields['customer_scope_id']!=='' &&
+                    !self::uuid($fields['customer_scope_id']))) {
+                throw new RegistrationError('invalid_staff_role_request',422);
+            }
+            if(!$this->boundary->permitsMutation(
+                $server,$bearer,$csrfHeader,'staff.roles.assign',null)) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            $result=$this->roleRequestWriter->request(
+                $bearer,$fields['request_id'],$fields['target_staff_id'],
+                $fields['role'],$fields['customer_scope_id']===''
+                    ?null:$fields['customer_scope_id'],$fields['reason']);
+            return ['kind'=>'private_role_request_receipt_html',
+                'html'=>CentralStaffRoleRequestService::html($result)];
         }
         throw new RegistrationError('staff_route_not_found',404);
     }

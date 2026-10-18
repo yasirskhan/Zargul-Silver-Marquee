@@ -81,6 +81,24 @@ final class CentralStaffPortalPrivateResponse
             }
             return ['status'=>200,'headers'=>$headers,'cookies'=>[],'body'=>$html];
         }
+        if ($kind==='private_role_request_receipt_html') {
+            $html=$internal['html']??null;
+            if(!is_string($html) || strlen($html)>262144 ||
+                !str_starts_with($html,
+                    '<section aria-label="Private HAFZATECH role request receipt">')) {
+                throw new RegistrationError('invalid_staff_response');
+            }
+            return ['status'=>200,'headers'=>$headers,'cookies'=>[],'body'=>$html];
+        }
+        if ($kind==='private_staff_role_decision_html') {
+            $html=$internal['html']??null;
+            if(!is_string($html) || strlen($html)>262144 ||
+                !str_starts_with($html,
+                    '<section aria-label="Private HAFZATECH role decision receipt">')) {
+                throw new RegistrationError('invalid_staff_response');
+            }
+            return ['status'=>200,'headers'=>$headers,'cookies'=>[],'body'=>$html];
+        }
         if ($kind==='private_role_review_html') {
             $html=$internal['html']??null;
             if(!is_string($html) || strlen($html)>262144 ||

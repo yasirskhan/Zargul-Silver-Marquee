@@ -62,20 +62,21 @@ final class CentralStaffRoleRequestService
                 throw new RegistrationError('staff_role_request_denied');
             }
             $q=$this->db->prepare(
-                'SELECT role FROM central_staff_role_grants
+                'SELECT role,customer_scope_id FROM central_staff_role_grants
                  WHERE staff_id=:actor AND revoked_at IS NULL
                  ORDER BY id FOR SHARE'
             );
             $q->execute(['actor'=>$actor]);
-            $roles=$q->fetchAll(PDO::FETCH_COLUMN);
+            $grants=$q->fetchAll(PDO::FETCH_ASSOC);
             if(!$this->access->permits(
                 $actor,'staff.roles.assign',null,true)) {
                 throw new RegistrationError('staff_role_request_denied');
             }
             $allowed=false;
-            foreach($roles as $actorRole) {
-                if(StaffRolePermissions::mayGrantRole(
-                    $actorRole,$role,false,true)) {
+            foreach($grants as $grant) {
+                if($grant['customer_scope_id']===null &&
+                    StaffRolePermissions::mayGrantRole(
+                    $grant['role'],$role,false,true)) {
                     $allowed=true;
                     break;
                 }
@@ -139,6 +140,24 @@ final class CentralStaffRoleRequestService
             }
             throw $e;
         }
+    }
+
+    /** No target staff identity, credential or private reason in receipt. */
+    public static function html(array $result):string
+    {
+        if(($result['state']??null)!=='pending_independent_approval' ||
+            !is_string($result['request_id']??null) ||
+            !self::uuid($result['request_id'])) {
+            throw new RegistrationError('invalid_staff_role_request_result');
+        }
+        return '<section aria-label="Private HAFZATECH role request receipt">'.
+            '<h2>Role proposal recorded</h2>'.
+            '<p>This request has not granted any staff permission. '.
+            'A different authorized MFA administrator must review it.</p>'.
+            '<p>Request ID: '.
+            htmlspecialchars($result['request_id'],
+                ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8').
+            '</p></section>';
     }
 
     private static function uuid(string $id):bool

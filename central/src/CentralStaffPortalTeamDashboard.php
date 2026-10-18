@@ -40,6 +40,8 @@ final class CentralStaffPortalTeamDashboard
                 :''). 
             '<form method="post" action="/staff/team/accounts">'.$hidden.
             '<button type="submit">Staff accounts</button></form>'.
+            (getenv('CENTRAL_STAFF_ROLE_REQUEST_ENABLED')==='true'
+                ?self::roleRequestForm($hidden):'').
             '<form method="post" action="/staff/team/role-requests">'.$hidden.
             '<button type="submit">Pending independent role reviews</button></form>'.
             '<form method="post" action="/staff/team/roles">'.$hidden.
@@ -55,5 +57,33 @@ final class CentralStaffPortalTeamDashboard
             '<form method="post" action="/staff/session/logout">'.$hidden.
             '<button type="submit">Sign out</button></form>'.
             '</nav></section>';
+    }
+
+    private static function roleRequestForm(string $hidden):string
+    {
+        $options='';
+        foreach(array_keys(StaffRolePermissions::ROLE_PERMISSIONS) as $name) {
+            $safe=htmlspecialchars($name,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+            $options.='<option value="'.$safe.'">'.$safe.'</option>';
+        }
+        $b=random_bytes(16);
+        $b[6]=chr((ord($b[6])&15)|64);
+        $b[8]=chr((ord($b[8])&63)|128);
+        $hex=bin2hex($b);
+        $id=substr($hex,0,8).'-'.substr($hex,8,4).'-'.
+            substr($hex,12,4).'-'.substr($hex,16,4).'-'.substr($hex,20);
+        return '<form method="post" action="/staff/team/role-request">'.$hidden.
+            '<input type="hidden" name="request_id" value="'.$id.'">'.
+            '<label>Target staff ID <input type="text" name="target_staff_id" '.
+            'maxlength="36" required></label>'.
+            '<label>Requested role <select name="role" required>'.
+            '<option value="" disabled selected>Select a role</option>'.
+            $options.'</select></label>'.
+            '<label>Customer scope ID (leave blank for global) '.
+            '<input type="text" name="customer_scope_id" maxlength="36"></label>'.
+            '<label>Reason <input type="text" name="reason" '.
+            'minlength="5" maxlength="500" required></label>'.
+            '<button type="submit">Submit for independent approval</button>'.
+            '</form>';
     }
 }
