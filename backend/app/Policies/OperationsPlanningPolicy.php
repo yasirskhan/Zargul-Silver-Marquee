@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\CompanyMembership;
 use App\Models\User;
+use App\Services\CentralVenueOperationsAccessGate;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -17,6 +18,9 @@ final class OperationsPlanningPolicy
             // Direct service calls must check the current persisted user record.
             || ! DB::table('users')->where('id', $actor->getKey())
                 ->where('is_active', true)->whereNotNull('email_verified_at')->exists()) {
+            return null;
+        }
+        if (! app(CentralVenueOperationsAccessGate::class)->allowsCompany($companyId)) {
             return null;
         }
         return CompanyMembership::query()->where('company_id', $companyId)
