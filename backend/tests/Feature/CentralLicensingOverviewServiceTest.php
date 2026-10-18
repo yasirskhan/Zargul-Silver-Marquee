@@ -30,6 +30,7 @@ class CentralLicensingOverviewServiceTest extends TestCase
         $this->assertSame('unchanged',$view['public_policy']);
         $this->assertSame('unchanged',$view['dashboard_policy']);
         $this->assertNull($view['license_id']);
+        $this->assertNull($view['grace_ends_at']);
         $this->assertNull($view['edition']);
         $this->assertFalse($view['online_check_due']);
         $this->assertSame($before,DB::table('central_license_check_state')->count());
@@ -49,6 +50,7 @@ class CentralLicensingOverviewServiceTest extends TestCase
         $state=app(CentralLicensingOverviewService::class)
             ->snapshot(new DateTimeImmutable('2026-10-17T00:00:00Z'));
         $this->assertSame('awaiting_signed_license',$state['state']);
+        $this->assertNull($state['grace_ends_at']);
         $this->assertSame('maintenance',$state['public_policy']);
         $this->assertSame('restricted',$state['dashboard_policy']);
         $this->assertTrue($state['online_check_due']);
@@ -94,6 +96,7 @@ class CentralLicensingOverviewServiceTest extends TestCase
         $warning=$overview->snapshot(new DateTimeImmutable('2027-09-16T00:00:00Z'));
         $this->assertSame('licensed',$warning['state']);
         $this->assertTrue($warning['expiry_warning']);
+        $this->assertSame('2027-10-08T00:00:00Z',$warning['grace_ends_at']);
         $this->assertSame(2,$warning['revision']);
         $this->assertSame($license,$warning['license_id']);
         $this->assertSame('standard',$warning['edition']);
@@ -104,6 +107,7 @@ class CentralLicensingOverviewServiceTest extends TestCase
         $this->assertSame('expired_grace',$expired['state']);
         $this->assertSame('maintenance',$expired['public_policy']);
         $this->assertSame('grace',$expired['dashboard_policy']);
+        $this->assertSame('2027-10-08T00:00:00Z',$expired['grace_ends_at']);
         $after=$overview->snapshot(new DateTimeImmutable('2027-10-08T00:00:00Z'));
         $this->assertSame('restricted',$after['dashboard_policy']);
         $this->assertDatabaseCount('central_license_check_state',0);
