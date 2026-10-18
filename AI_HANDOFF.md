@@ -523,3 +523,9 @@ Append only concise current milestones (commit SHA, exact CI job result, code fi
 - Real central staff MFA session-bound security history reader at `0da9a5a0d18df90c6b084e9e9e9e2115ee819169`: hosted [39119931236](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39119931236) **SUCCESS all six jobs**.
 - Account-action reader commit `82a3cba24ffb082608291cfa0b318e4b44082878`: hosted [39120378278](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39120378278) ran central/5 focused jobs successfully; exact full Laravel job pending when written, not yet VERIFIED.
 - All these are vendor INTERNAL foundations; production HAFZATECH staff host, KMS, HTTPS/cookie delivery, official signers, verified settlement and customer release remain unapproved/OFF.
+
+## VENDOR PASSWORD-CHANGE AUDIT READER — SOURCE PENDING HOSTED CI
+- Latest predecessor source `36582bf126870a785d1c5b6713c69f0a71e4cbf9` verified six-job SUCCESS in GitHub Actions `39120829641`.
+- Added internal `CentralStaffPasswordChangeAuditReader`: requires real currently authorized central MFA staff session and live `audit.read` role, UUIDv4 subject, keyset cursor, bounded 1–100 pagination. Returns ONLY event ID, staff ID, `changed` outcome and recorded timestamp; never password hashes, credentials, tokens, network identity or venue business records.
+- Dedicated isolated PostgreSQL acceptance test validates auditor session, newest/older pages, precise safe fields, forged token, ordinary support role denial, malformed UUID/cursor/limits, and immediate denial after auditor role revocation. Added to central-postgres hosted CI.
+- NO vendor HTTP route, KMS secret, production TLS/identity deployment, customer login sharing, central signing activation or billing flags enabled. Verify exact new SHA six-job CI, fix regressions, and then proceed to operator credential lifecycle and secure portal infrastructure.
