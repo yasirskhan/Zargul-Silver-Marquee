@@ -10,6 +10,7 @@ use Hafzatech\Central\CentralStaffSessionAuthorization;
 use Hafzatech\Central\CentralStaffSessionService;
 use Hafzatech\Central\CentralStaffPaidLicensePreparation;
 use Hafzatech\Central\CentralStaffSignedGrantFinalization;
+use Hafzatech\Central\CentralStaffSignedGrantManifest;
 use Hafzatech\Central\InstallationRegistry;
 use Hafzatech\Central\LicenseTermCalendar;
 use Hafzatech\Central\PaidInvoiceEligibility;
@@ -24,7 +25,7 @@ foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
     'CentralStaffLoginRateLimiter','CentralStaffSessionService',
     'CentralStaffSessionAuthorization','CentralStaffPaidLicensePreparation',
     'PreparedSignedGrantValidator','SignedGrantFinalization',
-    'CentralStaffSignedGrantFinalization'
+    'CentralStaffSignedGrantFinalization','CentralStaffSignedGrantManifest'
 ] as $name) {
     require dirname(__DIR__).'/src/'.$name.'.php';
 }
@@ -197,6 +198,21 @@ $claim=[
     'not_before'=>$prepared['from'],'expires_at'=>$prepared['expiry'],
     'limits'=>['max_halls'=>2,'max_staff'=>12],'features'=>['booking'=>true],
 ];
+$manifest=new CentralStaffSignedGrantManifest($db,$sessions,
+    new CentralStaffSessionAuthorization($sessions,$access),
+    new PaidInvoiceEligibility($db));
+paidSessionDeny(fn()=>$manifest->forRevision(str_repeat('0',64),$prepared['revision_id']),
+    'staff_session_required');
+paidSessionDeny(fn()=>$manifest->forRevision($billingSession,$prepared['revision_id']),
+    'license_officer_required');
+paidSessionDeny(fn()=>$manifest->forRevision($foreignSession,$prepared['revision_id']),
+    'license_officer_required');
+paidSessionDeny(fn()=>$manifest->forRevision($issuer,'invalid'),
+    'invalid_license_request');
+paidSessionDeny(fn()=>$manifest->forRevision($issuer,paidSessionUuid()),
+    'signed_grant_not_eligible');
+paidSessionAssert($manifest->forRevision($issuer,$prepared['revision_id'])===$claim,
+    'exact paid grant manifest derives the signed claim from immutable invoice snapshot');
 $envelope=Hafzatech\Signing\Ed25519GrantCodec::sign(
     $claim,'session-test-key',sodium_crypto_sign_secretkey($keypair));
 paidSessionDeny(fn()=>$finalize->finalize(str_repeat('0',64),
@@ -224,6 +240,8 @@ try {
 } finally {
     putenv('CENTRAL_SIGNER_FINALIZATION_ENABLED=false');
 }
+paidSessionDeny(fn()=>$manifest->forRevision($issuer,$prepared['revision_id']),
+    'signed_grant_not_eligible');
 $signatureCount=$db->prepare('SELECT count(*) FROM central_license_signature_events
     WHERE revision_id=:rev AND authorized_officer_id=:officer');
 $signatureCount->execute(['rev'=>$prepared['revision_id'],'officer'=>$officer]);
