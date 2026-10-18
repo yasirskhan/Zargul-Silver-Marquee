@@ -120,12 +120,19 @@ try {
  $scopeId=rolesUuid();
  $db->prepare("INSERT INTO vendor_customers(id,legal_name)
   VALUES(:id,'Synthetic scoped vendor role')")->execute(['id'=>$scopeId]);
+ $scopedActor=rolesUuid();
+ $q->execute(['id'=>$scopedActor,'email'=>'role-scoped-actor@example.test',
+  'hash'=>password_hash($password,PASSWORD_ARGON2ID),
+  'seed'=>bin2hex($seed),'status'=>'active']);
  $db->prepare("INSERT INTO central_staff_role_grants
   (id,staff_id,role,customer_scope_id,reason)
   VALUES(:id,:staff,'super_administrator',:scope,
    'Scoped role must not issue global HAFZATECH roles')")
-  ->execute(['id'=>rolesUuid(),'staff'=>$staff['admin'],'scope'=>$scopeId]);
- rolesDeny(fn()=>$on->request($adminBearer,rolesUuid(),$staff['target'],
+  ->execute(['id'=>rolesUuid(),'staff'=>$scopedActor,'scope'=>$scopeId]);
+ $scopedBearer=$sessions->login('role-scoped-actor@example.test',
+  $password,$code,'192.0.2.193');
+ rolesCheck(is_string($scopedBearer),'independent scoped actor MFA login');
+ rolesDeny(fn()=>$on->request($scopedBearer,rolesUuid(),$staff['target'],
   'super_administrator',null,'Scoped Super Admin cannot request global role'),
   'staff_role_request_denied');
 
@@ -164,13 +171,7 @@ try {
   'approved','Separate authenticated permission approval'),
   'staff_role_decisions_not_enabled');
  putenv('CENTRAL_STAFF_ROLE_DECISIONS_ENABLED=true');
- $openReview=$route->dispatch($http,$reviewCookie,[],$approvalCsrf);
- rolesCheck(str_contains($openReview['html'],
-   'action="/staff/team/role-decisions"') &&
-  str_contains($openReview['html'],'name="decision_id"') &&
-  str_contains($openReview['html'],$approvalCsrf) &&
-  !str_contains($openReview['html'],$approverBearer),
-  'reviewer gets per-row CSRF-bound decision form only when enabled');
+
 
  rolesDeny(fn()=>$decisionOff->decide($approverBearer,$id,$decisionId,
   'approved','Separate authenticated permission approval'),
@@ -184,13 +185,20 @@ try {
  rolesDeny(fn()=>$decisionOn->decide($approverBearer,$high['request_id'],
   rolesUuid(),'approved','Only second Super Administrator can approve'),
   'staff_role_decision_denied');
+ $scopedReviewer=rolesUuid();
+ $q->execute(['id'=>$scopedReviewer,'email'=>'role-scoped-review@example.test',
+  'hash'=>password_hash($password,PASSWORD_ARGON2ID),
+  'seed'=>bin2hex($seed),'status'=>'active']);
  $db->prepare("INSERT INTO central_staff_role_grants
   (id,staff_id,role,customer_scope_id,reason)
   VALUES(:id,:staff,'super_administrator',:scope,
    'Scoped reviewer cannot approve global vendor Super Admin')")
-  ->execute(['id'=>rolesUuid(),'staff'=>$staff['approver'],'scope'=>$scopeId]);
- rolesDeny(fn()=>$decisionOn->decide($approverBearer,$high['request_id'],
-  rolesUuid(),'approved','Scoped reviewer is not authorized for global role'),
+  ->execute(['id'=>rolesUuid(),'staff'=>$scopedReviewer,'scope'=>$scopeId]);
+ $scopedReviewBearer=$sessions->login('role-scoped-review@example.test',
+  $password,$code,'192.0.2.194');
+ rolesCheck(is_string($scopedReviewBearer),'independent scoped reviewer MFA');
+ rolesDeny(fn()=>$decisionOn->decide($scopedReviewBearer,$high['request_id'],
+  rolesUuid(),'approved','Scoped reviewer cannot approve global role'),
   'staff_role_decision_denied');
 
  $auth=new CentralStaffSessionAuthorization($sessions,$access);
@@ -200,8 +208,10 @@ try {
  rolesDeny(fn()=>$queue->listPending($approverBearer,26),
   'invalid_staff_review_queue');
  $pending=$queue->listPending($approverBearer);
+ putenv('CENTRAL_STAFF_ROLE_DECISIONS_ENABLED=false');
  $hiddenReview=CentralStaffRoleReviewQueue::html($pending,
   str_repeat('b',64));
+ putenv('CENTRAL_STAFF_ROLE_DECISIONS_ENABLED=true');
  rolesCheck(!str_contains($hiddenReview,'action="/staff/team/role-decisions"'),
   'independent decision UI hidden while operator decision gate is OFF');
 
@@ -281,6 +291,13 @@ try {
   str_contains($newProposalForm,'name="request_id"') &&
   !str_contains($newProposalForm,$adminBearer),
   'operator-gated Staff Admin role proposal has no preselected privileged role');
+ $openReview=$route->dispatch($http,$reviewCookie,[],$approvalCsrf);
+ rolesCheck(str_contains($openReview['html'],
+   'action="/staff/team/role-decisions"') &&
+  str_contains($openReview['html'],'name="decision_id"') &&
+  str_contains($openReview['html'],$approvalCsrf) &&
+  !str_contains($openReview['html'],$approverBearer),
+  'reviewer gets per-row CSRF-bound decision form only when enabled');
  $reviewPage=$route->dispatch($http,$reviewCookie,[],$approvalCsrf);
  rolesCheck($reviewPage['kind']==='private_role_review_html' &&
   str_contains($reviewPage['html'],$id) &&
