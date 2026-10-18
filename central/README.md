@@ -27,3 +27,7 @@ Use `CentralStaffSessionAuthorization` to bind every vendor capability decision 
 ### Protected staff HTTP flow adapter (default OFF)
 
 `CentralStaffProtectedHttpBoundary` composes the internal policy, MFA-based session, independent CSRF proof, scope authorization and logout in one disabled-by-default service. It returns cookie and proof material only for a future trusted server renderer and **must never be serialized as public JSON or logged**. There is no new URL in `central/public`. HTTPS/DNS, operator-managed KMS and HMAC secrets, trusted reverse-proxy provenance, cookie writer/CSRF validation, full session audit and staff recovery are still blocking operator go-live.
+
+### Vendor staff immutable session audit (internal)
+
+The separate central database will maintain append-only session issued, rotated, logged-out and authorization-invalidated outcomes. Token, CSRF, password and OTP secrets are never placed in events. Application session mutations and corresponding records commit atomically and PostgreSQL rejects audit UPDATE/DELETE. Vendor staff public login remains OFF pending KMS and operator controls.

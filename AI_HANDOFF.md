@@ -478,3 +478,9 @@ Append only concise current milestones (commit SHA, exact CI job result, code fi
 ## STAFF HTTP ADAPTER CI REPAIR — TEST-ONLY SOURCE
 - Hosted CI `39096652061` on `fd5f31c2d86f30d9c4669a1881d0b4fe4842dd39`: central-postgres failed in the new standalone `staff_http_boundary.php` integration fixture with `Class Hafzatech\\Central\\StaffRolePermissions not found`. This is missing PHP explicit class require in a stand-alone test, NOT production session grant logic.
 - Added the existing `StaffRolePermissions` require/use to that fixture only; central authorization implementation, rate limits, CSRF, scopes and disabled public flags unchanged. Re-run six hosted jobs on exact new SHA before VERIFIED. The independent immutable audit batch is prepared but must NOT be published until this repair CI is fully green.
+
+## IMMUTABLE STAFF SESSION SECURITY EVENTS — PREPARED, NOT YET PUBLISHED
+- Add `central/schema/017_staff_session_events.sql` PostgreSQL immutable append-only session events; FK vendor staff/session, outcomes issued/rotated/logged_out/invalidated, mutation-denial trigger, indexed audit. No bearer, CSRF, credential, IP or customer content is stored.
+- Update internal `CentralStaffSessionService` to atomically transactionally write an audit event with each issue, rotation, logout and authorization-fingerprint invalidation, preserving the MFA/session gate and existing per-action customer authorization.
+- Extend existing isolated central PostgreSQL `staff_sessions.php` test to require event sequence, durable audit and UPDATE/DELETE refusal. Current test-only StaffRolePermissions require fix `65c2676632bc4a594f13e59c55d061a2ab117ef6` must pass six-job CI before publishing this batch.
+- All public central staff routes remain OFF. Next: scoped paged vendor session audit reader and approved secure operator deployment.

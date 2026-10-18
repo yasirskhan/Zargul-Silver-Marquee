@@ -103,6 +103,13 @@ sessCheck($service->staffFor($replacement)===$ids['rotate'],'new bearer is valid
 sessCheck($service->logout($replacement),'logout invalidates active bearer');
 sessCheck($service->staffFor($replacement)===null,'logged-out bearer fails');
 sessCheck(!$csrf->accepts($replacement,$nextCsrf),'logged-out CSRF proof denied');
+$journal=$db->prepare(
+    'SELECT outcome FROM central_staff_session_events WHERE staff_id=:id ORDER BY id'
+);
+$journal->execute(['id'=>$ids['rotate']]);
+sessCheck(array_column($journal->fetchAll(PDO::FETCH_ASSOC),'outcome')===
+    ['issued','rotated','logged_out'],
+    'issued, rotated and logout events committed without bearer disclosure');
 
 $other=[];
 foreach(['suspend','role','password','idle'] as $which){
@@ -116,6 +123,9 @@ sessCheck($service->staffFor($other['suspend'])===null,'suspension invalidates s
 $db->prepare('UPDATE central_staff_role_grants SET revoked_at=now() WHERE staff_id=:id')
     ->execute(['id'=>$ids['role']]);
 sessCheck($service->staffFor($other['role'])===null,'role revocation invalidates session');
+$journal->execute(['id'=>$ids['role']]);
+sessCheck(array_column($journal->fetchAll(PDO::FETCH_ASSOC),'outcome')===
+    ['issued','invalidated'],'role revocation creates immutable invalidation event');
 $db->prepare('UPDATE central_staff_users SET password_hash=:hash WHERE id=:id')
     ->execute(['id'=>$ids['password'],
         'hash'=>password_hash('reset-synthetic-password',PASSWORD_DEFAULT)]);
@@ -125,4 +135,17 @@ $db->prepare("UPDATE central_staff_sessions
     ->execute(['id'=>$ids['idle']]);
 sessCheck($service->staffFor($other['idle'])===null,'expired idle window denied');
 sessCheck($service->staffFor('malformed')===null,'malformed bearer denied');
-echo "PASS: vendor-only MFA sessions, hashed bearer, replay, rotation, logout, revoked roles, suspension, password reset, idle expiry\n";
+
+$eventId=$db->query('SELECT id FROM central_staff_session_events ORDER BY id LIMIT 1')
+    ->fetchColumn();
+sessCheck($eventId!==false,'durable staff session event retained');
+foreach(['UPDATE central_staff_session_events SET outcome=outcome WHERE id=:id',
+         'DELETE FROM central_staff_session_events WHERE id=:id'] as $sql){
+    try{
+        $db->prepare($sql)->execute(['id'=>$eventId]);
+        throw new RuntimeException('Session event audit mutation unexpectedly allowed');
+    }catch(PDOException $e){
+        if($e->getCode()!=='23514')throw $e;
+    }
+}
+echo "PASS: vendor MFA sessions, hashed bearer and CSRF, rotation/logout, stale role/identity denial, immutable atomic session history\n";

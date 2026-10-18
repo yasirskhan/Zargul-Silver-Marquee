@@ -26,14 +26,23 @@ final class CentralStaffSessionService
         $snapshot=$this->snapshot($staff);
         if($snapshot===null)return null;
         $token=bin2hex(random_bytes(32));
-        $q=$this->db->prepare(
-            "INSERT INTO central_staff_sessions
-             (id,staff_id,token_hash,authorization_snapshot,expires_at,idle_until)
-             VALUES(:id,:staff,decode(:digest,'hex'),:snapshot,
-              now()+interval '12 hours',now()+interval '30 minutes')"
-        );
-        $q->execute(['id'=>self::uuid(),'staff'=>$staff,
-            'digest'=>hash('sha256',$token),'snapshot'=>$snapshot]);
+        $id=self::uuid();
+        $this->db->beginTransaction();
+        try{
+            $q=$this->db->prepare(
+                "INSERT INTO central_staff_sessions
+                 (id,staff_id,token_hash,authorization_snapshot,expires_at,idle_until)
+                 VALUES(:id,:staff,decode(:digest,'hex'),:snapshot,
+                 now()+interval '12 hours',now()+interval '30 minutes')"
+            );
+            $q->execute(['id'=>$id,'staff'=>$staff,
+                'digest'=>hash('sha256',$token),'snapshot'=>$snapshot]);
+            $this->audit($id,$staff,'issued');
+            $this->db->commit();
+        }catch(\Throwable $e){
+            if($this->db->inTransaction())$this->db->rollBack();
+            throw $e;
+        }
         $this->limiter->clearSuccessfulAccount($email);
         return $token;
     }
@@ -52,7 +61,7 @@ final class CentralStaffSessionService
         if(!$row)return null;
         $current=$this->snapshot($row['staff_id']);
         if($current===null || !hash_equals($row['authorization_snapshot'],$current)){
-            $this->logout($token);
+            $this->revoke($token,'invalidated');
             return null;
         }
         $q=$this->db->prepare(
@@ -69,26 +78,62 @@ final class CentralStaffSessionService
     {
         if($this->staffFor($token)===null)return null;
         $new=bin2hex(random_bytes(32));
-        $q=$this->db->prepare(
-            "UPDATE central_staff_sessions SET token_hash=decode(:next,'hex'),csrf_hash=NULL
-             WHERE token_hash=decode(:old,'hex') AND revoked_at IS NULL
-             AND expires_at>now() AND idle_until>now() RETURNING id"
-        );
-        $q->execute(['next'=>hash('sha256',$new),'old'=>self::digest($token)]);
-        return $q->fetchColumn()===false?null:$new;
+        $this->db->beginTransaction();
+        try{
+            $q=$this->db->prepare(
+                "UPDATE central_staff_sessions
+                 SET token_hash=decode(:next,'hex'),csrf_hash=NULL
+                 WHERE token_hash=decode(:old,'hex') AND revoked_at IS NULL
+                 AND expires_at>now() AND idle_until>now()
+                 RETURNING id,staff_id"
+            );
+            $q->execute(['next'=>hash('sha256',$new),
+                'old'=>self::digest($token)]);
+            $row=$q->fetch(PDO::FETCH_ASSOC);
+            if(!$row){$this->db->rollBack();return null;}
+            $this->audit($row['id'],$row['staff_id'],'rotated');
+            $this->db->commit();return $new;
+        }catch(\Throwable $e){
+            if($this->db->inTransaction())$this->db->rollBack();
+            throw $e;
+        }
     }
 
     public function logout(string $token): bool
     {
+        return $this->revoke($token,'logged_out');
+    }
+
+    private function revoke(string $token,string $outcome): bool
+    {
         $digest=self::digest($token);
         if($digest===null)return false;
+        $this->db->beginTransaction();
+        try{
+            $q=$this->db->prepare(
+                "UPDATE central_staff_sessions SET revoked_at=now()
+                 WHERE token_hash=decode(:digest,'hex') AND revoked_at IS NULL
+                 RETURNING id,staff_id"
+            );
+            $q->execute(['digest'=>$digest]);
+            $row=$q->fetch(PDO::FETCH_ASSOC);
+            if(!$row){$this->db->rollBack();return false;}
+            $this->audit($row['id'],$row['staff_id'],$outcome);
+            $this->db->commit();return true;
+        }catch(\Throwable $e){
+            if($this->db->inTransaction())$this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    /** Immutable event journal never contains login secrets or client data. */
+    private function audit(string $sessionId,string $staffId,string $outcome): void
+    {
         $q=$this->db->prepare(
-            "UPDATE central_staff_sessions SET revoked_at=now()
-             WHERE token_hash=decode(:digest,'hex') AND revoked_at IS NULL
-             RETURNING id"
+            'INSERT INTO central_staff_session_events(session_id,staff_id,outcome)
+             VALUES(:session,:staff,:outcome)'
         );
-        $q->execute(['digest'=>$digest]);
-        return $q->fetchColumn()!==false;
+        $q->execute(['session'=>$sessionId,'staff'=>$staffId,'outcome'=>$outcome]);
     }
 
     private function snapshot(string $staff): ?string
