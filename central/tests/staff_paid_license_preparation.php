@@ -178,7 +178,7 @@ paidSessionAssert((int)$signedCount->fetchColumn()===0,
 // installation or production vault. Keep all production release gates OFF.
 $keypair=sodium_crypto_sign_keypair();
 $public=InstallationRegistry::base64Url(sodium_crypto_sign_publickey($keypair));
-$validator=new Hafzatech\\Central\\PreparedSignedGrantValidator(
+$validator=new Hafzatech\Central\PreparedSignedGrantValidator(
     $db,new PaidInvoiceEligibility($db),$access,['session-test-key'=>$public]);
 $vault=random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES);
 $seal=static function(string $clear)use($vault):string{
@@ -187,7 +187,7 @@ $seal=static function(string $clear)use($vault):string{
 };
 $finalize=new CentralStaffSignedGrantFinalization(
     $db,$sessions,new CentralStaffSessionAuthorization($sessions,$access),
-    new Hafzatech\\Central\\SignedGrantFinalization($db,$validator,$seal));
+    new Hafzatech\Central\SignedGrantFinalization($db,$validator,$seal));
 $claim=[
     'api_version'=>'v1','issuer'=>'HAFZATECH','product'=>'VenueDesk',
     'license_id'=>$prepared['license_id'],'customer_id'=>$company,
@@ -196,7 +196,7 @@ $claim=[
     'not_before'=>$prepared['from'],'expires_at'=>$prepared['expiry'],
     'limits'=>['max_halls'=>2,'max_staff'=>12],'features'=>['booking'=>true],
 ];
-$envelope=Hafzatech\\Signing\\Ed25519GrantCodec::sign(
+$envelope=Hafzatech\Signing\Ed25519GrantCodec::sign(
     $claim,'session-test-key',sodium_crypto_sign_secretkey($keypair));
 paidSessionDeny(fn()=>$finalize->finalize(str_repeat('0',64),
     $prepared['revision_id'],true,$envelope),'staff_session_required');
