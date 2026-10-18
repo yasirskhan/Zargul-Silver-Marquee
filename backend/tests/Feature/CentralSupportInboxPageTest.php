@@ -50,7 +50,8 @@ class CentralSupportInboxPageTest extends TestCase
         DB::table('company_memberships')
             ->where('company_id',$company->id)->where('user_id',$owner->id)
             ->update(['role'=>'manager']);
-        $view->call('refreshMessages')->assertForbidden();
+        // Filament also hides an already-mounted page when the user's role is revoked.
+        $view->call('refreshMessages')->assertNotFound();
         $this->be($other);
         $this->assertFalse(SupportInbox::canAccess());
         // Filament hides pages inaccessible to the current actor as 404.
