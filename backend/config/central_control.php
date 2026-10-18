@@ -12,6 +12,8 @@ return [
     'scheduled_checks_enabled' => (bool) env('VENUE_CENTRAL_SCHEDULED_CHECKS_ENABLED', false),
     // Independent manual action rollout, controlled by vendor/operator.
     'manual_checks_enabled' => (bool) env('VENUE_CENTRAL_MANUAL_CHECKS_ENABLED', false),
+    // Independent support delivery gate; support is not linked to license expiry.
+    'support_enabled' => (bool) env('VENUE_CENTRAL_SUPPORT_ENABLED', false),
     // Populate ONLY in the vendor-built installer with audited pinned Ed25519
     // public keys. Never trust keys downloaded from an unauthenticated host.
     'trusted_signing_public_keys' => [],
