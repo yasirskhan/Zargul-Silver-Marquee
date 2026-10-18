@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\CentralLicensingOverviewService;
 use Illuminate\Http\Request;
+use Throwable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -40,6 +42,29 @@ final class PublicSiteRequestGate
                 ->where('status', 'verified')
                 ->whereNotNull('verified_at')->exists();
             abort_unless($verified, 503, 'Verified DNS domain ownership is required.');
+        }
+
+        // Commercial enforcement is entirely inert in default builds.
+        // Once explicitly released, the exact approved public venue must also
+        // be the company and domain of the registered central installation.
+        // Missing/unsigned/expired grants close ALL website, media and crawl
+        // endpoints without altering existing bookings or financial records.
+        if (config('central_control.activation_enabled') === true) {
+            $enrolled = DB::table('central_installation_activation')
+                ->where('singleton_id', 1)
+                ->where('company_id', $companyId)
+                ->where('approved_domain', $host)
+                ->where('status', 'registered_pending_license')
+                ->exists();
+            abort_unless($enrolled, 503, 'The venue website is temporarily unavailable.');
+            try {
+                $license = app(CentralLicensingOverviewService::class)
+                    ->snapshot(now()->toDateTimeImmutable());
+            } catch (Throwable) {
+                abort(503, 'The venue website is temporarily unavailable.');
+            }
+            abort_unless(($license['public_policy'] ?? null) === 'open', 503,
+                'The venue website is temporarily unavailable.');
         }
 
         return ['host' => $host, 'companyId' => $companyId, 'websiteId' => $websiteId];
