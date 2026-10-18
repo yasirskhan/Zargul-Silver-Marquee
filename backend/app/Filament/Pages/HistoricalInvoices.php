@@ -28,6 +28,8 @@ final class HistoricalInvoices extends Page
     protected static ?string $navigationLabel = 'Past invoices';
     protected static ?string $slug = 'historical-invoices';
 
+    private const PAGE_SIZE = 25;
+
     #[Url(as: 'company')]
     public ?string $companyId = null;
 
@@ -41,6 +43,12 @@ final class HistoricalInvoices extends Page
 
     #[Locked]
     public ?string $loadedCompanyId = null;
+
+    #[Locked]
+    public int $offset = 0;
+
+    #[Locked]
+    public bool $hasMore = false;
 
     private static function visibleCompanies(User $actor): array
     {
@@ -102,6 +110,26 @@ final class HistoricalInvoices extends Page
     public function updatedCompanyId(): void
     {
         $this->selectedInvoiceId='';
+        $this->offset=0;
+        $this->refreshInvoices();
+    }
+
+    public function nextPage(): void
+    {
+        $this->authorizeCompany();
+        abort_unless($this->loadedCompanyId===$this->companyId,403);
+        if (!$this->hasMore || $this->offset>=5000-self::PAGE_SIZE) return;
+        $this->offset+=self::PAGE_SIZE;
+        $this->selectedInvoiceId='';
+        $this->refreshInvoices();
+    }
+
+    public function previousPage(): void
+    {
+        $this->authorizeCompany();
+        abort_unless($this->loadedCompanyId===$this->companyId,403);
+        $this->offset=max(0,$this->offset-self::PAGE_SIZE);
+        $this->selectedInvoiceId='';
         $this->refreshInvoices();
     }
 
@@ -110,7 +138,9 @@ final class HistoricalInvoices extends Page
         $actor=$this->authorizeCompany();
         $this->statement=null;
         $this->invoices=[];
+        $this->hasMore=false;
         $this->loadedCompanyId=null;
+        $this->offset=max(0,min(5000,$this->offset));
         // Invoice IDs are never selected from a cross-company query. A
         // second per-hall entitlement check protects historical data even
         // during commercial post-grace or account role changes.
@@ -124,11 +154,13 @@ final class HistoricalInvoices extends Page
             ->where('i.company_id', $this->companyId)
             ->where('h.is_active', true)
             ->orderByDesc('i.number')
-            ->limit(100)
+            ->offset($this->offset)
+            ->limit(self::PAGE_SIZE+1)
             ->get(['i.id', 'i.invoice_number', 'i.currency_code',
                 'i.total_minor', 'i.issued_at', 'h.id as hall_id']);
+        $this->hasMore=$rows->count()>self::PAGE_SIZE;
         $access=app(TenantAccess::class);
-        foreach ($rows as $row) {
+        foreach ($rows->take(self::PAGE_SIZE) as $row) {
             $hall=Hall::query()->where('id', $row->hall_id)
                 ->where('company_id', $this->companyId)
                 ->where('is_active', true)->first();
