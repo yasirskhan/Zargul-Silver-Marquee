@@ -171,6 +171,8 @@ reverseCheck(!$guard->isEligible($invoice,$officer),
  'customer uploaded evidence cannot reverse negative paid-license eligibility');
 $review=new CentralStaffPaymentEvidenceReviewService($db,$sessions,
  new CentralStaffSessionAuthorization($sessions,new CentralStaffAccess($db)));
+$overview=new CentralStaffInvoicePaymentOverview($db,$sessions,
+ new CentralStaffSessionAuthorization($sessions,new CentralStaffAccess($db)));
 $decisionReason='Externally assessed claim; screenshot is NOT verified bank funds';
 // A future private staff portal can ONLY enter through this exact
 // same-origin, CSRF and MFA protected internal adapter. No route is exposed.
@@ -306,8 +308,6 @@ reverseCheck(!$guard->isEligible($invoice,$officer),
  'reviewed and rejected customer claims never restore reversed invoice entitlement');
 
 
-$overview=new CentralStaffInvoicePaymentOverview($db,$sessions,
- new CentralStaffSessionAuthorization($sessions,new CentralStaffAccess($db)));
 $partial=$overview->forInvoice($billingBearer,$invoice);
 reverseCheck(is_array($partial) && $partial['verified_minor']==='10000' &&
  $partial['reversed_minor']==='2500' && $partial['net_minor']==='7500' &&
