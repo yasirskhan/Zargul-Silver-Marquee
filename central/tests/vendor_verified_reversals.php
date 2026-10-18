@@ -10,6 +10,7 @@ use Hafzatech\Central\CentralStaffSessionService;
 use Hafzatech\Central\CentralVendorVerifiedReversalService;
 use Hafzatech\Central\CentralStaffInvoicePaymentOverview;
 use Hafzatech\Central\CentralStaffPaymentEvidenceQueue;
+use Hafzatech\Central\CentralStaffPaymentEvidenceReviewService;
 use Hafzatech\Central\PaidInvoiceEligibility;
 use Hafzatech\Central\RegistrationError;
 foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
@@ -17,7 +18,8 @@ foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
     'CentralStaffMfaChallenge','CentralStaffCredentialVerifier',
     'CentralStaffLoginRateLimiter','CentralStaffSessionService',
     'CentralStaffSessionAuthorization','CentralVendorVerifiedReversalService',
-    'CentralStaffInvoicePaymentOverview','CentralStaffPaymentEvidenceQueue'] as $name) {
+    'CentralStaffInvoicePaymentOverview','CentralStaffPaymentEvidenceQueue',
+    'CentralStaffPaymentEvidenceReviewService'] as $name) {
     require dirname(__DIR__).'/src/'.$name.'.php';
 }
 function reverseCheck(bool $v,string $msg):void{
@@ -162,10 +164,69 @@ reverseCheck($evidence->listPending($billingBearer,$customer,1,1)===[],
  'bounded pagination excludes already read customer claim');
 reverseCheck(!$guard->isEligible($invoice,$officer),
  'customer uploaded evidence cannot reverse negative paid-license eligibility');
-$db->prepare("UPDATE central_vendor_payment_evidence SET status='reviewed'
- WHERE id=:id")->execute(['id'=>$claimId]);
+$review=new CentralStaffPaymentEvidenceReviewService($db,$sessions,
+ new CentralStaffSessionAuthorization($sessions,new CentralStaffAccess($db)));
+$decisionReason='Externally assessed claim; screenshot is NOT verified bank funds';
+reverseDeny(fn()=>$review->decide(str_repeat('0',64),$claimId,'reviewed',$decisionReason),
+ 'staff_session_required');
+reverseDeny(fn()=>$review->decide($officerBearer,$claimId,'reviewed',$decisionReason),
+ 'billing_role_required');
+reverseDeny(fn()=>$review->decide($foreignBearer,$claimId,'reviewed',$decisionReason),
+ 'billing_role_required');
+reverseDeny(fn()=>$review->decide($billingBearer,$claimId,'paid',$decisionReason),
+ 'invalid_payment_evidence_review');
+reverseDeny(fn()=>$review->decide($billingBearer,$claimId,'reviewed','short'),
+ 'invalid_payment_evidence_review');
+reverseDeny(fn()=>$review->decide($billingBearer,reverseId(),'reviewed',$decisionReason),
+ 'payment_evidence_not_found');
+$reviewed=$review->decide($billingBearer,$claimId,'reviewed',$decisionReason);
+reverseCheck($reviewed['evidence_id']===$claimId &&
+ $reviewed['decision']==='reviewed' && $reviewed['reviewed_by']===$billing,
+ 'authorized billing session records a reviewed claim without creating settlement');
+reverseCheck($review->decide($billingBearer,$claimId,'reviewed',$decisionReason)===$reviewed,
+ 'exact same billing actor and review reason idempotently returns prior decision');
+reverseDeny(fn()=>$review->decide($billingBearer,$claimId,'rejected',$decisionReason),
+ 'payment_evidence_already_decided');
 reverseCheck($evidence->listPending($billingBearer,$customer)===[],
- 'reviewed customer claim not in pending queue, with no settlement created');
+ 'reviewed customer claim no longer appears pending without a settlement');
+$reviewCount=$db->prepare('SELECT count(*) FROM central_vendor_payment_evidence_reviews
+ WHERE evidence_id=:id AND reviewer_id=:reviewer');
+$reviewCount->execute(['id'=>$claimId,'reviewer'=>$billing]);
+reverseCheck((int)$reviewCount->fetchColumn()===1,
+ 'one immutable review audit per customer-submitted claim');
+foreach ([
+ "UPDATE central_vendor_payment_evidence_reviews SET reason=reason WHERE evidence_id=:id",
+ "DELETE FROM central_vendor_payment_evidence_reviews WHERE evidence_id=:id",
+ "UPDATE central_vendor_payment_evidence SET claimed_reference='forged' WHERE id=:id"
+] as $tamper){
+ try {
+  $db->prepare($tamper)->execute(['id'=>$claimId]);
+  throw new RuntimeException('UNEXPECTED customer evidence or review mutation');
+ } catch (PDOException $expected) {
+  reverseCheck($expected->getCode()==='P0001',
+   'PostgreSQL protects original customer claim and immutable review audit');
+ }
+}
+$pendingDirect=reverseId();
+$db->prepare("INSERT INTO central_vendor_payment_evidence
+ (id,invoice_id,claimed_reference) VALUES(:id,:invoice,'SECOND-CLAIM-UNVERIFIED')")
+ ->execute(['id'=>$pendingDirect,'invoice'=>$invoice]);
+try {
+ $db->prepare("UPDATE central_vendor_payment_evidence SET status='reviewed' WHERE id=:id")
+  ->execute(['id'=>$pendingDirect]);
+ throw new RuntimeException('UNEXPECTED direct SQL review without matching audit');
+} catch (PDOException $expected) {
+ reverseCheck($expected->getCode()==='P0001',
+  'database refuses claim status changes without immutable review event');
+}
+$rejected=$review->decide($billingBearer,$pendingDirect,'rejected',
+ 'Inspected receipt lacks independent bank settlement confirmation');
+reverseCheck($rejected['decision']==='rejected' &&
+ $evidence->listPending($billingBearer,$customer)===[],
+ 'rejected unverified evidence excluded from pending queue');
+reverseCheck(!$guard->isEligible($invoice,$officer),
+ 'reviewed and rejected customer claims never restore reversed invoice entitlement');
+
 
 $overview=new CentralStaffInvoicePaymentOverview($db,$sessions,
  new CentralStaffSessionAuthorization($sessions,new CentralStaffAccess($db)));
@@ -255,6 +316,9 @@ reverseDeny(fn()=>$service->record($billingBearer,$newSettlement,1000,
  'refund','BANK-REFUND-AFTER-REVOKE','Verified refund must be refused'),
  'staff_session_required');
 reverseCheck($sessions->staffFor($billingBearer)===null,'revoked staff bearer invalidated');
+reverseDeny(fn()=>$review->decide($billingBearer,$pendingDirect,'rejected',
+ 'Inspected receipt lacks independent bank settlement confirmation'),
+ 'staff_session_required');
 reverseDeny(fn()=>$evidence->listPending($billingBearer,$customer),
  'billing_role_required');
 echo "PASS: immutable independent vendor refund/chargeback accounting, live vendor MFA scope, exact idempotency, over-reversal guard and net license eligibility\n";
