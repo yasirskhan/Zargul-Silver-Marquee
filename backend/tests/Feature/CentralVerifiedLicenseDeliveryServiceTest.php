@@ -171,6 +171,99 @@ class CentralVerifiedLicenseDeliveryServiceTest extends TestCase
         $this->assertDatabaseCount('central_license_check_state',0);
     }
 
+    public function test_early_paid_renewal_keeps_existing_signed_term_open_until_new_revision_starts(): void
+    {
+        [$pair,$customer,$installation]=$this->enroll();
+        // The company must remain bound for a subsequent signed online check.
+        $company=(string)Str::uuid();
+        DB::table('companies')->insert([
+            'id'=>$company,'name'=>'Prepaid Renewal Venue',
+            'slug'=>'prepaid-renewal-test','is_active'=>true,
+            'created_at'=>now(),'updated_at'=>now(),
+        ]);
+        DB::table('central_installation_activation')->where('singleton_id',1)
+            ->update(['company_id'=>$company]);
+        $svc=app(CentralVerifiedLicenseDeliveryService::class);
+        $firstNonce=self::encode(random_bytes(32));
+        [$original,$firstReceipt]=$this->evidence($pair,$customer,$installation,$firstNonce);
+        $firstAt=new DateTimeImmutable('2026-10-17T23:00:01Z');
+        $this->assertTrue($svc->accept($original,$firstReceipt,$customer,
+            'hall.example.test',$firstNonce,$firstAt)['active']);
+
+        $claim=json_decode(base64_decode(strtr($original['payload'],'-_','+/'),true),
+            true,16,JSON_THROW_ON_ERROR);
+        $claim['revision']=2;
+        $claim['not_before']='2027-10-01T00:00:00Z';
+        $claim['expires_at']='2028-10-01T00:00:00Z';
+        $renewalNonce=self::encode(random_bytes(32));
+        [, $renewReceipt]=$this->evidence($pair,$customer,$installation,$renewalNonce,2);
+        $renewAt=new DateTimeImmutable('2026-10-17T23:00:10Z');
+
+        $gap=$claim;
+        $gap['not_before']='2027-10-02T00:00:00Z';
+        try {
+            $svc->accept($this->signed($gap,$pair,'HAFZATECH-LICENSE-GRANT-V1'),
+                $renewReceipt,$customer,'hall.example.test',$renewalNonce,$renewAt);
+            $this->fail('Prepaid renewal with one day of missing signed coverage accepted.');
+        } catch(InvalidArgumentException) {}
+        $this->assertSame(1,(int)DB::table('central_signed_license_cache')
+            ->value('revision'));
+
+        $renewal=$this->signed($claim,$pair,'HAFZATECH-LICENSE-GRANT-V1');
+        $delivered=$svc->accept($renewal,$renewReceipt,$customer,
+            'hall.example.test',$renewalNonce,$renewAt);
+        $this->assertSame([
+            'license_id'=>$claim['license_id'],
+            'revision'=>2,'changed'=>true,'active'=>true,
+        ],$delivered);
+        $this->assertDatabaseCount('central_signed_license_cache',1);
+        $this->assertSame(2,(int)DB::table('central_signed_license_cache')
+            ->value('revision'));
+        $this->assertSame(1,(int)DB::table('central_signed_license_cache')
+            ->value('previous_revision'));
+
+        $snapshot=app(\App\Services\CentralLicensingOverviewService::class)
+            ->snapshot($renewAt);
+        $this->assertSame('licensed',$snapshot['state']);
+        $this->assertSame('operational',$snapshot['dashboard_policy']);
+        $this->assertSame('2027-10-01T00:00:00Z',$snapshot['expires_at']);
+        $this->assertSame('2028-10-01T00:00:00Z',$snapshot['renewal_expires_at']);
+        $this->assertSame(1,$snapshot['revision']);
+        $this->assertSame(2,$snapshot['renewal_revision']);
+        $this->assertFalse($snapshot['expiry_warning']);
+        $this->assertSame($claim['license_id'],$snapshot['license_id']);
+
+        // Fifteen-day checks must verify already-accepted revision 2 without
+        // resetting the currently active and independently signed revision 1.
+        $verifyNonce=self::encode(random_bytes(32));
+        [, $newReceipt]=$this->evidence($pair,$customer,$installation,$verifyNonce,2);
+        $result=$svc->verifyExisting($newReceipt,$customer,'hall.example.test',
+            $verifyNonce,new DateTimeImmutable('2026-10-17T23:00:20Z'));
+        $this->assertSame(['revision'=>2,'active'=>true,'changed'=>false],$result);
+
+        $before=app(\App\Services\CentralLicensingOverviewService::class)->snapshot(
+            new DateTimeImmutable('2027-09-30T23:59:59Z'));
+        $this->assertSame('open',$before['public_policy']);
+        $this->assertSame('operational',$before['dashboard_policy']);
+        $this->assertSame(1,$before['revision']);
+        $after=app(\App\Services\CentralLicensingOverviewService::class)->snapshot(
+            new DateTimeImmutable('2027-10-01T00:00:00Z'));
+        $this->assertSame('open',$after['public_policy']);
+        $this->assertSame('operational',$after['dashboard_policy']);
+        $this->assertSame(2,$after['revision']);
+        $this->assertSame('2028-10-01T00:00:00Z',$after['expires_at']);
+        $this->assertNull($after['renewal_expires_at']);
+
+        // A corrupted predecessor cannot be used as an unsigned fallback.
+        DB::table('central_signed_license_cache')->where('singleton_id',1)
+            ->update(['previous_envelope_sha256'=>str_repeat('0',64)]);
+        $blocked=app(\App\Services\CentralLicensingOverviewService::class)
+            ->snapshot(new DateTimeImmutable('2027-09-01T00:00:00Z'));
+        $this->assertSame('invalid_signed_license',$blocked['state']);
+        $this->assertSame('maintenance',$blocked['public_policy']);
+        $this->assertDatabaseCount('finance_journals',0);
+    }
+
     public function test_default_off_blocks_delivery_even_when_valid_crypto_exists(): void
     {
         [$pair,$customer,$installation]=$this->enroll();
