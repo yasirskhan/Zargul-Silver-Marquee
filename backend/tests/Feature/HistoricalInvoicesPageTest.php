@@ -145,6 +145,44 @@ class HistoricalInvoicesPageTest extends TestCase
             $owner,$company->id,$quote,$invoiceId,'Historic pre-expiry invoice issuance');
         $this->assertDatabaseCount('venue_invoices',1);
 
+        // Synthetic immutable graph for pagination coverage. Only invoice 1
+        // is issued through the real application service. The additional
+        // old records are fixture-only; they are not payment confirmation.
+        for ($n=2; $n<=26; $n++) {
+            $priorSnapshot=(string)Str::uuid();
+            $priorQuote=(string)Str::uuid();
+            DB::table('venue_quote_snapshots')->insert([
+                'id'=>$priorSnapshot,'company_id'=>$company->id,
+                'reservation_id'=>$reservation,'reservation_revision'=>1,
+                'hall_id'=>$hall->id,'program_revision'=>1,
+                'seating_revision'=>1,'addon_revision'=>0,
+                'currency_code'=>'PKR','frozen_lines'=>$frozen,
+                'request_fingerprint'=>hash('sha256','historic-'.$n),
+                'subtotal_minor'=>150000,'created_by'=>$owner->id,
+                'reason'=>'Synthetic archived invoice page boundary',
+            ]);
+            DB::table('venue_quote_issues')->insert([
+                'id'=>$priorQuote,'company_id'=>$company->id,
+                'snapshot_id'=>$priorSnapshot,'reservation_id'=>$reservation,
+                'number'=>$n,'document_number'=>sprintf('Q-%09d',$n),
+                'currency_code'=>'PKR','subtotal_minor'=>150000,
+                'frozen_lines'=>$frozen,'purpose'=>'Synthetic archived quote',
+                'issued_by'=>$owner->id,'issued_at'=>now(),
+            ]);
+            DB::table('venue_invoices')->insert([
+                'id'=>(string)Str::uuid(),'company_id'=>$company->id,
+                'quote_issue_id'=>$priorQuote,'reservation_id'=>$reservation,
+                'customer_id'=>$customer,'number'=>$n,
+                'invoice_number'=>sprintf('INV-%09d',$n),
+                'tax_rate_bps'=>1000,'currency_code'=>'PKR',
+                'frozen_lines'=>$frozen,'subtotal_minor'=>150000,
+                'tax_minor'=>15000,'total_minor'=>165000,
+                'reason'=>'Synthetic older historical invoice',
+                'issued_by'=>$owner->id,'issued_at'=>now(),
+            ]);
+        }
+        $this->assertDatabaseCount('venue_invoices',26);
+
         // The original installed company remains bound, but there is no
         // signed paid license. New bookings and payments are restricted.
         config()->set('central_control.activation_enabled',true);
@@ -158,11 +196,17 @@ class HistoricalInvoicesPageTest extends TestCase
         ]);
         $this->assertFalse(app(TenantAccess::class)->canManageBookings($owner,$hall));
         Livewire::test(HistoricalInvoices::class)
-            ->assertSee('INV-000000001')
+            ->assertSee('INV-000000026')
+            ->assertDontSee('INV-000000001')
             ->assertDontSee('Private Historic Client')
-            ->assertSet('invoices.0.id',$invoiceId)
+            ->assertCount('invoices',25)
             ->assertSet('offset',0)
+            ->assertSet('hasMore',true)
+            ->call('nextPage')
+            ->assertSet('offset',25)
             ->assertSet('hasMore',false)
+            ->assertSet('invoices.0.id',$invoiceId)
+            ->assertSee('INV-000000001')
             ->set('selectedInvoiceId',$invoiceId)
             ->call('viewStatement')
             ->assertSet('statement.invoiceId',$invoiceId)
