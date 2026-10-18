@@ -7,6 +7,7 @@ use Hafzatech\Central\InstallationStatusService;
 
 require dirname(__DIR__).'/src/InstallationRegistry.php';
 require dirname(__DIR__).'/src/InstallationStatusService.php';
+require dirname(__DIR__).'/src/CentralInstallationApiHttpPolicy.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, private');
@@ -23,9 +24,9 @@ function reply(int $status, array $body): never
 // TLS must be terminated with HTTPS=on or SERVER_PORT=443 by trusted server config;
 // untrusted X-Forwarded-Proto headers are intentionally ignored.
 if (getenv('CENTRAL_API_ENABLED') !== 'true') reply(503, ['api_version' => 'v1', 'error' => 'service_not_enabled']);
-$secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
-    (isset($_SERVER['SERVER_PORT']) && (string) $_SERVER['SERVER_PORT'] === '443');
-if (!$secure) reply(403, ['api_version' => 'v1', 'error' => 'https_required']);
+if (!\Hafzatech\Central\CentralInstallationApiHttpPolicy::trustedHost($_SERVER)) {
+    reply(403, ['api_version'=>'v1','error'=>'trusted_https_host_required']);
+}
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') reply(405, ['api_version' => 'v1', 'error' => 'method_not_allowed']);
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 if (!in_array($path, ['/api/v1/installations/challenge', '/api/v1/installations/register', '/api/v1/installations/status'], true)) {

@@ -82,6 +82,7 @@ jobs:
           php central/bin/migrate.php
       - name: Verify central cross-customer and licensing tests
         run: |
+          php central/tests/installation_http_policy.php
           php central/tests/installation_identity.php
           php central/tests/staff_permissions.php
           php central/tests/staff_access.php
