@@ -16,6 +16,7 @@ use Hafzatech\Central\CentralStaffProtectedHttpBoundary;
 use Hafzatech\Central\CentralStaffPaymentEvidenceHttpAdapter;
 use Hafzatech\Central\CentralStaffBillingDashboardRenderer;
 use Hafzatech\Central\CentralStaffPortalHttpRouter;
+use Hafzatech\Central\CentralStaffPortalPrivateResponse;
 use Hafzatech\Central\PaidInvoiceEligibility;
 use Hafzatech\Central\RegistrationError;
 foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
@@ -28,7 +29,8 @@ foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
     'CentralStaffHttpPolicy','CentralStaffProtectedHttpBoundary',
     'CentralStaffPaymentEvidenceHttpAdapter',
     'CentralStaffBillingDashboardRenderer',
-    'CentralStaffPortalHttpRouter'] as $name) {
+    'CentralStaffPortalHttpRouter',
+    'CentralStaffPortalPrivateResponse'] as $name) {
     require dirname(__DIR__).'/src/'.$name.'.php';
 }
 function reverseCheck(bool $v,string $msg):void{
@@ -374,6 +376,50 @@ reverseDeny(fn()=>$portalOn->dispatch(
  $dashboardRequest,$privateCookie,$portalFields,$privateCsrf),'staff_http_denied');
 reverseDeny(fn()=>$portalOn->dispatch(
  $logoutHttp,$privateCookie,[],$privateCsrf),'staff_portal_denied');
+
+// Safe PRIVATE response plan: never echo bearer into HTML or JSON, and only
+// emit an operator-validated host-only Secure HttpOnly cookie instruction.
+$responseOff=new CentralStaffPortalPrivateResponse();
+$responseOn=new CentralStaffPortalPrivateResponse(true);
+reverseDeny(fn()=>$responseOff->compose($portalLogin),'staff_response_not_enabled');
+$loginWire=$responseOn->compose($portalLogin);
+reverseCheck($loginWire['status']===200 &&
+ $loginWire['headers']['Cache-Control']==='no-store, private' &&
+ str_contains($loginWire['headers']['Content-Security-Policy'],"default-src 'none'") &&
+ count($loginWire['cookies'])===1 &&
+ $loginWire['cookies'][0]['name']===
+ \Hafzatech\Central\CentralStaffHttpPolicy::COOKIE_NAME &&
+ $loginWire['cookies'][0]['options']['secure']===true &&
+ $loginWire['cookies'][0]['options']['httponly']===true &&
+ $loginWire['cookies'][0]['options']['samesite']==='Strict' &&
+ !str_contains($loginWire['body'],$privateCookie[
+ \Hafzatech\Central\CentralStaffHttpPolicy::COOKIE_NAME]) &&
+ !str_contains(json_encode($loginWire['headers']),$privateCookie[
+ \Hafzatech\Central\CentralStaffHttpPolicy::COOKIE_NAME]) &&
+ str_contains($loginWire['body'],$privateCsrf),
+ 'protected login response keeps bearer solely in strict HttpOnly cookie plan');
+$viewWire=$responseOn->compose($privatePage);
+reverseCheck($viewWire['cookies']===[] && $viewWire['body']===$privatePage['html'] &&
+ !str_contains($viewWire['body'],$billingBearer) &&
+ !str_contains($viewWire['body'],$csrfToken) &&
+ !str_contains($viewWire['body'],'private/vendor-evidence/'),
+ 'private billing view never issues a new credential or exposes protected values');
+reverseDeny(fn()=>$responseOn->compose(
+ ['kind'=>'internal_login','credentials'=>array_replace(
+ $portalLogin['credentials'],['cookie_options'=>array_replace(
+ $portalLogin['credentials']['cookie_options'],['secure'=>false])])]),
+ 'invalid_staff_response');
+reverseDeny(fn()=>$responseOn->compose(
+ ['kind'=>'private_html','html'=>'<script>alert(1)</script>']),
+ 'invalid_staff_response');
+reverseDeny(fn()=>$responseOn->compose(['kind'=>'unexpected']),
+ 'invalid_staff_response');
+$logoutWire=$responseOn->compose($portalLogout);
+reverseCheck($logoutWire['cookies'][0]['value']==='' &&
+ $logoutWire['cookies'][0]['options']['expires']===1 &&
+ $logoutWire['cookies'][0]['options']['secure']===true &&
+ !str_contains($logoutWire['body'],$privateCsrf),
+ 'private logout response securely clears host-only cookie and reveals no proof');
 
 $decisionHttp=$httpRequest;
 $decisionHttp['REQUEST_URI']='/staff/billing/payment-evidence/decide';
