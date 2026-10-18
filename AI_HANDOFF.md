@@ -399,6 +399,12 @@
 - No production code, database schema, permission role, or release gate was changed. Parent `b2f14b167565ace3caf65def150bc7c623818118` added scoped pending-support dashboard count and needs its exact full six-job CI verification.
 - Next: verify this new six-job CI including early overview tests; fix failures without widening access to support data, then continue central support deployment prerequisites.
 
+## SEPARATE VENDOR STAFF RFC 6238 TOTP FOUNDATION — HOSTED CI PENDING
+- New `central/src/CentralStaffTotpVerifier.php` is a private, pure RFC 6238 HMAC-SHA1 six-digit TOTP verifier. Accepts only 16–64 byte raw secrets, exactly six numeric digits, one 30-second skew interval, and counters strictly above the caller's last accepted counter. Returns the accepted integer counter for a future centralized transaction/replay ledger, never issues a session/token or treats HTTP JSON as MFA.
+- `central/tests/staff_totp.php` runs standard public RFC 6238 SHA-1 test vectors, rejects same-code replay, stale window, weak secret and malformed codes. Added to independent central-postgres hosted job.
+- This does NOT implement central staff login, a credential vault, KMS/HSM protection, attempt rate limits, replay-counter storage/transaction, session cookies or deploy a central portal. The trusted central staff auth layer must serialize and durably store accepted counter; all vendor API, licensing and support release flags remain OFF. Verify exact six-job CI and operator security readiness before any deployment.
+- Previous support queue and overview milestones remain in authorized branch and their hosted CI jobs must be checked for exact SHAs; no main/property-platform changes.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`
