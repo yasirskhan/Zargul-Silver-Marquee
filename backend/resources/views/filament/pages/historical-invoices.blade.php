@@ -18,7 +18,7 @@
             Refresh historical invoices
         </button>
         @if ($loadedCompanyId === $companyId)
-            <p class="text-xs">Showing up to 100 most recent invoices for the selected company. No records are deleted by license expiry.</p>
+            <p class="text-xs">Showing up to 25 invoices from position {{ $offset + 1 }} for the selected company. Older records remain available through pagination.</p>
             <div class="space-y-2">
                 @forelse ($invoices as $invoice)
                     <article wire:key="historic-invoice-{{ $invoice['id'] }}" class="rounded-lg border p-3 text-sm">
@@ -30,6 +30,12 @@
                     <p class="rounded-lg border p-4 text-sm">No existing invoices found for this company.</p>
                 @endforelse
             </div>
+            <nav aria-label="Historical invoice pagination" class="flex items-center gap-3">
+                <button type="button" wire:click="previousPage" @disabled($offset === 0)
+                    class="rounded-lg border px-4 py-2 text-sm disabled:opacity-50">Previous</button>
+                <button type="button" wire:click="nextPage" @disabled(! $hasMore || $offset >= 5000 - 25)
+                    class="rounded-lg border px-4 py-2 text-sm disabled:opacity-50">Next</button>
+            </nav>
             @if ($invoices !== [])
                 <form wire:submit="viewStatement" class="space-y-3">
                     <label class="block space-y-1">
