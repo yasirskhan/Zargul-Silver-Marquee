@@ -10,7 +10,8 @@ foreach([
  'CentralStaffTotpVerifier','CentralStaffMfaChallenge',
  'CentralStaffCredentialVerifier','CentralStaffLoginRateLimiter',
  'CentralStaffSessionService','CentralStaffProvisioningService',
- 'CentralStaffSessionAuthorization','CentralStaffCsrfTokenService',
+ 'CentralStaffSessionAuthorization','CentralStaffProvisionAuditReader',
+ 'CentralStaffCsrfTokenService',
  'CentralStaffHttpPolicy','CentralStaffProtectedHttpBoundary',
  'CentralStaffPaymentEvidenceQueue','CentralStaffPaymentEvidenceReviewService',
  'CentralStaffInvoicePaymentOverview','CentralStaffPaymentEvidenceHttpAdapter',
@@ -53,10 +54,11 @@ VALUES(:id,:email,:name,:hash,decode(:secret,'hex'),now(),'active')");
 $role=$db->prepare("INSERT INTO central_staff_role_grants
 (id,staff_id,role,reason)
 VALUES(:id,:staff,:role,'Synthetic staff provisioning authorization')");
-$admin=provisionId();$support=provisionId();$password='synthetic-provisioner-password';
+$admin=provisionId();$support=provisionId();$auditor=provisionId();$password='synthetic-provisioner-password';
 foreach([
  [$admin,'provision-admin@example.test','staff_administrator'],
- [$support,'provision-support@example.test','support_agent']
+ [$support,'provision-support@example.test','support_agent'],
+ [$auditor,'provision-auditor@example.test','auditor']
 ] as [$id,$email,$r]) {
  $create->execute(['id'=>$id,'email'=>$email,'name'=>'Synthetic User',
   'hash'=>password_hash($password,PASSWORD_ARGON2ID),
@@ -74,8 +76,10 @@ $adminBearer=$sessions->login('provision-admin@example.test',
  $password,$otp,'192.0.2.171');
 $supportBearer=$sessions->login('provision-support@example.test',
  $password,$otp,'192.0.2.172');
-provisionAssert(is_string($adminBearer)&&is_string($supportBearer),
- 'two separate current MFA sessions');
+$auditorBearer=$sessions->login('provision-auditor@example.test',
+ $password,$otp,'192.0.2.174');
+provisionAssert(is_string($adminBearer)&&is_string($supportBearer)&&
+ is_string($auditorBearer),'three separate current MFA sessions');
 $off=new CentralStaffProvisioningService(
  $db,$sessions,new Hafzatech\Central\CentralStaffAccess($db));
 $on=new CentralStaffProvisioningService(
@@ -134,6 +138,32 @@ try{
   $events[0]['action']==='created_pending_mfa' &&
   $events[0]['reason']==='Approved initial staffing',
   'one append-only actor-attributed account provision decision');
+ $authForAudit=new Hafzatech\Central\CentralStaffSessionAuthorization(
+  $sessions,new Hafzatech\Central\CentralStaffAccess($db));
+ $audit=new Hafzatech\Central\CentralStaffProvisionAuditReader(
+  $db,$authForAudit);
+ provisionDeny(fn()=>$audit->listForTarget($adminBearer,$created['staff_id']),
+  'staff_audit_denied');
+ provisionDeny(fn()=>$audit->listForTarget($supportBearer,$created['staff_id']),
+  'staff_audit_denied');
+ provisionDeny(fn()=>$audit->listForTarget($auditorBearer,'bad-id'),
+  'invalid_provision_audit_request');
+ provisionDeny(fn()=>$audit->listForTarget($auditorBearer,$created['staff_id'],26),
+  'invalid_provision_audit_request');
+ $history=$audit->listForTarget($auditorBearer,$created['staff_id']);
+ provisionAssert(count($history)===1 &&
+  array_keys($history[0])===['actor_staff_id','action','occurred_at'] &&
+  $history[0]['actor_staff_id']===$admin &&
+  $history[0]['action']==='created_pending_mfa' &&
+  !array_key_exists('reason',$history[0]) &&
+  !array_key_exists('password_hash',$history[0]),
+  'current independent auditor sees only immutable provision metadata');
+ $q=$db->prepare("UPDATE central_staff_role_grants SET revoked_at=now()
+  WHERE staff_id=:auditor");
+ $q->execute(['auditor'=>$auditor]);
+ provisionDeny(fn()=>$audit->listForTarget($auditorBearer,$created['staff_id']),
+  'staff_audit_denied');
+
  provisionDeny(fn()=>$on->createPending($adminBearer,
   'new-vendor@example.test','Different display name','Approved initial staffing'),
   'staff_account_already_exists');

@@ -61,7 +61,8 @@ final class CentralStaffPortalOperatorWiring
         $support=new CentralStaffSupportTicketQueue($db,$auth);
         $audit=new CentralStaffPortalAuditHistoryPage(
             new CentralStaffSessionAuditReader($db,$auth),
-            new CentralStaffAccountActionReader($db,$auth));
+            new CentralStaffAccountActionReader($db,$auth),
+            new CentralStaffProvisionAuditReader($db,$auth));
         $reply=new CentralStaffSessionSupportReply($db,$sessions,$auth,
             new SupportAgentReplyService($db,$access,$encryptSupportReply),true);
         $router=new CentralStaffPortalHttpRouter(
@@ -75,7 +76,8 @@ final class CentralStaffPortalOperatorWiring
                 new CentralStaffOwnPasswordChange($db,$sessions),true),
             new CentralStaffPortalTeamDashboard($auth),
             new CentralStaffProvisioningService(
-                $db,$sessions,$access,true));
+                $db,$sessions,$access,true),
+            new CentralStaffPortalAuditorDashboard($auth));
         return new CentralStaffPortalOperatorApp(
             new CentralStaffPortalOperatorKernel(
                 $router,new CentralStaffPortalPrivateResponse(true),true),

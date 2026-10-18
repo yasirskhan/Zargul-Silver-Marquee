@@ -29,7 +29,8 @@ final class CentralStaffPortalHttpRouter
         private readonly ?CentralStaffSessionSupportReply $supportReply = null,
         private readonly ?CentralStaffPortalOwnPassword $ownPassword = null,
         private readonly ?CentralStaffPortalTeamDashboard $teamDashboard = null,
-        private readonly ?CentralStaffProvisioningService $provisioner = null
+        private readonly ?CentralStaffProvisioningService $provisioner = null,
+        private readonly ?CentralStaffPortalAuditorDashboard $auditorHome = null
     ) {}
 
     /**
@@ -301,6 +302,17 @@ final class CentralStaffPortalHttpRouter
                 $fields['reason']);
             return ['kind'=>'private_staff_provisioned_html',
                 'html'=>CentralStaffProvisioningService::html($record)];
+        }
+        if($uri==='/staff/audit/dashboard' && $this->auditorHome!==null) {
+            if($fields!==[]) {
+                throw new RegistrationError('invalid_staff_auditor_dashboard',422);
+            }
+            if(!$this->boundary->permitsMutation(
+                $server,$bearer,$csrfHeader,'audit.read',null)) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            return ['kind'=>'private_auditor_home_html',
+                'html'=>$this->auditorHome->render($bearer,$csrfHeader)];
         }
         throw new RegistrationError('staff_route_not_found',404);
     }

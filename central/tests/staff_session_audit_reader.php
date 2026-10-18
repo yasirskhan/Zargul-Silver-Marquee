@@ -26,7 +26,8 @@ foreach(['CentralStaffPasswordVerifier','CentralStaffTotpVerifier',
     'CentralStaffProtectedHttpBoundary','CentralStaffPaymentEvidenceQueue',
     'CentralStaffPaymentEvidenceReviewService',
     'CentralStaffInvoicePaymentOverview','CentralStaffPaymentEvidenceHttpAdapter',
-    'CentralStaffPortalHttpRouter','CentralStaffPortalPrivateResponse'] as $class) {
+    'CentralStaffPortalHttpRouter','CentralStaffPortalPrivateResponse',
+    'CentralStaffPortalAuditorDashboard'] as $class) {
     require dirname(__DIR__).'/src/'.$class.'.php';
 }
 function journalRequire(bool $ok,string $message):void {
@@ -189,6 +190,43 @@ try {
  journalRequire($error->errorCode==='staff_portal_not_enabled',
   'default disabled staff audit route');
 }
+$auditorHome=new \Hafzatech\Central\CentralStaffPortalAuditorDashboard(
+    $auditAuth);
+$auditorRouter=new \Hafzatech\Central\CentralStaffPortalHttpRouter(
+    $boundary,$billingDisabled,true,null,null,null,null,$auditPage,
+    null,null,null,null,null,null,$auditorHome);
+$homeRequest=$staffAuditRequest;
+$homeRequest['REQUEST_URI']='/staff/audit/dashboard';
+$homePage=$auditorRouter->dispatch($homeRequest,$staffCookie,[],$proof);
+journalRequire($homePage['kind']==='private_auditor_home_html' &&
+    str_contains($homePage['html'],'action="/staff/audit/staff"') &&
+    str_contains($homePage['html'],'name="subject_staff_id"') &&
+    str_contains($homePage['html'],'action="/staff/session/logout"') &&
+    !str_contains($homePage['html'],'action="/staff/team/accounts"') &&
+    !str_contains($homePage['html'],'/staff/billing/overview') &&
+    !str_contains($homePage['html'],$auditorBearer),
+    'current MFA Auditor only sees restricted staff audit navigation');
+$homeResponse=(new \Hafzatech\Central\CentralStaffPortalPrivateResponse(true))
+    ->compose($homePage);
+journalRequire($homeResponse['cookies']===[] &&
+    $homeResponse['headers']['Cache-Control']==='no-store, private',
+    'staff Auditor page remains protected and cookie free');
+foreach([
+ [$homeRequest,$staffCookie,['role'=>'super_administrator'],$proof],
+ [$homeRequest,$staffCookie,[],str_repeat('0',64)],
+ [array_replace($homeRequest,['HTTP_ORIGIN'=>'https://evil.example']),
+  $staffCookie,[],$proof],
+ [array_replace($homeRequest,['REQUEST_METHOD'=>'GET']),
+  $staffCookie,[],$proof]
+] as [$srv,$cookies,$body,$csrfToken]) {
+ try{$auditorRouter->dispatch($srv,$cookies,$body,$csrfToken);
+  throw new RuntimeException('UNAUTHORIZED AUDITOR HOME ACCESS');}
+ catch(\Hafzatech\Central\RegistrationError $e){
+  journalRequire(in_array($e->errorCode,
+    ['invalid_staff_auditor_dashboard','staff_portal_denied'],true),
+    'auditor dashboard refuses forged role, origin, CSRF and GET');
+ }
+}
 $auditorPage=$routerOn->dispatch(
     $staffAuditRequest,$staffCookie,$staffAuditFields,$proof);
 journalRequire($auditorPage['kind']==='private_audit_html' &&
@@ -237,6 +275,13 @@ try{
  throw new RuntimeException('REVOKED AUDITOR PAGE ACCESS');
 }catch(RuntimeException $error){
  if($error->getMessage()==='REVOKED AUDITOR PAGE ACCESS')throw $error;
+}
+try{
+ $auditorRouter->dispatch($homeRequest,$staffCookie,[],$proof);
+ throw new RuntimeException('REVOKED AUDITOR HOME ACCESS');
+}catch(\Hafzatech\Central\RegistrationError $e){
+ journalRequire($e->errorCode==='staff_portal_denied',
+  'revoked auditor loses private role homepage');
 }
 try {
  $routerOn->dispatch($staffAuditRequest,$staffCookie,$staffAuditFields,$proof);

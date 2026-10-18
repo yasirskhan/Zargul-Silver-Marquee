@@ -13,7 +13,8 @@ final class CentralStaffPortalAuditHistoryPage
 {
     public function __construct(
         private readonly CentralStaffSessionAuditReader $sessions,
-        private readonly CentralStaffAccountActionReader $actions
+        private readonly CentralStaffAccountActionReader $actions,
+        private readonly ?CentralStaffProvisionAuditReader $provisioning=null
     ) {}
 
     public function render(string $vendorBearer,string $subjectStaffId): string
@@ -41,6 +42,21 @@ final class CentralStaffPortalAuditHistoryPage
         if($accountRows==='') {
             $accountRows='<tr><td colspan="3">No account actions</td></tr>';
         }
+        $provisionRows='';
+        if($this->provisioning!==null) {
+            foreach($this->provisioning->listForTarget(
+                $vendorBearer,$subjectStaffId,25) as $event) {
+                $provisionRows.='<tr><td>'.$e($event['action']??'').
+                    '</td><td>'.$e($event['actor_staff_id']??'').
+                    '</td><td>'.$e($event['occurred_at']??'').'</td></tr>';
+            }
+            if($provisionRows==='') {
+                $provisionRows='<tr><td colspan="3">No provisioning events</td></tr>';
+            }
+            $provisionRows='<h3>Identity provisioning</h3>'.
+                '<table><thead><tr><th>Action</th><th>Authorized actor ID</th>'.
+                '<th>When</th></tr></thead><tbody>'.$provisionRows.'</tbody></table>';
+        }
         return '<section aria-label="Private HAFZATECH staff audit">'.
             '<h2>Staff security history</h2><p>Read-only. '.
             'Session tokens, session IDs, MFA secrets and staff-account '.
@@ -50,6 +66,6 @@ final class CentralStaffPortalAuditHistoryPage
             $sessionRows.'</tbody></table>'.
             '<h3>Account actions</h3><table><thead><tr>'.
             '<th>Action</th><th>Previous status</th><th>When</th>'.
-            '</tr></thead><tbody>'.$accountRows.'</tbody></table></section>';
+            '</tr></thead><tbody>'.$accountRows.'</tbody></table>'.$provisionRows.'</section>';
     }
 }
