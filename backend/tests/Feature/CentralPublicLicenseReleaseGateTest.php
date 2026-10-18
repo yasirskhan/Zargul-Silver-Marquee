@@ -7,6 +7,9 @@ use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\User;
 use App\Services\TenantAccess;
+use App\Services\ApprovalWorkflowService;
+use App\Policies\FinanceAccessPolicy;
+use Illuminate\Auth\Access\AuthorizationException;
 use App\Services\CentralInstallationIdentity;
 use App\Services\CentralInstallationCompanyScope;
 use App\Services\CentralSignedLicenseCache;
@@ -53,6 +56,9 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
         $tenant=app(TenantAccess::class);
         $this->assertTrue($tenant->canManageCustomerProfiles($owner,$company->id),
             'Default-OFF licensing preserves management permissions');
+        $finance=app(FinanceAccessPolicy::class);
+        $this->assertTrue($finance->view($owner,$company->id),
+            'Default-OFF licensing preserves owner finance access');
 
         $website=(string)Str::uuid();
         DB::table('websites')->insert([
@@ -127,6 +133,8 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
 
             $this->assertTrue($tenant->canManageCustomerProfiles($owner,$company->id),
                 'Active vendor-signed license permits company operations');
+            $this->assertTrue($finance->view($owner,$company->id),
+                'Active vendor-signed license permits scoped finance');
             config()->set('public_site.company_id',(string)Str::uuid());
             $this->assertBlocked();
             config()->set('public_site.company_id',$company->id);
@@ -168,6 +176,17 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
             $this->travelTo(Carbon::parse('2027-10-08T00:00:00Z'));
             $this->assertFalse($tenant->canManageCustomerProfiles($owner,$company->id),
                 'Normal operations stop precisely at signed expiry plus seven days');
+            $this->assertFalse($finance->view($owner,$company->id),
+                'Expired grace cannot bypass finance authorization');
+            $this->be($owner);
+            try {
+                app(ApprovalWorkflowService::class)->request(
+                    $owner,$company->id,(string)Str::uuid(),'expense',1,'PKR',
+                    null,'Synthetic request after commercial grace expiry');
+                $this->fail('Expired license unexpectedly allowed financial approval request');
+            } catch (AuthorizationException) {
+                $this->assertTrue(true);
+            }
             // Licensing, verified owner company scope and HAFZATECH support
             // remain available to resolve renewal even after operations end.
             app(CentralInstallationCompanyScope::class)->assertCanRead($owner,$company->id);
