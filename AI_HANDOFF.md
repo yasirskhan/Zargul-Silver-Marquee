@@ -350,6 +350,11 @@
 ## READ AUDIT SCHEMA CI FIX
 - GitHub Actions [39088113663](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39088113663) detected synthetic PostgreSQL FK type mismatch in new support read-audit migration: user `users.id` uses bigint, not UUID. Changed ONLY `actor_user_id` to unsignedBigInteger; company/message IDs remain UUID. No production access control, inbox body or license behavior altered. Exact new SHA six-job CI required before this audit checkpoint VERIFIED.
 
+## IMMUTABLE SUPPORT READ AUDIT ENFORCEMENT — NEW BATCH
+- The previous read-audit FK fix `9934508` has focused licensing/central/browser/prototype checks passing, with full Laravel suite requiring exact completion. New additive migration installs a PostgreSQL BEFORE UPDATE OR DELETE trigger that refuses rewrite/deletion of any support read receipt. Existing roundtrip now asserts forbidden update and delete with SQLSTATE 23514, including savepoint cleanup, and original event retained; no plaintext support content is logged.
+- This protects the first-read actor/time record from accidental/malicious application writes, not from privileged DBA operations. The migration is unverified until all six hosted CI jobs PASS; release gates remain OFF.
+- Next: protected central support replies and authorized vendor staff/KMS, then optional visible audit reporting. Avoid touching main or property-platform.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`

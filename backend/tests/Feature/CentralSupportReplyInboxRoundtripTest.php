@@ -79,6 +79,27 @@ class CentralSupportReplyInboxRoundtripTest extends TestCase
         $this->assertSame($owner->id,$readAudit->actor_user_id);
         $this->assertSame($company->id,$readAudit->company_id);
         $this->assertSame($row->id,$readAudit->message_id);
+        // A replayed or adversarial application write cannot rewrite the
+        // identity or delete the immutable read receipt.
+        foreach (['rewrite','delete'] as $attempt) {
+            try {
+                DB::transaction(function () use ($attempt,$readAudit):void {
+                    if ($attempt === 'rewrite') {
+                        DB::table('central_support_reply_read_events')
+                            ->where('id',$readAudit->id)
+                            ->update(['actor_user_id'=>$readAudit->actor_user_id]);
+                    } else {
+                        DB::table('central_support_reply_read_events')
+                            ->where('id',$readAudit->id)->delete();
+                    }
+                });
+                $this->fail('Immutable support read audit was altered: '.$attempt);
+            } catch (\Illuminate\Database\QueryException $expected) {
+                $this->assertSame('23514',$expected->errorInfo[0]);
+            }
+        }
+        $this->assertDatabaseCount('central_support_reply_read_events',1);
+
 
         $this->assertSame(0,$reader->unreadCount($owner,$company->id));
         try {
