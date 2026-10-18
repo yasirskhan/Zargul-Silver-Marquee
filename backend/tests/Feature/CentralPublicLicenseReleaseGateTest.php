@@ -112,6 +112,24 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
             $this->assertBlocked();
             config()->set('public_site.company_id',$company->id);
 
+            // An operator host alone must not override the single immutable
+            // registered domain or the installer-pinned signature trust key.
+            DB::table('central_installation_activation')
+                ->where('singleton_id',1)->update(['approved_domain'=>'other.example.test']);
+            $this->assertBlocked();
+            DB::table('central_installation_activation')
+                ->where('singleton_id',1)->update(['approved_domain'=>'licensed.example.test']);
+            $this->assertSame('licensed.example.test',
+                app(PublicSiteRequestGate::class)->authorize($request)['host']);
+
+            config()->set('central_control.trusted_signing_public_keys',[]);
+            $this->assertBlocked();
+            config()->set('central_control.trusted_signing_public_keys',[
+                'fixture-test-key'=>self::b64(sodium_crypto_sign_publickey($pair))
+            ]);
+            $this->assertSame('licensed.example.test',
+                app(PublicSiteRequestGate::class)->authorize($request)['host']);
+
             $this->travelTo(Carbon::parse('2027-10-01T00:00:00Z'));
             $this->assertBlocked();
             foreach (['/', '/robots.txt', '/sitemap.xml',
