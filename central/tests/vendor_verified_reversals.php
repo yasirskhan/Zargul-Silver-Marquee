@@ -8,13 +8,15 @@ use Hafzatech\Central\CentralStaffPasswordVerifier;
 use Hafzatech\Central\CentralStaffSessionAuthorization;
 use Hafzatech\Central\CentralStaffSessionService;
 use Hafzatech\Central\CentralVendorVerifiedReversalService;
+use Hafzatech\Central\CentralStaffInvoicePaymentOverview;
 use Hafzatech\Central\PaidInvoiceEligibility;
 use Hafzatech\Central\RegistrationError;
 foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
     'PaidInvoiceEligibility','CentralStaffPasswordVerifier','CentralStaffTotpVerifier',
     'CentralStaffMfaChallenge','CentralStaffCredentialVerifier',
     'CentralStaffLoginRateLimiter','CentralStaffSessionService',
-    'CentralStaffSessionAuthorization','CentralVendorVerifiedReversalService'] as $name) {
+    'CentralStaffSessionAuthorization','CentralVendorVerifiedReversalService',
+    'CentralStaffInvoicePaymentOverview'] as $name) {
     require dirname(__DIR__).'/src/'.$name.'.php';
 }
 function reverseCheck(bool $v,string $msg):void{
@@ -124,6 +126,23 @@ reverseCheck($first['amount_minor']===2500&&$first['kind']==='refund',
  'verified reversal recorded as immutable evidence without sending payment');
 reverseCheck(!$guard->isEligible($invoice,$officer),
  'partial verified reversal reduces future paid license eligibility');
+$overview=new CentralStaffInvoicePaymentOverview($db,$sessions,
+ new CentralStaffSessionAuthorization($sessions,new CentralStaffAccess($db)));
+$partial=$overview->forInvoice($billingBearer,$invoice);
+reverseCheck(is_array($partial) && $partial['verified_minor']==='10000' &&
+ $partial['reversed_minor']==='2500' && $partial['net_minor']==='7500' &&
+ $partial['net_covered']===false,'safe bill-only net paid status after verified refund');
+reverseCheck(array_keys($partial)===[
+ 'invoice_id','invoice_number','customer_id','currency','status','total_minor',
+ 'verified_minor','reversed_minor','net_minor','net_covered'
+], 'read-only invoice overview excludes provider/payment private details');
+reverseCheck($overview->forInvoice($officerBearer,$invoice)!==null,
+ 'license officer may read current invoice paid status without payment mutation');
+reverseCheck($overview->forInvoice($foreignBearer,$invoice)===null,
+ 'foreign scoped billing officer cannot see another invoice');
+reverseCheck($overview->forInvoice(str_repeat('0',64),$invoice)===null &&
+ $overview->forInvoice($billingBearer,'not-an-invoice')===null,
+ 'forged session and malformed invoice are denied');
 // A direct SQL insert must also serialize behind an invoice lock. This
 // protects outstanding license signer eligibility against race windows.
 $locked=$db->prepare('SELECT id FROM central_vendor_invoices WHERE id=:invoice FOR UPDATE');
@@ -173,6 +192,11 @@ $insertSettlement->execute(['id'=>$newSettlement,'invoice'=>$invoice,
  'billing'=>$billing]);
 reverseCheck($guard->isEligible($invoice,$officer),
  'separate new independently verified full settlement restores eligibility');
+$covered=$overview->forInvoice($billingBearer,$invoice);
+reverseCheck($covered['verified_minor']==='20000' &&
+ $covered['reversed_minor']==='10000' &&
+ $covered['net_minor']==='10000' && $covered['net_covered']===true,
+ 'invoice overview reflects a fully refunded original settlement and new independent payment');
 foreach([
  "UPDATE central_vendor_settlement_reversals SET amount_minor=amount_minor WHERE id=:id",
  "DELETE FROM central_vendor_settlement_reversals WHERE id=:id"
