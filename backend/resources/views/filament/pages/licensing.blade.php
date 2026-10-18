@@ -41,11 +41,19 @@
             <p class="text-xs">Public-site policy: {{ $summary['public_policy'] }}. Dashboard policy: {{ $summary['dashboard_policy'] }}. These are informational until commercial enforcement is approved.</p>
             <div class="flex flex-wrap gap-3">
                 <button type="button" wire:click="refreshStatus" class="rounded-lg border px-4 py-2 text-sm">Refresh local status</button>
-                <button type="button" disabled aria-disabled="true" title="Requires approved HAFZATECH signed online license service"
-                    class="rounded-lg border px-4 py-2 text-sm opacity-60">
-                    Verify License (central service not activated)
-                </button>
+                @if (config('central_control.activation_enabled') === true && config('central_control.manual_checks_enabled') === true)
+                    <button type="button" wire:click="verifyLicense" wire:loading.attr="disabled" wire:target="verifyLicense"
+                        class="rounded-lg border px-4 py-2 text-sm">Verify License</button>
+                @else
+                    <button type="button" disabled aria-disabled="true" title="Requires approved HAFZATECH signed online license service"
+                        class="rounded-lg border px-4 py-2 text-sm opacity-60">
+                        Verify License (central service not activated)
+                    </button>
+                @endif
             </div>
+            @if ($verificationMessage)
+                <p role="status" class="text-sm" aria-live="polite">{{ $verificationMessage }}</p>
+            @endif
         @endif
     </section>
 </x-filament-panels::page>

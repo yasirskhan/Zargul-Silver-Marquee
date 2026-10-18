@@ -33,6 +33,9 @@ final class Licensing extends Page
     #[Locked]
     public array $summary = [];
 
+    #[Locked]
+    public ?string $verificationMessage = null;
+
     /** @return array<string,string> */
     private static function allowedCompanies(User $actor): array
     {
@@ -83,6 +86,33 @@ final class Licensing extends Page
 
     public function updatedCompanyId(): void
     {
+        $this->refreshStatus();
+    }
+
+    /**
+     * Explicit, owner-scoped action. Never makes an online license request
+     * during mount, hydration, periodic UI polling or local refresh.
+     */
+    public function verifyLicense(): void
+    {
+        $this->verificationMessage=null;
+        $actor=Filament::auth()->user();
+        abort_unless($actor instanceof User && $this->companyId !== null &&
+            static::canAccess() &&
+            array_key_exists($this->companyId,$this->companyOptions()),403);
+        try {
+            $result=app(\App\Services\CentralOwnerManualLicenseVerification::class)
+                ->verify($actor,$this->companyId,now()->toDateTimeImmutable());
+        } catch (\Illuminate\Auth\Access\AuthorizationException) {
+            abort(403);
+        }
+        $this->verificationMessage=match($result['state']) {
+            'verified'=>'License signature and HAFZATECH online status verified.',
+            'rate_limited'=>'A verification was just requested. Please try again shortly.',
+            'pending_signed_license'=>'The central service has not delivered a valid signed license.',
+            'license_attention'=>'HAFZATECH reports an issue with this license. Contact support.',
+            default=>'Unable to verify online now. Your locally signed license remains unchanged.',
+        };
         $this->refreshStatus();
     }
 
