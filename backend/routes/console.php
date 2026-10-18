@@ -175,3 +175,17 @@ Artisan::command('venuedesk:check-central-license', function (): int {
 
 \Illuminate\Support\Facades\Schedule::command('venuedesk:check-central-license')
     ->hourly()->withoutOverlapping(15);
+
+
+/** Customer support sync runs independently of the 15-day license cadence.
+ * Entirely inert until vendor HTTPS support API and dedicated operator gate
+ * are ready. It does not post tenant bookings, payments or private records.
+ */
+Artisan::command('venuedesk:send-hafzatech-support', function (): int {
+    $out=app(\App\Services\CentralSupportOutboundTransport::class)->sendOne();
+    $this->info('HAFZATECH support outbox: '.$out['state']);
+    return $out['state']==='error' ? 1 : 0;
+})->purpose('Deliver one already owner-authorized queued support ticket if enabled');
+
+\Illuminate\Support\Facades\Schedule::command('venuedesk:send-hafzatech-support')
+    ->everyFiveMinutes()->withoutOverlapping(10);

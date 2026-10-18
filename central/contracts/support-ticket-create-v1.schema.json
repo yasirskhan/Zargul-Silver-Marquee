@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lichall.hafzatech.com/contracts/support-ticket-create-v1",
+  "title": "HAFZATECH authenticated customer support ticket v1",
+  "description": "Internal contract only. API route and actual support delivery remain disabled until operator rollout. No tenant bookings, finance, customers or bank data are sent automatically.",
+  "request": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "api_version",
+      "installation_id",
+      "customer_id",
+      "request_time",
+      "nonce",
+      "known_revision",
+      "signature",
+      "client_ticket_id",
+      "subject",
+      "body",
+      "content_signature"
+    ],
+    "properties": {
+      "api_version": {
+        "const": "v1"
+      },
+      "installation_id": {
+        "$ref": "#/$defs/uuidV4"
+      },
+      "customer_id": {
+        "$ref": "#/$defs/uuidV4"
+      },
+      "request_time": {
+        "type": "string",
+        "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+      },
+      "nonce": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_-]{43}$"
+      },
+      "known_revision": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 2147483647
+      },
+      "signature": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_-]{86}$"
+      },
+      "client_ticket_id": {
+        "$ref": "#/$defs/uuidV4"
+      },
+      "subject": {
+        "type": "string",
+        "minLength": 4,
+        "maxLength": 160
+      },
+      "body": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 4000
+      },
+      "content_signature": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_-]{86}$"
+      }
+    }
+  },
+  "response": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "api_version",
+      "ticket_id",
+      "client_ticket_id",
+      "customer_id",
+      "ticket_number",
+      "status"
+    ],
+    "properties": {
+      "api_version": {
+        "const": "v1"
+      },
+      "ticket_id": {
+        "$ref": "#/$defs/uuidV4"
+      },
+      "client_ticket_id": {
+        "$ref": "#/$defs/uuidV4"
+      },
+      "customer_id": {
+        "$ref": "#/$defs/uuidV4"
+      },
+      "ticket_number": {
+        "type": "string",
+        "pattern": "^HAF-[0-9]{8,}$"
+      },
+      "status": {
+        "enum": [
+          "new",
+          "pending",
+          "in_progress",
+          "waiting_for_client",
+          "on_hold",
+          "resolved",
+          "closed",
+          "reopened"
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "uuidV4": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    }
+  },
+  "x-signatures": {
+    "installation_status": "HAFZATECH-INSTALL-CHECK-V1 followed by newline-separated installation_id/customer_id/request_time/nonce/known_revision",
+    "support_content": "HAFZATECH-SUPPORT-CREATE-V1 followed by newline-separated installation_id/customer_id/client_ticket_id/nonce/sha256(subject)/sha256(body); SHA256 is lowercase hex of UTF-8 bytes"
+  }
+}

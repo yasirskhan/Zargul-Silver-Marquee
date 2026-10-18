@@ -87,6 +87,8 @@ try {
     ensureSupport($first['api_version']==='v1' &&
         str_starts_with($first['ticket_number'],'HAF-'),'stable server ticket number');
     ensureSupport($first['status']==='new','staff ticket begins new');
+    ensureSupport($first['client_ticket_id']===$clientTicket && $first['customer_id']===$customer,
+        'server acknowledgment is bound to signed customer and client ticket');
     supportDenied(fn()=>$service->receive($request),'replayed_check');
     $again=$service->receive($build($clientTicket,$subject,$body));
     ensureSupport($again===$first,'retries return same vendor ticket');

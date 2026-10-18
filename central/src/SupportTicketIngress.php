@@ -84,7 +84,7 @@ final class SupportTicketIngress
                 if(!hash_equals(trim($stored['content_sha256']),$digest))
                     throw new RegistrationError('support_idempotency_conflict',409);
                 $this->db->commit();
-                return self::result($stored);
+                return self::result($stored,$input['customer_id'],$input['client_ticket_id']);
             }
             $subjectCipher=($this->encrypt)($input['subject']);
             $bodyCipher=($this->encrypt)($input['body']);
@@ -111,7 +111,7 @@ final class SupportTicketIngress
             $q->execute(['id'=>$messageId,'ticket'=>$id,'customer'=>$input['customer_id'],
                 'source'=>$input['client_ticket_id'],'body'=>bin2hex($bodyCipher)]);
             $this->db->commit();
-            return self::result($saved);
+            return self::result($saved,$input['customer_id'],$input['client_ticket_id']);
         }catch(Throwable $e){
             if($this->db->inTransaction())$this->db->rollBack();
             throw $e;
@@ -119,9 +119,10 @@ final class SupportTicketIngress
     }
 
     /** @param array<string,mixed> $row */
-    private static function result(array $row): array
+    private static function result(array $row,string $customerId,string $clientTicketId): array
     {
         return ['api_version'=>'v1','ticket_id'=>$row['id'],
+            'client_ticket_id'=>$clientTicketId,'customer_id'=>$customerId,
             'ticket_number'=>'HAF-'.str_pad((string)$row['ticket_number'],8,'0',STR_PAD_LEFT),
             'status'=>$row['status']];
     }
