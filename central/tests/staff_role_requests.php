@@ -245,6 +245,23 @@ try {
   $sensitive[0]['actor_staff_id']===$staff['super'] &&
   $sensitive[0]['can_decide']===false,
   'review queue shows issuer but restricts second-person actions by role');
+ $statusSql=$db->prepare("UPDATE central_staff_users SET status=:state WHERE id=:id");
+ $statusSql->execute(['state'=>'disabled','id'=>$staff['target']]);
+ $disabledTarget=array_values(array_filter($queue->listPending($approverBearer),
+  static fn(array $row):bool=>$row['request_id']===$id));
+ rolesCheck(count($disabledTarget)===1 &&
+  $disabledTarget[0]['can_decide']===false &&
+  str_contains(CentralStaffRoleReviewQueue::html(
+   $disabledTarget,str_repeat('b',64)),'Review-only'),
+  'disabled recipient remains visible for audit but cannot show approval action');
+ $statusSql->execute(['state'=>'pending_mfa','id'=>$staff['target']]);
+ $statusSql->execute(['state'=>'suspended','id'=>$staff['admin']]);
+ $disabledIssuer=array_values(array_filter($queue->listPending($approverBearer),
+  static fn(array $row):bool=>$row['request_id']===$id));
+ rolesCheck(count($disabledIssuer)===1 &&
+  $disabledIssuer[0]['can_decide']===false,
+  'suspended issuer role request is review-only, never actionable');
+ $statusSql->execute(['state'=>'active','id'=>$staff['admin']]);
  $noSuperApproval=CentralStaffRoleReviewQueue::html(
   $sensitive,str_repeat('b',64));
  rolesCheck(!str_contains($noSuperApproval,'action="/staff/team/role-decisions"') &&

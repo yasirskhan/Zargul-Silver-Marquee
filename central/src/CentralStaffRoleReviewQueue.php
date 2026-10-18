@@ -44,6 +44,7 @@ final class CentralStaffRoleReviewQueue
             'SELECT r.id AS request_id,r.actor_staff_id,r.target_staff_id,r.role,
                     r.customer_scope_id,r.reason,r.created_at,
                     requester.email AS requester_email,
+                    requester.status AS requester_status,
                     target.email AS target_email,target.status AS target_status
              FROM central_staff_role_requests r
              JOIN central_staff_users requester ON requester.id=r.actor_staff_id
@@ -61,6 +62,13 @@ final class CentralStaffRoleReviewQueue
         $rows=$q->fetchAll(PDO::FETCH_ASSOC);
         foreach($rows as &$row) {
             $row['can_decide']=false;
+            // A stale or disabled participant must never receive an
+            // actionable review form. The decision service rechecks the
+            // same identities under lock independently of this UI guard.
+            if($row['requester_status']!=='active' ||
+                !in_array($row['target_status'],['pending_mfa','active'],true)) {
+                continue;
+            }
             foreach($globalRoles as $role) {
                 if(StaffRolePermissions::mayGrantRole(
                     $role,$row['role'],false,true)) {
