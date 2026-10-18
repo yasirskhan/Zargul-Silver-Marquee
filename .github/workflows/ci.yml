@@ -101,7 +101,6 @@ jobs:
           php central/tests/staff_account_action_reader.php
           php central/tests/staff_own_password_change.php
           php central/tests/staff_password_change_audit_reader.php
-          php central/tests/staff_paid_license_preparation.php
           php central/tests/vendor_receiving_directory.php
           php central/tests/payment_eligibility.php
           php central/tests/domain_ownership.php
@@ -114,6 +113,7 @@ jobs:
           php central/tests/support_reply_pull.php
           php central/tests/support_reply_page_codec.php
           php central/tests/status_receipt_codec.php
+          php central/tests/staff_paid_license_preparation.php
 
   licensing-postgres:
     runs-on: ubuntu-latest
