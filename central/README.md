@@ -31,3 +31,7 @@ Use `CentralStaffSessionAuthorization` to bind every vendor capability decision 
 ### Vendor staff immutable session audit (internal)
 
 The separate central database will maintain append-only session issued, rotated, logged-out and authorization-invalidated outcomes. Token, CSRF, password and OTP secrets are never placed in events. Application session mutations and corresponding records commit atomically and PostgreSQL rejects audit UPDATE/DELETE. Vendor staff public login remains OFF pending KMS and operator controls.
+
+### Role-scoped session event history reader (not public)
+
+The internal `CentralStaffSessionAuditReader` queries only safe event fields under a live central staff bearer with active `audit.read` permission. Its bounded ID cursor and subject UUID checks prevent unscoped history access. It does not create an HTTP endpoint or reuse a customer venue login. Operator KMS-backed credential handling, trusted HTTPS/proxy, audit/alerting and staff security recovery must be verified before any live staff portal.
