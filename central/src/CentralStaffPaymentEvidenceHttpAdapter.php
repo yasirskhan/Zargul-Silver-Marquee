@@ -22,6 +22,7 @@ final class CentralStaffPaymentEvidenceHttpAdapter
         private readonly CentralStaffProtectedHttpBoundary $boundary,
         private readonly CentralStaffPaymentEvidenceQueue $queue,
         private readonly CentralStaffPaymentEvidenceReviewService $reviews,
+        private readonly CentralStaffInvoicePaymentOverview $invoices,
         private readonly bool $enabled = false
     ) {}
 
@@ -32,6 +33,24 @@ final class CentralStaffPaymentEvidenceHttpAdapter
         $this->authorize($server,'/staff/billing/payment-evidence/pending',
             $sessionCookie,$csrfHeader,$customerId);
         return $this->queue->listPending($sessionCookie,$customerId,$offset,$limit);
+    }
+
+    /**
+     * Safe net-settlement summary from existing independently verified
+     * immutable provider/bank evidence. Uploaded claims are never summed.
+     *
+     * @return array<string,mixed>
+     */
+    public function invoiceStatus(array $server, string $sessionCookie,
+        string $csrfHeader, string $customerId, string $invoiceId): array
+    {
+        $this->authorize($server,'/staff/billing/invoice/status',
+            $sessionCookie,$csrfHeader,$customerId,'billing.invoice.read');
+        $status=$this->invoices->forInvoice($sessionCookie,$invoiceId);
+        if ($status===null || $status['customer_id']!==$customerId) {
+            throw new RegistrationError('invoice_not_found');
+        }
+        return $status;
     }
 
     /** @return array{evidence_id:string,decision:string,reviewed_by:string} */
@@ -62,7 +81,8 @@ final class CentralStaffPaymentEvidenceHttpAdapter
     }
 
     private function authorize(array $server,string $exactPath,
-        string $sessionCookie,string $csrfHeader,string $customerId): void
+        string $sessionCookie,string $csrfHeader,string $customerId,
+        string $capability='billing.payment.verify'): void
     {
         if (!$this->enabled) {
             throw new RegistrationError('staff_http_not_enabled');
@@ -70,7 +90,7 @@ final class CentralStaffPaymentEvidenceHttpAdapter
         $path=parse_url((string)($server['REQUEST_URI']??''),PHP_URL_PATH);
         if ($path!==$exactPath ||
             !$this->boundary->permitsMutation($server,$sessionCookie,$csrfHeader,
-                'billing.payment.verify',$customerId)) {
+                $capability,$customerId)) {
             throw new RegistrationError('staff_http_denied');
         }
     }
