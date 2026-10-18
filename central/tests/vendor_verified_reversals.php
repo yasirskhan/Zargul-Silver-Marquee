@@ -11,6 +11,9 @@ use Hafzatech\Central\CentralVendorVerifiedReversalService;
 use Hafzatech\Central\CentralStaffInvoicePaymentOverview;
 use Hafzatech\Central\CentralStaffPaymentEvidenceQueue;
 use Hafzatech\Central\CentralStaffPaymentEvidenceReviewService;
+use Hafzatech\Central\CentralStaffCsrfTokenService;
+use Hafzatech\Central\CentralStaffProtectedHttpBoundary;
+use Hafzatech\Central\CentralStaffPaymentEvidenceHttpAdapter;
 use Hafzatech\Central\PaidInvoiceEligibility;
 use Hafzatech\Central\RegistrationError;
 foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
@@ -19,7 +22,9 @@ foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
     'CentralStaffLoginRateLimiter','CentralStaffSessionService',
     'CentralStaffSessionAuthorization','CentralVendorVerifiedReversalService',
     'CentralStaffInvoicePaymentOverview','CentralStaffPaymentEvidenceQueue',
-    'CentralStaffPaymentEvidenceReviewService'] as $name) {
+    'CentralStaffPaymentEvidenceReviewService','CentralStaffCsrfTokenService',
+    'CentralStaffHttpPolicy','CentralStaffProtectedHttpBoundary',
+    'CentralStaffPaymentEvidenceHttpAdapter'] as $name) {
     require dirname(__DIR__).'/src/'.$name.'.php';
 }
 function reverseCheck(bool $v,string $msg):void{
@@ -167,6 +172,58 @@ reverseCheck(!$guard->isEligible($invoice,$officer),
 $review=new CentralStaffPaymentEvidenceReviewService($db,$sessions,
  new CentralStaffSessionAuthorization($sessions,new CentralStaffAccess($db)));
 $decisionReason='Externally assessed claim; screenshot is NOT verified bank funds';
+// A future private staff portal can ONLY enter through this exact
+// same-origin, CSRF and MFA protected internal adapter. No route is exposed.
+$csrfTokens=new CentralStaffCsrfTokenService($db,$sessions);
+$csrfToken=$csrfTokens->issue($billingBearer);
+reverseCheck(is_string($csrfToken),'session-bound CSRF issue after real vendor MFA');
+$httpBoundary=new CentralStaffProtectedHttpBoundary(
+ $sessions,$csrfTokens,
+ new CentralStaffSessionAuthorization($sessions,new CentralStaffAccess($db)),true);
+$httpOff=new CentralStaffPaymentEvidenceHttpAdapter(
+ $db,$httpBoundary,$evidence,$review);
+$httpOn=new CentralStaffPaymentEvidenceHttpAdapter(
+ $db,$httpBoundary,$evidence,$review,true);
+$httpRequest=[
+ 'HTTPS'=>'on','SERVER_PORT'=>'443',
+ 'HTTP_HOST'=>'lichall.hafzatech.com',
+ 'REQUEST_METHOD'=>'POST',
+ 'REQUEST_URI'=>'/staff/billing/payment-evidence/pending',
+ 'HTTP_ORIGIN'=>'https://lichall.hafzatech.com',
+ 'HTTP_SEC_FETCH_SITE'=>'same-origin',
+ 'REMOTE_ADDR'=>'192.0.2.49'
+];
+reverseDeny(fn()=>$httpOff->pending($httpRequest,$billingBearer,$csrfToken,$customer),
+ 'staff_http_not_enabled');
+reverseCheck(count($httpOn->pending($httpRequest,$billingBearer,$csrfToken,$customer))===1,
+ 'internal protected billing evidence POST allows one scoped pending claim');
+$wrongOrigin=$httpRequest;
+$wrongOrigin['HTTP_ORIGIN']='https://evil.example.test';
+reverseDeny(fn()=>$httpOn->pending($wrongOrigin,$billingBearer,$csrfToken,$customer),
+ 'staff_http_denied');
+$wrongMethod=$httpRequest;$wrongMethod['REQUEST_METHOD']='GET';
+reverseDeny(fn()=>$httpOn->pending($wrongMethod,$billingBearer,$csrfToken,$customer),
+ 'staff_http_denied');
+$wrongPath=$httpRequest;$wrongPath['REQUEST_URI']='/staff/billing/other';
+reverseDeny(fn()=>$httpOn->pending($wrongPath,$billingBearer,$csrfToken,$customer),
+ 'staff_http_denied');
+reverseDeny(fn()=>$httpOn->pending($httpRequest,$officerBearer,$csrfToken,$customer),
+ 'staff_http_denied');
+reverseDeny(fn()=>$httpOn->pending($httpRequest,$foreignBearer,$csrfToken,$customer),
+ 'staff_http_denied');
+reverseDeny(fn()=>$httpOn->pending($httpRequest,$billingBearer,str_repeat('0',64),$customer),
+ 'staff_http_denied');
+reverseDeny(fn()=>$httpOn->pending($httpRequest,str_repeat('0',64),$csrfToken,$customer),
+ 'staff_http_denied');
+$decisionHttp=$httpRequest;
+$decisionHttp['REQUEST_URI']='/staff/billing/payment-evidence/decide';
+reverseDeny(fn()=>$httpOff->decide($decisionHttp,$billingBearer,$csrfToken,
+ $customer,$claimId,'reviewed',$decisionReason),'staff_http_not_enabled');
+reverseDeny(fn()=>$httpOn->decide($decisionHttp,$billingBearer,$csrfToken,
+ $foreign,$claimId,'reviewed',$decisionReason),'payment_evidence_not_found');
+reverseDeny(fn()=>$httpOn->decide($httpRequest,$billingBearer,$csrfToken,
+ $customer,$claimId,'reviewed',$decisionReason),'staff_http_denied');
+
 reverseDeny(fn()=>$review->decide(str_repeat('0',64),$claimId,'reviewed',$decisionReason),
  'staff_session_required');
 reverseDeny(fn()=>$review->decide($officerBearer,$claimId,'reviewed',$decisionReason),
@@ -179,7 +236,8 @@ reverseDeny(fn()=>$review->decide($billingBearer,$claimId,'reviewed','short'),
  'invalid_payment_evidence_review');
 reverseDeny(fn()=>$review->decide($billingBearer,reverseId(),'reviewed',$decisionReason),
  'payment_evidence_not_found');
-$reviewed=$review->decide($billingBearer,$claimId,'reviewed',$decisionReason);
+$reviewed=$httpOn->decide($decisionHttp,$billingBearer,$csrfToken,
+ $customer,$claimId,'reviewed',$decisionReason);
 reverseCheck($reviewed['evidence_id']===$claimId &&
  $reviewed['decision']==='reviewed' && $reviewed['reviewed_by']===$billing,
  'authorized billing session records a reviewed claim without creating settlement');
