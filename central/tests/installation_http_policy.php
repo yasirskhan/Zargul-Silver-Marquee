@@ -25,7 +25,7 @@ foreach ([
  ['HTTP_HOST'=>null],
  ['HTTPS'=>'off'],
  ['HTTPS'=>'0'],
- ['HTTPS'=>''],
+ ['HTTPS'=>'','SERVER_PORT'=>'80'],
 ] as $change) {
  $bad=array_replace($valid,$change);
  centralApiPolicyAssert(!CentralInstallationApiHttpPolicy::trustedHost($bad),
