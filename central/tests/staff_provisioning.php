@@ -9,7 +9,12 @@ foreach([
  'StaffRolePermissions','CentralStaffAccess','CentralStaffPasswordVerifier',
  'CentralStaffTotpVerifier','CentralStaffMfaChallenge',
  'CentralStaffCredentialVerifier','CentralStaffLoginRateLimiter',
- 'CentralStaffSessionService','CentralStaffProvisioningService'
+ 'CentralStaffSessionService','CentralStaffProvisioningService',
+ 'CentralStaffSessionAuthorization','CentralStaffCsrfTokenService',
+ 'CentralStaffHttpPolicy','CentralStaffProtectedHttpBoundary',
+ 'CentralStaffPaymentEvidenceQueue','CentralStaffPaymentEvidenceReviewService',
+ 'CentralStaffInvoicePaymentOverview','CentralStaffPaymentEvidenceHttpAdapter',
+ 'CentralStaffPortalHttpRouter','CentralStaffPortalPrivateResponse'
 ] as $class)require dirname(__DIR__).'/src/'.$class.'.php';
 
 function provisionAssert(bool $v,string $reason):void {
@@ -142,7 +147,58 @@ try{
   provisionAssert($e->getCode()==='23514',
    'database protects account provisioning journal');
  }
- $db->prepare("UPDATE central_staff_role_grants SET revoked_at=now()
+ // The vendor portal may ONLY compose a PENDING account behind the existing
+// same-origin HTTPS, current MFA and CSRF authorization plus the independent
+// staff provisioning release flag. No new role or invitation is created.
+$auth=new Hafzatech\Central\CentralStaffSessionAuthorization(
+ $sessions,new Hafzatech\Central\CentralStaffAccess($db));
+$csrf=new Hafzatech\Central\CentralStaffCsrfTokenService($db,$sessions);
+$csrfProof=$csrf->issue($adminBearer);
+provisionAssert(is_string($csrfProof),'staff admin has bound CSRF proof');
+$boundary=new Hafzatech\Central\CentralStaffProtectedHttpBoundary(
+ $sessions,$csrf,$auth,true);
+$billing=new Hafzatech\Central\CentralStaffPaymentEvidenceHttpAdapter(
+ $db,$boundary,
+ new Hafzatech\Central\CentralStaffPaymentEvidenceQueue($db,$auth),
+ new Hafzatech\Central\CentralStaffPaymentEvidenceReviewService(
+  $db,$sessions,$auth),
+ new Hafzatech\Central\CentralStaffInvoicePaymentOverview($db,$sessions,$auth));
+$router=new Hafzatech\Central\CentralStaffPortalHttpRouter(
+ $boundary,$billing,true,null,null,null,null,null,null,null,null,null,null,$on);
+$server=[
+ 'HTTPS'=>'on','SERVER_PORT'=>'443','HTTP_HOST'=>'lichall.hafzatech.com',
+ 'REQUEST_METHOD'=>'POST','REQUEST_URI'=>'/staff/team/create-pending',
+ 'HTTP_ORIGIN'=>'https://lichall.hafzatech.com',
+ 'HTTP_SEC_FETCH_SITE'=>'same-origin','REMOTE_ADDR'=>'192.0.2.171'
+];
+$cookie=[Hafzatech\Central\CentralStaffHttpPolicy::COOKIE_NAME=>$adminBearer];
+$fields=['email'=>'new-vendor@example.test','display_name'=>'New Support User',
+ 'reason'=>'Approved initial staffing'];
+$page=$router->dispatch($server,$cookie,$fields,$csrfProof);
+provisionAssert($page['kind']==='private_staff_provisioned_html' &&
+ str_contains($page['html'],$created['staff_id']) &&
+ str_contains($page['html'],'Not activated') &&
+ !str_contains($page['html'],$adminBearer) &&
+ !str_contains($page['html'],$csrfProof) &&
+ !str_contains($page['html'],'password_hash'),
+ 'admin portal returns only pending identity and no usable credential');
+$wire=(new Hafzatech\Central\CentralStaffPortalPrivateResponse(true))
+ ->compose($page);
+provisionAssert($wire['cookies']===[] &&
+ $wire['headers']['Cache-Control']==='no-store, private',
+ 'pending account confirmation private and cookie free');
+provisionDeny(fn()=>$router->dispatch($server,$cookie,
+ $fields+['staff_id'=>$admin],$csrfProof),
+ 'invalid_staff_provision_request');
+provisionDeny(fn()=>$router->dispatch($server,$cookie,
+ $fields,str_repeat('0',64)),'staff_portal_denied');
+provisionDeny(fn()=>$router->dispatch(
+ array_replace($server,['HTTP_ORIGIN'=>'https://evil.example']),
+ $cookie,$fields,$csrfProof),'staff_portal_denied');
+provisionDeny(fn()=>$router->dispatch($server,
+ [Hafzatech\Central\CentralStaffHttpPolicy::COOKIE_NAME=>$supportBearer],
+ $fields,$csrfProof),'staff_portal_denied');
+$db->prepare("UPDATE central_staff_role_grants SET revoked_at=now()
   WHERE staff_id=:actor")->execute(['actor'=>$admin]);
  provisionDeny(fn()=>$on->createPending($adminBearer,
   'second-vendor@example.test','Second User','Approved initial staffing'),

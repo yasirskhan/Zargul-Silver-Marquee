@@ -131,6 +131,26 @@ final class CentralStaffProvisioningService
         }
     }
 
+    /** Only safe pending-account identity metadata, NEVER credentials. */
+    public static function html(array $record):string
+    {
+        if(($record['status']??null)!=='pending_mfa' ||
+            ($record['activation_ready']??null)!==false ||
+            !is_string($record['staff_id']??null) ||
+            !is_string($record['email']??null)) {
+            throw new RegistrationError('invalid_staff_provision_receipt');
+        }
+        $e=static fn(string $value):string=>htmlspecialchars(
+            $value,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+        return '<section aria-label="Private HAFZATECH staff pending account">'.
+            '<h2>Pending staff identity prepared</h2>'.
+            '<p>Not activated. No login, MFA enrollment, invitation or '.
+            'role assignment was created.</p><dl>'.
+            '<dt>Staff ID</dt><dd>'.$e($record['staff_id']).'</dd>'.
+            '<dt>Email</dt><dd>'.$e($record['email']).'</dd>'.
+            '</dl></section>';
+    }
+
     private static function result(string $id,string $email):array
     {
         return ['staff_id'=>$id,'email'=>$email,

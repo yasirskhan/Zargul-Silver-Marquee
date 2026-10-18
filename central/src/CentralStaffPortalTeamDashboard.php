@@ -28,8 +28,16 @@ final class CentralStaffPortalTeamDashboard
         return '<section aria-label="Private HAFZATECH team dashboard">'.
             '<h1>HAFZATECH staff administration</h1>'.
             '<p>Current vendor staff accounts and role assignments. '.
-            'Read-only. No self-elevation or unapproved role changes.</p>'.
+            'No self-elevation or unapproved role changes.</p>'.
             '<nav aria-label="Staff administration navigation">'.
+            (getenv('CENTRAL_STAFF_PROVISIONING_ENABLED')==='true' &&
+              $this->authorization->permits($bearer,'staff.create',null)
+                ?'<form method="post" action="/staff/team/create-pending">'.$hidden.
+                 '<label>Staff email <input type="email" name="email" required></label>'.
+                 '<label>Display name <input type="text" name="display_name" required></label>'.
+                 '<label>Reason <input type="text" name="reason" minlength="5" required></label>'.
+                 '<button type="submit">Prepare pending staff identity</button></form>'
+                :''). 
             '<form method="post" action="/staff/team/accounts">'.$hidden.
             '<button type="submit">Staff accounts</button></form>'.
             '<form method="post" action="/staff/team/roles">'.$hidden.

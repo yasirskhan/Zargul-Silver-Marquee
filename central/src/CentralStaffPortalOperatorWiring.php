@@ -73,7 +73,9 @@ final class CentralStaffPortalOperatorWiring
             $reply,
             new CentralStaffPortalOwnPassword(
                 new CentralStaffOwnPasswordChange($db,$sessions),true),
-            new CentralStaffPortalTeamDashboard($auth));
+            new CentralStaffPortalTeamDashboard($auth),
+            new CentralStaffProvisioningService(
+                $db,$sessions,$access,true));
         return new CentralStaffPortalOperatorApp(
             new CentralStaffPortalOperatorKernel(
                 $router,new CentralStaffPortalPrivateResponse(true),true),

@@ -28,7 +28,8 @@ final class CentralStaffPortalHttpRouter
         private readonly ?CentralStaffRoleGrantDirectory $staffRoles = null,
         private readonly ?CentralStaffSessionSupportReply $supportReply = null,
         private readonly ?CentralStaffPortalOwnPassword $ownPassword = null,
-        private readonly ?CentralStaffPortalTeamDashboard $teamDashboard = null
+        private readonly ?CentralStaffPortalTeamDashboard $teamDashboard = null,
+        private readonly ?CentralStaffProvisioningService $provisioner = null
     ) {}
 
     /**
@@ -281,6 +282,25 @@ final class CentralStaffPortalHttpRouter
             }
             return ['kind'=>'private_team_dashboard_html',
                 'html'=>$this->teamDashboard->render($bearer,$csrfHeader)];
+        }
+        if ($uri==='/staff/team/create-pending' &&
+            $this->provisioner!==null) {
+            if(!$this->exactFields($fields,
+                ['email','display_name','reason']) ||
+                !is_string($fields['email']) ||
+                !is_string($fields['display_name']) ||
+                !is_string($fields['reason'])) {
+                throw new RegistrationError('invalid_staff_provision_request',422);
+            }
+            if(!$this->boundary->permitsMutation(
+                $server,$bearer,$csrfHeader,'staff.create',null)) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            $record=$this->provisioner->createPending(
+                $bearer,$fields['email'],$fields['display_name'],
+                $fields['reason']);
+            return ['kind'=>'private_staff_provisioned_html',
+                'html'=>CentralStaffProvisioningService::html($record)];
         }
         throw new RegistrationError('staff_route_not_found',404);
     }

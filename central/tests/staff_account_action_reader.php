@@ -153,7 +153,19 @@ $server=['HTTPS'=>'on','SERVER_PORT'=>'443','HTTP_HOST'=>'lichall.hafzatech.com'
  'HTTP_SEC_FETCH_SITE'=>'same-origin','REMOTE_ADDR'=>'192.0.2.109'];
 $cookie=[CentralStaffHttpPolicy::COOKIE_NAME=>$adminBearer];
 $teamReq=$server;$teamReq['REQUEST_URI']='/staff/team/dashboard';
+putenv('CENTRAL_STAFF_PROVISIONING_ENABLED=false');
 $teamPage=$http->dispatch($teamReq,$cookie,[],$adminCsrf);
+actionsRequire(!str_contains($teamPage['html'],'action="/staff/team/create-pending"'),
+ 'pending creation form invisible while separate operator gate is off');
+putenv('CENTRAL_STAFF_PROVISIONING_ENABLED=true');
+try{
+ $createNav=$http->dispatch($teamReq,$cookie,[],$adminCsrf);
+ actionsRequire(str_contains($createNav['html'],'action="/staff/team/create-pending"')
+  && !str_contains($createNav['html'],$adminBearer),
+  'Staff Administrator with staff.create may see pending-only protected form');
+} finally {
+ putenv('CENTRAL_STAFF_PROVISIONING_ENABLED=false');
+}
 actionsRequire($teamPage['kind']==='private_team_dashboard_html' &&
  str_contains($teamPage['html'],'action="/staff/team/accounts"') &&
  str_contains($teamPage['html'],'action="/staff/team/roles"') &&
