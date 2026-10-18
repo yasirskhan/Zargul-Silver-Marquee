@@ -23,7 +23,10 @@ final class CentralStaffPortalHttpRouter
         private readonly ?CentralStaffCustomerLookup $customers = null,
         private readonly ?CentralStaffPortalDashboard $dashboard = null,
         private readonly ?CentralStaffSupportTicketQueue $supportQueue = null,
-        private readonly ?CentralStaffPortalAuditHistoryPage $auditHistory = null
+        private readonly ?CentralStaffPortalAuditHistoryPage $auditHistory = null,
+        private readonly ?CentralStaffAccountDirectory $staffDirectory = null,
+        private readonly ?CentralStaffRoleGrantDirectory $staffRoles = null,
+        private readonly ?CentralStaffSessionSupportReply $supportReply = null
     ) {}
 
     /**
@@ -197,6 +200,55 @@ final class CentralStaffPortalHttpRouter
             return ['kind'=>'private_audit_html',
                 'html'=>$this->auditHistory->render(
                     $bearer,$fields['subject_staff_id'])];
+        }
+        if ($uri==='/staff/team/accounts' && $this->staffDirectory!==null) {
+            if($fields!==[]) {
+                throw new RegistrationError('invalid_staff_directory_request',422);
+            }
+            if(!$this->boundary->permitsMutation(
+                $server,$bearer,$csrfHeader,'staff.roles.assign',null)) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            return ['kind'=>'private_staff_directory_html',
+                'html'=>CentralStaffAccountDirectory::html(
+                    $this->staffDirectory->listStaff($bearer,0,25))];
+        }
+        if ($uri==='/staff/team/roles' && $this->staffRoles!==null) {
+            if (!$this->exactFields($fields,['subject_staff_id']) ||
+                !is_string($fields['subject_staff_id']) ||
+                !self::uuid($fields['subject_staff_id'])) {
+                throw new RegistrationError('invalid_staff_roles_request',422);
+            }
+            if (!$this->boundary->permitsMutation(
+                $server,$bearer,$csrfHeader,'staff.roles.assign',null)) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            return ['kind'=>'private_staff_roles_html',
+                'html'=>CentralStaffRoleGrantDirectory::html(
+                    $this->staffRoles->listForStaff(
+                        $bearer,$fields['subject_staff_id']))];
+        }
+        if ($uri==='/staff/support/reply' && $this->supportReply!==null) {
+            if(!$this->exactFields($fields,
+                    ['customer_id','ticket_id','message_id','body']) ||
+                !is_string($fields['customer_id']) ||
+                !is_string($fields['ticket_id']) ||
+                !is_string($fields['message_id']) ||
+                !is_string($fields['body']) ||
+                !self::uuid($fields['customer_id']) ||
+                !self::uuid($fields['ticket_id']) ||
+                !self::uuid($fields['message_id'])) {
+                throw new RegistrationError('invalid_support_reply_request',422);
+            }
+            if(!$this->boundary->permitsMutation($server,$bearer,$csrfHeader,
+                'support.reply',$fields['customer_id'])) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            $receipt=$this->supportReply->reply(
+                $bearer,$fields['customer_id'],$fields['ticket_id'],
+                $fields['message_id'],$fields['body']);
+            return ['kind'=>'private_support_reply_html',
+                'html'=>CentralStaffSessionSupportReply::html($receipt)];
         }
         throw new RegistrationError('staff_route_not_found',404);
     }

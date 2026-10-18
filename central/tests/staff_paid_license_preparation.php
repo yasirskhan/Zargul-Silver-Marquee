@@ -35,7 +35,8 @@ foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
     'CentralStaffPortalHttpRouter','CentralStaffPortalPrivateResponse',
     'CentralStaffLicenseQueueHtmlRenderer','CentralStaffCustomerLookup',
     'CentralStaffPortalDashboard','CentralStaffSupportTicketQueue',
-    'CentralStaffSupportQueueHtmlRenderer'
+    'CentralStaffSupportQueueHtmlRenderer','SupportAgentReplyService',
+    'CentralStaffSessionSupportReply'
 ] as $name) {
     require dirname(__DIR__).'/src/'.$name.'.php';
 }
@@ -556,6 +557,106 @@ $supportWrongOrigin['HTTP_ORIGIN']='https://evil.example.test';
 paidSessionDeny(fn()=>$supportRouter->dispatch(
  $supportWrongOrigin,$supportCookie,['customer_id'=>$company],$supportCsrf),
  'staff_portal_denied');
+// True authenticated support staff may reply only under independent
+// operator release gates; caller-supplied actor/MFA can never impersonate.
+$testVault=random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES);
+$sealSupport=static function(string $body)use($testVault):string{
+ $nonce=random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+ return $nonce.sodium_crypto_secretbox($body,$nonce,$testVault);
+};
+$replyService=new \Hafzatech\Central\SupportAgentReplyService(
+ $db,$access,$sealSupport);
+$replyOff=new \Hafzatech\Central\CentralStaffSessionSupportReply(
+ $db,$sessions,$queueAuth,$replyService);
+$replyOn=new \Hafzatech\Central\CentralStaffSessionSupportReply(
+ $db,$sessions,$queueAuth,$replyService,true);
+$replyId=paidSessionUuid();
+$replyBody='Synthetic test-only staff response. No real client message.';
+putenv('CENTRAL_STAFF_SUPPORT_REPLY_HTTP_ENABLED=false');
+putenv('CENTRAL_SUPPORT_STAFF_REPLY_ENABLED=false');
+paidSessionDeny(fn()=>$replyOff->reply(
+ $supportBearer,$company,$ticket,$replyId,$replyBody),
+ 'staff_support_reply_not_enabled');
+paidSessionDeny(fn()=>$replyOn->reply(
+ $supportBearer,$company,$ticket,$replyId,$replyBody),
+ 'staff_support_reply_not_enabled');
+putenv('CENTRAL_STAFF_SUPPORT_REPLY_HTTP_ENABLED=true');
+putenv('CENTRAL_SUPPORT_STAFF_REPLY_ENABLED=true');
+try {
+ paidSessionDeny(fn()=>$replyOff->reply(
+  $supportBearer,$company,$ticket,$replyId,$replyBody),
+  'staff_support_reply_not_enabled');
+ paidSessionDeny(fn()=>$replyOn->reply(
+  $issuer,$company,$ticket,$replyId,$replyBody),'support_scope_denied');
+ paidSessionDeny(fn()=>$replyOn->reply(
+  $supportBearer,$other,$ticket,$replyId,$replyBody),'support_scope_denied');
+ paidSessionDeny(fn()=>$replyOn->reply(
+  $supportBearer,$company,'not-a-uuid',$replyId,$replyBody),
+  'invalid_support_reply_request');
+ paidSessionDeny(fn()=>$replyOn->reply(
+  $supportBearer,$company,$ticket,$replyId,'x'),
+  'invalid_support_reply_request');
+ $replyResult=$replyOn->reply(
+  $supportBearer,$company,$ticket,$replyId,$replyBody);
+ paidSessionAssert($replyResult['status']==='waiting_for_client' &&
+  $replyOn->reply($supportBearer,$company,$ticket,$replyId,$replyBody)===$replyResult,
+  'vendor support reply written once and replay is idempotent');
+ $replyCount=$db->prepare("SELECT count(*) FROM vendor_support_messages
+  WHERE ticket_id=:ticket AND direction='staff'");
+ $replyCount->execute(['ticket'=>$ticket]);
+ paidSessionAssert((int)$replyCount->fetchColumn()===1,
+  'one durable encrypted staff message posted');
+ $auditCount=$db->prepare("SELECT count(*) FROM vendor_support_reply_audit
+  WHERE ticket_id=:ticket");
+ $auditCount->execute(['ticket'=>$ticket]);
+ paidSessionAssert((int)$auditCount->fetchColumn()===1,
+  'one independently immutable support reply journal');
+ $receiptHtml=\Hafzatech\Central\CentralStaffSessionSupportReply::html(
+  $replyResult);
+ paidSessionAssert(str_contains($receiptHtml,'waiting_for_client') &&
+  !str_contains($receiptHtml,$replyBody) &&
+  !str_contains($receiptHtml,$supportBearer) &&
+  !str_contains($receiptHtml,$ticket),
+  'private reply receipt has no plaintext reply, bearer or ticket identifiers');
+ $replyHttp=$queueRequest;
+ $replyHttp['REQUEST_URI']='/staff/support/reply';
+ $replyRouter=new \Hafzatech\Central\CentralStaffPortalHttpRouter(
+  $queueBoundary,$unusedBilling,true,$queue,$customerReader,
+  $dashboardService,$supportReader,null,null,null,$replyOn);
+ $replyFields=['customer_id'=>$company,'ticket_id'=>$ticket,
+  'message_id'=>$replyId,'body'=>$replyBody];
+ $replyPage=$replyRouter->dispatch(
+  $replyHttp,$supportCookie,$replyFields,$supportCsrf);
+ paidSessionAssert($replyPage['kind']==='private_support_reply_html' &&
+  !str_contains($replyPage['html'],$replyBody),
+  'protected same-origin router returns safe encrypted reply receipt');
+ $replyWire=(new \Hafzatech\Central\CentralStaffPortalPrivateResponse(true))
+  ->compose($replyPage);
+ paidSessionAssert($replyWire['cookies']===[] &&
+  $replyWire['headers']['Cache-Control']==='no-store, private',
+  'reply receipt cannot issue bearer or be cached');
+ paidSessionDeny(fn()=>$replyRouter->dispatch(
+  $replyHttp,$billingCookie,$replyFields,$billingCsrf),'staff_portal_denied');
+ paidSessionDeny(fn()=>$replyRouter->dispatch(
+  $replyHttp,$supportCookie,$replyFields+['actor'=>$issuer],$supportCsrf),
+  'invalid_support_reply_request');
+ paidSessionDeny(fn()=>$replyRouter->dispatch(
+  $replyHttp,$supportCookie,$replyFields,str_repeat('0',64)),
+  'staff_portal_denied');
+ $wrongReplyOrigin=$replyHttp;
+ $wrongReplyOrigin['HTTP_ORIGIN']='https://evil.example';
+ paidSessionDeny(fn()=>$replyRouter->dispatch(
+  $wrongReplyOrigin,$supportCookie,$replyFields,$supportCsrf),
+  'staff_portal_denied');
+ paidSessionDeny(fn()=>$replyRouter->dispatch(
+  $replyHttp,$supportCookie,
+  ['customer_id'=>$other,'ticket_id'=>$ticket,
+   'message_id'=>paidSessionUuid(),'body'=>$replyBody],$supportCsrf),
+  'staff_portal_denied');
+} finally {
+ putenv('CENTRAL_STAFF_SUPPORT_REPLY_HTTP_ENABLED=false');
+ putenv('CENTRAL_SUPPORT_STAFF_REPLY_ENABLED=false');
+}
 $db->prepare("UPDATE central_staff_users SET status='suspended' WHERE id=:staff")
  ->execute(['staff'=>$supportStaff]);
 paidSessionDeny(fn()=>$supportReader->listForCustomer(

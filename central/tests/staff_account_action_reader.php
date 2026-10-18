@@ -10,13 +10,28 @@ use Hafzatech\Central\CentralStaffSessionService;
 use Hafzatech\Central\CentralStaffAccess;
 use Hafzatech\Central\CentralStaffSessionAuthorization;
 use Hafzatech\Central\CentralStaffAccountActionReader;
+use Hafzatech\Central\CentralStaffAccountDirectory;
+use Hafzatech\Central\CentralStaffRoleGrantDirectory;
+use Hafzatech\Central\CentralStaffHttpPolicy;
+use Hafzatech\Central\CentralStaffProtectedHttpBoundary;
+use Hafzatech\Central\CentralStaffCsrfTokenService;
+use Hafzatech\Central\CentralStaffPortalHttpRouter;
+use Hafzatech\Central\CentralStaffPortalPrivateResponse;
 use Hafzatech\Central\StaffRolePermissions;
+use Hafzatech\Central\RegistrationError;
+
+require dirname(__DIR__).'/src/InstallationRegistry.php';
 
 foreach(['CentralStaffPasswordVerifier','CentralStaffTotpVerifier',
  'CentralStaffMfaChallenge','CentralStaffCredentialVerifier',
  'CentralStaffLoginRateLimiter','CentralStaffSessionService','CentralStaffAccess',
  'CentralStaffSessionAuthorization','CentralStaffAccountActionReader',
- 'StaffRolePermissions'] as $class)
+ 'StaffRolePermissions','CentralStaffAccountDirectory','CentralStaffRoleGrantDirectory',
+ 'CentralStaffPaymentEvidenceHttpAdapter','CentralStaffPaymentEvidenceQueue',
+ 'CentralStaffPaymentEvidenceReviewService','CentralStaffInvoicePaymentOverview',
+ 'CentralStaffHttpPolicy','CentralStaffProtectedHttpBoundary',
+ 'CentralStaffCsrfTokenService','CentralStaffPortalHttpRouter',
+ 'CentralStaffPortalPrivateResponse'] as $class)
  require dirname(__DIR__).'/src/'.$class.'.php';
 
 function actionsRequire(bool $yes,string $reason):void {
@@ -49,13 +64,13 @@ $account=$db->prepare("INSERT INTO central_staff_users
 $role=$db->prepare("INSERT INTO central_staff_role_grants
  (id,staff_id,role,reason) VALUES(:grant,:staff,:role,'Account audit read fixture')");
 $staff=[];
-foreach(['auditor','support','target'] as $name){
+foreach(['auditor','support','target','admin'] as $name){
  $id=actionsUuid();$staff[$name]=$id;
  $account->execute(['id'=>$id,'email'=>'action-audit-'.$name.'@example.test',
   'hash'=>password_hash('synthetic-password-for-fixture',PASSWORD_DEFAULT),
   'seed'=>bin2hex($seed)]);
  $role->execute(['grant'=>actionsUuid(),'staff'=>$id,
-  'role'=>$name==='auditor'?'auditor':'support_agent']);
+  'role'=>$name==='auditor'?'auditor':($name==='admin'?'staff_administrator':'support_agent')]);
 }
 $insert=$db->prepare("INSERT INTO central_staff_account_actions
  (actor_staff_id,target_staff_id,action,previous_status,reason)
@@ -78,6 +93,145 @@ $supportBearer=$sessions->login('action-audit-support@example.test',
  'synthetic-password-for-fixture',$code,'192.0.2.102');
 actionsRequire(is_string($auditorBearer)&&is_string($supportBearer),
  'vendor MFA staff authentication is required');
+$adminBearer=$sessions->login('action-audit-admin@example.test',
+ 'synthetic-password-for-fixture',$code,'192.0.2.109');
+actionsRequire(is_string($adminBearer),'distinct central Staff Admin MFA login');
+$auth=new CentralStaffSessionAuthorization($sessions,new CentralStaffAccess($db));
+$roleReader=new CentralStaffRoleGrantDirectory($db,$auth);
+$directory=new CentralStaffAccountDirectory($db,$auth);
+try{$directory->listStaff($supportBearer);throw new RuntimeException('SUPPORT ENUMERATED STAFF');}
+catch(RegistrationError $error){actionsRequire($error->errorCode==='staff_directory_denied','support cannot read directory');}
+try{$directory->listStaff($auditorBearer);throw new RuntimeException('AUDITOR ENUMERATED STAFF');}
+catch(RegistrationError $error){actionsRequire($error->errorCode==='staff_directory_denied','auditor cannot read directory');}
+$accounts=$directory->listStaff($adminBearer,0,25);
+actionsRequire(count($accounts)>=4 &&
+ array_keys($accounts[0])===['id','email','display_name','status','mfa_enrolled','active_role_count'] &&
+ !array_key_exists('password_hash',$accounts[0]) &&
+ !array_key_exists('mfa_secret_ciphertext',$accounts[0]) &&
+ !array_key_exists('authorization_snapshot',$accounts[0]),
+ 'only six allowlisted staff fields visible to current global administrator');
+$adminRecord=array_values(array_filter($accounts,
+ static fn(array $row)=>$row['id']===$staff['admin']));
+actionsRequire(count($adminRecord)===1 &&
+ $adminRecord[0]['mfa_enrolled']===true &&
+ $adminRecord[0]['active_role_count']===1,
+ 'staff-admin account has valid MFA and one active role');
+actionsRequire(count($directory->listStaff($adminBearer,1,1))===1,
+ 'admin directory bounded pagination');
+foreach([[-1,25],[0,0],[0,26],[10001,25]] as [$offset,$limit]){
+ try{$directory->listStaff($adminBearer,$offset,$limit);
+ throw new RuntimeException('INVALID ADMIN PAGINATION ACCEPTED');}
+ catch(RegistrationError $error){
+  actionsRequire($error->errorCode==='invalid_staff_directory_request',
+   'invalid offset or limit denied');
+ }
+}
+$unsafe=CentralStaffAccountDirectory::html([[
+ 'display_name'=>'<script>unsafe</script>',
+ 'email'=>'bad<img src=x onerror=alert(1)>',
+ 'status'=>'active','mfa_enrolled'=>true,'active_role_count'=>1
+]]);
+actionsRequire(str_contains($unsafe,'&lt;script&gt;') &&
+ str_contains($unsafe,'&lt;img') && !str_contains($unsafe,'<script>') &&
+ !str_contains($unsafe,'<img'),
+ 'staff display fields are escaped in private HTML');
+$csrfService=new CentralStaffCsrfTokenService($db,$sessions);
+$adminCsrf=$csrfService->issue($adminBearer);
+$boundary=new CentralStaffProtectedHttpBoundary($sessions,$csrfService,$auth,true);
+$http=new CentralStaffPortalHttpRouter(
+ $boundary, new Hafzatech\Central\CentralStaffPaymentEvidenceHttpAdapter(
+  $db,$boundary,
+  new Hafzatech\Central\CentralStaffPaymentEvidenceQueue($db,$auth),
+  new Hafzatech\Central\CentralStaffPaymentEvidenceReviewService($db,$sessions,$auth),
+  new Hafzatech\Central\CentralStaffInvoicePaymentOverview($db,$sessions,$auth)),
+ true,null,null,null,null,null,$directory,$roleReader);
+$server=['HTTPS'=>'on','SERVER_PORT'=>'443','HTTP_HOST'=>'lichall.hafzatech.com',
+ 'REQUEST_METHOD'=>'POST','REQUEST_URI'=>'/staff/team/accounts',
+ 'HTTP_ORIGIN'=>'https://lichall.hafzatech.com',
+ 'HTTP_SEC_FETCH_SITE'=>'same-origin','REMOTE_ADDR'=>'192.0.2.109'];
+$cookie=[CentralStaffHttpPolicy::COOKIE_NAME=>$adminBearer];
+$rolesRequest=$server;$rolesRequest['REQUEST_URI']='/staff/team/roles';
+$rolePage=$http->dispatch($rolesRequest,$cookie,
+ ['subject_staff_id'=>$staff['support']],$adminCsrf);
+actionsRequire($rolePage['kind']==='private_staff_roles_html' &&
+ str_contains($rolePage['html'],'support_agent') &&
+ str_contains($rolePage['html'],'Global') &&
+ !str_contains($rolePage['html'],$adminBearer),
+ 'active support role visible to current global staff administrator');
+$roleWire=(new CentralStaffPortalPrivateResponse(true))->compose($rolePage);
+actionsRequire($roleWire['cookies']===[] &&
+ $roleWire['headers']['Cache-Control']==='no-store, private',
+ 'private roles view has no session bearer or cacheable response');
+try{$roleReader->listForStaff($supportBearer,$staff['support']);
+ throw new RuntimeException('SUPPORT READS STAFF ROLES');}
+catch(RegistrationError $error){
+ actionsRequire($error->errorCode==='staff_roles_denied','support cannot view global staff grants');
+}
+try{$http->dispatch($rolesRequest,
+ [CentralStaffHttpPolicy::COOKIE_NAME=>$supportBearer],
+ ['subject_staff_id'=>$staff['support']],$adminCsrf);
+ throw new RuntimeException('UNAUTHORIZED STAFF ROLES ROUTE');}
+catch(RegistrationError $error){
+ actionsRequire($error->errorCode==='staff_portal_denied','role route denied for nonadmin');
+}
+foreach([
+  ['subject_staff_id'=>'invalid'],
+  ['subject_staff_id'=>$staff['support'],'role'=>'super_administrator'],
+  []
+] as $input) {
+ try{$http->dispatch($rolesRequest,$cookie,$input,$adminCsrf);
+ throw new RuntimeException('FORGED ROLE QUERY');}
+ catch(RegistrationError $error){
+ actionsRequire($error->errorCode==='invalid_staff_roles_request',
+  'role route requires only exact subject UUID');
+ }
+}
+try{$http->dispatch($rolesRequest,$cookie,
+ ['subject_staff_id'=>$staff['support']],str_repeat('0',64));
+ throw new RuntimeException('FORGED ROLE CSRF');}
+catch(RegistrationError $error){
+ actionsRequire($error->errorCode==='staff_portal_denied',
+  'role route CSRF mismatches current session');
+}
+$roleEscaped=CentralStaffRoleGrantDirectory::html([[
+ 'role'=>'<script>alert(1)</script>',
+ 'customer_scope_id'=>'<img src=x onerror=1>',
+ 'created_at'=>'2026-10-18'
+]]);
+actionsRequire(str_contains($roleEscaped,'&lt;script&gt;') &&
+ str_contains($roleEscaped,'&lt;img') &&
+ !str_contains($roleEscaped,'<script>') && !str_contains($roleEscaped,'<img'),
+ 'untrusted role and customer scope strings escaped before rendering');
+$internal=$http->dispatch($server,$cookie,[],$adminCsrf);
+actionsRequire($internal['kind']==='private_staff_directory_html' &&
+ str_contains($internal['html'],'Vendor staff accounts') &&
+ !str_contains($internal['html'],$adminBearer) &&
+ !str_contains($internal['html'],$adminCsrf),
+ 'protected directory route requires real MFA staff, no secrets in HTML');
+$private=(new CentralStaffPortalPrivateResponse(true))->compose($internal);
+actionsRequire($private['cookies']===[] &&
+ $private['headers']['Cache-Control']==='no-store, private',
+ 'directory page private headers and no cookie credentials');
+foreach([
+ [$server,$cookie,['role'=>'super_administrator'],$adminCsrf],
+ [$server,$cookie,[],str_repeat('0',64)],
+ [array_replace($server,['HTTP_ORIGIN'=>'https://evil.example']),$cookie,[],$adminCsrf],
+ [array_replace($server,['REQUEST_METHOD'=>'GET']),$cookie,[],$adminCsrf],
+] as [$srv,$cookies,$fields,$proof]){
+ try{$http->dispatch($srv,$cookies,$fields,$proof);
+ throw new RuntimeException('UNAUTHORIZED STAFF DIRECTORY ROUTE');}
+ catch(RegistrationError $error) {
+  actionsRequire(in_array($error->errorCode,
+   ['invalid_staff_directory_request','staff_portal_denied'],true),
+   'directory rejects extra role, CSRF, cross-site, wrong method');
+ }
+}
+try{$http->dispatch($server,[CentralStaffHttpPolicy::COOKIE_NAME=>$supportBearer],[],$adminCsrf);
+ throw new RuntimeException('SUPPORT ROUTED STAFF DIRECTORY');}
+catch(RegistrationError $error){
+ actionsRequire($error->errorCode==='staff_portal_denied','support route denies unauthorized role');
+}
+
 $events=$reader->listForTarget($auditorBearer,$staff['target'],0,2);
 actionsRequire(count($events)===2 &&
  $events[0]['reason']==='Synthetic suspension case 3' &&
@@ -105,6 +259,14 @@ foreach([
  }catch(RuntimeException $e){
   if($e->getMessage()==='UNAUTHORIZED ACCOUNT AUDIT READ')throw $e;
  }
+}
+$db->prepare("UPDATE central_staff_role_grants SET revoked_at=now()
+ WHERE staff_id=:admin")->execute(['admin'=>$staff['admin']]);
+try{$http->dispatch($server,$cookie,[],$adminCsrf);
+ throw new RuntimeException('REVOKED ADMIN DIRECTORY ACCESS');}
+catch(RegistrationError $error){
+ actionsRequire($error->errorCode==='staff_portal_denied',
+  'revoked Staff Administrator loses directory even with old session cookie');
 }
 $db->prepare('UPDATE central_staff_role_grants SET revoked_at=now()
  WHERE staff_id=:actor')->execute(['actor'=>$staff['auditor']]);
