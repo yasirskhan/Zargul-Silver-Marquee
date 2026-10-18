@@ -27,6 +27,12 @@ final class SupportInbox extends Page
     #[Locked]
     public int $unread = 0;
 
+    public string $newSubject = '';
+    public string $newMessage = '';
+
+    #[Locked]
+    public ?string $composeResult = null;
+
     private static function allowedCompanies(User $actor):array
     {
         if(!DB::table('users')->where('id',$actor->getKey())
@@ -84,6 +90,35 @@ final class SupportInbox extends Page
         $reader=app(CentralSupportReplyInboxReader::class);
         $this->messages=$reader->list($actor,$this->companyId,25);
         $this->unread=$reader->unreadCount($actor,$this->companyId);
+    }
+
+    /**
+     * One explicit owner/admin support ticket creation. No venue booking,
+     * guest, finance or private customer records are silently attached.
+     */
+    public function submitTicket():void
+    {
+        $actor=Filament::auth()->user();
+        abort_unless($actor instanceof User && self::canAccess() &&
+            $this->companyId!==null &&
+            array_key_exists($this->companyId,$this->companyOptions()),403);
+        abort_unless(config('central_control.support_enabled')===true,403);
+        $this->validate([
+            'newSubject'=>'required|string|min:4|max:160',
+            'newMessage'=>'required|string|min:3|max:4000',
+        ]);
+        try {
+            app(\App\Services\CentralSupportOutboxService::class)->queue(
+                $actor,$this->companyId,(string)\Illuminate\Support\\Str::uuid(),
+                trim($this->newSubject),trim($this->newMessage)
+            );
+        } catch (\Illuminate\Auth\\Access\\AuthorizationException) {
+            abort(403);
+        }
+        $this->newSubject='';
+        $this->newMessage='';
+        $this->composeResult='Support request queued for protected HAFZATECH delivery.';
+        $this->refreshMessages();
     }
 
     public function markMessageRead(string $messageId):void

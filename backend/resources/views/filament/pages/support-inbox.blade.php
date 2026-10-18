@@ -12,6 +12,28 @@
                 @endforeach
             </select>
         </label>
+        @if(config('central_control.support_enabled'))
+            <form wire:submit="submitTicket" class="rounded-lg border p-4 space-y-3">
+                <h3 class="font-semibold">Ask HAFZATECH Support</h3>
+                <p class="text-xs">Enter only the details you choose to share; your event, guest and payment records are not attached.</p>
+                <label class="block space-y-1">
+                    <span class="text-sm">Subject</span>
+                    <input wire:model="newSubject" type="text" maxlength="160" required class="w-full rounded-lg border p-2 text-gray-900" />
+                </label>
+                @error('newSubject') <p role="alert" class="text-sm">{{ $message }}</p> @enderror
+                <label class="block space-y-1">
+                    <span class="text-sm">Message</span>
+                    <textarea wire:model="newMessage" rows="4" maxlength="4000" required class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                </label>
+                @error('newMessage') <p role="alert" class="text-sm">{{ $message }}</p> @enderror
+                <button type="submit" wire:loading.attr="disabled" wire:target="submitTicket" class="rounded-lg border px-4 py-2 text-sm">Queue support request</button>
+            </form>
+        @else
+            <p class="text-xs">Sending new requests is disabled until secure HAFZATECH support delivery is activated.</p>
+        @endif
+        @if($composeResult)
+            <p role="status" aria-live="polite">{{ $composeResult }}</p>
+        @endif
         <p role="status" aria-live="polite">{{ $unread }} unread {{ $unread === 1 ? 'reply' : 'replies' }}</p>
         <button type="button" wire:click="refreshMessages" class="rounded-lg border px-4 py-2 text-sm">Refresh local inbox</button>
         @forelse($messages as $message)
