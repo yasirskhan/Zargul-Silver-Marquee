@@ -94,6 +94,7 @@ jobs:
           php central/tests/staff_login_throttle.php
           php central/tests/staff_http_policy.php
           php central/tests/staff_session_authorization.php
+          php central/tests/staff_http_boundary.php
           php central/tests/vendor_receiving_directory.php
           php central/tests/payment_eligibility.php
           php central/tests/domain_ownership.php

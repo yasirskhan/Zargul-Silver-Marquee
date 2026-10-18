@@ -23,3 +23,7 @@ The internal staff session code is not an HTTP controller. Before any vendor log
 ### Staff request security policy and session-derived authorization (INTERNAL)
 
 Use `CentralStaffSessionAuthorization` to bind every vendor capability decision to an actual centrally authenticated session rather than an HTTP-supplied staff UUID or MFA Boolean. A separate session-bound CSRF proof and host/origin policy are available as internal helpers. All central staff HTTP routing remains disabled. A future controller must enforce the exact trusted HTTPS vhost, same-origin state-changing requests, secure host-only cookies, bearer privacy, trusted origin IP, protected HMAC/MFA secrets and independent customer scope per action. These helpers alone are not a staff login portal.
+
+### Protected staff HTTP flow adapter (default OFF)
+
+`CentralStaffProtectedHttpBoundary` composes the internal policy, MFA-based session, independent CSRF proof, scope authorization and logout in one disabled-by-default service. It returns cookie and proof material only for a future trusted server renderer and **must never be serialized as public JSON or logged**. There is no new URL in `central/public`. HTTPS/DNS, operator-managed KMS and HMAC secrets, trusted reverse-proxy provenance, cookie writer/CSRF validation, full session audit and staff recovery are still blocking operator go-live.
