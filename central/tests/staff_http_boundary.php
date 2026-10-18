@@ -11,12 +11,13 @@ use Hafzatech\Central\CentralStaffSessionAuthorization;
 use Hafzatech\Central\CentralStaffCsrfTokenService;
 use Hafzatech\Central\CentralStaffHttpPolicy;
 use Hafzatech\Central\CentralStaffProtectedHttpBoundary;
+use Hafzatech\Central\StaffRolePermissions;
 foreach(['CentralStaffPasswordVerifier','CentralStaffTotpVerifier',
     'CentralStaffMfaChallenge','CentralStaffCredentialVerifier',
     'CentralStaffLoginRateLimiter','CentralStaffSessionService',
     'CentralStaffAccess','CentralStaffSessionAuthorization',
     'CentralStaffCsrfTokenService','CentralStaffHttpPolicy',
-    'CentralStaffProtectedHttpBoundary'] as $name)
+    'CentralStaffProtectedHttpBoundary','StaffRolePermissions'] as $name)
     require dirname(__DIR__).'/src/'.$name.'.php';
 function boundaryCheck(bool $ok,string $reason):void {
     if(!$ok)throw new RuntimeException('Vendor HTTP boundary: '.$reason);
