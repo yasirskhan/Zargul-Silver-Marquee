@@ -21,10 +21,13 @@ foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
     'CentralStaffPasswordVerifier','CentralStaffTotpVerifier',
     'CentralStaffMfaChallenge','CentralStaffCredentialVerifier',
     'CentralStaffLoginRateLimiter','CentralStaffSessionService',
-    'CentralStaffSessionAuthorization','CentralStaffPaidLicensePreparation'
+    'CentralStaffSessionAuthorization','CentralStaffPaidLicensePreparation',
+    'PreparedSignedGrantValidator','SignedGrantFinalization',
+    'CentralStaffSignedGrantFinalization'
 ] as $name) {
     require dirname(__DIR__).'/src/'.$name.'.php';
 }
+require dirname(__DIR__).'/signing/Ed25519GrantCodec.php';
 function paidSessionAssert(bool $ok, string $message): void {
     if (!$ok) throw new RuntimeException('Session-bound license: '.$message);
 }
@@ -171,6 +174,60 @@ $signedCount=$db->prepare("SELECT count(*) FROM central_paid_license_revisions
 $signedCount->execute(['invoice'=>$invoice]);
 paidSessionAssert((int)$signedCount->fetchColumn()===0,
     'THIS invoice remains unsigned; no activation occurred');
+// Test-only, isolated Ed25519 fixture; no signer private key enters an
+// installation or production vault. Keep all production release gates OFF.
+$keypair=sodium_crypto_sign_keypair();
+$public=InstallationRegistry::base64Url(sodium_crypto_sign_publickey($keypair));
+$validator=new Hafzatech\\Central\\PreparedSignedGrantValidator(
+    $db,new PaidInvoiceEligibility($db),$access,['session-test-key'=>$public]);
+$vault=random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES);
+$seal=static function(string $clear)use($vault):string{
+    $nonce=random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+    return $nonce.sodium_crypto_secretbox($clear,$nonce,$vault);
+};
+$finalize=new CentralStaffSignedGrantFinalization(
+    $db,$sessions,new CentralStaffSessionAuthorization($sessions,$access),
+    new Hafzatech\\Central\\SignedGrantFinalization($db,$validator,$seal));
+$claim=[
+    'api_version'=>'v1','issuer'=>'HAFZATECH','product'=>'VenueDesk',
+    'license_id'=>$prepared['license_id'],'customer_id'=>$company,
+    'installation_id'=>$installation,'revision'=>1,'term_months'=>12,
+    'edition'=>'synthetic_session_plan','approved_domains'=>['licensed-session.example.test'],
+    'not_before'=>$prepared['from'],'expires_at'=>$prepared['expiry'],
+    'limits'=>['max_halls'=>2,'max_staff'=>12],'features'=>['booking'=>true],
+];
+$envelope=Hafzatech\\Signing\\Ed25519GrantCodec::sign(
+    $claim,'session-test-key',sodium_crypto_sign_secretkey($keypair));
+paidSessionDeny(fn()=>$finalize->finalize(str_repeat('0',64),
+    $prepared['revision_id'],true,$envelope),'staff_session_required');
+paidSessionDeny(fn()=>$finalize->finalize($billingSession,
+    $prepared['revision_id'],true,$envelope),'license_officer_required');
+paidSessionDeny(fn()=>$finalize->finalize($foreignSession,
+    $prepared['revision_id'],true,$envelope),'license_officer_required');
+paidSessionDeny(fn()=>$finalize->finalize($issuer,'invalid',true,$envelope),
+    'invalid_license_request');
+paidSessionDeny(fn()=>$finalize->finalize($issuer,paidSessionUuid(),true,$envelope),
+    'signed_grant_not_eligible');
+paidSessionDeny(fn()=>$finalize->finalize($issuer,$prepared['revision_id'],
+    true,$envelope),'protected_signer_not_enabled');
+putenv('CENTRAL_SIGNER_FINALIZATION_ENABLED=true');
+try {
+    paidSessionDeny(fn()=>$finalize->finalize($issuer,$prepared['revision_id'],
+        false,$envelope),'protected_signer_not_enabled');
+    $result=$finalize->finalize($issuer,$prepared['revision_id'],true,$envelope);
+    paidSessionAssert($result['state']==='signed' &&
+        $result['license_id']===$prepared['license_id'],
+        'only active original issuer can finalize externally signed paid revision');
+    paidSessionDeny(fn()=>$finalize->finalize($issuer,$prepared['revision_id'],
+        true,$envelope),'revision_not_pending');
+} finally {
+    putenv('CENTRAL_SIGNER_FINALIZATION_ENABLED=false');
+}
+$signatureCount=$db->prepare('SELECT count(*) FROM central_license_signature_events
+    WHERE revision_id=:rev AND authorized_officer_id=:officer');
+$signatureCount->execute(['rev'=>$prepared['revision_id'],'officer'=>$officer]);
+paidSessionAssert((int)$signatureCount->fetchColumn()===1,
+    'exactly one immutable signing audit tied to authenticated vendor officer');
 $db->prepare("UPDATE central_staff_role_grants SET revoked_at=now()
     WHERE staff_id=:id AND role='license_officer'")
  ->execute(['id'=>$officer]);
