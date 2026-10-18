@@ -10,13 +10,23 @@ use Hafzatech\Central\CentralStaffSessionService;
 use Hafzatech\Central\CentralStaffAccess;
 use Hafzatech\Central\CentralStaffSessionAuthorization;
 use Hafzatech\Central\CentralStaffSessionAuditReader;
+use Hafzatech\Central\CentralStaffAccountActionReader;
+use Hafzatech\Central\CentralStaffPortalAuditHistoryPage;
 use Hafzatech\Central\StaffRolePermissions;
+
+require dirname(__DIR__).'/src/InstallationRegistry.php';
 
 foreach(['CentralStaffPasswordVerifier','CentralStaffTotpVerifier',
     'CentralStaffMfaChallenge','CentralStaffCredentialVerifier',
     'CentralStaffLoginRateLimiter','CentralStaffSessionService',
     'CentralStaffAccess','CentralStaffSessionAuthorization',
-    'CentralStaffSessionAuditReader','StaffRolePermissions'] as $class) {
+    'CentralStaffSessionAuditReader','CentralStaffAccountActionReader',
+    'CentralStaffPortalAuditHistoryPage','StaffRolePermissions',
+    'CentralStaffCsrfTokenService','CentralStaffHttpPolicy',
+    'CentralStaffProtectedHttpBoundary','CentralStaffPaymentEvidenceQueue',
+    'CentralStaffPaymentEvidenceReviewService',
+    'CentralStaffInvoicePaymentOverview','CentralStaffPaymentEvidenceHttpAdapter',
+    'CentralStaffPortalHttpRouter','CentralStaffPortalPrivateResponse'] as $class) {
     require dirname(__DIR__).'/src/'.$class.'.php';
 }
 function journalRequire(bool $ok,string $message):void {
@@ -115,6 +125,104 @@ foreach([
         if($error->getMessage()==='FORBIDDEN AUDIT READ SUCCEEDED')throw $error;
     }
 }
+// The protected audit page uses TWO independently authorized immutable
+// readers and omits session-id, account reason and all bearer/MFA values.
+$db->prepare("INSERT INTO central_staff_account_actions
+ (actor_staff_id,target_staff_id,action,previous_status,reason)
+ VALUES(:actor,:target,'suspended','active',:reason)")
+ ->execute(['actor'=>$staff['auditor'],'target'=>$staff['support'],
+    'reason'=>'Synthetic internal note NEVER EXPOSE AUDIT REASON']);
+$auditPage=new CentralStaffPortalAuditHistoryPage(
+ $reader,new CentralStaffAccountActionReader(
+  $db,new CentralStaffSessionAuthorization($sessions,new CentralStaffAccess($db))));
+$privateAudit=$auditPage->render($auditorBearer,$staff['support']);
+journalRequire(str_contains($privateAudit,'Staff security history') &&
+ str_contains($privateAudit,'logged_out') &&
+ str_contains($privateAudit,'rotated') &&
+ str_contains($privateAudit,'suspended') &&
+ !str_contains($privateAudit,'NEVER EXPOSE AUDIT REASON') &&
+ !str_contains($privateAudit,$auditorBearer) &&
+ !str_contains($privateAudit,$staff['support']) &&
+ !str_contains($privateAudit,$events[0]['session_id']),
+ 'MFA auditor gets minimal immutable history and no private identifiers');
+try{
+ $auditPage->render($rotated,$staff['support']);
+ throw new RuntimeException('UNAUTHORIZED SUPPORT AUDIT PAGE');
+}catch(RuntimeException $error){
+ if($error->getMessage()==='UNAUTHORIZED SUPPORT AUDIT PAGE')throw $error;
+}
+// Internal audit endpoint stays detached from public routing and requires
+// exact HTTPS origin POST, live MFA audit.read + session-bound CSRF. No
+// production operator deployment or separate signing/payment privileges.
+$auditAuth=new CentralStaffSessionAuthorization($sessions,new CentralStaffAccess($db));
+$auditCsrf=new \Hafzatech\Central\CentralStaffCsrfTokenService($db,$sessions);
+$proof=$auditCsrf->issue($auditorBearer);
+journalRequire(is_string($proof),'auditor receives independent session CSRF');
+$boundary=new \Hafzatech\Central\CentralStaffProtectedHttpBoundary(
+    $sessions,$auditCsrf,$auditAuth,true);
+$billingDisabled=new \Hafzatech\Central\CentralStaffPaymentEvidenceHttpAdapter(
+    $db,$boundary,
+    new \Hafzatech\Central\CentralStaffPaymentEvidenceQueue($db,$auditAuth),
+    new \Hafzatech\Central\CentralStaffPaymentEvidenceReviewService(
+        $db,$sessions,$auditAuth),
+    new \Hafzatech\Central\CentralStaffInvoicePaymentOverview(
+        $db,$sessions,$auditAuth));
+$routerOff=new \Hafzatech\Central\CentralStaffPortalHttpRouter(
+    $boundary,$billingDisabled);
+$routerOn=new \Hafzatech\Central\CentralStaffPortalHttpRouter(
+    $boundary,$billingDisabled,true,null,null,null,null,$auditPage);
+$staffCookie=[
+    \Hafzatech\Central\CentralStaffHttpPolicy::COOKIE_NAME=>$auditorBearer
+];
+$staffAuditRequest=[
+    'HTTPS'=>'on','SERVER_PORT'=>'443',
+    'HTTP_HOST'=>'lichall.hafzatech.com','REQUEST_METHOD'=>'POST',
+    'REQUEST_URI'=>'/staff/audit/staff',
+    'HTTP_ORIGIN'=>'https://lichall.hafzatech.com',
+    'HTTP_SEC_FETCH_SITE'=>'same-origin','REMOTE_ADDR'=>'192.0.2.116'
+];
+$staffAuditFields=['subject_staff_id'=>$staff['support']];
+try {
+ $routerOff->dispatch($staffAuditRequest,$staffCookie,$staffAuditFields,$proof);
+ throw new RuntimeException('DISABLED STAFF AUDIT ROUTE EXPOSED');
+} catch (\Hafzatech\Central\RegistrationError $error) {
+ journalRequire($error->errorCode==='staff_portal_not_enabled',
+  'default disabled staff audit route');
+}
+$auditorPage=$routerOn->dispatch(
+    $staffAuditRequest,$staffCookie,$staffAuditFields,$proof);
+journalRequire($auditorPage['kind']==='private_audit_html' &&
+    str_contains($auditorPage['html'],'logged_out') &&
+    !str_contains($auditorPage['html'],$auditorBearer) &&
+    !str_contains($auditorPage['html'],$staff['support']),
+    'protected security audit page has no bearer or subject identity');
+$privateOutput=(new \Hafzatech\Central\CentralStaffPortalPrivateResponse(true))
+    ->compose($auditorPage);
+journalRequire($privateOutput['status']===200 &&
+    $privateOutput['cookies']===[] &&
+    $privateOutput['headers']['Cache-Control']==='no-store, private',
+    'auditor HTML output is private no-store and has no cookie');
+foreach([
+    [$staffAuditRequest,$staffCookie,[
+        'subject_staff_id'=>'invalid'],$proof],
+    [$staffAuditRequest,$staffCookie,[
+        'subject_staff_id'=>$staff['support'],'other'=>'extra'],$proof],
+    [$staffAuditRequest,$staffCookie,$staffAuditFields,str_repeat('0',64)],
+    [$staffAuditRequest,[],$staffAuditFields,$proof],
+    [array_replace($staffAuditRequest,['HTTP_ORIGIN'=>'https://attacker.example']),
+        $staffCookie,$staffAuditFields,$proof],
+    [array_replace($staffAuditRequest,['REQUEST_METHOD'=>'GET']),
+        $staffCookie,$staffAuditFields,$proof]
+] as [$srv,$cookie,$fields,$token]) {
+ try {
+  $routerOn->dispatch($srv,$cookie,$fields,$token);
+  throw new RuntimeException('UNSAFE STAFF AUDIT REQUEST ACCEPTED');
+ } catch(\Hafzatech\Central\RegistrationError $error) {
+  journalRequire(in_array($error->errorCode,[
+    'invalid_staff_audit_request','staff_portal_denied'],true),
+    'invalid audit form/origin/cookie or proof refused');
+ }
+}
 $db->prepare('UPDATE central_staff_role_grants SET revoked_at=now()
  WHERE staff_id=:id')->execute(['id'=>$staff['auditor']]);
 try{
@@ -123,5 +231,18 @@ try{
 }catch(RuntimeException $error){
     if($error->getMessage()==='REVOKED AUDITOR SESSION STILL AUTHORIZED')
         throw $error;
+}
+try{
+ $auditPage->render($auditorBearer,$staff['support']);
+ throw new RuntimeException('REVOKED AUDITOR PAGE ACCESS');
+}catch(RuntimeException $error){
+ if($error->getMessage()==='REVOKED AUDITOR PAGE ACCESS')throw $error;
+}
+try {
+ $routerOn->dispatch($staffAuditRequest,$staffCookie,$staffAuditFields,$proof);
+ throw new RuntimeException('REVOKED AUDITOR ROUTE ACCESS');
+} catch (\Hafzatech\Central\RegistrationError $error) {
+ journalRequire($error->errorCode==='staff_portal_denied',
+   'revoked audit session cannot reuse private route');
 }
 echo "PASS: live MFA staff session required, bounded vendor audit cursor and metadata, revoked/foreign role denial\n";

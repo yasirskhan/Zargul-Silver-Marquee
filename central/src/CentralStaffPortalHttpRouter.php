@@ -22,7 +22,8 @@ final class CentralStaffPortalHttpRouter
         private readonly ?CentralStaffLicenseSigningQueue $licenseQueue = null,
         private readonly ?CentralStaffCustomerLookup $customers = null,
         private readonly ?CentralStaffPortalDashboard $dashboard = null,
-        private readonly ?CentralStaffSupportTicketQueue $supportQueue = null
+        private readonly ?CentralStaffSupportTicketQueue $supportQueue = null,
+        private readonly ?CentralStaffPortalAuditHistoryPage $auditHistory = null
     ) {}
 
     /**
@@ -182,6 +183,20 @@ final class CentralStaffPortalHttpRouter
                 $bearer,$fields['customer_id'],0,25);
             return ['kind'=>'private_support_html',
                 'html'=>CentralStaffSupportQueueHtmlRenderer::render($rows)];
+        }
+        if ($uri==='/staff/audit/staff' && $this->auditHistory!==null) {
+            if (!$this->exactFields($fields,['subject_staff_id']) ||
+                !is_string($fields['subject_staff_id']) ||
+                !self::uuid($fields['subject_staff_id'])) {
+                throw new RegistrationError('invalid_staff_audit_request',422);
+            }
+            if (!$this->boundary->permitsMutation(
+                $server,$bearer,$csrfHeader,'audit.read',null)) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            return ['kind'=>'private_audit_html',
+                'html'=>$this->auditHistory->render(
+                    $bearer,$fields['subject_staff_id'])];
         }
         throw new RegistrationError('staff_route_not_found',404);
     }
