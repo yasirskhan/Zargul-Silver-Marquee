@@ -394,6 +394,11 @@
 - Count joins matching enrolled installation and support-outbox company IDs; manager/operations/foreign companies see null and no link. PostgreSQL + Livewire positive/negative test covers owner and manager and absence of any finance or license check mutations.
 - Parent 2cf29536f88a2f5b4ba50121af1ee79a8e4ef4e8 introduced keyset request history navigation; focused CI must be checked on its exact SHA and this new implementation too. Vendor support public APIs, staff MFA and cryptographic signing custody remain not deployed, release gates default OFF.
 
+## EARLY FULL-DASHBOARD AUTHORIZATION TEST COVERAGE — HOSTED CI PENDING
+- Retained mandatory all-tests Laravel PostgreSQL job, and expanded the parallel focused licensing-postgres job's filter to include VenueOverviewLivewireTest alongside all Central* tests. This catches owner/admin-versus-manager support-backlog security regressions before the slower full suite finishes.
+- No production code, database schema, permission role, or release gate was changed. Parent `b2f14b167565ace3caf65def150bc7c623818118` added scoped pending-support dashboard count and needs its exact full six-job CI verification.
+- Next: verify this new six-job CI including early overview tests; fix failures without widening access to support data, then continue central support deployment prerequisites.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`

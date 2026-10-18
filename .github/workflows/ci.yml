@@ -130,8 +130,8 @@ jobs:
           composer install --no-interaction --no-progress --prefer-dist
           cp .env.example .env
           php artisan key:generate --force --no-interaction
-      - name: Run focused signed-license and central client regressions
-        run: php artisan test --no-ansi --filter='Central.*Test'
+      - name: Run focused central, support and private overview authorization regressions
+        run: php artisan test --no-ansi --filter='Central.*Test|VenueOverviewLivewireTest'
 
   laravel-postgres:
     runs-on: ubuntu-latest
