@@ -233,6 +233,18 @@ try {
         $receiptClaim['status']==='signed_revision_pending_delivery',
         'client receipt exactly matches the delivered signed paid revision');
     signedCheckDeny(fn()=>$realCombined->check($paidRequest),'replayed_check');
+    // A tampered unsealed envelope cannot be returned as a grant, even if
+    // the status worker itself can still produce a valid signed receipt.
+    $tamperUnseal=static function(string $cipher)use($grantEnvelope):string {
+        $altered=$grantEnvelope;
+        $altered['signature']=InstallationRegistry::base64Url(random_bytes(64));
+        return json_encode($altered,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);
+    };
+    $badDelivery=new SignedGrantDeliveryService($db,$status,$tamperUnseal,$keys);
+    $badCombined=new CentralInstallationSignedStatusResponse(
+        $status,$signer,$keys,true,$badDelivery);
+    signedCheckDeny(fn()=>$badCombined->check($makeRequest($customer)),
+        'invalid_grant_signature');
     $existingRequest=$makeRequest($customer,1);
     $existingResponse=$realCombined->check($existingRequest);
     signedCheckAssert($existingResponse['revision']===1 &&
@@ -267,8 +279,8 @@ try {
             $status,$wrongSig,$keys,true))->check($makeRequest($customer)),
         'invalid_signed_status_receipt');
     $recorded->execute(['installation'=>$installation]);
-    signedCheckAssert((int)$recorded->fetchColumn()===7,
-        'seven authenticated status probes consume exactly one nonce each');
+    signedCheckAssert((int)$recorded->fetchColumn()===8,
+        'eight authenticated status probes consume exactly one nonce each');
 } finally {
     putenv('CENTRAL_SIGNED_STATUS_ENABLED=false');
     putenv('CENTRAL_GRANT_DELIVERY_ENABLED=false');
