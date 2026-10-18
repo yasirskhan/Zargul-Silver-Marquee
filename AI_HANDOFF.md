@@ -347,6 +347,9 @@
 - Previous `44a3f25` corrected the last Filament 403/404 unauthorized test distinction; focused five suites passed, full backend suite must still be checked for exact SHA before VERIFIED. The new audit batch requires its own hosted six-job CI.
 - Next: operational protected vendor support API, signer custody and client delivery only after operator readiness. All gates remain OFF.
 
+## READ AUDIT SCHEMA CI FIX
+- GitHub Actions [39088113663](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39088113663) detected synthetic PostgreSQL FK type mismatch in new support read-audit migration: user `users.id` uses bigint, not UUID. Changed ONLY `actor_user_id` to unsignedBigInteger; company/message IDs remain UUID. No production access control, inbox body or license behavior altered. Exact new SHA six-job CI required before this audit checkpoint VERIFIED.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`

@@ -13,7 +13,7 @@ return new class extends Migration {
             $table->uuid('id')->primary();
             $table->uuid('company_id');
             $table->uuid('message_id');
-            $table->uuid('actor_user_id');
+            $table->unsignedBigInteger('actor_user_id');
             $table->timestampTz('read_at');
             $table->foreign('company_id')->references('id')->on('companies')->restrictOnDelete();
             $table->foreign('message_id')->references('id')->on('central_support_reply_inbox')->restrictOnDelete();
