@@ -27,7 +27,7 @@
                     <div class="rounded-lg border p-4">
                         <dt class="text-sm">Prepaid renewal valid through (UTC)</dt>
                         <dd class="font-semibold">{{ $summary['renewal_expires_at'] }}</dd>
-                        <p class="text-xs">Signed revision {{ $summary['renewal_revision'] }} begins when the current paid term expires. Your venue remains operational under the current signed term.</p>
+                        <p class="text-xs">Signed renewal revision {{ $summary['renewal_revision'] }} starts {{ $summary['renewal_starts_at'] }} UTC. The current signed term remains active until then; existing hall and staff limits continue to apply.</p>
                     </div>
                 @endif
                 @if (!empty($summary['grace_ends_at']))
