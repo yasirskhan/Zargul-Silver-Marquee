@@ -54,6 +54,7 @@ final class CentralStaffMfaChallenge
             $lock=$state['locked_until']??null;
             if($lock!==null && $trustedServerUnixTime<
                 (new DateTimeImmutable($lock))->getTimestamp()){
+                $this->audit($staffId,'locked',null);
                 $this->db->commit();return false;
             }
             $cipher=hex2bin($staff['sealed']);
@@ -71,9 +72,11 @@ final class CentralStaffMfaChallenge
                     ? gmdate('Y-m-d H:i:s+00',$trustedServerUnixTime+900)
                     : null;
                 $this->save($staffId,$last,$failed,$locked);
+                $this->audit($staffId,$locked===null?'rejected':'locked_out',null);
                 $this->db->commit();return false;
             }
             $this->save($staffId,$counter,0,null);
+            $this->audit($staffId,'accepted',$counter);
             $this->db->commit();return true;
         }catch(Throwable $e){
             if($this->db->inTransaction())$this->db->rollBack();
@@ -96,4 +99,17 @@ final class CentralStaffMfaChallenge
         $stmt->execute(['staff'=>$staffId,'counter'=>$counter,
             'fail'=>$failed,'locked'=>$lock]);
     }
+    /**
+     * Audit is committed atomically with the MFA replay counter/lockout.
+     * Never record submitted TOTP digits, decrypted secrets or IP addresses.
+     */
+    private function audit(string $staffId,string $outcome,?int $counter):void
+    {
+        $q=$this->db->prepare(
+            'INSERT INTO central_staff_mfa_attempt_audit(staff_id,outcome,accepted_counter)
+             VALUES(:staff,:outcome,:counter)'
+        );
+        $q->execute(['staff'=>$staffId,'outcome'=>$outcome,'counter'=>$counter]);
+    }
+
 }

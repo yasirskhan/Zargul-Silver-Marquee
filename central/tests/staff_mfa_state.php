@@ -66,4 +66,27 @@ mfaRequire((int)$reset['failed_attempts']===0 && $reset['locked_until']===null,
 $m->execute(['id'=>$second]);
 mfaRequire((int)$m->fetchColumn()===intdiv(1111111109,30),
     'new accepted counter advanced under database row lock');
+$audit=$db->prepare(
+    'SELECT outcome,accepted_counter FROM central_staff_mfa_attempt_audit
+     WHERE staff_id=:staff ORDER BY id'
+);
+$audit->execute(['staff'=>$first]);
+$firstEvents=$audit->fetchAll(PDO::FETCH_ASSOC);
+mfaRequire(array_column($firstEvents,'outcome')===['accepted','rejected'],
+    'successful MFA and replay recorded in order without exposing submitted code');
+mfaRequire((int)$firstEvents[0]['accepted_counter']===1 &&
+    $firstEvents[1]['accepted_counter']===null,
+    'only accepted MFA logs a counter');
+$audit->execute(['staff'=>$second]);
+mfaRequire(array_column($audit->fetchAll(PDO::FETCH_ASSOC),'outcome')===
+    ['rejected','rejected','rejected','rejected','locked_out','locked','accepted'],
+    'five failures, active lockout and recovery fully auditable');
+$testRow=$db->query('SELECT id FROM central_staff_mfa_attempt_audit LIMIT 1')->fetchColumn();
+try{
+    $db->prepare('DELETE FROM central_staff_mfa_attempt_audit WHERE id=:id')
+        ->execute(['id'=>$testRow]);
+    throw new RuntimeException('FAIL MFA audit was deletable');
+}catch(PDOException $e){
+    mfaRequire($e->getCode()==='23514','audit deletion blocked by database trigger');
+}
 echo "PASS: durable staff TOTP replay, disabled staff, trusted password and failed-attempt lockout\n";
