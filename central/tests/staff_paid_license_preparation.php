@@ -27,7 +27,13 @@ foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
     'CentralStaffSessionAuthorization','CentralStaffPaidLicensePreparation',
     'PreparedSignedGrantValidator','SignedGrantFinalization',
     'CentralStaffSignedGrantFinalization','CentralStaffSignedGrantManifest',
-    'CentralStaffLicenseSigningQueue'
+    'CentralStaffLicenseSigningQueue',
+    'CentralStaffCsrfTokenService','CentralStaffHttpPolicy',
+    'CentralStaffProtectedHttpBoundary','CentralStaffPaymentEvidenceQueue',
+    'CentralStaffInvoicePaymentOverview','CentralStaffPaymentEvidenceReviewService',
+    'CentralStaffPaymentEvidenceHttpAdapter','CentralStaffBillingDashboardRenderer',
+    'CentralStaffPortalHttpRouter','CentralStaffPortalPrivateResponse',
+    'CentralStaffLicenseQueueHtmlRenderer'
 ] as $name) {
     require dirname(__DIR__).'/src/'.$name.'.php';
 }
@@ -226,6 +232,102 @@ paidSessionAssert(array_keys($pending[0])===[
 ], 'queue discloses only bounded safe license metadata');
 paidSessionAssert($queue->listPending($issuer,$company,1,1)===[],
     'pending signing queue has bounded predictable pagination');
+// Read-only, independently default-OFF license queue page under a real
+// current MFA session and customer scope. This does not invoke any signer.
+$queueCsrfTokens=new \Hafzatech\Central\CentralStaffCsrfTokenService($db,$sessions);
+$issuerCsrf=$queueCsrfTokens->issue($issuer);
+$billingCsrf=$queueCsrfTokens->issue($billingSession);
+$foreignCsrf=$queueCsrfTokens->issue($foreignSession);
+paidSessionAssert(is_string($issuerCsrf)&&is_string($billingCsrf)&&
+ is_string($foreignCsrf),'three vendor sessions receive independent CSRF proofs');
+$queueBoundary=new \Hafzatech\Central\CentralStaffProtectedHttpBoundary(
+ $sessions,$queueCsrfTokens,
+ new CentralStaffSessionAuthorization($sessions,$access),true);
+$queueAuth=new CentralStaffSessionAuthorization($sessions,$access);
+$unusedBilling=new \Hafzatech\Central\CentralStaffPaymentEvidenceHttpAdapter(
+ $db,$queueBoundary,
+ new \Hafzatech\Central\CentralStaffPaymentEvidenceQueue($db,$queueAuth),
+ new \Hafzatech\Central\CentralStaffPaymentEvidenceReviewService(
+  $db,$sessions,$queueAuth),
+ new \Hafzatech\Central\CentralStaffInvoicePaymentOverview(
+  $db,$sessions,$queueAuth),false);
+$queuePortalOff=new \Hafzatech\Central\CentralStaffPortalHttpRouter(
+ $queueBoundary,$unusedBilling);
+$queuePortal=new \Hafzatech\Central\CentralStaffPortalHttpRouter(
+ $queueBoundary,$unusedBilling,true,$queue);
+$queueRequest=[
+ 'HTTPS'=>'on','SERVER_PORT'=>'443','HTTP_HOST'=>'lichall.hafzatech.com',
+ 'REQUEST_METHOD'=>'POST','REQUEST_URI'=>'/staff/licenses/pending',
+ 'HTTP_ORIGIN'=>'https://lichall.hafzatech.com',
+ 'HTTP_SEC_FETCH_SITE'=>'same-origin','REMOTE_ADDR'=>'192.0.2.96'
+];
+$issuerCookie=[
+ \Hafzatech\Central\CentralStaffHttpPolicy::COOKIE_NAME=>$issuer
+];
+$billingCookie=[
+ \Hafzatech\Central\CentralStaffHttpPolicy::COOKIE_NAME=>$billingSession
+];
+$foreignCookie=[
+ \Hafzatech\Central\CentralStaffHttpPolicy::COOKIE_NAME=>$foreignSession
+];
+paidSessionDeny(fn()=>$queuePortalOff->dispatch(
+ $queueRequest,$issuerCookie,['customer_id'=>$company],$issuerCsrf),
+ 'staff_portal_not_enabled');
+$queuePage=$queuePortal->dispatch(
+ $queueRequest,$issuerCookie,['customer_id'=>$company],$issuerCsrf);
+paidSessionAssert($queuePage['kind']==='private_license_html' &&
+ str_contains($queuePage['html'],$pending[0]['invoice_number']) &&
+ str_contains($queuePage['html'],$prepared['license_id']) &&
+ str_contains($queuePage['html'],'Awaiting isolated signer') &&
+ !str_contains($queuePage['html'],$issuer) &&
+ !str_contains($queuePage['html'],$issuerCsrf),
+ 'authorized officer sees escaped scoped pending revision without session secrets');
+$queueWire=(new \Hafzatech\Central\CentralStaffPortalPrivateResponse(true))
+ ->compose($queuePage);
+paidSessionAssert($queueWire['status']===200 &&
+ $queueWire['cookies']===[] &&
+ $queueWire['headers']['Cache-Control']==='no-store, private' &&
+ str_contains($queueWire['headers']['Content-Security-Policy'],"default-src 'none'"),
+ 'private licensing response is cookie-free and cache-disabled');
+paidSessionDeny(fn()=>$queuePortal->dispatch(
+ $queueRequest,$billingCookie,['customer_id'=>$company],$billingCsrf),
+ 'staff_portal_denied');
+paidSessionDeny(fn()=>$queuePortal->dispatch(
+ $queueRequest,$foreignCookie,['customer_id'=>$company],$foreignCsrf),
+ 'staff_portal_denied');
+$globalOfficerOther=$queuePortal->dispatch(
+ $queueRequest,$issuerCookie,['customer_id'=>$other],$issuerCsrf);
+paidSessionAssert($globalOfficerOther['kind']==='private_license_html' &&
+ str_contains($globalOfficerOther['html'],'No pending signed-revision requests') &&
+ !str_contains($globalOfficerOther['html'],$prepared['license_id']),
+ 'globally authorized officer sees no foreign customer queue records');
+paidSessionDeny(fn()=>$queuePortal->dispatch(
+ $queueRequest,$issuerCookie,
+ ['customer_id'=>$company,'revision_id'=>$prepared['revision_id']],$issuerCsrf),
+ 'invalid_license_request');
+paidSessionDeny(fn()=>$queuePortal->dispatch(
+ $queueRequest,$issuerCookie,['customer_id'=>$company],str_repeat('0',64)),
+ 'staff_portal_denied');
+$queueCross=$queueRequest;$queueCross['HTTP_ORIGIN']='https://evil.example.test';
+paidSessionDeny(fn()=>$queuePortal->dispatch(
+ $queueCross,$issuerCookie,['customer_id'=>$company],$issuerCsrf),
+ 'staff_portal_denied');
+$queuePut=$queueRequest;$queuePut['REQUEST_METHOD']='PUT';
+paidSessionDeny(fn()=>$queuePortal->dispatch(
+ $queuePut,$issuerCookie,['customer_id'=>$company],$issuerCsrf),
+ 'staff_portal_denied');
+$malicious=\Hafzatech\Central\CentralStaffLicenseQueueHtmlRenderer::render([[
+ 'invoice_number'=>'<script>alert(1)</script>',
+ 'approved_domain'=>'"><img src=x onerror=alert(1)>',
+ 'license_id'=>$prepared['license_id'],'revision'=>1,
+ 'expires_at'=>'2027-10-18'
+]]);
+paidSessionAssert(str_contains($malicious,'&lt;script&gt;') &&
+ str_contains($malicious,'&lt;img') &&
+ !str_contains($malicious,'<script>') &&
+ !str_contains($malicious,'<img'),
+ 'license queue escapes untrusted invoice and approved domain fields');
+
 $manifest=new CentralStaffSignedGrantManifest($db,$sessions,
     new CentralStaffSessionAuthorization($sessions,$access),
     new PaidInvoiceEligibility($db));

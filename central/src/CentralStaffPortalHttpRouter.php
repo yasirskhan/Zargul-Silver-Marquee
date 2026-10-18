@@ -18,7 +18,8 @@ final class CentralStaffPortalHttpRouter
     public function __construct(
         private readonly CentralStaffProtectedHttpBoundary $boundary,
         private readonly CentralStaffPaymentEvidenceHttpAdapter $billing,
-        private readonly bool $enabled = false
+        private readonly bool $enabled = false,
+        private readonly ?CentralStaffLicenseSigningQueue $licenseQueue = null
     ) {}
 
     /**
@@ -103,6 +104,24 @@ final class CentralStaffPortalHttpRouter
                         "default-src 'none'; base-uri 'none'; frame-ancestors 'none'"
                 ],
                 'html'=>$html
+            ];
+        }
+        if ($uri==='/staff/licenses/pending' && $this->licenseQueue!==null) {
+            if (!$this->exactFields($fields,['customer_id']) ||
+                !is_string($fields['customer_id']) ||
+                !self::uuid($fields['customer_id'])) {
+                throw new RegistrationError('invalid_license_request',422);
+            }
+            if (!$this->boundary->permitsMutation(
+                $server,$bearer,$csrfHeader,'license.read_status',
+                $fields['customer_id'])) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            $rows=$this->licenseQueue->listPending(
+                $bearer,$fields['customer_id'],0,25);
+            return [
+                'kind'=>'private_license_html',
+                'html'=>CentralStaffLicenseQueueHtmlRenderer::render($rows)
             ];
         }
         throw new RegistrationError('staff_route_not_found',404);
