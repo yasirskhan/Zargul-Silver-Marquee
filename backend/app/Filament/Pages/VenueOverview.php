@@ -136,6 +136,8 @@ final class VenueOverview extends Page
 
         $this->summary = [
             'role' => $role,
+            'licenseRestricted' => config('central_control.activation_enabled') === true
+                && ! $canOperate,
             'visibleHalls' => $halls,
             'hallsNeedingSetup' => $canSeeCompanyProposals
                 ? DB::table('halls')->where('company_id', $this->companyId)
