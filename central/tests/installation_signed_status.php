@@ -327,9 +327,6 @@ try {
         'untrusted_status_signer');
     // A malicious or broken isolated worker must not return arbitrary
     // oversized signed status data even if its signing key is pinned.
-    $oversized=static fn(array $claim):array=>
-        Ed25519StatusReceiptCodec::sign($claim,'worker-test-key',
-            sodium_crypto_sign_secretkey($receiptKeys));
     $oversizedEnvelope=static function(array $claim)use($receiptKeys):array {
         $bytes=str_repeat('X',4097);
         return [
@@ -337,7 +334,7 @@ try {
             'payload'=>InstallationRegistry::base64Url($bytes),
             'signature'=>InstallationRegistry::base64Url(
                 sodium_crypto_sign_detached(
-                    'HAFZATECH-INSTALL-STATUS-RECEIPT-V1'."\\n".$bytes,
+                    'HAFZATECH-INSTALL-STATUS-RECEIPT-V1'."\n".$bytes,
                     sodium_crypto_sign_secretkey($receiptKeys)))
         ];
     };
