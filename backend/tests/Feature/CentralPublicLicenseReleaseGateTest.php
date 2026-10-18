@@ -4,6 +4,9 @@ namespace Tests\Feature;
 
 use App\Http\Controllers\PublicSiteRequestGate;
 use App\Models\Company;
+use App\Models\CompanyMembership;
+use App\Models\User;
+use App\Services\TenantAccess;
 use App\Services\CentralInstallationIdentity;
 use App\Services\CentralSignedLicenseCache;
 use DateTimeImmutable;
@@ -41,6 +44,15 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
         $company=Company::create([
             'name'=>'License Gate Venue', 'slug'=>'license-gate-venue'
         ]);
+        $owner=User::create(['name'=>'Signed-License Owner',
+            'email'=>'signed-license-owner@example.test','password'=>'test-only']);
+        $owner->markEmailAsVerified();
+        CompanyMembership::create([
+            'company_id'=>$company->id, 'user_id'=>$owner->id, 'role'=>'owner']);
+        $tenant=app(TenantAccess::class);
+        $this->assertTrue($tenant->canManageCustomerProfiles($owner,$company->id),
+            'Default-OFF licensing preserves management permissions');
+
         $website=(string)Str::uuid();
         DB::table('websites')->insert([
             'id'=>$website,'company_id'=>$company->id,'name'=>'Synthetic public site'
@@ -59,6 +71,8 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
 
         config()->set('central_control.activation_enabled',true);
         $this->assertBlocked();
+        $this->assertFalse($tenant->canManageCustomerProfiles($owner,$company->id),
+            'Commercial release cannot authorize company before signed enrollment');
         $identity=app(CentralInstallationIdentity::class)->initialize();
         $customer=(string)Str::uuid();
         DB::table('central_installation_activation')->insert([
@@ -72,6 +86,8 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
             'created_at'=>now(),'updated_at'=>now(),
         ]);
         $this->assertBlocked();
+        $this->assertFalse($tenant->canManageCustomerProfiles($owner,$company->id),
+            'Enrolled but unsigned company remains restricted');
         $pair=sodium_crypto_sign_keypair();
         config()->set('central_control.trusted_signing_public_keys',[
             'fixture-test-key'=>self::b64(sodium_crypto_sign_publickey($pair))
@@ -108,6 +124,8 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
             $this->assertSame('licensed.example.test',
                 app(PublicSiteRequestGate::class)->authorize($request)['host']);
 
+            $this->assertTrue($tenant->canManageCustomerProfiles($owner,$company->id),
+                'Active vendor-signed license permits company operations');
             config()->set('public_site.company_id',(string)Str::uuid());
             $this->assertBlocked();
             config()->set('public_site.company_id',$company->id);
@@ -117,6 +135,8 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
             DB::table('central_installation_activation')
                 ->where('singleton_id',1)->update(['approved_domain'=>'other.example.test']);
             $this->assertBlocked();
+            $this->assertFalse($tenant->canManageCustomerProfiles($owner,$company->id),
+                'Wrong approved license domain also denies tenant business access');
             DB::table('central_installation_activation')
                 ->where('singleton_id',1)->update(['approved_domain'=>'licensed.example.test']);
             $this->assertSame('licensed.example.test',
@@ -124,6 +144,8 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
 
             config()->set('central_control.trusted_signing_public_keys',[]);
             $this->assertBlocked();
+            $this->assertFalse($tenant->canManageCustomerProfiles($owner,$company->id),
+                'Untrusted signer prevents management authorization');
             config()->set('central_control.trusted_signing_public_keys',[
                 'fixture-test-key'=>self::b64(sodium_crypto_sign_publickey($pair))
             ]);
@@ -132,11 +154,19 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
 
             $this->travelTo(Carbon::parse('2027-10-01T00:00:00Z'));
             $this->assertBlocked();
+            $this->assertTrue($tenant->canManageCustomerProfiles($owner,$company->id),
+                'Business operations remain available at signed expiry during grace');
             foreach (['/', '/robots.txt', '/sitemap.xml',
                 '/_venue-media/home/'.Str::uuid().'.webp'] as $path) {
                 $this->get('https://licensed.example.test'.$path)
                     ->assertStatus(503);
             }
+            $this->travelTo(Carbon::parse('2027-10-07T23:59:59Z'));
+            $this->assertTrue($tenant->canManageCustomerProfiles($owner,$company->id),
+                'Seven-day operations grace includes the last second');
+            $this->travelTo(Carbon::parse('2027-10-08T00:00:00Z'));
+            $this->assertFalse($tenant->canManageCustomerProfiles($owner,$company->id),
+                'Normal operations stop precisely at signed expiry plus seven days');
             $this->assertSame('registered_pending_license',
                 DB::table('central_installation_activation')
                     ->where('singleton_id',1)->value('status'));
