@@ -75,3 +75,20 @@ Nonessential extensions only; inventory, wages, vendor finance and reporting are
 
 ## Phase 9.1 — HAFZATECH central control contracts (2026-10-17 approved; not implemented)
 Implement `docs/CENTRAL_CONTROL_CENTER_V1.md` and `docs/FAST_DELIVERY_PLAN.md`: `lichall.hafzatech.com` trusted client bootstrap, customer/install identity, signed license 6m/12m, automatic 15-day status verification plus owner manual Verify, early paid renewal same license ID, 15-day warning, public maintenance on expiry, seven-day backend grace, audited grace/revocation. Central HAFZATECH staff roles with least privilege, per-customer vendor bank/Easypaisa/international/WU/eligible future PayPal receiving accounts, verified invoice payment before license signing, encrypted optional issuance, separate client operating ISO currency/IANA timezone per hall and support sync. Keep existing VenueDesk functionality untouched and license release OFF until CI and operator release gates.
+
+## Phase 9.2 — Central operator staff portal implementation checkpoint (October 18, 2026)
+The dated Phase 9/9.1 "not implemented" baseline above is historical. Current code and
+`AI_HANDOFF.md` have implemented isolated installation enrollment, paid-term
+and signed status/grant foundations, staff MFA/CSRF sessions, internal
+role-scoped read-only vendor dashboards, immutable billing/support audit and
+self-password change. Last fully green operator source before this batch:
+`e34e9b8`, GitHub Actions 39165362826, all six jobs passed.
+
+Next gated development includes an INTERNAL vendor operator application
+composition with injected external secret-manager/MFA and native cookie writers;
+pending-only staff account provisioning with no roles or usable credentials.
+These new candidate features require their own exact-SHA hosted CI. They DO NOT
+constitute a deployed staff website. DNS/TLS/proxy, KMS-backed credentials,
+bank settlement verification, real HSM signer, operator recovery and
+production release certification are still blockers. Never switch on the
+production toggles merely because development CI passes.

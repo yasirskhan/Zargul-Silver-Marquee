@@ -66,3 +66,25 @@ a separately audited operator HTTPS/vhost, KMS-backed MFA decryption, protected
 HMAC rate limits, session recovery, secure host-only cookie emitter, WAF,
 central database isolation, auditable permissions, and explicit release approval.
 No production signing, bank collection or client license activation is available.
+
+## Independent operator staff composition and pending account preparation
+
+`CentralStaffPortalOperatorWiring` is an **internal composition factory**,
+NOT an endpoint under `central/public`. It requires explicit operator
+approval, `CENTRAL_STAFF_BOOTSTRAP_ENABLED=true`, an isolated vendor PostgreSQL
+database, HMAC throttle key and external secret-manager-provided MFA decryptor
+and support encryption callbacks, plus trusted native HTTPS header/cookie/body
+writers. The resulting `CentralStaffPortalOperatorApp` rechecks bootstrap
+enablement for each request and retains separate general portal and response
+emitter release gates. The sample synthetic callbacks in unit tests are NOT a
+production vault. No signer private key or bank provider credential is involved.
+
+`CentralStaffProvisioningService` creates only `pending_mfa` central
+staff placeholders, with a random unreachable Argon2id password, no enrolled
+MFA, and **zero role assignments**. Every action requires current central
+MFA with global `staff.create` authorization and a separate off-by-default
+provisioning release. A PostgreSQL immutable journal records who staged the
+account. There is intentionally NO invitation delivery, MFA enrollment
+completion, staff role grant or public self-registration yet. These require
+a separate operator-approved, audited lifecycle. All production switches
+remain OFF.
