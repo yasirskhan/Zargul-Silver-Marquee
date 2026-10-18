@@ -111,6 +111,16 @@ class TenantAccess
         return $membership !== null && in_array($membership->role, ['owner', 'admin'], true);
     }
 
+    /** Read-only existing invoice/payment history is a customer data right,
+     * never authority to accept new deposits or alter prior ledger entries.
+     */
+    public function canReadExistingInvoiceHistory(User $user, Hall $hall): bool
+    {
+        $membership=$this->restrictedRecordMembership($user,$hall->company_id);
+        return $hall->is_active && $membership !== null &&
+            in_array($membership->role,['owner','admin'],true);
+    }
+
     /** A narrowly approved refund of an EXISTING payment is not a new sale.
      * VenueInvoiceRefundService still enforces original payment/approval,
      * dual control, ledger reversal and all three posting release gates.
