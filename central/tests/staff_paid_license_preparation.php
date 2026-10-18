@@ -9,6 +9,7 @@ use Hafzatech\Central\CentralStaffPasswordVerifier;
 use Hafzatech\Central\CentralStaffSessionAuthorization;
 use Hafzatech\Central\CentralStaffSessionService;
 use Hafzatech\Central\CentralStaffPaidLicensePreparation;
+use Hafzatech\Central\CentralStaffSignedGrantFinalization;
 use Hafzatech\Central\InstallationRegistry;
 use Hafzatech\Central\LicenseTermCalendar;
 use Hafzatech\Central\PaidInvoiceEligibility;

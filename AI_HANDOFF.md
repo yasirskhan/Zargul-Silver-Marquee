@@ -596,3 +596,6 @@ Append only concise current milestones (commit SHA, exact CI job result, code fi
 
 ## SESSION-BOUND SIGNED GRANT TEST NAMESPACE REPAIR — 2026-10-18
 - Post-publish inspection of source `c6d8924eae3f53cbd4a4cdd708d5c76f302fdca4` found double backslashes in three fully-qualified PHP class names in the new standalone synthetic finalization fixture. Corrected them to valid PHP namespace separators; application code and signer authorization logic unchanged. Verify new exact-SHA hosted CI before calling this batch VERIFIED.
+
+## SESSION-BOUND SIGNER TEST IMPORT CORRECTION — 2026-10-18
+- Source `85e5454d06a66112def050cb858aa16736a8231f` hosted [39128391435](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39128391435) central-postgres PHP lint passed and previous central suites passed, but the appended synthetic finalization fixture failed with `Class CentralStaffSignedGrantFinalization not found` at line 188: missing namespace import (the source class itself is present and the test runner already requires its file). Corrected test import only; CI must pass all six exact new SHA before verified. No production routes, signing keys, release flags or system app code changed in this correction.
