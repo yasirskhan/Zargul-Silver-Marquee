@@ -15,6 +15,7 @@ use Hafzatech\Central\CentralStaffCsrfTokenService;
 use Hafzatech\Central\CentralStaffProtectedHttpBoundary;
 use Hafzatech\Central\CentralStaffPaymentEvidenceHttpAdapter;
 use Hafzatech\Central\CentralStaffBillingDashboardRenderer;
+use Hafzatech\Central\CentralStaffPortalHttpRouter;
 use Hafzatech\Central\PaidInvoiceEligibility;
 use Hafzatech\Central\RegistrationError;
 foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
@@ -26,7 +27,8 @@ foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
     'CentralStaffPaymentEvidenceReviewService','CentralStaffCsrfTokenService',
     'CentralStaffHttpPolicy','CentralStaffProtectedHttpBoundary',
     'CentralStaffPaymentEvidenceHttpAdapter',
-    'CentralStaffBillingDashboardRenderer'] as $name) {
+    'CentralStaffBillingDashboardRenderer',
+    'CentralStaffPortalHttpRouter'] as $name) {
     require dirname(__DIR__).'/src/'.$name.'.php';
 }
 function reverseCheck(bool $v,string $msg):void{
@@ -273,6 +275,105 @@ reverseCheck(str_contains($injected,'&lt;script&gt;') &&
  !str_contains($injected,'<img') &&
  !str_contains($injected,'hidden-vault-key'),
  'malicious customer claim and invoice fields HTML-escaped, private keys not projected');
+
+// The FIRST operator staff HTTP/UI composition is deliberately not public.
+// It routes a strict POST whitelist only after the independent operator gate,
+// same-origin TLS checks, live vendor MFA, scoped authorization and CSRF.
+$portalOff=new CentralStaffPortalHttpRouter($httpBoundary,$httpOn);
+$portalOn=new CentralStaffPortalHttpRouter($httpBoundary,$httpOn,true);
+$portalCookie=[\Hafzatech\Central\CentralStaffHttpPolicy::COOKIE_NAME=>$billingBearer];
+$portalFields=['customer_id'=>$customer,'invoice_id'=>$invoice];
+reverseDeny(fn()=>$portalOff->dispatch(
+ $dashboardRequest,$portalCookie,$portalFields,$csrfToken),
+ 'staff_portal_not_enabled');
+$privatePage=$portalOn->dispatch(
+ $dashboardRequest,$portalCookie,$portalFields,$csrfToken);
+reverseCheck($privatePage['kind']==='private_html' &&
+ str_contains($privatePage['html'],'7500') &&
+ str_contains($privatePage['html'],'Unverified customer claim') &&
+ $privatePage['headers']['Cache-Control']==='no-store, private' &&
+ str_contains($privatePage['headers']['Content-Security-Policy'],"default-src 'none'") &&
+ !str_contains($privatePage['html'],$billingBearer) &&
+ !str_contains($privatePage['html'],$csrfToken) &&
+ !str_contains($privatePage['html'],'private/vendor-evidence/'),
+ 'operator POST route renders private billing only with no secrets or claims as money');
+$portalWrongMethod=$dashboardRequest;$portalWrongMethod['REQUEST_METHOD']='PUT';
+reverseDeny(fn()=>$portalOn->dispatch(
+ $portalWrongMethod,$portalCookie,$portalFields,$csrfToken),'staff_portal_denied');
+$portalWrongOrigin=$dashboardRequest;
+$portalWrongOrigin['HTTP_ORIGIN']='https://attacker.example';
+reverseDeny(fn()=>$portalOn->dispatch(
+ $portalWrongOrigin,$portalCookie,$portalFields,$csrfToken),'staff_portal_denied');
+$portalQuery=$dashboardRequest;$portalQuery['REQUEST_URI'].='?invoice=forged';
+reverseDeny(fn()=>$portalOn->dispatch(
+ $portalQuery,$portalCookie,$portalFields,$csrfToken),'staff_portal_denied');
+$portalUnknown=$dashboardRequest;$portalUnknown['REQUEST_URI']='/staff/billing/delete';
+reverseDeny(fn()=>$portalOn->dispatch(
+ $portalUnknown,$portalCookie,[],$csrfToken),'staff_route_not_found');
+reverseDeny(fn()=>$portalOn->dispatch(
+ $dashboardRequest,$portalCookie,$portalFields+['untrusted'=>'x'],$csrfToken),
+ 'invalid_billing_request');
+reverseDeny(fn()=>$portalOn->dispatch(
+ $dashboardRequest,$portalCookie,['customer_id'=>$foreign,'invoice_id'=>$invoice],$csrfToken),
+ 'invoice_not_found');
+reverseDeny(fn()=>$portalOn->dispatch(
+ $dashboardRequest,$portalCookie,$portalFields,str_repeat('0',64)),
+ 'staff_http_denied');
+reverseDeny(fn()=>$portalOn->dispatch(
+ $dashboardRequest,[],$portalFields,$csrfToken),'staff_portal_denied');
+reverseDeny(fn()=>$portalOn->dispatch(
+ $dashboardRequest,
+ [\Hafzatech\Central\CentralStaffHttpPolicy::COOKIE_NAME=>$officerBearer],
+ $portalFields,$csrfToken),'staff_http_denied');
+
+// A separate unused MFA identity proves the composed login+logout lifecycle
+// without reusing an already-consumed TOTP counter from a previous session.
+$portalStaff=reverseId();
+$u->execute(['id'=>$portalStaff,'email'=>'reversal-portal@example.test',
+ 'hash'=>password_hash($password,PASSWORD_ARGON2ID),'seed'=>bin2hex($seed)]);
+$g->execute(['id'=>reverseId(),'staff'=>$portalStaff,
+ 'role'=>'billing_officer','scope'=>$customer]);
+$loginHttp=$httpRequest;$loginHttp['REQUEST_URI']='/staff/session/login';
+$loginFields=['email'=>'reversal-portal@example.test',
+ 'password'=>$password,'totp'=>reverseTotp($seed)];
+reverseDeny(fn()=>$portalOff->dispatch($loginHttp,[],$loginFields,null),
+ 'staff_portal_not_enabled');
+reverseDeny(fn()=>$portalOn->dispatch(
+ $loginHttp,[],$loginFields+['staff_id'=>$billing],null),'staff_login_denied');
+$portalLogin=$portalOn->dispatch($loginHttp,[],$loginFields,null);
+reverseCheck($portalLogin['kind']==='internal_login' &&
+ $portalLogin['credentials']['cookie_name']===
+ \Hafzatech\Central\CentralStaffHttpPolicy::COOKIE_NAME &&
+ $portalLogin['credentials']['cookie_options']['secure']===true &&
+ $portalLogin['credentials']['cookie_options']['httponly']===true &&
+ $portalLogin['credentials']['cookie_options']['samesite']==='Strict',
+ 'internal TOTP login returns host-only secure cookie only to protected response writer');
+$privateCookie=[
+ \Hafzatech\Central\CentralStaffHttpPolicy::COOKIE_NAME=>
+ $portalLogin['credentials']['cookie_value']
+];
+$privateCsrf=$portalLogin['credentials']['csrf'];
+$staffPage=$portalOn->dispatch(
+ $dashboardRequest,$privateCookie,$portalFields,$privateCsrf);
+reverseCheck($staffPage['kind']==='private_html' &&
+ !str_contains($staffPage['html'],$privateCsrf) &&
+ !str_contains($staffPage['html'],$privateCookie[
+ \Hafzatech\Central\CentralStaffHttpPolicy::COOKIE_NAME]),
+ 'newly authenticated billing session can view only scoped private financial summary');
+$logoutHttp=$httpRequest;$logoutHttp['REQUEST_URI']='/staff/session/logout';
+reverseDeny(fn()=>$portalOn->dispatch(
+ $logoutHttp,$privateCookie,['extra'=>'forged'],$privateCsrf),'staff_portal_denied');
+$portalLogout=$portalOn->dispatch($logoutHttp,$privateCookie,[],$privateCsrf);
+reverseCheck($portalLogout['kind']==='internal_logout' &&
+ $portalLogout['clear_cookie_name']===
+ \Hafzatech\Central\CentralStaffHttpPolicy::COOKIE_NAME &&
+ $portalLogout['clear_cookie_options']['expires']===1 &&
+ $portalLogout['clear_cookie_options']['secure']===true,
+ 'authenticated logout supplies secure host cookie clearing instruction');
+reverseDeny(fn()=>$portalOn->dispatch(
+ $dashboardRequest,$privateCookie,$portalFields,$privateCsrf),'staff_http_denied');
+reverseDeny(fn()=>$portalOn->dispatch(
+ $logoutHttp,$privateCookie,[],$privateCsrf),'staff_portal_denied');
 
 $decisionHttp=$httpRequest;
 $decisionHttp['REQUEST_URI']='/staff/billing/payment-evidence/decide';

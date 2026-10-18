@@ -1,0 +1,128 @@
+<?php
+declare(strict_types=1);
+
+namespace Hafzatech\Central;
+
+/**
+ * INTERNAL staff request composition for a future trusted operator controller.
+ * This is NOT registered in central/public and defaults OFF independently of
+ * installation API, boundary and billing-adapter release switches.
+ *
+ * The future HTTPS operator front controller MUST supply parsed host-only
+ * Secure/HttpOnly cookies and server-validated HTTPS/Origin information.
+ * Do not JSON-serialize the login result: it contains private cookie and
+ * session-bound CSRF material for a trusted response writer only.
+ */
+final class CentralStaffPortalHttpRouter
+{
+    public function __construct(
+        private readonly CentralStaffProtectedHttpBoundary $boundary,
+        private readonly CentralStaffPaymentEvidenceHttpAdapter $billing,
+        private readonly bool $enabled = false
+    ) {}
+
+    /**
+     * @param array<string,mixed> $server
+     * @param array<string,mixed> $cookies Trusted server-parsed cookie bag only
+     * @param array<string,mixed> $fields Trusted bounded decoded request fields
+     * @return array<string,mixed> INTERNAL only, never serialize wholesale
+     */
+    public function dispatch(array $server,array $cookies,array $fields,
+        ?string $csrfHeader): array
+    {
+        if (!$this->enabled) {
+            throw new RegistrationError('staff_portal_not_enabled',503);
+        }
+        $uri=$server['REQUEST_URI']??null;
+        if (($server['REQUEST_METHOD']??null)!=='POST' ||
+            !CentralStaffHttpPolicy::staffMutationAllowed($server) ||
+            !is_string($uri) || strlen($uri)>256 ||
+            !str_starts_with($uri,'/staff/') ||
+            str_contains($uri,'?') || str_contains($uri,'#')) {
+            throw new RegistrationError('staff_portal_denied');
+        }
+
+        if ($uri==='/staff/session/login') {
+            if (!$this->exactFields($fields,['email','password','totp']) ||
+                !is_string($fields['email']) ||
+                !is_string($fields['password']) ||
+                !is_string($fields['totp']) ||
+                strlen($fields['email'])>254 ||
+                strlen($fields['password'])>1024 ||
+                preg_match('/^[0-9]{6}$/D',$fields['totp'])!==1) {
+                throw new RegistrationError('staff_login_denied');
+            }
+            $credentials=$this->boundary->authenticate(
+                $server,$fields['email'],$fields['password'],$fields['totp']);
+            if ($credentials===null) {
+                throw new RegistrationError('staff_login_denied');
+            }
+            // Never send this array as JSON; only the trusted response writer
+            // may set the host-only cookie and furnish protected CSRF material.
+            return ['kind'=>'internal_login','credentials'=>$credentials];
+        }
+
+        $bearer=$cookies[CentralStaffHttpPolicy::COOKIE_NAME]??null;
+        if (!is_string($bearer) ||
+            preg_match('/^[a-f0-9]{64}$/D',$bearer)!==1 ||
+            !is_string($csrfHeader) ||
+            preg_match('/^[a-f0-9]{64}$/D',$csrfHeader)!==1) {
+            throw new RegistrationError('staff_portal_denied');
+        }
+        if ($uri==='/staff/session/logout') {
+            if ($fields!==[] ||
+                !$this->boundary->signOut($server,$bearer,$csrfHeader)) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            return [
+                'kind'=>'internal_logout',
+                'clear_cookie_name'=>CentralStaffHttpPolicy::COOKIE_NAME,
+                'clear_cookie_options'=>array_replace(
+                    CentralStaffHttpPolicy::cookieOptions(time()),['expires'=>1])
+            ];
+        }
+        if ($uri==='/staff/billing/overview') {
+            if (!$this->exactFields($fields,['customer_id','invoice_id']) ||
+                !is_string($fields['customer_id']) ||
+                !is_string($fields['invoice_id']) ||
+                !self::uuid($fields['customer_id']) ||
+                !self::uuid($fields['invoice_id'])) {
+                throw new RegistrationError('invalid_billing_request',422);
+            }
+            $html=$this->billing->billingDashboard(
+                $server,$bearer,$csrfHeader,
+                $fields['customer_id'],$fields['invoice_id']);
+            return [
+                'kind'=>'private_html',
+                'headers'=>[
+                    'Content-Type'=>'text/html; charset=utf-8',
+                    'Cache-Control'=>'no-store, private',
+                    'X-Content-Type-Options'=>'nosniff',
+                    'Referrer-Policy'=>'no-referrer',
+                    'Content-Security-Policy'=>
+                        "default-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+                ],
+                'html'=>$html
+            ];
+        }
+        throw new RegistrationError('staff_route_not_found',404);
+    }
+
+    /** @param array<string,mixed> $fields
+     *  @param array<int,string> $names
+     */
+    private function exactFields(array $fields,array $names): bool
+    {
+        $actual=array_keys($fields);
+        sort($actual,SORT_STRING);
+        sort($names,SORT_STRING);
+        return $actual===$names;
+    }
+
+    private static function uuid(string $id): bool
+    {
+        return preg_match(
+            '/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/D',
+            $id)===1;
+    }
+}
