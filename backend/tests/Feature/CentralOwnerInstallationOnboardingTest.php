@@ -85,7 +85,7 @@ class CentralOwnerInstallationOnboardingTest extends TestCase
                     'api_version'=>'v1','nonce'=>$nonce,'expires_in_seconds'=>300
                 ],200),
             'https://lichall.hafzatech.com/api/v1/installations/register'
-                =>function(Request $request)use($customer):\Illuminate\Http\Client\Response {
+                =>function(Request $request)use($customer) {
                     return Http::response([
                         'api_version'=>'v1',
                         'installation_id'=>$request['installation_id'],
