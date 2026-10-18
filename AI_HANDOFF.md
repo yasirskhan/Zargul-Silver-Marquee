@@ -339,6 +339,9 @@
 ## FILAMENT HYDRATION 404 CI FIX — SECOND EXPECTATION
 - CI [39087742319](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39087742319) found one remaining 403 assertion at `CentralSupportInboxPageTest:53`. When an owner role is revoked on an already-mounted page, Filament intercepts the Livewire refresh and returns 404 to hide that inaccessible page. Corrected the test expectation to 404; no production policy or authentication changes. Need complete six-job exact SHA verification.
 
+## FILAMENT TWO-PATH AUTHORIZATION CI REPAIR
+- CI 39087820377 confirms two distinct unauthorized behaviors: revoked already-mounted Livewire page hydration responds 404 (now correctly tested), while fresh unauthorized foreign-user Livewire mount responds 403. Restored 403 expectation for the fresh mount, preserving 404 assertion for revocation. The earlier combined expectation was incorrect. **No production code or access policy changed.** New source requires exact six-job green CI.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`

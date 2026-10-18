@@ -54,8 +54,8 @@ class CentralSupportInboxPageTest extends TestCase
         $view->call('refreshMessages')->assertNotFound();
         $this->be($other);
         $this->assertFalse(SupportInbox::canAccess());
-        // Filament hides pages inaccessible to the current actor as 404.
-        Livewire::test(SupportInbox::class)->assertNotFound();
+        // Fresh Livewire mount aborts 403, unlike revoked mounted-page hydration (404).
+        Livewire::test(SupportInbox::class)->assertForbidden();
         $this->assertDatabaseCount('finance_journals',0);
     }
 }
