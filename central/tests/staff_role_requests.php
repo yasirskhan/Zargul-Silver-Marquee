@@ -218,6 +218,22 @@ try {
  rolesCheck(in_array($id,array_column($pending,'request_id'),true) &&
   in_array($high['request_id'],array_column($pending,'request_id'),true),
   'independent second administrator sees bounded pending metadata queue');
+ $ordinary=array_values(array_filter($pending,
+  static fn(array $row):bool=>$row['request_id']===$id));
+ $sensitive=array_values(array_filter($pending,
+  static fn(array $row):bool=>$row['request_id']===$high['request_id']));
+ rolesCheck(count($ordinary)===1 &&
+  $ordinary[0]['actor_staff_id']===$staff['admin'] &&
+  $ordinary[0]['can_decide']===true &&
+  count($sensitive)===1 &&
+  $sensitive[0]['actor_staff_id']===$staff['super'] &&
+  $sensitive[0]['can_decide']===false,
+  'review queue shows issuer but restricts second-person actions by role');
+ $noSuperApproval=CentralStaffRoleReviewQueue::html(
+  $sensitive,str_repeat('b',64));
+ rolesCheck(!str_contains($noSuperApproval,'action="/staff/team/role-decisions"') &&
+  str_contains($noSuperApproval,'Review-only'),
+  'Staff Administrator cannot submit Super Administrator approval from UI');
  $selfReview=$queue->listPending($adminBearer);
  rolesCheck(!in_array($id,array_column($selfReview,'request_id'),true),
   'requesting administrator cannot review own submitted role request');

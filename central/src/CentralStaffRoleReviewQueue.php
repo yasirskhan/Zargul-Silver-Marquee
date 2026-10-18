@@ -30,8 +30,17 @@ final class CentralStaffRoleReviewQueue
                 $bearer,'staff.roles.assign',null)) {
             throw new RegistrationError('staff_review_queue_denied');
         }
+        // Review is permitted by a global staff administrative grant;
+        // actions additionally require authority over this specific role.
+        $rolesQuery=$this->db->prepare(
+            'SELECT role FROM central_staff_role_grants
+             WHERE staff_id=:reviewer AND customer_scope_id IS NULL
+               AND revoked_at IS NULL ORDER BY id'
+        );
+        $rolesQuery->execute(['reviewer'=>$actor]);
+        $globalRoles=$rolesQuery->fetchAll(PDO::FETCH_COLUMN);
         $q=$this->db->prepare(
-            'SELECT r.id AS request_id,r.target_staff_id,r.role,
+            'SELECT r.id AS request_id,r.actor_staff_id,r.target_staff_id,r.role,
                     r.customer_scope_id,r.created_at
              FROM central_staff_role_requests r
              LEFT JOIN central_staff_role_decisions d
@@ -44,7 +53,19 @@ final class CentralStaffRoleReviewQueue
         $q->bindValue(':reviewer',$actor,PDO::PARAM_STR);
         $q->bindValue(':limit',$limit,PDO::PARAM_INT);
         $q->execute();
-        return $q->fetchAll(PDO::FETCH_ASSOC);
+        $rows=$q->fetchAll(PDO::FETCH_ASSOC);
+        foreach($rows as &$row) {
+            $row['can_decide']=false;
+            foreach($globalRoles as $role) {
+                if(StaffRolePermissions::mayGrantRole(
+                    $role,$row['role'],false,true)) {
+                    $row['can_decide']=true;
+                    break;
+                }
+            }
+        }
+        unset($row);
+        return $rows;
     }
 
     public static function html(array $rows,?string $csrf=null):string
@@ -58,12 +79,13 @@ final class CentralStaffRoleReviewQueue
         $body='';
         foreach(array_slice($rows,0,25) as $r) {
             $body.='<tr><td>'.$e($r['request_id']??'').
+                '</td><td>'.$e($r['actor_staff_id']??'').
                 '</td><td>'.$e($r['target_staff_id']??'').
                 '</td><td>'.$e($r['role']??'').
                 '</td><td>'.(($r['customer_scope_id']??null)===null
                     ?'Global':$e($r['customer_scope_id'])).
                 '</td><td>'.$e($r['created_at']??'').'</td>'.
-                ($allowDecision
+                ($allowDecision && ($r['can_decide']??false)===true
                     ?'<td><form method="post" action="/staff/team/role-decisions">'.
                      '<input type="hidden" name="staff_csrf" value="'.$proof.'">'.
                      '<input type="hidden" name="request_id" value="'.
@@ -81,13 +103,13 @@ final class CentralStaffRoleReviewQueue
                     :'<td>Review-only</td>').'</tr>';
         }
         if($body==='') {
-            $body='<tr><td colspan="6">No pending independent reviews</td></tr>';
+            $body='<tr><td colspan="7">No pending independent reviews</td></tr>';
         }
         return '<section aria-label="Private HAFZATECH role review queue">'.
             '<h2>Staff role requests awaiting another administrator</h2>'.
-            '<p>Read-only. No role becomes active until independent MFA '.
-            'review and an audited second decision are completed.</p>'.
-            '<table><thead><tr><th>Request ID</th><th>Staff ID</th>'.
+            '<p>Role changes require an audited, independent MFA decision. '.
+            'Only authorized reviewers may act on a requested role.</p>'.
+            '<table><thead><tr><th>Request ID</th><th>Requester ID</th><th>Staff ID</th>'.
             '<th>Requested role</th><th>Scope</th><th>Created</th><th>Action</th>'.
             '</tr></thead><tbody>'.$body.'</tbody></table></section>';
     }
