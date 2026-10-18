@@ -9,7 +9,7 @@ return new class extends Migration {
         // Defense in depth: once a read receipt has been written, even an
         // application-level UPDATE/DELETE must be rejected by PostgreSQL.
         DB::unprepared(<<<'SQL'
-CREATE FUNCTION prevent_central_support_read_audit_mutation()
+CREATE OR REPLACE FUNCTION prevent_central_support_read_audit_mutation()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     RAISE EXCEPTION 'Support read audit events are immutable'
