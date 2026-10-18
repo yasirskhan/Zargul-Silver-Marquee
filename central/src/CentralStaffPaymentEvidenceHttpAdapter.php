@@ -53,6 +53,26 @@ final class CentralStaffPaymentEvidenceHttpAdapter
         return $status;
     }
 
+    /**
+     * A safe read-only private staff dashboard fragment; never a public HTTP
+     * route. Both invoice-reading and billing-evidence permissions are
+     * mandatory, with independent invoice/customer binding verification.
+     */
+    public function billingDashboard(array $server, string $sessionCookie,
+        string $csrfHeader, string $customerId, string $invoiceId): string
+    {
+        $this->authorize($server,'/staff/billing/overview',
+            $sessionCookie,$csrfHeader,$customerId,'billing.invoice.read');
+        $this->authorize($server,'/staff/billing/overview',
+            $sessionCookie,$csrfHeader,$customerId,'billing.payment.verify');
+        $invoice=$this->invoices->forInvoice($sessionCookie,$invoiceId);
+        if ($invoice===null || $invoice['customer_id']!==$customerId) {
+            throw new RegistrationError('invoice_not_found');
+        }
+        $pending=$this->queue->listPending($sessionCookie,$customerId,0,25);
+        return CentralStaffBillingDashboardRenderer::render($invoice,$pending);
+    }
+
     /** @return array{evidence_id:string,decision:string,reviewed_by:string} */
     public function decide(array $server, string $sessionCookie,
         string $csrfHeader, string $customerId, string $evidenceId,
