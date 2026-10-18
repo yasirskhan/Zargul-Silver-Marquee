@@ -430,6 +430,10 @@
 - Added isolated central PostgreSQL test covering valid vendor account, wrong password, suspended and non-MFA-enrolled staff, case changes, unknown email and invalid input, wired into the independent central CI job.
 - **NOT production login**: HTTPS, rate limiting, credential reset, protected session and CSRF, central staff UI, KMS-protected MFA secrets and operator signoff are still required. All public release gates remain OFF. Verify exact six-job CI before marking VERIFIED.
 
+## TRUSTED INTERNAL VENDOR TWO-FACTOR CREDENTIAL FLOW — PENDING HOSTED CI
+- Added `CentralStaffCredentialVerifier`, an internal orchestrator verifying the separately stored vendor staff password before calling protected MFA TOTP proof. Callers cannot substitute a Boolean password assertion. Returns staff ID only after both factors, NOT a cookie/session/token. Synthetic central integration tests deny invalid password before TOTP audit/counter changes, deny malformed OTP, accept correct both factors and reject replay with durable audit.
+- Registered dedicated central test in six-job CI. Vendor staff HTTP entry, session persistence, external rate limit, CSRF, KMS, public DNS/HTTPS remain NOT implemented and default OFF. Previous MFA audit/history/password primitives must be exact-SHA CI verified before release.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`

@@ -89,6 +89,7 @@ jobs:
           php central/tests/staff_mfa_state.php
           php central/tests/staff_mfa_audit_reader.php
           php central/tests/staff_password.php
+          php central/tests/staff_credentials.php
           php central/tests/vendor_receiving_directory.php
           php central/tests/payment_eligibility.php
           php central/tests/domain_ownership.php
