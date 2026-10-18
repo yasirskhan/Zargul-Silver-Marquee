@@ -48,7 +48,17 @@ final class VenueInvoicePaymentService
         if (! $invoice) {
             throw new AuthorizationException('Invoice is not accessible.');
         }
-        $this->authorize($actor, $companyId, $invoice->hall_id);
+        // Historical invoice statements survive a signed subscription's
+        // business-operations cutoff. This separate permission is read-only
+        // and still requires a LIVE owner/admin account, bound company and
+        // exact existing hall/invoice. New payment recording below continues
+        // to use the unrestricted business authorization gate.
+        $hall=Hall::query()->where('company_id',$companyId)
+            ->where('id',$invoice->hall_id)->where('is_active',true)->first();
+        if (!$hall || ! Auth::check() || (int)Auth::id()!==(int)$actor->getKey()
+            || ! $this->access->canReadExistingInvoiceHistory($actor,$hall)) {
+            throw new AuthorizationException('Historic invoice is not accessible to this company owner.');
+        }
         $payments = DB::table('venue_invoice_payments')->where('company_id', $companyId)
             ->where('invoice_id', $invoiceId)->orderBy('number')->limit(200)
             ->get()->map(fn ($p) => $this->summary($p))->all();
