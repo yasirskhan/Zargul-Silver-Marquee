@@ -7,8 +7,9 @@ use PDO;
 
 /**
  * Read-only, MFA-authorized independent-review inbox for central vendor staff.
- * Lists metadata from immutable role requests with NO decision yet. Never
- * grants, approves, rejects, or reads password/MFA/approval secret materials.
+ * Lists immutable role requests with NO decision yet, including the bounded
+ * stated justification for an independent human review. Never grants,
+ * approves, rejects, or reads password/MFA/approval secret materials.
  */
 final class CentralStaffRoleReviewQueue
 {
@@ -41,7 +42,7 @@ final class CentralStaffRoleReviewQueue
         $globalRoles=$rolesQuery->fetchAll(PDO::FETCH_COLUMN);
         $q=$this->db->prepare(
             'SELECT r.id AS request_id,r.actor_staff_id,r.target_staff_id,r.role,
-                    r.customer_scope_id,r.created_at
+                    r.customer_scope_id,r.reason,r.created_at
              FROM central_staff_role_requests r
              LEFT JOIN central_staff_role_decisions d
                 ON d.request_id=r.id
@@ -84,6 +85,7 @@ final class CentralStaffRoleReviewQueue
                 '</td><td>'.$e($r['role']??'').
                 '</td><td>'.(($r['customer_scope_id']??null)===null
                     ?'Global':$e($r['customer_scope_id'])).
+                '</td><td>'.$e($r['reason']??'').
                 '</td><td>'.$e($r['created_at']??'').'</td>'.
                 ($allowDecision && ($r['can_decide']??false)===true
                     ?'<td><form method="post" action="/staff/team/role-decisions">'.
@@ -103,14 +105,15 @@ final class CentralStaffRoleReviewQueue
                     :'<td>Review-only</td>').'</tr>';
         }
         if($body==='') {
-            $body='<tr><td colspan="7">No pending independent reviews</td></tr>';
+            $body='<tr><td colspan="8">No pending independent reviews</td></tr>';
         }
         return '<section aria-label="Private HAFZATECH role review queue">'.
             '<h2>Staff role requests awaiting another administrator</h2>'.
             '<p>Role changes require an audited, independent MFA decision. '.
             'Only authorized reviewers may act on a requested role.</p>'.
             '<table><thead><tr><th>Request ID</th><th>Requester ID</th><th>Staff ID</th>'.
-            '<th>Requested role</th><th>Scope</th><th>Created</th><th>Action</th>'.
+            '<th>Requested role</th><th>Scope</th><th>Justification</th>'.
+            '<th>Created</th><th>Action</th>'.
             '</tr></thead><tbody>'.$body.'</tbody></table></section>';
     }
 

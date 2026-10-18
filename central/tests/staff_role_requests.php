@@ -224,6 +224,7 @@ try {
   static fn(array $row):bool=>$row['request_id']===$high['request_id']));
  rolesCheck(count($ordinary)===1 &&
   $ordinary[0]['actor_staff_id']===$staff['admin'] &&
+  $ordinary[0]['reason']==='Assign support after independent approval' &&
   $ordinary[0]['can_decide']===true &&
   count($sensitive)===1 &&
   $sensitive[0]['actor_staff_id']===$staff['super'] &&
@@ -240,13 +241,19 @@ try {
  $malicious=CentralStaffRoleReviewQueue::html([[
   'request_id'=>$id,'target_staff_id'=>$staff['target'],
   'role'=>'<script>alert(1)</script>',
+  'actor_staff_id'=>'<iframe src=evil>',
   'customer_scope_id'=>'<img src=x onerror=alert(2)>',
+  'reason'=>'<svg onload=alert(3)>',
   'created_at'=>'2026-10-18'
  ]]);
  rolesCheck(str_contains($malicious,'&lt;script&gt;') &&
   str_contains($malicious,'&lt;img') &&
+  str_contains($malicious,'&lt;svg') &&
+  str_contains($malicious,'&lt;iframe') &&
   !str_contains($malicious,'<script>') &&
-  !str_contains($malicious,'<img'),
+  !str_contains($malicious,'<img') &&
+  !str_contains($malicious,'<svg') &&
+  !str_contains($malicious,'<iframe'),
   'untrusted role review metadata HTML escaped');
  $csrf=new CentralStaffCsrfTokenService($db,$sessions);
  $approvalCsrf=$csrf->issue($approverBearer);
@@ -317,6 +324,7 @@ try {
  $reviewPage=$route->dispatch($http,$reviewCookie,[],$approvalCsrf);
  rolesCheck($reviewPage['kind']==='private_role_review_html' &&
   str_contains($reviewPage['html'],$id) &&
+  str_contains($reviewPage['html'],'Assign support after independent approval') &&
   !str_contains($reviewPage['html'],$approverBearer) &&
   !str_contains($reviewPage['html'],'synthetic-role-request-password'),
   'independent admin sees only metadata with no password/session bearer');
