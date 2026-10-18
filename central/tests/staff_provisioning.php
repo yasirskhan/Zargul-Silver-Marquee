@@ -223,7 +223,7 @@ $billing=new Hafzatech\Central\CentralStaffPaymentEvidenceHttpAdapter(
   $db,$sessions,$auth),
  new Hafzatech\Central\CentralStaffInvoicePaymentOverview($db,$sessions,$auth));
 $router=new Hafzatech\Central\CentralStaffPortalHttpRouter(
- $boundary,$billing,true,null,null,null,null,null,null,null,null,null,null,$on);
+ $boundary,$billing,true,provisioner:$on,activationReview:$reviewOn);
 $server=[
  'HTTPS'=>'on','SERVER_PORT'=>'443','HTTP_HOST'=>'lichall.hafzatech.com',
  'REQUEST_METHOD'=>'POST','REQUEST_URI'=>'/staff/team/create-pending',
@@ -257,8 +257,41 @@ provisionDeny(fn()=>$router->dispatch(
 provisionDeny(fn()=>$router->dispatch($server,
  [Hafzatech\Central\CentralStaffHttpPolicy::COOKIE_NAME=>$supportBearer],
  $fields,$csrfProof),'staff_portal_denied');
+
+$reviewServer=array_replace($server,[
+ 'REQUEST_URI'=>'/staff/team/activation-review']);
+$reviewFields=['target_staff_id'=>$created['staff_id']];
+$reviewPage=$router->dispatch($reviewServer,$cookie,$reviewFields,$csrfProof);
+provisionAssert($reviewPage['kind']==='private_staff_activation_readiness_html' &&
+ str_contains($reviewPage['html'],$created['staff_id']) &&
+ str_contains($reviewPage['html'],'Activation is NOT authorized') &&
+ !str_contains($reviewPage['html'],$adminBearer) &&
+ !str_contains($reviewPage['html'],$csrfProof) &&
+ !str_contains($reviewPage['html'],'synthetic-provisioner-password'),
+ 'global admin sees only non-activating checklist through protected route');
+$reviewWire=(new Hafzatech\Central\CentralStaffPortalPrivateResponse(true))
+ ->compose($reviewPage);
+provisionAssert($reviewWire['cookies']===[] &&
+ $reviewWire['headers']['Cache-Control']==='no-store, private',
+ 'activation readiness screen stays private and never sets credentials');
+provisionDeny(fn()=>$router->dispatch($reviewServer,$cookie,
+ $reviewFields+['status'=>'active'],$csrfProof),
+ 'invalid_staff_activation_review');
+provisionDeny(fn()=>$router->dispatch($reviewServer,$cookie,
+ $reviewFields,str_repeat('0',64)),'staff_portal_denied');
+provisionDeny(fn()=>$router->dispatch(array_replace($reviewServer,[
+ 'HTTP_ORIGIN'=>'https://attacker.example']),
+ $cookie,$reviewFields,$csrfProof),'staff_portal_denied');
+provisionDeny(fn()=>$router->dispatch($reviewServer,[
+ Hafzatech\Central\CentralStaffHttpPolicy::COOKIE_NAME=>$supportBearer],
+ $reviewFields,$csrfProof),'staff_portal_denied');
+provisionDeny(fn()=>Hafzatech\Central\CentralStaffActivationReadiness::html(
+ array_replace($readiness,['activation_allowed'=>true])),
+ 'invalid_staff_activation_review_result');
 $db->prepare("UPDATE central_staff_role_grants SET revoked_at=now()
   WHERE staff_id=:actor")->execute(['actor'=>$admin]);
+provisionDeny(fn()=>$reviewOn->inspect($adminBearer,$created['staff_id']),
+ 'staff_activation_review_denied');
  provisionDeny(fn()=>$on->createPending($adminBearer,
   'second-vendor@example.test','Second User','Approved initial staffing'),
   'staff_provision_denied');

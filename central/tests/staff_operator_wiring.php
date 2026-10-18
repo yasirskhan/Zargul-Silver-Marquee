@@ -21,7 +21,7 @@ foreach([
  'CentralStaffPortalAuditHistoryPage',
  'CentralStaffLicenseSigningQueue','CentralStaffLicenseQueueHtmlRenderer',
  'CentralStaffAccountDirectory','CentralStaffRoleGrantDirectory',
- 'CentralStaffProvisioningService',
+ 'CentralStaffProvisioningService','CentralStaffActivationReadiness',
  'SupportAgentReplyService','CentralStaffSessionSupportReply',
  'CentralStaffOwnPasswordChange','CentralStaffPortalOwnPassword',
  'CentralStaffPortalTeamDashboard','CentralStaffPortalAuditorDashboard','CentralStaffRoleReviewQueue',

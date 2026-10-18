@@ -33,7 +33,8 @@ final class CentralStaffPortalHttpRouter
         private readonly ?CentralStaffPortalAuditorDashboard $auditorHome = null,
         private readonly ?CentralStaffRoleReviewQueue $roleReviewQueue = null,
         private readonly ?CentralStaffRoleDecisionService $roleDecisions = null,
-        private readonly ?CentralStaffRoleRequestService $roleRequestWriter = null
+        private readonly ?CentralStaffRoleRequestService $roleRequestWriter = null,
+        private readonly ?CentralStaffActivationReadiness $activationReview = null
     ) {}
 
     /**
@@ -286,6 +287,22 @@ final class CentralStaffPortalHttpRouter
             }
             return ['kind'=>'private_team_dashboard_html',
                 'html'=>$this->teamDashboard->render($bearer,$csrfHeader)];
+        }
+        if ($uri==='/staff/team/activation-review' &&
+            $this->activationReview!==null) {
+            if (!$this->exactFields($fields,['target_staff_id']) ||
+                !is_string($fields['target_staff_id']) ||
+                !self::uuid($fields['target_staff_id'])) {
+                throw new RegistrationError('invalid_staff_activation_review',422);
+            }
+            if (!$this->boundary->permitsMutation(
+                $server,$bearer,$csrfHeader,'staff.create',null)) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            $record=$this->activationReview->inspect(
+                $bearer,$fields['target_staff_id']);
+            return ['kind'=>'private_staff_activation_readiness_html',
+                'html'=>CentralStaffActivationReadiness::html($record)];
         }
         if ($uri==='/staff/team/create-pending' &&
             $this->provisioner!==null) {

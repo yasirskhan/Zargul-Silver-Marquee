@@ -332,6 +332,8 @@ try {
   'staff_portal_denied');
  $team=new CentralStaffPortalTeamDashboard($auth);
  $newProposalForm=$team->render($adminBearer,$requesterCsrf);
+ rolesCheck(str_contains($newProposalForm,'action="/staff/team/activation-review"'),
+  'global current staff administrator sees read-only pending activation review');
  rolesCheck(str_contains($newProposalForm,'action="/staff/team/role-request"') &&
   str_contains($newProposalForm,'Select a role') &&
   str_contains($newProposalForm,'name="customer_scope_id"') &&

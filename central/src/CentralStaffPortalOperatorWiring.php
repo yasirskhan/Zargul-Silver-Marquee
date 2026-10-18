@@ -80,7 +80,8 @@ final class CentralStaffPortalOperatorWiring
             new CentralStaffPortalAuditorDashboard($auth),
             new CentralStaffRoleReviewQueue($db,$sessions,$auth),
             new CentralStaffRoleDecisionService($db,$sessions,$access,true),
-            new CentralStaffRoleRequestService($db,$sessions,$access,true));
+            new CentralStaffRoleRequestService($db,$sessions,$access,true),
+            new CentralStaffActivationReadiness($db,$sessions,$access,true));
         return new CentralStaffPortalOperatorApp(
             new CentralStaffPortalOperatorKernel(
                 $router,new CentralStaffPortalPrivateResponse(true),true),

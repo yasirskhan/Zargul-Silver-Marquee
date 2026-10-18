@@ -36,6 +36,15 @@ final class CentralStaffPortalPrivateResponse
             'Content-Security-Policy'=>
                 "default-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
         ];
+        if ($kind==='private_staff_activation_readiness_html') {
+            $html=$internal['html']??null;
+            if(!is_string($html) || strlen($html)>262144 ||
+                !str_starts_with($html,
+                    '<section aria-label="Private HAFZATECH activation readiness">')) {
+                throw new RegistrationError('invalid_staff_response');
+            }
+            return ['status'=>200,'headers'=>$headers,'cookies'=>[],'body'=>$html];
+        }
         if ($kind==='private_staff_provisioned_html') {
             $html=$internal['html']??null;
             if(!is_string($html) || strlen($html)>262144 ||

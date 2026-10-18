@@ -38,6 +38,13 @@ final class CentralStaffPortalTeamDashboard
                  '<label>Reason <input type="text" name="reason" minlength="5" required></label>'.
                  '<button type="submit">Prepare pending staff identity</button></form>'
                 :''). 
+            (getenv('CENTRAL_STAFF_ACTIVATION_REVIEW_ENABLED')==='true' &&
+              $this->authorization->permits($bearer,'staff.create',null)
+                ?'<form method="post" action="/staff/team/activation-review">'.$hidden.
+                 '<label>Pending staff ID <input type="text" '.
+                 'name="target_staff_id" maxlength="36" required></label>'.
+                 '<button type="submit">Review activation safeguards</button></form>'
+                :'').
             '<form method="post" action="/staff/team/accounts">'.$hidden.
             '<button type="submit">Staff accounts</button></form>'.
             (getenv('CENTRAL_STAFF_ROLE_REQUEST_ENABLED')==='true'

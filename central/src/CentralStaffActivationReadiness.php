@@ -14,6 +14,13 @@ use PDO;
  */
 final class CentralStaffActivationReadiness
 {
+    private const REMAINING_REQUIREMENTS = [
+        'out_of_band_identity_verification',
+        'recipient_controlled_password_enrollment',
+        'operator_kms_backed_mfa_enrollment',
+        'independent_activation_authorization'
+    ];
+
     public function __construct(
         private readonly PDO $db,
         private readonly CentralStaffSessionService $sessions,
@@ -62,12 +69,38 @@ final class CentralStaffActivationReadiness
             'status'=>'pending_mfa',
             'approved_role_count'=>(int)$row['independently_approved_roles'],
             'activation_allowed'=>false,
-            'remaining_requirements'=>[
-                'out_of_band_identity_verification',
-                'recipient_controlled_password_enrollment',
-                'operator_kms_backed_mfa_enrollment',
-                'independent_activation_authorization'
-            ]
+            'remaining_requirements'=>self::REMAINING_REQUIREMENTS
         ];
+    }
+
+    /** Safe private operator view: display blockers, never an activation button. */
+    public static function html(array $record):string
+    {
+        if(($record['status']??null)!=='pending_mfa' ||
+           ($record['activation_allowed']??null)!==false ||
+           !is_string($record['staff_id']??null) ||
+           preg_match('/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][0-9a-f]{3}-[a-f0-9]{12}$/D',
+               $record['staff_id'])!==1 ||
+           !is_int($record['approved_role_count']??null) ||
+           $record['approved_role_count']<0 ||
+           ($record['remaining_requirements']??null)!==self::REMAINING_REQUIREMENTS) {
+            throw new RegistrationError('invalid_staff_activation_review_result');
+        }
+        $id=htmlspecialchars($record['staff_id'],
+            ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+        return '<section aria-label="Private HAFZATECH activation readiness">'.
+            '<h2>Pending staff activation safeguards</h2>'.
+            '<p>Activation is NOT authorized. Role approval alone never enables login.</p>'.
+            '<dl><dt>Staff ID</dt><dd>'.$id.'</dd>'.
+            '<dt>Account status</dt><dd>pending_mfa</dd>'.
+            '<dt>Independently approved current roles</dt><dd>'.
+            $record['approved_role_count'].'</dd></dl>'.
+            '<p>Required before any separately approved activation:</p>'.
+            '<ol><li>Verify recipient identity out of band</li>'.
+            '<li>Enroll a recipient-controlled password through a trusted channel</li>'.
+            '<li>Enroll MFA using an operator-approved KMS/vault</li>'.
+            '<li>Obtain independent authorization to change account status</li></ol>'.
+            '<p>No credentials, enrollment link or activation action are available.</p>'.
+            '</section>';
     }
 }
