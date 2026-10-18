@@ -20,6 +20,7 @@ foreach([
  'CentralStaffCredentialVerifier','CentralStaffLoginRateLimiter',
  'CentralStaffSessionService','CentralStaffRoleRequestService',
  'CentralStaffRoleDecisionService','CentralStaffRoleReviewQueue',
+ 'CentralStaffActivationReadiness',
  'CentralStaffPortalTeamDashboard',
  'CentralStaffSessionAuthorization','CentralStaffCsrfTokenService',
  'CentralStaffHttpPolicy','CentralStaffProtectedHttpBoundary',
@@ -91,6 +92,15 @@ $approverBearer=$sessions->login('role-intent-approver@example.test',
 rolesCheck(is_string($adminBearer)&&is_string($supportBearer)&&
  is_string($superBearer)&&is_string($approverBearer),'separate vendor MFA sessions');
 $access=new Hafzatech\Central\CentralStaffAccess($db);
+// Recreate the immutable pending-provision provenance that a real operator
+// must have recorded before any future activation review.
+$db->prepare("INSERT INTO central_staff_provision_events
+ (actor_staff_id,target_staff_id,action,reason)
+ VALUES(:actor,:target,'created_pending_mfa','Synthetic pending onboarding')")
+ ->execute(['actor'=>$staff['admin'],'target'=>$staff['target']]);
+$activationReview=new Hafzatech\Central\CentralStaffActivationReadiness(
+ $db,$sessions,$access,true);
+putenv('CENTRAL_STAFF_ACTIVATION_REVIEW_ENABLED=true');
 $off=new CentralStaffRoleRequestService($db,$sessions,$access);
 $on=new CentralStaffRoleRequestService($db,$sessions,$access,true);
 $decisionOff=new CentralStaffRoleDecisionService($db,$sessions,$access);
@@ -414,6 +424,15 @@ try {
   'approved grant tracks two independent real MFA staff identities');
  rolesCheck(!$access->permits($staff['target'],'support.reply',null,true),
   'approved grant cannot activate pending staff before identity and MFA enrollment');
+ $activationState=$activationReview->inspect($adminBearer,$staff['target']);
+ rolesCheck($activationState['approved_role_count']===1 &&
+  $activationState['status']==='pending_mfa' &&
+  $activationState['activation_allowed']===false &&
+  in_array('operator_kms_backed_mfa_enrollment',
+   $activationState['remaining_requirements'],true),
+  'immutable independent role approval never activates unverified pending staff');
+ rolesDeny(fn()=>$activationReview->inspect($supportBearer,$staff['target']),
+  'staff_activation_review_denied');
  $rejected=$decisionOn->decide($approverBearer,$rejectIntent['request_id'],
   rolesUuid(),'rejected','Reviewer rejected proposed unnecessary role');
  rolesCheck($rejected['outcome']==='rejected' &&
@@ -468,5 +487,6 @@ try {
 }finally{
  putenv('CENTRAL_STAFF_ROLE_REQUEST_ENABLED=false');
  putenv('CENTRAL_STAFF_ROLE_DECISIONS_ENABLED=false');
+ putenv('CENTRAL_STAFF_ACTIVATION_REVIEW_ENABLED=false');
 }
 echo "PASS: MFA staff role requests are pending-only, independently gated, immutable, idempotent, never immediate grants\n";

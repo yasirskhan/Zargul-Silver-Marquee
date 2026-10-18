@@ -10,6 +10,7 @@ foreach([
  'CentralStaffTotpVerifier','CentralStaffMfaChallenge',
  'CentralStaffCredentialVerifier','CentralStaffLoginRateLimiter',
  'CentralStaffSessionService','CentralStaffProvisioningService',
+ 'CentralStaffActivationReadiness',
  'CentralStaffSessionAuthorization','CentralStaffProvisionAuditReader',
  'CentralStaffCsrfTokenService',
  'CentralStaffHttpPolicy','CentralStaffProtectedHttpBoundary',
@@ -125,6 +126,34 @@ try{
   $state['mfa_secret_ciphertext']===null &&
   !password_verify('guessable-password',$state['password_hash']),
   'provisional account has no MFA enrollment or known password');
+ $reviewOff=new Hafzatech\Central\CentralStaffActivationReadiness(
+  $db,$sessions,new Hafzatech\Central\CentralStaffAccess($db));
+ $reviewOn=new Hafzatech\Central\CentralStaffActivationReadiness(
+  $db,$sessions,new Hafzatech\Central\CentralStaffAccess($db),true);
+ putenv('CENTRAL_STAFF_ACTIVATION_REVIEW_ENABLED=false');
+ provisionDeny(fn()=>$reviewOn->inspect($adminBearer,$created['staff_id']),
+  'staff_activation_review_not_enabled');
+ putenv('CENTRAL_STAFF_ACTIVATION_REVIEW_ENABLED=true');
+ provisionDeny(fn()=>$reviewOff->inspect($adminBearer,$created['staff_id']),
+  'staff_activation_review_not_enabled');
+ provisionDeny(fn()=>$reviewOn->inspect($supportBearer,$created['staff_id']),
+  'staff_activation_review_denied');
+ provisionDeny(fn()=>$reviewOn->inspect(str_repeat('0',64),$created['staff_id']),
+  'staff_activation_review_denied');
+ provisionDeny(fn()=>$reviewOn->inspect($adminBearer,'invalid'),
+  'invalid_staff_activation_review');
+ provisionDeny(fn()=>$reviewOn->inspect($adminBearer,provisionId()),
+  'staff_activation_review_unavailable');
+ $readiness=$reviewOn->inspect($adminBearer,$created['staff_id']);
+ provisionAssert($readiness===[
+  'staff_id'=>$created['staff_id'],'status'=>'pending_mfa',
+  'approved_role_count'=>0,'activation_allowed'=>false,
+  'remaining_requirements'=>[
+   'out_of_band_identity_verification',
+   'recipient_controlled_password_enrollment',
+   'operator_kms_backed_mfa_enrollment',
+   'independent_activation_authorization']
+  ],'current global MFA staff administrator can inspect bounded, non-activating prerequisite checklist');
  $q=$db->prepare("SELECT count(*) FROM central_staff_role_grants WHERE staff_id=:id");
  $q->execute(['id'=>$created['staff_id']]);
  provisionAssert((int)$q->fetchColumn()===0,'no staff roles automatically assigned');
@@ -233,5 +262,8 @@ $db->prepare("UPDATE central_staff_role_grants SET revoked_at=now()
  provisionDeny(fn()=>$on->createPending($adminBearer,
   'second-vendor@example.test','Second User','Approved initial staffing'),
   'staff_provision_denied');
-}finally{putenv('CENTRAL_STAFF_PROVISIONING_ENABLED=false');}
+}finally{
+ putenv('CENTRAL_STAFF_PROVISIONING_ENABLED=false');
+ putenv('CENTRAL_STAFF_ACTIVATION_REVIEW_ENABLED=false');
+}
 echo "PASS: central MFA staff creates pending-only account, no automatic roles or credentials, immutable audit and idempotent protected retries\n";
