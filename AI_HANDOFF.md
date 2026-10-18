@@ -342,6 +342,11 @@
 ## FILAMENT TWO-PATH AUTHORIZATION CI REPAIR
 - CI 39087820377 confirms two distinct unauthorized behaviors: revoked already-mounted Livewire page hydration responds 404 (now correctly tested), while fresh unauthorized foreign-user Livewire mount responds 403. Restored 403 expectation for the fresh mount, preserving 404 assertion for revocation. The earlier combined expectation was incorrect. **No production code or access policy changed.** New source requires exact six-job green CI.
 
+## COMPANY SUPPORT READ RECEIPT AUDIT — NEW SOURCE PENDING CI
+- Added `central_support_reply_read_events` durable append-only PostgreSQL audit table with company/message/actor/timestamp and unique per-message read transition, foreign keys and scoped index. First explicit authorized support reply mark-read writes state + audit atomically; idempotent repeated read creates no duplicate event. No support reply body copied into audit, no finance or 15-day licensing changes. Positive signed-reply inbox roundtrip verifies audit actor/company/message.
+- Previous `44a3f25` corrected the last Filament 403/404 unauthorized test distinction; focused five suites passed, full backend suite must still be checked for exact SHA before VERIFIED. The new audit batch requires its own hosted six-job CI.
+- Next: operational protected vendor support API, signer custody and client delivery only after operator readiness. All gates remain OFF.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`

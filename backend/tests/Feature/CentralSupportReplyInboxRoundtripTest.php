@@ -74,6 +74,12 @@ class CentralSupportReplyInboxRoundtripTest extends TestCase
         $this->assertSame('Here are the approved setup steps.',$reader->list($owner,$company->id)[0]['body']);
         $this->assertTrue($reader->markRead($owner,$company->id,$row->id));
         $this->assertFalse($reader->markRead($owner,$company->id,$row->id));
+        $this->assertDatabaseCount('central_support_reply_read_events',1);
+        $readAudit=DB::table('central_support_reply_read_events')->first();
+        $this->assertSame($owner->id,$readAudit->actor_user_id);
+        $this->assertSame($company->id,$readAudit->company_id);
+        $this->assertSame($row->id,$readAudit->message_id);
+
         $this->assertSame(0,$reader->unreadCount($owner,$company->id));
         try {
             app(CentralSupportReplyInboxService::class)->accept($envelope,$nonce,0);

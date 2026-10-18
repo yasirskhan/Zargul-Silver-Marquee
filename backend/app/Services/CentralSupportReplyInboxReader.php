@@ -51,9 +51,19 @@ final class CentralSupportReplyInboxReader
                 ->lockForUpdate()->first();
             if(!$row)throw new AuthorizationException('Support reply is outside your company.');
             if($row->read_at!==null)return false;
+            $readAt=now();
             DB::table('central_support_reply_inbox')->where('id',$messageId)
                 ->where('company_id',$companyId)
-                ->update(['read_at'=>now(),'updated_at'=>now()]);
+                ->update(['read_at'=>$readAt,'updated_at'=>$readAt]);
+            // Write one durable actor/timestamp audit event atomically with
+            // the state transition; a failed insert rolls back both changes.
+            DB::table('central_support_reply_read_events')->insert([
+                'id'=>(string)\Illuminate\Support\Str::uuid(),
+                'company_id'=>$companyId,
+                'message_id'=>$messageId,
+                'actor_user_id'=>$actor->getKey(),
+                'read_at'=>$readAt,
+            ]);
             return true;
         });
     }
