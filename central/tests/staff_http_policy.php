@@ -17,6 +17,11 @@ $valid=[
 httpCheck(CentralStaffHttpPolicy::staffMutationAllowed($valid),'same origin HTTPS staff POST permitted');
 foreach([
     ['HTTPS'=>'off','SERVER_PORT'=>'80','HTTP_X_FORWARDED_PROTO'=>'https'],
+    ['HTTPS'=>'off','SERVER_PORT'=>'443'],
+    ['HTTPS'=>'0','SERVER_PORT'=>'443'],
+    ['HTTPS'=>'untrusted','SERVER_PORT'=>'443'],
+    ['HTTP_HOST'=>'lichall.hafzatech.com:443'],
+    ['HTTP_HOST'=>'LICHALL.HAFZATECH.COM'],
     ['HTTP_HOST'=>'evil.example'],
     ['HTTP_HOST'=>'lichall.hafzatech.com.evil.example'],
     ['REQUEST_METHOD'=>'GET'],
@@ -30,6 +35,9 @@ foreach([
     httpCheck(!CentralStaffHttpPolicy::staffMutationAllowed($candidate),
         'spoofed or cross-boundary request denied: '.json_encode($mutation));
 }
+$portOnly=$valid;unset($portOnly['HTTPS']);
+httpCheck(CentralStaffHttpPolicy::staffMutationAllowed($portOnly),
+    'trusted server port 443 is acceptable only when HTTPS is absent');
 $missing=$valid;unset($missing['HTTP_ORIGIN']);
 httpCheck(!CentralStaffHttpPolicy::staffMutationAllowed($missing),'missing Origin fails closed');
 $forward=$valid;$forward['REMOTE_ADDR']='192.0.2.7';

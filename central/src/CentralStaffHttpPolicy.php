@@ -15,10 +15,13 @@ final class CentralStaffHttpPolicy
     /** Validates trusted TLS server variables; never trusts forwarded headers. */
     public static function secureHost(array $server): bool
     {
-        $tls=isset($server['HTTPS']) &&
-            in_array(strtolower((string)$server['HTTPS']),['on','1'],true);
-        $tls=$tls || (string)($server['SERVER_PORT']??'')==='443';
-        return $tls && ($server['HTTP_HOST']??null)==='lichall.hafzatech.com';
+        if(($server['HTTP_HOST']??null)!=='lichall.hafzatech.com')return false;
+        $https=strtolower((string)($server['HTTPS']??''));
+        // Explicit plaintext is never overruled by SERVER_PORT=443.
+        // Forwarded headers are not a trusted source of TLS status.
+        if($https==='off'||$https==='0')return false;
+        return in_array($https,['on','1'],true) ||
+            ($https==='' && (string)($server['SERVER_PORT']??'')==='443');
     }
 
     /** Fail-closed protection for every future state-changing /staff request. */
