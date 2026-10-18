@@ -914,3 +914,6 @@ Append only concise current milestones (commit SHA, exact CI job result, code fi
 - Expanded `central/tests/staff_provisioning.php` to prove protected exact POST/cookie/CSRF/role boundaries, forged staff-ID/extra parameter denial, private no-store response, pending-only safe display and cross-site rejection. Source **PREPARED / not yet hosted VERIFIED**. No public staff SAPI endpoint or production provider/KMS activated.
 
 - Final prepublish menu safety amendment: pending-staff form requires BOTH its dedicated enabled flag and current real `staff.create` capability on a live MFA session; team dashboard test covers hidden-OFF and permitted temporary synthetic ON status. Does not change the authorization checks inside the actual route/service.
+
+## CI REPAIR — staff operator wiring (October 18, 2026)
+- Exact source `ba1ae84210dc041a538b6635ad764bae4cda36ad` CI [39166749154](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39166749154) FAILED `central-postgres`: the synthetic `central/tests/staff_operator_wiring.php` manually requires operator dependencies, but omitted the newly introduced `CentralStaffProvisioningService` class. The runtime class exists and its migration passed; fix the explicit test require list. This repair source must pass its own hosted all-six CI before VERIFIED. All commercial/release switches OFF.

@@ -20,6 +20,7 @@ foreach([
  'CentralStaffAccountActionReader','CentralStaffPortalAuditHistoryPage',
  'CentralStaffLicenseSigningQueue','CentralStaffLicenseQueueHtmlRenderer',
  'CentralStaffAccountDirectory','CentralStaffRoleGrantDirectory',
+ 'CentralStaffProvisioningService',
  'SupportAgentReplyService','CentralStaffSessionSupportReply',
  'CentralStaffOwnPasswordChange','CentralStaffPortalOwnPassword',
  'CentralStaffPortalTeamDashboard','CentralStaffPortalHttpRouter',
