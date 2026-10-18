@@ -15,6 +15,23 @@
         @if ($loadedCompanyId === $companyId && $summary !== [])
             <section class="space-y-3" aria-label="Private venue overview">
                 <h2 class="font-semibold">Your workspace · {{ ucfirst($summary['role']) }}</h2>
+                @if ($summary['licenseRestricted'] ?? false)
+                    <div class="rounded-lg border p-4 space-y-2" role="status"
+                        aria-label="Venue licensing access">
+                        <p class="font-semibold">Venue operations are unavailable until a valid HAFZATECH-signed license or its approved management grace is active.</p>
+                        <p class="text-sm">Your bookings and financial records remain stored. Licensed business actions are restricted; authorized support and licensing access remain available.</p>
+                        @if (($summary['hafzatechSupportQueued'] ?? null) !== null)
+                            <a class="underline text-sm"
+                                href="{{ \App\Filament\Pages\Licensing::getUrl(['company' => $companyId]) }}">
+                                Open Licensing
+                            </a>
+                            <a class="underline text-sm ml-3"
+                                href="{{ \App\Filament\Pages\SupportInbox::getUrl(['company' => $companyId]) }}">
+                                Contact HAFZATECH Support
+                            </a>
+                        @endif
+                    </div>
+                @endif
                 <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <div class="rounded-xl border p-4">
                         <p class="text-sm">Halls visible to you</p>
