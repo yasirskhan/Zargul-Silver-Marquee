@@ -32,7 +32,7 @@ $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 if (!in_array($path, ['/api/v1/installations/challenge', '/api/v1/installations/register', '/api/v1/installations/status'], true)) {
     reply(404, ['api_version' => 'v1', 'error' => 'not_found']);
 }
-if (!str_starts_with(strtolower($_SERVER['CONTENT_TYPE'] ?? ''), 'application/json')) {
+if (!\Hafzatech\Central\CentralInstallationApiHttpPolicy::acceptsJson($_SERVER['CONTENT_TYPE'] ?? null)) {
     reply(415, ['api_version' => 'v1', 'error' => 'json_required']);
 }
 $raw = file_get_contents('php://input', false, null, 0, 8193);

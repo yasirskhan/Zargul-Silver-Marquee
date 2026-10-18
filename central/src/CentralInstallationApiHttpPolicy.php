@@ -13,6 +13,13 @@ final class CentralInstallationApiHttpPolicy
 {
     public const HOST = 'lichall.hafzatech.com';
 
+    /** Exact JSON media type; optional UTF-8 charset is allowed, prefix matches are not. */
+    public static function acceptsJson(?string $contentType): bool
+    {
+        if ($contentType === null) return false;
+        return preg_match('/^application\\/json(?:\\s*;\\s*charset\\s*=\\s*(?:utf-8|"utf-8"))?\\s*$/iD', trim($contentType)) === 1;
+    }
+
     public static function trustedHost(array $server): bool
     {
         if (($server['HTTP_HOST']??null)!==self::HOST) return false;

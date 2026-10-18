@@ -46,4 +46,11 @@ centralApiPolicyAssert(CentralInstallationApiHttpPolicy::trustedHost($portOnly),
 $portOnly['HTTPS']='off';
 centralApiPolicyAssert(!CentralInstallationApiHttpPolicy::trustedHost($portOnly),
  'explicit plaintext rejects even when port metadata suggests 443');
+foreach (['application/json','application/json; charset=utf-8','Application/JSON; Charset="UTF-8"'] as $media) {
+ centralApiPolicyAssert(CentralInstallationApiHttpPolicy::acceptsJson($media), 'valid JSON media: '.$media);
+}
+foreach ([null,'','text/plain','application/json-seq','application/jsonp','application/json; charset=latin1','application/json; boundary=x','application/json, text/plain',"application/json\\r\\nContent-Length: 0"] as $media) {
+ centralApiPolicyAssert(!CentralInstallationApiHttpPolicy::acceptsJson($media), 'reject ambiguous or wrong JSON media: '.var_export($media,true));
+}
+echo "PASS: central installation content type accepts only JSON and optional UTF-8 charset\\n";
 echo "PASS: default-OFF central registration/status endpoints require exact approved vendor Host plus trusted HTTPS origin\n";
