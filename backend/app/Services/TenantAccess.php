@@ -11,6 +11,28 @@ class TenantAccess
 {
     private function membership(User $user, string $companyId): ?CompanyMembership
     {
+        $member=$this->restrictedRecordMembership($user,$companyId);
+        return $member !== null &&
+            app(CentralVenueOperationsAccessGate::class)->allowsCompany($companyId)
+                ? $member : null;
+    }
+
+    /**
+     * Narrow data-rights path: tenant historical audit/export and a previously
+     * approved, already-received payment refund are lawful obligations even
+     * after a paid license's operations grace ends. NEVER use this for new
+     * bookings, new deposits, pricing, discount approvals or CMS edits.
+     */
+    private function restrictedRecordMembership(User $user,string $companyId): ?CompanyMembership
+    {
+        if (config('central_control.activation_enabled') === true &&
+            ! DB::table('central_installation_activation')
+                ->where('singleton_id',1)
+                ->where('company_id',$companyId)
+                ->where('status','registered_pending_license')
+                ->exists()) {
+            return null;
+        }
         // A cached authenticated User can outlive an administrator's
         // account revocation or email-verification reset in another process.
         // Read current persisted account state for every hall/tenant policy.
@@ -27,15 +49,7 @@ class TenantAccess
             ->whereHas('company', fn ($query) => $query->where('is_active', true))
             ->first();
 
-        if ($membership === null) {
-            return null;
-        }
-
-        // Expired/restricted commercial installations cannot grant normal
-        // hall, booking, CMS, inventory or audit actions. The operator gate
-        // defaults OFF; Licensing and Support have separate scopes.
-        return app(CentralVenueOperationsAccessGate::class)->allowsCompany($companyId)
-            ? $membership : null;
+        return $membership;
     }
 
     public function canViewHall(User $user, Hall $hall): bool
@@ -89,12 +103,23 @@ class TenantAccess
         return $membership !== null && in_array($membership->role, ['owner', 'admin'], true);
     }
 
-    /** Owner/admin audit scope; sensitive before/after values require least privilege. */
+    /** Historical audit/read-only export remains owner/admin-scoped post-expiry. */
     public function canReadAuditHistory(User $user, string $companyId): bool
     {
-        $membership = $this->membership($user, $companyId);
+        $membership = $this->restrictedRecordMembership($user, $companyId);
 
         return $membership !== null && in_array($membership->role, ['owner', 'admin'], true);
+    }
+
+    /** A narrowly approved refund of an EXISTING payment is not a new sale.
+     * VenueInvoiceRefundService still enforces original payment/approval,
+     * dual control, ledger reversal and all three posting release gates.
+     */
+    public function canCorrectExistingApprovedRefund(User $user, Hall $hall): bool
+    {
+        $membership=$this->restrictedRecordMembership($user,$hall->company_id);
+        return $hall->is_active && $membership !== null &&
+            in_array($membership->role,['owner','admin'],true);
     }
 
     /** Catalog edits are hall-specific and require active assigned manager or owner/admin. */
