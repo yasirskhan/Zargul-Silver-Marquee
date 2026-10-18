@@ -40,6 +40,8 @@ final class CentralStaffPortalTeamDashboard
                 :''). 
             '<form method="post" action="/staff/team/accounts">'.$hidden.
             '<button type="submit">Staff accounts</button></form>'.
+            '<form method="post" action="/staff/team/role-requests">'.$hidden.
+            '<button type="submit">Pending independent role reviews</button></form>'.
             '<form method="post" action="/staff/team/roles">'.$hidden.
             '<label>Staff ID <input type="text" name="subject_staff_id" '.
             'maxlength="36" required></label>'.

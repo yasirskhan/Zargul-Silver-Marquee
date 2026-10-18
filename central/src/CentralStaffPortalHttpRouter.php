@@ -30,7 +30,8 @@ final class CentralStaffPortalHttpRouter
         private readonly ?CentralStaffPortalOwnPassword $ownPassword = null,
         private readonly ?CentralStaffPortalTeamDashboard $teamDashboard = null,
         private readonly ?CentralStaffProvisioningService $provisioner = null,
-        private readonly ?CentralStaffPortalAuditorDashboard $auditorHome = null
+        private readonly ?CentralStaffPortalAuditorDashboard $auditorHome = null,
+        private readonly ?CentralStaffRoleReviewQueue $roleReviewQueue = null
     ) {}
 
     /**
@@ -313,6 +314,19 @@ final class CentralStaffPortalHttpRouter
             }
             return ['kind'=>'private_auditor_home_html',
                 'html'=>$this->auditorHome->render($bearer,$csrfHeader)];
+        }
+        if($uri==='/staff/team/role-requests' &&
+            $this->roleReviewQueue!==null) {
+            if($fields!==[]) {
+                throw new RegistrationError('invalid_staff_review_queue',422);
+            }
+            if(!$this->boundary->permitsMutation(
+                $server,$bearer,$csrfHeader,'staff.roles.assign',null)) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            return ['kind'=>'private_role_review_html',
+                'html'=>CentralStaffRoleReviewQueue::html(
+                    $this->roleReviewQueue->listPending($bearer,25))];
         }
         throw new RegistrationError('staff_route_not_found',404);
     }

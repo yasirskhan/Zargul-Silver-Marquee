@@ -2,6 +2,14 @@
 declare(strict_types=1);
 
 use Hafzatech\Central\CentralStaffRoleRequestService;
+use Hafzatech\Central\CentralStaffRoleDecisionService;
+use Hafzatech\Central\CentralStaffRoleReviewQueue;
+use Hafzatech\Central\CentralStaffSessionAuthorization;
+use Hafzatech\Central\CentralStaffCsrfTokenService;
+use Hafzatech\Central\CentralStaffHttpPolicy;
+use Hafzatech\Central\CentralStaffProtectedHttpBoundary;
+use Hafzatech\Central\CentralStaffPortalHttpRouter;
+use Hafzatech\Central\CentralStaffPortalPrivateResponse;
 use Hafzatech\Central\RegistrationError;
 
 require dirname(__DIR__).'/src/InstallationRegistry.php';
@@ -9,7 +17,13 @@ foreach([
  'StaffRolePermissions','CentralStaffAccess','CentralStaffPasswordVerifier',
  'CentralStaffTotpVerifier','CentralStaffMfaChallenge',
  'CentralStaffCredentialVerifier','CentralStaffLoginRateLimiter',
- 'CentralStaffSessionService','CentralStaffRoleRequestService'
+ 'CentralStaffSessionService','CentralStaffRoleRequestService',
+ 'CentralStaffRoleDecisionService','CentralStaffRoleReviewQueue',
+ 'CentralStaffSessionAuthorization','CentralStaffCsrfTokenService',
+ 'CentralStaffHttpPolicy','CentralStaffProtectedHttpBoundary',
+ 'CentralStaffPortalHttpRouter','CentralStaffPortalPrivateResponse',
+ 'CentralStaffPaymentEvidenceHttpAdapter','CentralStaffPaymentEvidenceQueue',
+ 'CentralStaffPaymentEvidenceReviewService','CentralStaffInvoicePaymentOverview'
 ] as $class)require dirname(__DIR__).'/src/'.$class.'.php';
 function rolesCheck(bool $ok,string $why):void {
  if(!$ok)throw new RuntimeException('Central role request: '.$why);
@@ -47,7 +61,8 @@ $q=$db->prepare("INSERT INTO central_staff_users
 $g=$db->prepare("INSERT INTO central_staff_role_grants
  (id,staff_id,role,reason) VALUES(:id,:staff,:role,'Synthetic role approval fixture')");
 foreach(['admin'=>'staff_administrator','support'=>'support_agent',
- 'super'=>'super_administrator','target'=>null] as $name=>$role){
+ 'super'=>'super_administrator','approver'=>'staff_administrator',
+ 'target'=>null] as $name=>$role){
  $id=rolesUuid();$staff[$name]=$id;
  $q->execute(['id'=>$id,'email'=>'role-intent-'.$name.'@example.test',
   'hash'=>password_hash($password,PASSWORD_ARGON2ID),
@@ -69,11 +84,15 @@ $supportBearer=$sessions->login('role-intent-support@example.test',
  $password,$code,'192.0.2.189');
 $superBearer=$sessions->login('role-intent-super@example.test',
  $password,$code,'192.0.2.190');
+$approverBearer=$sessions->login('role-intent-approver@example.test',
+ $password,$code,'192.0.2.191');
 rolesCheck(is_string($adminBearer)&&is_string($supportBearer)&&
- is_string($superBearer),'separate vendor MFA sessions');
+ is_string($superBearer)&&is_string($approverBearer),'separate vendor MFA sessions');
 $access=new Hafzatech\Central\CentralStaffAccess($db);
 $off=new CentralStaffRoleRequestService($db,$sessions,$access);
 $on=new CentralStaffRoleRequestService($db,$sessions,$access,true);
+$decisionOff=new CentralStaffRoleDecisionService($db,$sessions,$access);
+$decisionOn=new CentralStaffRoleDecisionService($db,$sessions,$access,true);
 $id=rolesUuid();
 putenv('CENTRAL_STAFF_ROLE_REQUEST_ENABLED=false');
 rolesDeny(fn()=>$on->request($adminBearer,$id,$staff['target'],
@@ -121,6 +140,139 @@ try {
   'super_administrator',null,'Independent super admin review required');
  rolesCheck($high['state']==='pending_independent_approval',
   'even super administrator request grants no immediate privilege');
+ $rejectIntent=$on->request($adminBearer,rolesUuid(),$staff['target'],
+  'plan_administrator',null,'Independent plan role review required');
+ $futureIntent=$on->request($adminBearer,rolesUuid(),$staff['target'],
+  'support_supervisor',null,'Later independent review after stale grants');
+ $decisionId=rolesUuid();
+ putenv('CENTRAL_STAFF_ROLE_DECISIONS_ENABLED=false');
+ rolesDeny(fn()=>$decisionOn->decide($approverBearer,$id,$decisionId,
+  'approved','Separate authenticated permission approval'),
+  'staff_role_decisions_not_enabled');
+ putenv('CENTRAL_STAFF_ROLE_DECISIONS_ENABLED=true');
+ rolesDeny(fn()=>$decisionOff->decide($approverBearer,$id,$decisionId,
+  'approved','Separate authenticated permission approval'),
+  'staff_role_decisions_not_enabled');
+ rolesDeny(fn()=>$decisionOn->decide($adminBearer,$id,$decisionId,
+  'approved','Requester cannot approve own grant'),
+  'staff_role_decision_denied');
+ rolesDeny(fn()=>$decisionOn->decide($supportBearer,$id,$decisionId,
+  'approved','Non administrator cannot approve grant'),
+  'staff_role_decision_denied');
+ rolesDeny(fn()=>$decisionOn->decide($approverBearer,$high['request_id'],
+  rolesUuid(),'approved','Only second Super Administrator can approve'),
+  'staff_role_decision_denied');
+ $auth=new CentralStaffSessionAuthorization($sessions,$access);
+ $queue=new CentralStaffRoleReviewQueue($db,$sessions,$auth);
+ rolesDeny(fn()=>$queue->listPending($supportBearer),
+  'staff_review_queue_denied');
+ rolesDeny(fn()=>$queue->listPending($approverBearer,26),
+  'invalid_staff_review_queue');
+ $pending=$queue->listPending($approverBearer);
+ rolesCheck(in_array($id,array_column($pending,'request_id'),true) &&
+  in_array($high['request_id'],array_column($pending,'request_id'),true),
+  'independent second administrator sees bounded pending metadata queue');
+ $selfReview=$queue->listPending($adminBearer);
+ rolesCheck(!in_array($id,array_column($selfReview,'request_id'),true),
+  'requesting administrator cannot review own submitted role request');
+ $malicious=CentralStaffRoleReviewQueue::html([[
+  'request_id'=>$id,'target_staff_id'=>$staff['target'],
+  'role'=>'<script>alert(1)</script>',
+  'customer_scope_id'=>'<img src=x onerror=alert(2)>',
+  'created_at'=>'2026-10-18'
+ ]]);
+ rolesCheck(str_contains($malicious,'&lt;script&gt;') &&
+  str_contains($malicious,'&lt;img') &&
+  !str_contains($malicious,'<script>') &&
+  !str_contains($malicious,'<img'),
+  'untrusted role review metadata HTML escaped');
+ $csrf=new CentralStaffCsrfTokenService($db,$sessions);
+ $approvalCsrf=$csrf->issue($approverBearer);
+ $requesterCsrf=$csrf->issue($adminBearer);
+ $boundary=new CentralStaffProtectedHttpBoundary(
+  $sessions,$csrf,$auth,true);
+ $billing=new Hafzatech\Central\CentralStaffPaymentEvidenceHttpAdapter(
+  $db,$boundary,
+  new Hafzatech\Central\CentralStaffPaymentEvidenceQueue($db,$auth),
+  new Hafzatech\Central\CentralStaffPaymentEvidenceReviewService(
+   $db,$sessions,$auth),
+  new Hafzatech\Central\CentralStaffInvoicePaymentOverview(
+   $db,$sessions,$auth));
+ $route=new CentralStaffPortalHttpRouter(
+  $boundary,$billing,true,null,null,null,null,null,null,null,null,null,
+  null,null,null,$queue);
+ $http=['HTTPS'=>'on','SERVER_PORT'=>'443',
+  'HTTP_HOST'=>'lichall.hafzatech.com','REQUEST_METHOD'=>'POST',
+  'REQUEST_URI'=>'/staff/team/role-requests',
+  'HTTP_ORIGIN'=>'https://lichall.hafzatech.com',
+  'HTTP_SEC_FETCH_SITE'=>'same-origin','REMOTE_ADDR'=>'192.0.2.191'];
+ $reviewCookie=[CentralStaffHttpPolicy::COOKIE_NAME=>$approverBearer];
+ $reviewPage=$route->dispatch($http,$reviewCookie,[],$approvalCsrf);
+ rolesCheck($reviewPage['kind']==='private_role_review_html' &&
+  str_contains($reviewPage['html'],$id) &&
+  !str_contains($reviewPage['html'],$approverBearer) &&
+  !str_contains($reviewPage['html'],'synthetic-role-request-password'),
+  'independent admin sees only metadata with no password/session bearer');
+ $view=(new CentralStaffPortalPrivateResponse(true))->compose($reviewPage);
+ rolesCheck($view['cookies']===[] &&
+  $view['headers']['Cache-Control']==='no-store, private',
+  'pending role review private no-store and cookie-free');
+ $fake=[CentralStaffHttpPolicy::COOKIE_NAME=>$supportBearer];
+ rolesDeny(fn()=>$route->dispatch($http,$fake,[],$approvalCsrf),
+  'staff_portal_denied');
+ rolesDeny(fn()=>$route->dispatch($http,$reviewCookie,
+  ['role'=>'super_administrator'],$approvalCsrf),
+  'invalid_staff_review_queue');
+ rolesDeny(fn()=>$route->dispatch($http,$reviewCookie,[],
+  str_repeat('0',64)),'staff_portal_denied');
+ rolesDeny(fn()=>$route->dispatch(array_replace(
+  $http,['HTTP_ORIGIN'=>'https://attacker.example']),
+  $reviewCookie,[],$approvalCsrf),'staff_portal_denied');
+ $decision=$decisionOn->decide($approverBearer,$id,$decisionId,
+  'approved','Separate authenticated permission approval');
+ rolesCheck($decision===['request_id'=>$id,'outcome'=>'approved',
+  'grant_created'=>true],'independent current MFA approver records grant');
+ rolesCheck($decisionOn->decide($approverBearer,$id,$decisionId,
+  'approved','Separate authenticated permission approval')===$decision,
+  'exact approved decision replay is idempotent');
+ rolesCheck(!in_array($id,array_column(
+  $queue->listPending($approverBearer),'request_id'),true),
+  'approved role disappears from independent review queue');
+
+ rolesDeny(fn()=>$decisionOn->decide($approverBearer,$id,rolesUuid(),
+  'approved','Different duplicate approval'),
+  'staff_role_decision_conflict');
+ $query=$db->prepare("SELECT role,granted_by,approved_by,customer_scope_id
+  FROM central_staff_role_grants WHERE staff_id=:target");
+ $query->execute(['target'=>$staff['target']]);
+ $assigned=$query->fetchAll(PDO::FETCH_ASSOC);
+ rolesCheck(count($assigned)===1 &&
+  $assigned[0]['role']==='support_agent' &&
+  $assigned[0]['granted_by']===$staff['admin'] &&
+  $assigned[0]['approved_by']===$staff['approver'],
+  'approved grant tracks two independent real MFA staff identities');
+ rolesCheck(!$access->permits($staff['target'],'support.reply',null,true),
+  'approved grant cannot activate pending staff before identity and MFA enrollment');
+ $rejected=$decisionOn->decide($approverBearer,$rejectIntent['request_id'],
+  rolesUuid(),'rejected','Reviewer rejected proposed unnecessary role');
+ rolesCheck($rejected['outcome']==='rejected' &&
+  $rejected['grant_created']===false,'independent denial creates no role');
+ $q=$db->prepare("SELECT count(*) FROM central_staff_role_grants
+  WHERE staff_id=:target AND role='plan_administrator'");
+ $q->execute(['target'=>$staff['target']]);
+ rolesCheck((int)$q->fetchColumn()===0,'rejected role never granted');
+ $q=$db->prepare("SELECT id FROM central_staff_role_decisions
+  WHERE request_id=:request");
+ $q->execute(['request'=>$id]);$sealedId=$q->fetchColumn();
+ try{
+  $db->prepare("UPDATE central_staff_role_decisions
+    SET reason=reason WHERE id=:id")->execute(['id'=>$sealedId]);
+  throw new RuntimeException('STAFF DECISION TAMPERED');
+ } catch(PDOException $e){
+  rolesCheck($e->getCode()==='23514',
+   'immutable database role decisions reject tampering');
+ }
+
  $db->prepare("INSERT INTO central_staff_role_grants
   (id,staff_id,role,reason)
   VALUES(:id,:target,'billing_officer','Synthetic segregation test')")
@@ -141,5 +293,19 @@ try {
  rolesDeny(fn()=>$on->request($adminBearer,rolesUuid(),$staff['target'],
   'support_agent',null,'Revoked admin cannot request roles'),
   'staff_role_request_denied');
-}finally{putenv('CENTRAL_STAFF_ROLE_REQUEST_ENABLED=false');}
+ rolesDeny(fn()=>$decisionOn->decide($approverBearer,
+  $futureIntent['request_id'],rolesUuid(),'approved',
+  'Revoked requester can no longer authorize grants'),
+  'staff_role_decision_denied');
+ $rejectStale=$decisionOn->decide($approverBearer,
+  $futureIntent['request_id'],rolesUuid(),'rejected',
+  'Independent rejection of stale staff request');
+ rolesCheck($rejectStale['outcome']==='rejected' &&
+  !$rejectStale['grant_created'],
+  'reviewer can safely reject stale request even after issuer role revocation');
+
+}finally{
+ putenv('CENTRAL_STAFF_ROLE_REQUEST_ENABLED=false');
+ putenv('CENTRAL_STAFF_ROLE_DECISIONS_ENABLED=false');
+}
 echo "PASS: MFA staff role requests are pending-only, independently gated, immutable, idempotent, never immediate grants\n";
