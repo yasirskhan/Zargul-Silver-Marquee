@@ -4,12 +4,14 @@ declare(strict_types=1);
 use Hafzatech\Central\InstallationRegistry;
 use Hafzatech\Central\InstallationStatusService;
 use Hafzatech\Central\CentralInstallationSignedStatusResponse;
+use Hafzatech\Central\SignedGrantDeliveryService;
 use Hafzatech\Central\RegistrationError;
 use Hafzatech\Signing\Ed25519StatusReceiptCodec;
 
 require dirname(__DIR__).'/src/InstallationRegistry.php';
 require dirname(__DIR__).'/src/InstallationStatusService.php';
 require dirname(__DIR__).'/src/CentralInstallationSignedStatusResponse.php';
+require dirname(__DIR__).'/src/SignedGrantDeliveryService.php';
 require dirname(__DIR__).'/signing/Ed25519StatusReceiptCodec.php';
 
 function signedCheckAssert(bool $yes,string $message):void {
@@ -116,6 +118,29 @@ try {
     $bad['signature']=InstallationRegistry::base64Url(random_bytes(64));
     signedCheckDeny(fn()=>$on->check($bad),'invalid_installation_proof');
 
+    // The full signed-status + sealed-grant response must authenticate
+    // installation proof ONCE. A second check of the same nonce is replay.
+    $delivery=new SignedGrantDeliveryService(
+        $db,$status,static function(string $sealed):string {
+            throw new RuntimeException('No signed sealed grant in synthetic fixture');
+        },$keys);
+    $combined=new CentralInstallationSignedStatusResponse(
+        $status,$signer,$keys,true,$delivery);
+    $deliveryReq=$makeRequest($customer);
+    putenv('CENTRAL_GRANT_DELIVERY_ENABLED=false');
+    signedCheckDeny(fn()=>$combined->check($deliveryReq),
+        'grant_delivery_not_enabled');
+    putenv('CENTRAL_GRANT_DELIVERY_ENABLED=true');
+    $delivered=$combined->check($deliveryReq);
+    signedCheckAssert($delivered['nonce']===$deliveryReq['nonce'] &&
+        $delivered['revision']===0 &&
+        array_key_exists('signed_grant',$delivered) &&
+        $delivered['signed_grant']===null &&
+        isset($delivered['signed_receipt']),
+        'single authenticated request returns signed status and no fabricated license');
+    signedCheckDeny(fn()=>$combined->check($deliveryReq),'replayed_check');
+    putenv('CENTRAL_GRANT_DELIVERY_ENABLED=false');
+
     $forged=static fn(array $claim):array=>
         Ed25519StatusReceiptCodec::sign(
             array_replace($claim,['nonce'=>InstallationRegistry::base64Url(random_bytes(32))]),
@@ -140,9 +165,10 @@ try {
             $status,$wrongSig,$keys,true))->check($makeRequest($customer)),
         'invalid_signed_status_receipt');
     $recorded->execute(['installation'=>$installation]);
-    signedCheckAssert((int)$recorded->fetchColumn()===4,
-        'only four authenticated non-replay status probes consumed nonce');
+    signedCheckAssert((int)$recorded->fetchColumn()===5,
+        'only five authenticated status probes consumed exactly one nonce each');
 } finally {
     putenv('CENTRAL_SIGNED_STATUS_ENABLED=false');
+    putenv('CENTRAL_GRANT_DELIVERY_ENABLED=false');
 }
 echo "PASS: default-OFF isolated signer status composer enforces single installation proof, nonce, exact signed response and pinned worker key\n";
