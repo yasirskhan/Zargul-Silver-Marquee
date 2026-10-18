@@ -228,6 +228,7 @@ class CentralVerifiedLicenseDeliveryServiceTest extends TestCase
         $this->assertSame('operational',$snapshot['dashboard_policy']);
         $this->assertSame('2027-10-01T00:00:00Z',$snapshot['expires_at']);
         $this->assertSame('2028-10-01T00:00:00Z',$snapshot['renewal_expires_at']);
+        $this->assertSame('2028-10-08T00:00:00Z',$snapshot['grace_ends_at']);
         $this->assertSame(1,$snapshot['revision']);
         $this->assertSame(2,$snapshot['renewal_revision']);
         $this->assertFalse($snapshot['expiry_warning']);
