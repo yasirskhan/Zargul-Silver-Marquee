@@ -17,6 +17,8 @@ use Hafzatech\Central\CentralStaffPaymentEvidenceHttpAdapter;
 use Hafzatech\Central\CentralStaffBillingDashboardRenderer;
 use Hafzatech\Central\CentralStaffPortalHttpRouter;
 use Hafzatech\Central\CentralStaffPortalPrivateResponse;
+use Hafzatech\Central\CentralStaffPortalFormRequest;
+use Hafzatech\Central\CentralStaffPortalOperatorKernel;
 use Hafzatech\Central\PaidInvoiceEligibility;
 use Hafzatech\Central\RegistrationError;
 foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
@@ -30,7 +32,8 @@ foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
     'CentralStaffPaymentEvidenceHttpAdapter',
     'CentralStaffBillingDashboardRenderer',
     'CentralStaffPortalHttpRouter',
-    'CentralStaffPortalPrivateResponse'] as $name) {
+    'CentralStaffPortalPrivateResponse',
+    'CentralStaffPortalFormRequest','CentralStaffPortalOperatorKernel'] as $name) {
     require dirname(__DIR__).'/src/'.$name.'.php';
 }
 function reverseCheck(bool $v,string $msg):void{
@@ -421,6 +424,62 @@ reverseCheck($logoutWire['cookies'][0]['value']==='' &&
  !str_contains($logoutWire['body'],$privateCsrf),
  'private logout response securely clears host-only cookie and reveals no proof');
 
+// The future operator front controller is a THIRD independent OFF gate. Its
+// strict URL-form decoder refuses duplicate keys, oversized and multi-valued
+// query tricks before any live MFA/billing invocation or private response.
+$operatorOff=new CentralStaffPortalOperatorKernel($portalOn,$responseOn);
+$operatorOn=new CentralStaffPortalOperatorKernel($portalOn,$responseOn,true);
+$operatorServer=$dashboardRequest;
+$operatorServer['CONTENT_TYPE']='application/x-www-form-urlencoded';
+$operatorServer['HTTP_X_STAFF_CSRF']=$csrfToken;
+$operatorBody=http_build_query($portalFields,'','&',PHP_QUERY_RFC1738);
+putenv('CENTRAL_STAFF_PORTAL_ENABLED=false');
+reverseDeny(fn()=>$operatorOff->handle(
+ $operatorServer,$portalCookie,$operatorBody),'staff_operator_not_enabled');
+reverseDeny(fn()=>$operatorOn->handle(
+ $operatorServer,$portalCookie,$operatorBody),'staff_operator_not_enabled');
+putenv('CENTRAL_STAFF_PORTAL_ENABLED=true');
+try {
+ reverseDeny(fn()=>$operatorOff->handle(
+  $operatorServer,$portalCookie,$operatorBody),'staff_operator_not_enabled');
+ $operatorView=$operatorOn->handle(
+  $operatorServer,$portalCookie,$operatorBody);
+ reverseCheck($operatorView['status']===200 &&
+  $operatorView['cookies']===[] &&
+  str_contains($operatorView['body'],'7500') &&
+  !str_contains($operatorView['body'],$billingBearer) &&
+  !str_contains($operatorView['body'],$csrfToken),
+  'operator kernel composes only previously authorized billing and safe HTML');
+ $formProof=$operatorServer;
+ unset($formProof['HTTP_X_STAFF_CSRF']);
+ $posted=$operatorOn->handle($formProof,$portalCookie,
+  $operatorBody.'&staff_csrf='.$csrfToken);
+ reverseCheck($posted['body']===$operatorView['body'],
+  'protected same-origin form CSRF works without enabling scripting');
+ reverseDeny(fn()=>$operatorOn->handle($operatorServer,$portalCookie,
+  $operatorBody.'&invoice_id='.rawurlencode($invoice)),
+  'invalid_staff_form');
+ reverseDeny(fn()=>$operatorOn->handle($operatorServer,$portalCookie,
+  $operatorBody.'&staff_csrf='.str_repeat('0',64)),
+  'staff_form_denied');
+ reverseDeny(fn()=>$operatorOn->handle($operatorServer,$portalCookie,
+  'customer_id%5B%5D='.rawurlencode($customer)),
+  'invalid_staff_form');
+ reverseDeny(fn()=>$operatorOn->handle($operatorServer,$portalCookie,
+  str_repeat('a',4097)),'staff_form_too_large');
+ $wrongFormType=$operatorServer;$wrongFormType['CONTENT_TYPE']='application/json';
+ reverseDeny(fn()=>$operatorOn->handle(
+  $wrongFormType,$portalCookie,$operatorBody),'staff_form_required');
+ $wrongFormOrigin=$operatorServer;
+ $wrongFormOrigin['HTTP_ORIGIN']='https://attacker.example';
+ reverseDeny(fn()=>$operatorOn->handle(
+  $wrongFormOrigin,$portalCookie,$operatorBody),'staff_form_denied');
+ $wrongFormMethod=$operatorServer;$wrongFormMethod['REQUEST_METHOD']='PUT';
+ reverseDeny(fn()=>$operatorOn->handle(
+  $wrongFormMethod,$portalCookie,$operatorBody),'staff_form_denied');
+} finally {
+ putenv('CENTRAL_STAFF_PORTAL_ENABLED=false');
+}
 $decisionHttp=$httpRequest;
 $decisionHttp['REQUEST_URI']='/staff/billing/payment-evidence/decide';
 reverseDeny(fn()=>$httpOff->decide($decisionHttp,$billingBearer,$csrfToken,

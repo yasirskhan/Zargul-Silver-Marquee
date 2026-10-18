@@ -47,3 +47,22 @@ Use `CentralStaffAuthenticatedMfaHistory` for any future protected staff portal 
 
 ### Staff self-password rotation (internal only)
 The trusted current vendor MFA session and old password are both required to rotate its OWN secret. The new password is stored as Argon2id; all that staff member's live sessions are revoked atomically with immutable metadata-only audit. This is a private service, not a registered staff or customer API endpoint, and does not bypass operator KMS/HTTPS release gates.
+
+## Internal staff operator portal composition (not public)
+
+`CentralStaffPortalHttpRouter` and `CentralStaffPortalPrivateResponse` provide
+separately disabled routing and secure cookie/HTML response plans for a future
+HAFZATECH vendor-only interface. Login, logout, billing summary, active exact-ID
+customer lookup, prepared license queue, role-scoped dashboard and encrypted
+support ticket metadata views are internal only. Financial verification, signing,
+support replies and activation are NOT automatically enabled.
+
+`CentralStaffPortalFormRequest` rejects untrusted requests, duplicate/bracket
+parameters and large forms before `CentralStaffPortalOperatorKernel` composes
+the restricted response. The kernel requires both constructor enablement and
+`CENTRAL_STAFF_PORTAL_ENABLED=true`; it is not invoked by `central/public/index.php`
+and does not write public HTTP output. Even with that flag, do not deploy without
+a separately audited operator HTTPS/vhost, KMS-backed MFA decryption, protected
+HMAC rate limits, session recovery, secure host-only cookie emitter, WAF,
+central database isolation, auditable permissions, and explicit release approval.
+No production signing, bank collection or client license activation is available.
