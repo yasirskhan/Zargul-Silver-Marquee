@@ -58,6 +58,8 @@ class VenueOverviewLivewireTest extends TestCase
             ->assertSet('summary.visibleHalls', 1)
             ->assertSet('summary.hallsNeedingSetup', 1)
             ->assertSet('summary.pendingApprovals', 1)
+            ->assertSet('summary.licenseRestricted',false)
+            ->assertDontSee('Venue operations are unavailable')
             ->assertSee('Review pending approvals')
             ->assertSet('summary.drafts', 0)
             ->assertSee('Review booking proposals')
@@ -95,6 +97,10 @@ class VenueOverviewLivewireTest extends TestCase
         $this->be($people['owner']);
         Livewire::test(VenueOverview::class)
             ->assertSet('summary.hafzatechSupportQueued',1)
+            ->assertSet('summary.licenseRestricted',true)
+            ->assertSee('Venue operations are unavailable')
+            ->assertSee('Open Licensing')
+            ->assertSee('Contact HAFZATECH Support')
             ->assertSet('summary.pendingApprovals',null)
             ->assertSet('summary.drafts',null)
             ->assertSet('summary.canReviewFinance',false)
@@ -105,6 +111,8 @@ class VenueOverviewLivewireTest extends TestCase
         $this->be($people['manager']);
         Livewire::test(VenueOverview::class)
             ->assertSet('summary.hafzatechSupportQueued',null)
+            ->assertSet('summary.licenseRestricted',true)
+            ->assertDontSee('Open Licensing')
             ->assertDontSee('Local support requests awaiting delivery');
         $this->assertDatabaseCount('finance_journals',0);
         $this->assertDatabaseCount('central_license_check_state',0);
