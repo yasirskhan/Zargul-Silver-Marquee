@@ -51,7 +51,7 @@ final class CentralStaffRoleReviewQueue
                       FROM central_staff_role_grants g
                       WHERE g.staff_id=r.actor_staff_id
                         AND g.customer_scope_id IS NULL
-                        AND g.revoked_at IS NULL),'[]'::jsonb)
+                        AND g.revoked_at IS NULL),jsonb_build_array())
                       AS issuer_global_roles
              FROM central_staff_role_requests r
              JOIN central_staff_users requester ON requester.id=r.actor_staff_id

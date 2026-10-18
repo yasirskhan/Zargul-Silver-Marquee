@@ -1031,3 +1031,7 @@ Append only concise current milestones (commit SHA, exact CI job result, code fi
 
 ## STALE-ACCOUNT ROLE REVIEW GUARD VERIFIED — OCTOBER 18, 2026
 - Exact `39a4a641768db79d89c32f213f0ec388dd5b6789` [CI 39176702607](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39176702607) **VERIFIED SUCCESS all six hosted jobs**. Rejected stale request actions for inactive issuer/recipient already protected by independent transactional checks and now read-only in reviewer interface. This successor role reviewer scope/current issuer authority safety improvement is PUBLISHED SUBJECT TO ITS OWN hosted all-six exact SHA CI. No real operator or license signing activation.
+
+
+## CUSTOMER-SCOPE REVIEW CI SYNTAX REPAIR — OCTOBER 18, 2026
+- Run [39177111920](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39177111920) reported central-postgres FAILURE in PHP lint before database tests: a new JSON aggregate's SQL `'[]'::jsonb` literal broke the surrounding PHP single-quoted string in `CentralStaffRoleReviewQueue.php:66`. Replaced with semantically identical PostgreSQL `jsonb_build_array()` with no nested single quotes. No grants/permissions, account status, provider keys or production flags changed. Fixed source requires its OWN exact hosted six-job CI before VERIFIED.
