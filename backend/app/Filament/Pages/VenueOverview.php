@@ -120,9 +120,16 @@ final class VenueOverview extends Page
             ->pluck('id')->all();
         $halls = count($visibleHallIds);
         $role = $member->role;
-        $canSeeCompanyProposals = in_array($role, ['owner', 'admin'], true);
-        $canReadApprovals = in_array($role, ['owner', 'admin', 'manager'], true);
-        $canSearch = in_array($role, ['owner', 'admin', 'manager', 'operations'], true);
+        // Signed-license restriction applies to normal venue operations, not
+        // to independently scoped HAFZATECH support and license renewal.
+        $canOperate = app(\App\Services\CentralVenueOperationsAccessGate::class)
+            ->allowsCompany($this->companyId);
+        $canReadSupport = in_array($role, ['owner', 'admin'], true);
+        $canSeeCompanyProposals = $canOperate && $canReadSupport;
+        $canReadApprovals = $canOperate &&
+            in_array($role, ['owner', 'admin', 'manager'], true);
+        $canSearch = $canOperate &&
+            in_array($role, ['owner', 'admin', 'manager', 'operations'], true);
         $canPlan = $halls > 0 && in_array($role, ['owner', 'admin', 'manager', 'operations'], true);
         $weekFrom = now()->toDateString();
         $weekThrough = now()->addDays(6)->toDateString();
@@ -163,7 +170,7 @@ final class VenueOverview extends Page
                         'eventDate' => $row->event_date, 'program' => $row->program,
                         'hallName' => $row->hall_name,
                     ])->all() : [],
-            'hafzatechSupportQueued' => $canSeeCompanyProposals &&
+            'hafzatechSupportQueued' => $canReadSupport &&
                 DB::table('central_installation_activation')
                     ->where('company_id',$this->companyId)
                     ->where('status','registered_pending_license')->exists()
@@ -174,7 +181,7 @@ final class VenueOverview extends Page
                     ->where('queued.company_id',$this->companyId)
                     ->where('enrollment.status','registered_pending_license')
                     ->where('queued.delivery_state','queued')->count() : null,
-            'hafzatechSupportUnread' => $canSeeCompanyProposals &&
+            'hafzatechSupportUnread' => $canReadSupport &&
                 DB::table('central_installation_activation')
                     ->where('company_id',$this->companyId)
                     ->where('status','registered_pending_license')->exists()
