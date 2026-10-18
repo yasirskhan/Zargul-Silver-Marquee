@@ -158,8 +158,19 @@ class CentralScheduledLicenseCheckServiceTest extends TestCase
             app(CentralScheduledLicenseCheckService::class)->run($beforeDue));
         Http::assertNothingSent();
         $due=new DateTimeImmutable('2026-10-16T00:00:00Z');
-        $this->assertSame(['state'=>'signed_license_verified'],
-            app(CentralScheduledLicenseCheckService::class)->run($due));
+        $scheduledResult=app(CentralScheduledLicenseCheckService::class)->run($due);
+        if ($scheduledResult['state'] === 'error') {
+            // The production runner intentionally redacts exceptions. In a
+            // synthetic isolated CI fixture, invoke the identical trusted
+            // transport once to expose the exact root test failure.
+            try {
+                app(\App\Services\CentralInstallationStatusTransport::class)->check($due);
+            } catch (\Throwable $error) {
+                $this->fail('Synthetic 15-day receipt fixture: '.
+                    get_class($error).' '.$error->getMessage());
+            }
+        }
+        $this->assertSame(['state'=>'signed_license_verified'],$scheduledResult);
         $this->assertSame($originalHash,
             DB::table('central_signed_license_cache')->value('envelope_sha256'));
         $this->assertDatabaseCount('central_signed_license_cache',1);
