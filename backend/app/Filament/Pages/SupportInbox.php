@@ -103,16 +103,18 @@ final class SupportInbox extends Page
             $this->companyId!==null &&
             array_key_exists($this->companyId,$this->companyOptions()),403);
         abort_unless(config('central_control.support_enabled')===true,403);
+        $this->newSubject=trim($this->newSubject);
+        $this->newMessage=trim($this->newMessage);
         $this->validate([
             'newSubject'=>'required|string|min:4|max:160',
             'newMessage'=>'required|string|min:3|max:4000',
         ]);
         try {
             app(\App\Services\CentralSupportOutboxService::class)->queue(
-                $actor,$this->companyId,(string)\Illuminate\Support\\Str::uuid(),
+                $actor,$this->companyId,(string)\Illuminate\Support\Str::uuid(),
                 trim($this->newSubject),trim($this->newMessage)
             );
-        } catch (\Illuminate\Auth\\Access\\AuthorizationException) {
+        } catch (\Illuminate\Auth\Access\AuthorizationException) {
             abort(403);
         }
         $this->newSubject='';

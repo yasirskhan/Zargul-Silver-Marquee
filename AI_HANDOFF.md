@@ -321,6 +321,10 @@
 - Added Livewire/PostgreSQL positive owner composer regression: release-gated menu submits only explicitly entered support text, server encrypts into the locally queued outbox, clears Livewire inputs and sends **zero HTTP requests** or finance/licensing mutations. Existing disabled-gate test rejects unauthorized submission. Production support API remains OFF pending trusted central operator deployment. Requires exact CI.
 - Continue from latest verified SHA; check all six hosted jobs before proceeding with vendor-protected API and entitlement release.
 
+## SUPPORT COMPOSER EXACT CI SYNTAX REPAIR
+- Run [39085825903](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39085825903) for `3379463` failed PHP syntax in the *new page only*: malformed repeated backslashes on `\\Illuminate\\Support\\Str::uuid` and `\\Illuminate\\Auth\\Access\\AuthorizationException`. Corrected these to canonical PHP references; trimmed text before validation for user-friendly input. Business/security logic and default-OFF flags unchanged. New SHA requires exact hosted six-job CI to be VERIFIED; previous `e87b560` inherited parse failure.
+- Continue with signed outbox, support inbox and licensed tenant isolation intact; no production HAFZATECH endpoint is enabled.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`
