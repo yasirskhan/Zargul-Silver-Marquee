@@ -6,10 +6,12 @@ use Hafzatech\Central\CentralStaffMfaChallenge;
 use Hafzatech\Central\CentralStaffCredentialVerifier;
 use Hafzatech\Central\CentralStaffSessionService;
 use Hafzatech\Central\CentralStaffLoginRateLimiter;
+use Hafzatech\Central\CentralStaffCsrfTokenService;
 
 foreach(['CentralStaffPasswordVerifier','CentralStaffTotpVerifier',
     'CentralStaffMfaChallenge','CentralStaffCredentialVerifier',
-    'CentralStaffSessionService','CentralStaffLoginRateLimiter'] as $name)
+    'CentralStaffSessionService','CentralStaffLoginRateLimiter',
+    'CentralStaffCsrfTokenService'] as $name)
     require dirname(__DIR__).'/src/'.$name.'.php';
 
 function sessCheck(bool $ok,string $why):void {
@@ -55,6 +57,7 @@ $service=new CentralStaffSessionService($db,
     ),
     new CentralStaffLoginRateLimiter($db,str_repeat('s',32))
 );
+$csrf=new CentralStaffCsrfTokenService($db,$service);
 $otp=sessCode($secret);
 sessCheck($service->login('vendor-session-rotate@example.test','invalid',$otp,'127.0.0.1')===null,
     'wrong password cannot mint a session');
@@ -75,12 +78,31 @@ sessCheck($service->login('vendor-session-rotate@example.test','synthetic-vendor
 $q=$db->prepare("SELECT encode(token_hash,'hex') FROM central_staff_sessions WHERE staff_id=:id");
 $q->execute(['id'=>$ids['rotate']]);
 sessCheck($q->fetchColumn()===hash('sha256',$token),'database retains only digest');
+$firstCsrf=$csrf->issue($token);
+sessCheck(is_string($firstCsrf) && $csrf->accepts($token,$firstCsrf),
+    'same-session independent CSRF proof accepted');
+sessCheck(!$csrf->accepts($token,str_repeat('0',64)),
+    'forged CSRF token denied');
+sessCheck($csrf->issue(str_repeat('0',64))===null,
+    'forged session cannot mint a CSRF proof');
+$checkCsrf=$db->prepare("SELECT encode(csrf_hash,'hex')
+ FROM central_staff_sessions WHERE staff_id=:id");
+$checkCsrf->execute(['id'=>$ids['rotate']]);
+sessCheck($checkCsrf->fetchColumn()===hash('sha256',$firstCsrf),
+    'database stores only CSRF digest');
 $replacement=$service->rotate($token);
+sessCheck(!$csrf->accepts($replacement,$firstCsrf),
+    'rotated session cannot reuse previous CSRF token');
+$nextCsrf=$csrf->issue($replacement);
+sessCheck(is_string($nextCsrf) && $nextCsrf!==$firstCsrf &&
+    $csrf->accepts($replacement,$nextCsrf),
+    'rotated session establishes a new CSRF proof');
 sessCheck(is_string($replacement)&&$replacement!==$token,'rotation generated new bearer');
 sessCheck($service->staffFor($token)===null,'rotated previous bearer fails');
 sessCheck($service->staffFor($replacement)===$ids['rotate'],'new bearer is valid');
 sessCheck($service->logout($replacement),'logout invalidates active bearer');
 sessCheck($service->staffFor($replacement)===null,'logged-out bearer fails');
+sessCheck(!$csrf->accepts($replacement,$nextCsrf),'logged-out CSRF proof denied');
 
 $other=[];
 foreach(['suspend','role','password','idle'] as $which){

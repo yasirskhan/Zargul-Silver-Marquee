@@ -70,7 +70,7 @@ final class CentralStaffSessionService
         if($this->staffFor($token)===null)return null;
         $new=bin2hex(random_bytes(32));
         $q=$this->db->prepare(
-            "UPDATE central_staff_sessions SET token_hash=decode(:next,'hex')
+            "UPDATE central_staff_sessions SET token_hash=decode(:next,'hex'),csrf_hash=NULL
              WHERE token_hash=decode(:old,'hex') AND revoked_at IS NULL
              AND expires_at>now() AND idle_until>now() RETURNING id"
         );

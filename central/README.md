@@ -19,3 +19,7 @@ Next: customer provisioning/owner confirmation, domain TXT-proof workflow, rate 
 ## Protected central staff login prerequisites
 
 The internal staff session code is not an HTTP controller. Before any vendor login is enabled, deploy a dedicated secret-manager-backed TOTP/HMAC credential provider, trusted TLS/proxy client IP handling, pre-auth account and network throttling, secure HttpOnly/SameSite cookies, CSRF validation, session renewal/revocation and audit logging, credential lifecycle and tested operator recovery. The staff authenticator must never accept VenueDesk tenant logins or an installation signing credential as a vendor staff credential. All public launch gates remain OFF.
+
+### Staff request security policy and session-derived authorization (INTERNAL)
+
+Use `CentralStaffSessionAuthorization` to bind every vendor capability decision to an actual centrally authenticated session rather than an HTTP-supplied staff UUID or MFA Boolean. A separate session-bound CSRF proof and host/origin policy are available as internal helpers. All central staff HTTP routing remains disabled. A future controller must enforce the exact trusted HTTPS vhost, same-origin state-changing requests, secure host-only cookies, bearer privacy, trusted origin IP, protected HMAC/MFA secrets and independent customer scope per action. These helpers alone are not a staff login portal.
