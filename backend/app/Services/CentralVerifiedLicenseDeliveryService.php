@@ -60,8 +60,14 @@ final class CentralVerifiedLicenseDeliveryService
                 throw new InvalidArgumentException('Vendor status is not an exact unchanged paid revision.');
             }
             $cached=$this->cache->locallyVerified($customerId,$domain,$now);
+            // While an early paid renewal is signed but not yet effective,
+            // the current active term is still authenticated by the pinned
+            // previous signature. A same-revision online check is valid
+            // when the separately signed scheduled renewal is stored.
+            $effectiveRevision=(int)($cached['scheduled_renewal']['revision']
+                ?? $cached['grant']['revision']);
             if ($cached['active'] !== true ||
-                $cached['grant']['revision'] !== (int)$stored->revision ||
+                $effectiveRevision !== (int)$stored->revision ||
                 $cached['grant']['license_id'] !== $stored->license_id) {
                 throw new InvalidArgumentException('Existing signed license is invalid or expired.');
             }
@@ -110,12 +116,15 @@ final class CentralVerifiedLicenseDeliveryService
             // identity. Preserve monotonic license ID and revision, then
             // advance the online-success date in the SAME transaction.
             $result=$this->cache->accept($grantEnvelope,$customerId,$approvedDomain,$now);
+            // Signed early renewals are future-dated. They must not erase the
+            // active previous paid term or report the venue unlicensed.
+            $effective=$this->cache->locallyVerified($customerId,$approvedDomain,$now);
             $this->checkSchedule->recordVerifiedSuccess($now);
             return [
                 'license_id'=>$result['license_id'],
                 'revision'=>$result['revision'],
                 'changed'=>$result['changed'],
-                'active'=>$grant['active'],
+                'active'=>$effective['active'],
             ];
         });
     }
