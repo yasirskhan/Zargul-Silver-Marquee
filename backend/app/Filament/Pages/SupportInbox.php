@@ -25,6 +25,8 @@ final class SupportInbox extends Page
     #[Locked]
     public array $messages = [];
     #[Locked]
+    public array $requests = [];
+    #[Locked]
     public int $unread = 0;
     #[Locked]
     public ?int $olderBeforeEvent = null;
@@ -99,6 +101,8 @@ final class SupportInbox extends Page
         $this->hasOlderMessages=count($rows)>25;
         $this->messages=array_slice($rows,0,25);
         $this->unread=$reader->unreadCount($actor,$this->companyId);
+        $this->requests=app(\App\Services\CentralSupportOutboxReader::class)
+            ->list($actor,$this->companyId,20);
     }
 
     public function toggleUnreadOnly():void

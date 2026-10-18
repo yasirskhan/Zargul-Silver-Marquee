@@ -78,7 +78,10 @@ class CentralSupportInboxComposePageTest extends TestCase
             ->assertHasNoErrors()
             ->assertSet('newSubject','')
             ->assertSet('newMessage','')
-            ->assertSee('Support request queued for protected HAFZATECH delivery.');
+            ->assertSee('Support request queued for protected HAFZATECH delivery.')
+            ->assertSee('My support requests')
+            ->assertSee('Queued locally (not sent)')
+            ->assertSee('Need help configuring program hours');
         $this->assertDatabaseCount('central_support_outbox',1);
         $row=DB::table('central_support_outbox')->first();
         $this->assertSame($company->id,$row->company_id);

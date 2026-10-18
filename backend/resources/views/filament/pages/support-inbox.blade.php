@@ -34,6 +34,19 @@
         @if($composeResult)
             <p role="status" aria-live="polite">{{ $composeResult }}</p>
         @endif
+        <section class="rounded-lg border p-4 space-y-3" aria-label="My support requests">
+            <h3 class="font-semibold">My support requests</h3>
+            <p class="text-xs">Requests remain visible when protected delivery is disabled. Queued locally does not mean HAFZATECH has received them.</p>
+            @forelse($requests as $request)
+                <article class="border-t pt-2">
+                    <p class="text-sm font-medium">{{ $request['subject'] }}</p>
+                    <p class="text-xs">{{ $request['state'] }}{{ $request['ticket_number'] ? ' · '.$request['ticket_number'] : '' }}</p>
+                    <p class="text-xs">Created {{ $request['created_at'] }}</p>
+                </article>
+            @empty
+                <p class="text-sm">No support requests created for this company.</p>
+            @endforelse
+        </section>
         <p role="status" aria-live="polite">{{ $unread }} unread {{ $unread === 1 ? 'reply' : 'replies' }}</p>
         <button type="button" wire:click="refreshMessages" class="rounded-lg border px-4 py-2 text-sm">Refresh local inbox</button>
         <button type="button" wire:click="toggleUnreadOnly"
