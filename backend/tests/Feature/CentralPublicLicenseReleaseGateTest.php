@@ -74,6 +74,8 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
             'Verified owner historical audit is available when licensing is OFF');
         $this->assertTrue($tenant->canCorrectExistingApprovedRefund($owner,$hall),
             'Verified owner existing-payment refund correction is permitted before release');
+        $this->assertTrue($tenant->canReadExistingInvoiceHistory($owner,$hall),
+            'Unreleased commercial gate must not hide existing invoice history');
         $this->assertFalse($tenant->canReadAuditHistory($manager,$company->id));
         $this->assertFalse($tenant->canCorrectExistingApprovedRefund($manager,$hall));
         $this->assertTrue($tenant->canManageCustomerProfiles($owner,$company->id),
@@ -137,6 +139,7 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
             'Bound owner retains rights to existing historical records');
         $this->assertTrue($tenant->canCorrectExistingApprovedRefund($owner,$hall),
             'Bound owner may reconcile an independently preapproved existing refund');
+        $this->assertTrue($tenant->canReadExistingInvoiceHistory($owner,$hall));
         $pair=sodium_crypto_sign_keypair();
         config()->set('central_control.trusted_signing_public_keys',[
             'fixture-test-key'=>self::b64(sodium_crypto_sign_publickey($pair))
@@ -229,6 +232,9 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
                 'Owner must retain read-only historical audits after expiry');
             $this->assertTrue($tenant->canCorrectExistingApprovedRefund($owner,$hall),
                 'Existing independently approved full-payment refunds remain correctable');
+            $this->assertTrue($tenant->canReadExistingInvoiceHistory($owner,$hall),
+                'Past invoices remain readable without granting new deposit authority');
+            $this->assertFalse($tenant->canReadExistingInvoiceHistory($manager,$hall));
             $this->assertFalse($tenant->canReadAuditHistory($manager,$company->id));
             $this->assertFalse($tenant->canCorrectExistingApprovedRefund($manager,$hall));
             $this->assertNull($planning->membership($owner,$company->id),
