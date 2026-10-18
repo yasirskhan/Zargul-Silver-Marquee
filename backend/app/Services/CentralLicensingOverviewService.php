@@ -49,6 +49,10 @@ final class CentralLicensingOverviewService
                 'online_check_due'=>false,
                 'expires_at'=>null,
                 'revision'=>null,
+                'license_id'=>null,
+                'edition'=>null,
+                'max_halls'=>null,
+                'max_staff'=>null,
             ];
         }
         $binding=DB::table('central_installation_activation')
@@ -79,6 +83,10 @@ final class CentralLicensingOverviewService
             'online_check_due'=>$due,
             'expires_at'=>$state['expires_at'],
             'revision'=>(int)$verified['grant']['revision'],
+            'license_id'=>$verified['grant']['license_id'],
+            'edition'=>$verified['grant']['edition'],
+            'max_halls'=>$verified['grant']['limits']['max_halls'],
+            'max_staff'=>$verified['grant']['limits']['max_staff'],
         ];
     }
 
@@ -93,6 +101,10 @@ final class CentralLicensingOverviewService
             'online_check_due'=>$due,
             'expires_at'=>null,
             'revision'=>null,
+            'license_id'=>null,
+            'edition'=>null,
+            'max_halls'=>null,
+            'max_staff'=>null,
         ];
     }
 }

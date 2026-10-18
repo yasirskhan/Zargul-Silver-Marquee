@@ -32,6 +32,26 @@
                     <dd class="font-semibold">{{ $summary['online_check_due'] ? 'Yes' : 'No' }}</dd>
                 </div>
             </dl>
+            @if (!empty($summary['license_id']))
+                <dl class="grid gap-3 sm:grid-cols-2" aria-label="Verified signed license identity">
+                    <div class="rounded-lg border p-4">
+                        <dt class="text-sm">License ID</dt>
+                        <dd class="font-semibold break-all">{{ $summary['license_id'] }}</dd>
+                    </div>
+                    <div class="rounded-lg border p-4">
+                        <dt class="text-sm">Edition</dt>
+                        <dd class="font-semibold">{{ $summary['edition'] }}</dd>
+                    </div>
+                    <div class="rounded-lg border p-4">
+                        <dt class="text-sm">Maximum halls</dt>
+                        <dd class="font-semibold">{{ $summary['max_halls'] }}</dd>
+                    </div>
+                    <div class="rounded-lg border p-4">
+                        <dt class="text-sm">Maximum staff</dt>
+                        <dd class="font-semibold">{{ $summary['max_staff'] }}</dd>
+                    </div>
+                </dl>
+            @endif
             @if ($summary['expiry_warning'])
                 <p role="alert">Your signed license is within 15 days of expiration. Contact HAFZATECH about renewal.</p>
             @endif

@@ -29,6 +29,8 @@ class CentralLicensingOverviewServiceTest extends TestCase
         $this->assertSame('feature_disabled',$view['state']);
         $this->assertSame('unchanged',$view['public_policy']);
         $this->assertSame('unchanged',$view['dashboard_policy']);
+        $this->assertNull($view['license_id']);
+        $this->assertNull($view['edition']);
         $this->assertFalse($view['online_check_due']);
         $this->assertSame($before,DB::table('central_license_check_state')->count());
     }
@@ -93,6 +95,10 @@ class CentralLicensingOverviewServiceTest extends TestCase
         $this->assertSame('licensed',$warning['state']);
         $this->assertTrue($warning['expiry_warning']);
         $this->assertSame(2,$warning['revision']);
+        $this->assertSame($license,$warning['license_id']);
+        $this->assertSame('standard',$warning['edition']);
+        $this->assertSame(2,$warning['max_halls']);
+        $this->assertSame(10,$warning['max_staff']);
         $this->assertSame('open',$warning['public_policy']);
         $expired=$overview->snapshot(new DateTimeImmutable('2027-10-01T00:00:00Z'));
         $this->assertSame('expired_grace',$expired['state']);
