@@ -38,3 +38,6 @@ The internal `CentralStaffSessionAuditReader` queries only safe event fields und
 
 ### Internal central staff suspension (OFF for public use)
 A centrally MFA-authenticated staff administrator may suspend a different active vendor employee when authorized for `staff.disable`. The independent central database writes a tamper-resistant account-decision record and revokes all that target's sessions in one transaction. Ordinary administrators cannot suspend themselves or a Super Administrator through this primitive. No public vendor staff login, staff suspension HTTP route or central KMS secret is enabled by these changes.
+
+### Live vendor session binding for MFA history
+Use `CentralStaffAuthenticatedMfaHistory` for any future protected staff portal MFA audit display. It derives the actor from current central staff session state and rechecks the existing auditor permission and pagination, never trusting a supplied actor ID or claimed MFA Boolean. No public staff API was added.
