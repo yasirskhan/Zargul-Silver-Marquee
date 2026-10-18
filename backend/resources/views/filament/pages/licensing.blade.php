@@ -23,6 +23,13 @@
                     <dt class="text-sm">Expiry (UTC)</dt>
                     <dd class="font-semibold">{{ $summary['expires_at'] ?? 'Not issued' }}</dd>
                 </div>
+                @if (!empty($summary['renewal_expires_at']))
+                    <div class="rounded-lg border p-4">
+                        <dt class="text-sm">Prepaid renewal valid through (UTC)</dt>
+                        <dd class="font-semibold">{{ $summary['renewal_expires_at'] }}</dd>
+                        <p class="text-xs">Signed revision {{ $summary['renewal_revision'] }} begins when the current paid term expires. Your venue remains operational under the current signed term.</p>
+                    </div>
+                @endif
                 @if (!empty($summary['grace_ends_at']))
                     <div class="rounded-lg border p-4">
                         <dt class="text-sm">Management grace ends (UTC)</dt>
