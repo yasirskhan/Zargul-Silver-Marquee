@@ -133,6 +133,7 @@ final class SupportInbox extends Page
             app(CentralSupportReplyInboxReader::class)
                 ->markRead($actor,$this->companyId,$messageId);
         }catch(\Illuminate\Auth\Access\AuthorizationException){abort(403);}
+        catch(\InvalidArgumentException){abort(422);}
         $this->refreshMessages();
     }
 }

@@ -329,6 +329,10 @@
 - CI [39085969789](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39085969789) reported an additional malformed namespace in newly-added positive composer test line 88 (`Crypt::decryptString`). Fixed test-only namespace to normal single PHP separators. The application `SupportInbox` source has the earlier namespace fixes and input normalization; no production authorization, payment or license code was weakened. This new exact SHA requires all six CI jobs PASS before VERIFIED.
 - Preserve queued encrypted support and default-OFF gates. Continue immediately after hosted CI.
 
+## SUPPORT INBOX LIVE ROLE REVOCATION + MALFORMED IDS
+- Added owner/admin support inbox regression proving malformed message UUID is rejected with 422 rather than uncaught 500, and an already-mounted Livewire owner session loses access immediately after company role downgrade before it may refresh messages. Central inbox remains company-scoped; no vendor API, finance or license writes. Exact six-job CI required.
+- Prior composer namespace fixture repair `17b6e05` focused five jobs PASS, full Laravel PostgreSQL running on last check. Do not call it fully VERIFIED until sixth job succeeds.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`

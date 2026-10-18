@@ -41,11 +41,16 @@ class CentralSupportInboxPageTest extends TestCase
         app(CentralInstallationCompanyScope::class)->bind($owner,$company->id);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $this->be($owner);
-        Livewire::test(SupportInbox::class)
+        $view=Livewire::test(SupportInbox::class)
             ->assertSet('companyId',$company->id)
             ->assertSee('HAFZATECH Support')
             ->assertSee('0 unread replies')
             ->assertDontSee($foreign->name);
+        $view->call('markMessageRead','invalid-uuid')->assertStatus(422);
+        DB::table('company_memberships')
+            ->where('company_id',$company->id)->where('user_id',$owner->id)
+            ->update(['role'=>'manager']);
+        $view->call('refreshMessages')->assertForbidden();
         $this->be($other);
         $this->assertFalse(SupportInbox::canAccess());
         Livewire::test(SupportInbox::class)->assertForbidden();
