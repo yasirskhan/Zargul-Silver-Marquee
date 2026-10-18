@@ -8,6 +8,7 @@ use App\Models\CompanyMembership;
 use App\Models\User;
 use App\Services\TenantAccess;
 use App\Services\CentralInstallationIdentity;
+use App\Services\CentralInstallationCompanyScope;
 use App\Services\CentralSignedLicenseCache;
 use DateTimeImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -167,6 +168,10 @@ class CentralPublicLicenseReleaseGateTest extends TestCase
             $this->travelTo(Carbon::parse('2027-10-08T00:00:00Z'));
             $this->assertFalse($tenant->canManageCustomerProfiles($owner,$company->id),
                 'Normal operations stop precisely at signed expiry plus seven days');
+            // Licensing, verified owner company scope and HAFZATECH support
+            // remain available to resolve renewal even after operations end.
+            app(CentralInstallationCompanyScope::class)->assertCanRead($owner,$company->id);
+
             $this->assertSame('registered_pending_license',
                 DB::table('central_installation_activation')
                     ->where('singleton_id',1)->value('status'));
