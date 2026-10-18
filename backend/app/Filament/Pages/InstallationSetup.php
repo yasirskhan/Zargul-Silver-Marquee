@@ -11,6 +11,7 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Url;
+use Livewire\Attributes\Locked;
 use Throwable;
 
 final class InstallationSetup extends Page
@@ -27,6 +28,7 @@ final class InstallationSetup extends Page
     public string $enrollmentToken = '';
     public string $vendorCustomerId = '';
     public string $verifiedDomain = '';
+    #[Locked]
     public ?string $statusMessage = null;
 
     /** @return array<string,string> */
@@ -76,12 +78,26 @@ final class InstallationSetup extends Page
             array_key_exists($this->companyId, static::allowedCompanies()), 403);
     }
 
+    public function alreadyConnected(): bool
+    {
+        $this->assertCompany();
+        return DB::table('central_installation_activation')
+            ->where('singleton_id', 1)
+            ->where('company_id', $this->companyId)
+            ->where('status', 'registered_pending_license')->exists();
+    }
+
     public function connect(): void
     {
         $this->assertCompany();
         $actor = Filament::auth()->user();
         abort_unless($actor instanceof User, 403);
         $this->statusMessage = null;
+        if ($this->alreadyConnected()) {
+            $this->enrollmentToken = '';
+            $this->statusMessage = 'Installation is already registered. Open Licensing to verify a signed paid license.';
+            return;
+        }
         try {
             $data = $this->validate([
                 'enrollmentId' => ['required', 'uuid'],

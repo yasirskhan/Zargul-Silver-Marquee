@@ -81,10 +81,16 @@ class CentralInstallationSetupPageTest extends TestCase
             ->call('connect')
             ->assertSet('enrollmentToken','')
             ->assertSet('statusMessage','Installation registered. A separately verified paid license is still required.')
-            ->assertDontSee($token);
+            ->assertDontSee($token)
+            ->assertSee('Open Licensing')
+            ->assertDontSee('One-time enrollment token');
         $this->assertSame($company->id,DB::table('central_installation_activation')
             ->where('singleton_id',1)->value('company_id'));
         $this->assertDatabaseCount('central_signed_license_cache',0);
+        Http::assertSentCount(2);
+        $view->call('connect')
+            ->assertSet('statusMessage','Installation is already registered. Open Licensing to verify a signed paid license.')
+            ->assertSet('enrollmentToken','');
         Http::assertSentCount(2);
         DB::table('company_memberships')->where('company_id',$company->id)
             ->where('user_id',$actor->id)->update(['role'=>'manager']);

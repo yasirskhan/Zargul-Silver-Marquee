@@ -2,6 +2,11 @@
     <section class="space-y-5" aria-label="Private HAFZATECH installation enrollment">
         <h2 class="text-lg font-semibold">Connect your venue to HAFZATECH</h2>
         <p class="text-sm">A verified company owner can register the installation using enrollment details provided by HAFZATECH. This step does not issue or activate a paid license.</p>
+        @if ($this->alreadyConnected())
+            <p role="status">This installation is already connected to the selected company. A paid signed license must be verified separately.</p>
+            <a href="{{ \App\Filament\Pages\Licensing::getUrl(['company' => $companyId]) }}"
+                class="inline-flex rounded-lg border px-4 py-2">Open Licensing</a>
+        @else
         <form wire:submit="connect" class="space-y-4">
             <label class="block space-y-1">
                 <span>Operating company</span>
@@ -33,6 +38,7 @@
             </label>
             <button type="submit" wire:loading.attr="disabled" wire:target="connect" class="rounded-lg border px-4 py-2">Register installation</button>
         </form>
+        @endif
         @if ($statusMessage)
             <p role="status" aria-live="polite">{{ $statusMessage }}</p>
         @endif
