@@ -310,6 +310,9 @@
 - Private owner/admin VenueOverview now shows a company-scoped HAFZATECH unread count and link to `SupportInbox` only when the exact company has an enrolled installation. No count or link for foreign/unbound managers or unrelated tenants. Computed from encrypted local inbox, never from vendor network or licensing. Existing full Laravel/Blade/browser CI required; no vendor support API deployment implied.
 - Next: verify exact SHA CI and finish authenticated vendor reply HTTP bridge only after isolated signer/KMS and HAFZATECH operator account readiness.
 
+## REQUIREMENTS REGISTER RECONCILIATION
+- Updated CENT-006 to distinguish actual support foundations (signed ticket, agent reply, encrypted local inbox, five-minute default-OFF polling, owner/admin UI, unread count) from **NOT RELEASED** central API/staff/KMS/hosting/notification capabilities. Roadmap Phase 13 likewise documents only foundation in progress, avoiding inaccurate implemented/deployed assertions. No production gates flipped. Full hosted CI for last code and this checkpoint required.
+
 ## NEXT IMPLEMENTATION PRIORITY / EFFICIENT WORKING LOOP
 Follow `docs/FAST_DELIVERY_PLAN.md`: START **central customer/installation identity and API contract** in a separately deployable protected application boundary within same repo; then central staff permissions/provider directory + invoice/payment verified eligibility; then signing service+client online/offline/license expiry integration; then support sync+currency/timezone installer; then remaining inventory returns and other commercial scope. Write tests alongside each batch.
 `Read → verify live branch+CI → implement bounded slice with PG/authorization/security tests → commit expected HEAD → hosted four-job CI → fix reds → verify exact SHA → update THIS concise AI_HANDOFF.md + relevant docs and archived history when needed → continue another safe slice.`
