@@ -23,6 +23,12 @@
                     <dt class="text-sm">Expiry (UTC)</dt>
                     <dd class="font-semibold">{{ $summary['expires_at'] ?? 'Not issued' }}</dd>
                 </div>
+                @if (!empty($summary['grace_ends_at']))
+                    <div class="rounded-lg border p-4">
+                        <dt class="text-sm">Management grace ends (UTC)</dt>
+                        <dd class="font-semibold">{{ $summary['grace_ends_at'] }}</dd>
+                    </div>
+                @endif
                 <div class="rounded-lg border p-4">
                     <dt class="text-sm">Signed revision</dt>
                     <dd class="font-semibold">{{ $summary['revision'] ?? 'None' }}</dd>
