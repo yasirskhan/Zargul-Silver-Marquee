@@ -53,6 +53,16 @@
         @empty
             <p class="text-sm">No HAFZATECH support replies have been received for this company.</p>
         @endforelse
+        <nav class="flex flex-wrap gap-3" aria-label="Support reply pagination">
+            @if($olderBeforeEvent !== null)
+                <button type="button" wire:click="showRecentReplies"
+                    class="rounded-lg border px-4 py-2 text-sm">Newest replies</button>
+            @endif
+            @if($hasOlderMessages)
+                <button type="button" wire:click="loadOlderReplies"
+                    class="rounded-lg border px-4 py-2 text-sm">Older replies</button>
+            @endif
+        </nav>
         @if(!config('central_control.support_reply_pull_enabled'))
             <p class="text-xs">Automatic support-reply synchronization has not been activated.</p>
         @endif

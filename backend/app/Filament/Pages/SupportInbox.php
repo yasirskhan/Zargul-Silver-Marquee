@@ -26,6 +26,10 @@ final class SupportInbox extends Page
     public array $messages = [];
     #[Locked]
     public int $unread = 0;
+    #[Locked]
+    public ?int $olderBeforeEvent = null;
+    #[Locked]
+    public bool $hasOlderMessages = false;
 
     public string $newSubject = '';
     public string $newMessage = '';
@@ -78,6 +82,7 @@ final class SupportInbox extends Page
 
     public function updatedCompanyId():void
     {
+        $this->olderBeforeEvent=null;
         $this->refreshMessages();
     }
 
@@ -88,8 +93,28 @@ final class SupportInbox extends Page
             $this->companyId!==null &&
             array_key_exists($this->companyId,$this->companyOptions()),403);
         $reader=app(CentralSupportReplyInboxReader::class);
-        $this->messages=$reader->list($actor,$this->companyId,25);
+        $rows=$reader->list($actor,$this->companyId,26,$this->olderBeforeEvent);
+        $this->hasOlderMessages=count($rows)>25;
+        $this->messages=array_slice($rows,0,25);
         $this->unread=$reader->unreadCount($actor,$this->companyId);
+    }
+
+    public function loadOlderReplies():void
+    {
+        // Hydration refreshes the current scoped page before this action.
+        // A forged/expired cursor cannot escape the reader's company filter.
+        if(!$this->hasOlderMessages || $this->messages===[])return;
+        $last=end($this->messages);
+        $cursor=(int)($last['vendor_event_id']??0);
+        abort_unless($cursor>0,422);
+        $this->olderBeforeEvent=$cursor;
+        $this->refreshMessages();
+    }
+
+    public function showRecentReplies():void
+    {
+        $this->olderBeforeEvent=null;
+        $this->refreshMessages();
     }
 
     /**
