@@ -57,7 +57,7 @@ $db=new PDO($dsn,getenv('CENTRAL_DB_USERNAME'),getenv('CENTRAL_DB_PASSWORD'),
  [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
 $seed='12345678901234567890';$password='synthetic-role-request-password';
 $staff=[];
-$q=$db->prepare("INSERT INTO central_staff_users
+$insertStaff=$db->prepare("INSERT INTO central_staff_users
  (id,email,display_name,password_hash,mfa_secret_ciphertext,mfa_enrolled_at,status)
  VALUES(:id,:email,'Synthetic Role Actor',:hash,decode(:seed,'hex'),now(),:status)");
 $g=$db->prepare("INSERT INTO central_staff_role_grants
@@ -66,7 +66,7 @@ foreach(['admin'=>'staff_administrator','support'=>'support_agent',
  'super'=>'super_administrator','approver'=>'staff_administrator',
  'target'=>null] as $name=>$role){
  $id=rolesUuid();$staff[$name]=$id;
- $q->execute(['id'=>$id,'email'=>'role-intent-'.$name.'@example.test',
+ $insertStaff->execute(['id'=>$id,'email'=>'role-intent-'.$name.'@example.test',
   'hash'=>password_hash($password,PASSWORD_ARGON2ID),
   'seed'=>bin2hex($seed),'status'=>$name==='target'?'pending_mfa':'active']);
  if($role!==null)$g->execute(['id'=>rolesUuid(),'staff'=>$id,'role'=>$role]);
@@ -121,7 +121,7 @@ try {
  $db->prepare("INSERT INTO vendor_customers(id,legal_name)
   VALUES(:id,'Synthetic scoped vendor role')")->execute(['id'=>$scopeId]);
  $scopedActor=rolesUuid();
- $q->execute(['id'=>$scopedActor,'email'=>'role-scoped-actor@example.test',
+ $insertStaff->execute(['id'=>$scopedActor,'email'=>'role-scoped-actor@example.test',
   'hash'=>password_hash($password,PASSWORD_ARGON2ID),
   'seed'=>bin2hex($seed),'status'=>'active']);
  $db->prepare("INSERT INTO central_staff_role_grants
@@ -186,7 +186,7 @@ try {
   rolesUuid(),'approved','Only second Super Administrator can approve'),
   'staff_role_decision_denied');
  $scopedReviewer=rolesUuid();
- $q->execute(['id'=>$scopedReviewer,'email'=>'role-scoped-review@example.test',
+ $insertStaff->execute(['id'=>$scopedReviewer,'email'=>'role-scoped-review@example.test',
   'hash'=>password_hash($password,PASSWORD_ARGON2ID),
   'seed'=>bin2hex($seed),'status'=>'active']);
  $db->prepare("INSERT INTO central_staff_role_grants

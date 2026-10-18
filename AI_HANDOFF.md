@@ -979,3 +979,6 @@ Append only concise current milestones (commit SHA, exact CI job result, code fi
 
 ## ROLE REQUEST CI REPAIR — OCTOBER 18, 2026
 - CI 39169380626 failed central-postgres because fixture added a role grant to an already authenticated actor. This correctly invalidates its session authorization snapshot. Negative scoped-role tests now use separate MFA identities, preserving fail-closed session behavior. Reviewer form assertion also moved after router/CSRF initialization. Explicitly turn decision gate OFF for hidden-form test only; no production permissions weakened. Exact hosted CI required.
+
+## ROLE-REQUEST FIXTURE SQL HANDLE REPAIR — OCTOBER 18, 2026
+- Exact HEAD `2585b1f1bad36087e39974aa9fba68b5e157dfd6` [CI 39170741138](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39170741138) completed FAILURE: only central-postgres red; PHP `SQLSTATE[HY093]` at `central/tests/staff_role_requests.php:189`. The original `$q` INSERT prepared statement had been overwritten by later SELECT queries before new independent MFA fixture users were inserted. Retained a dedicated `$insertStaff` handle for initial and both scoped actors; no production role authorization/approval code changed. This fix is PUBLISHED SUBJECT TO exact next six-job hosted CI; do not call VERIFIED until green. All production staff/licensing/payments/KMS switches remain OFF.
