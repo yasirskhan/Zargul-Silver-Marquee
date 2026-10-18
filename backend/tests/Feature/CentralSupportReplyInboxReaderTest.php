@@ -15,7 +15,7 @@ class CentralSupportReplyInboxReaderTest extends TestCase
 
     public function test_unenrolled_user_cannot_read_or_mark_support_messages():void
     {
-        $actor=User::factory()->create();
+        $actor=new User();
         $reader=app(CentralSupportReplyInboxReader::class);
         $company=(string)Str::uuid();
         foreach([
@@ -33,7 +33,7 @@ class CentralSupportReplyInboxReaderTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
         app(CentralSupportReplyInboxReader::class)->list(
-            User::factory()->create(),(string)Str::uuid(),500
+            new User(),(string)Str::uuid(),500
         );
     }
 }
