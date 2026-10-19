@@ -28,11 +28,23 @@ final class HallInventoryPurchaseReview {
                 $join->on('i.company_id','=','r.company_id')
                     ->on('i.hall_id','=','r.hall_id')->on('i.id','=','r.item_id');
             })
+            ->leftJoin('hall_inventory_purchase_receiving_evidence as pe',function($join):void {
+                $join->on('pe.company_id','=','r.company_id')
+                    ->on('pe.hall_id','=','r.hall_id')
+                    ->on('pe.purchase_request_id','=','r.id');
+            })
+            ->leftJoin('hall_inventory_purchase_receiving_reviews as pr',function($join):void {
+                $join->on('pr.company_id','=','r.company_id')
+                    ->on('pr.hall_id','=','r.hall_id')
+                    ->on('pr.receiving_evidence_id','=','pe.id');
+            })
             ->where('r.company_id',$companyId)->where('r.hall_id',$hallId)
             ->orderByDesc('r.created_at')->orderByDesc('r.id')->limit($limit)
             ->get(['r.id','r.item_id','i.name as item_name','i.unit',
                 'r.quantity','r.vendor_name','r.vendor_reference',
-                'r.evidence_reference','r.reason','r.created_at','r.requested_by'])
+                'r.evidence_reference','r.reason','r.created_at','r.requested_by',
+                'pe.id as receipt_id','pe.counted_quantity','pe.received_by',
+                'pr.id as review_id','pr.reviewed_by'])
             ->map(static fn($r):array=>[
                 'id'=>(string)$r->id,'itemId'=>(string)$r->item_id,
                 'itemName'=>(string)$r->item_name,'unit'=>(string)$r->unit,
@@ -41,7 +53,16 @@ final class HallInventoryPurchaseReview {
                 'evidenceReference'=>(string)$r->evidence_reference,
                 'reason'=>(string)$r->reason,'requestedBy'=>(int)$r->requested_by,
                 'requestedAt'=>(string)$r->created_at,
-                'status'=>'UNVERIFIED CLAIM / AWAITING INDEPENDENT RECEIVING',
+                'receivingEvidenceId'=>$r->receipt_id===null?null:(string)$r->receipt_id,
+                'countedQuantity'=>$r->counted_quantity===null?null:(int)$r->counted_quantity,
+                'receivedBy'=>$r->received_by===null?null:(int)$r->received_by,
+                'independentReviewId'=>$r->review_id===null?null:(string)$r->review_id,
+                'reviewedBy'=>$r->reviewed_by===null?null:(int)$r->reviewed_by,
+                'status'=>$r->review_id!==null
+                    ?'INDEPENDENT REVIEW RECORDED / NOT STOCK POSTED'
+                    :($r->receipt_id!==null
+                        ?'PHYSICAL RECEIVING ASSERTED / AWAITING INDEPENDENT REVIEW'
+                        :'UNVERIFIED CLAIM / AWAITING INDEPENDENT RECEIVING'),
                 'ownedStockPosted'=>false,'financiallyPosted'=>false,
             ])->all();
     }

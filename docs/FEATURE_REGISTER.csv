@@ -66,3 +66,5 @@ CENT-008,Central domain migration software updates and operational recovery,9.1,
 WIZ-001,Client ISO business currency IANA timezone and hall overrides,9.1,Approved not implemented,PKR INR USD many other currencies precision local schedule UTC audit cross DST
 QA-001,Verified complete end to end feature traceability,Cross-cutting,Owner approved mandatory policy,Every approved feature is traced to UI backend audit errors tests and exact SHA hosted CI before COMPLETE
 QA-002,Proactive bug detection root cause repair and regression gates,Cross-cutting,Owner approved mandatory policy,Failures require reproducible issue root cause fix regression exact SHA green CI and release blocker handling without weakening tests
+
+INV-012-REVIEW,Hall-scoped purchase receiving and independent review history,12,Implementation published CI pending,Read-only stage indicators for unverified claims receiving assertion and third-person review; never show stock or payment posted until separately authorized and verified

@@ -7,6 +7,8 @@ use App\Models\User;
 use App\Services\HallInventoryCatalogService;
 use App\Services\HallInventoryPurchaseRequestService;
 use App\Services\HallInventoryPurchaseReview;
+use App\Services\HallInventoryPurchaseReceivingService;
+use App\Services\HallInventoryPurchaseReceivingReviewService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -46,6 +48,33 @@ class HallInventoryPurchaseReviewTest extends TestCase {
         $this->assertFalse($rows[0]['ownedStockPosted']);
         $this->assertFalse($rows[0]['financiallyPosted']);
         $this->assertSame([], $reader->recent($owner,$company->id,$other->id));
+        $receiver=User::create(['name'=>'Claim Receiver','email'=>'claim-receiver@example.test','password'=>'test-only']);
+        $receiver->markEmailAsVerified();
+        CompanyMembership::create(['company_id'=>$company->id,'user_id'=>$receiver->id,'role'=>'owner']);
+        $reviewer=User::create(['name'=>'Claim Reviewer','email'=>'claim-reviewer@example.test','password'=>'test-only']);
+        $reviewer->markEmailAsVerified();
+        CompanyMembership::create(['company_id'=>$company->id,'user_id'=>$reviewer->id,'role'=>'admin']);
+        $this->be($receiver);
+        $receipt=(string)Str::uuid();
+        app(HallInventoryPurchaseReceivingService::class)->record(
+            $receiver,$company->id,$hall->id,$id,$receipt,24,
+            'physical-custody-reference-24','Counted 24 chairs on delivery');
+        $rows=$reader->recent($receiver,$company->id,$hall->id);
+        $this->assertSame('PHYSICAL RECEIVING ASSERTED / AWAITING INDEPENDENT REVIEW',$rows[0]['status']);
+        $this->assertSame(24,$rows[0]['countedQuantity']);
+        $this->assertSame($receipt,$rows[0]['receivingEvidenceId']);
+        $this->assertNull($rows[0]['independentReviewId']);
+        $this->be($reviewer);
+        $reviewId=(string)Str::uuid();
+        app(HallInventoryPurchaseReceivingReviewService::class)->attest(
+            $reviewer,$company->id,$hall->id,$receipt,$reviewId,
+            'Independent review completed without stock acceptance');
+        $rows=$reader->recent($reviewer,$company->id,$hall->id);
+        $this->assertSame('INDEPENDENT REVIEW RECORDED / NOT STOCK POSTED',$rows[0]['status']);
+        $this->assertSame($reviewId,$rows[0]['independentReviewId']);
+        $this->assertFalse($rows[0]['ownedStockPosted']);
+        $this->assertFalse($rows[0]['financiallyPosted']);
+        $this->assertSame([], $reader->recent($reviewer,$company->id,$other->id));
         $outsider=User::create(['name'=>'Claim Outsider','email'=>'claim-outsider@example.test',
             'password'=>'test-only']);
         $outsider->markEmailAsVerified();

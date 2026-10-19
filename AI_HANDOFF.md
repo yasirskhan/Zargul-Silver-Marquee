@@ -311,3 +311,8 @@ Verify live branch/CI → reconcile current handoff + specific requirement/featu
 - Added `hall_inventory_purchase_receiving_reviews` immutable PostgreSQL table, `HallInventoryPurchaseReceivingReviewService`, and `HallInventoryPurchaseReceivingReviewServiceTest`. Only independently authorized current owner/admin who is NEITHER request creator NOR receipt receiver may attest, scoped to active company/hall. Immutable, single attestation per receipt with exact same-content retry and audit; release gate OFF by default.
 - This attestation does not authenticate supplier documents, imply trusted file custody, create owned inventory movements, record payment or finance entries, or make the complete Phase 12 ready for release.
 - NEXT: secure stored supplier and receiving evidence, independent acceptance and atomic `acquire_owned` stock posting with expected revision and immutable movement, PostgreSQL abuse/concurrency tests, and owner/manager UI. Existing loan custody/returns and end-to-end receipts still incomplete.
+
+
+## PHASE 12 PURCHASE RECEIVING STAGE VISIBILITY (2026-10-19)
+- Read-only hall purchase review now joins hall/item-scoped independent receiving and third-actor review records and accurately distinguishes claim, physical receipt assertion, and independent review. None can be labelled purchased inventory or verified financial payment. PostgreSQL end-to-end test creates three independent actors and checks stages, wrong-hall exclusion and no owned stock/payment posting.
+- Feature register INV-012-REVIEW added as CI PENDING; verify the exact pushed SHA and all six jobs before VERIFIED. Continue with genuine server-trusted evidence custody and reviewed acquisition posting. Release flags remain OFF.
