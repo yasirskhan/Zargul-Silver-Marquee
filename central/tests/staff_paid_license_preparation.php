@@ -338,6 +338,62 @@ paidSessionAssert(str_contains($malicious,'&lt;script&gt;') &&
 
 // Exact customer-id vendor lookup has NO arbitrary search/enumeration and uses
 // current MFA/scoped permissions independently at the data and HTTP layers.
+// Current MFA company directory NEVER enumerates foreign tenant details.
+// Global billing may access two active businesses; a scoped license officer
+// may see only their designated customer, even for substring probes.
+$directory=new \Hafzatech\Central\CentralStaffCustomerDirectory(
+ $db,$sessions,$queueAuth);
+$directoryRouter=new \Hafzatech\Central\CentralStaffPortalHttpRouter(
+ $queueBoundary,$unusedBilling,true,customerDirectory:$directory);
+$directoryRequest=$queueRequest;
+$directoryRequest['REQUEST_URI']='/staff/customers/directory';
+$directoryPage=$directoryRouter->dispatch($directoryRequest,
+ $foreignCookie,['search'=>'Foreign License'],$foreignCsrf);
+paidSessionAssert($directoryPage['kind']==='private_customer_directory_html' &&
+ str_contains($directoryPage['html'],'Foreign License Session Venue') &&
+ str_contains($directoryPage['html'],$other) &&
+ !str_contains($directoryPage['html'],$company) &&
+ !str_contains($directoryPage['html'],$foreignSession),
+ 'scoped licensing officer sees only assigned customer, never bearer');
+$noForeignLeak=$directoryRouter->dispatch($directoryRequest,
+ $foreignCookie,['search'=>'License Session'],$foreignCsrf);
+paidSessionAssert(!str_contains($noForeignLeak['html'],$company) &&
+ str_contains($noForeignLeak['html'],'No accessible customers'),
+ 'scoped customer directory cannot enumerate unrelated company');
+$globalDirectory=$directoryRouter->dispatch($directoryRequest,
+ $billingCookie,['search'=>'License Session'],$billingCsrf);
+paidSessionAssert(str_contains($globalDirectory['html'],$company) &&
+ !str_contains($globalDirectory['html'],'Foreign License Session Venue') &&
+ str_contains($globalDirectory['html'],'name="staff_csrf"') &&
+ str_contains($globalDirectory['html'],'action="/staff/dashboard"'),
+ 'global Billing Officer can find permitted customer by known name');
+$directoryResponse=(new \Hafzatech\Central\CentralStaffPortalPrivateResponse(true))
+ ->compose($globalDirectory);
+paidSessionAssert($directoryResponse['cookies']===[] &&
+ $directoryResponse['headers']['Cache-Control']==='no-store, private' &&
+ str_contains($directoryResponse['headers']['Content-Security-Policy'],
+    "default-src 'none'"), 'customer directory cannot cache or leak cookies');
+paidSessionDeny(fn()=>$directoryRouter->dispatch($directoryRequest,
+ $foreignCookie,['search'=>'Foreign','role'=>'admin'],$foreignCsrf),
+ 'invalid_customer_directory_request');
+paidSessionDeny(fn()=>$directoryRouter->dispatch($directoryRequest,
+ $foreignCookie,['search'=>'Foreign'],str_repeat('0',64)),
+ 'staff_portal_denied');
+$alienDirectory=$directoryRequest;
+$alienDirectory['HTTP_ORIGIN']='https://untrusted.example.test';
+paidSessionDeny(fn()=>$directoryRouter->dispatch($alienDirectory,
+ $foreignCookie,['search'=>'Foreign'],$foreignCsrf),'staff_portal_denied');
+paidSessionDeny(fn()=>$directory->search(str_repeat('0',64),'Foreign'),
+ 'staff_session_required');
+paidSessionDeny(fn()=>$directory->search($billingSession,str_repeat('z',65)),
+ 'invalid_customer_directory_request');
+$escapedName=\Hafzatech\Central\CentralStaffCustomerDirectoryRenderer::html([
+ ['id'=>$other,'legal_name'=>'<script>alert(1)</script>']
+],$foreignCsrf,'<tag>');
+paidSessionAssert(!str_contains($escapedName,'<script>') &&
+ str_contains($escapedName,'&lt;script&gt;') &&
+ str_contains($escapedName,'value="&lt;tag&gt;"'),
+ 'HTML injection in a business name or search prefix remains escaped');
 $customerReader=new \Hafzatech\Central\CentralStaffCustomerLookup(
  $db,$queueAuth);
 $customerPortal=new \Hafzatech\Central\CentralStaffPortalHttpRouter(
