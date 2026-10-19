@@ -97,7 +97,7 @@ class HallInventoryInternalLoanDispatchServiceTest extends TestCase
             $this->assertSame(0,(int)$pos->borrowed_usable);
             $this->assertSame(1,(int)$pos->revision);
         }
-        $review=app(\\App\\Services\\HallInventoryLoanDraftReview::class);
+        $review=app(\App\Services\HallInventoryLoanDraftReview::class);
         $sourceHistory=$review->recent($admin,$company->id,$source->id);
         $destinationHistory=$review->recent($admin,$company->id,$dest->id);
         $this->assertSame('source_dispatched_receipt_pending',$sourceHistory[0]['status']);
