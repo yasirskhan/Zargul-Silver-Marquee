@@ -11,6 +11,7 @@ use App\Services\HallInventoryLoanDraftService;
 use App\Services\HallInventoryInternalLoanDispatchService;
 use App\Services\HallInventoryInternalLoanReceiptService;
 use App\Services\HallInventoryInternalLoanReturnService;
+use App\Services\HallInventoryInternalLoanReturnReview;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -88,6 +89,23 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         $this->be($receiver);
         $this->assertSame($first,$send($first,5,1));
         $this->assertSame($first,$send($first,5,1));
+        $read=app(HallInventoryInternalLoanReturnReview::class);
+        $destinationLines=$read->destinationLines($receiver,$company->id,$dest->id,$loan);
+        $this->assertCount(1,$destinationLines);
+        $this->assertSame(12,$destinationLines[0]['receivedQuantity']);
+        $this->assertSame(5,$destinationLines[0]['alreadyReturnedQuantity']);
+        $this->assertSame(7,$destinationLines[0]['returnableQuantity']);
+        $this->assertSame(2,$destinationLines[0]['revision']);
+        try{
+            $read->sourceBatches($receiver,$company->id,$src->id);
+            $this->fail('Destination-only manager could read lender return review.');
+        }catch(AuthorizationException){}
+        $this->be($owner);
+        $sourceBatches=$read->sourceBatches($owner,$company->id,$src->id);
+        $this->assertCount(1,$sourceBatches);
+        $this->assertSame('IN_TRANSIT_SOURCE_ACK_PENDING',$sourceBatches[0]['state']);
+        $this->assertCount(1,$sourceBatches[0]['lines']);
+        $this->be($receiver);
         $this->assertSame(7,(int)DB::table('hall_inventory_positions')
             ->where('hall_id',$dest->id)->where('item_id',$dstItem)->value('borrowed_usable'));
         $this->assertSame(5,(int)DB::table('hall_inventory_positions')
@@ -173,6 +191,13 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
             $this->fail('Changed accepted return condition replayed.');
         }catch(ConflictHttpException){}
         $this->assertSame(0,DB::table('finance_journals')->count());
+        $finalHistory=$read->sourceBatches($owner,$company->id,$src->id);
+        $this->assertCount(2,$finalHistory);
+        $recorded=array_values(array_filter($finalHistory,fn($row)=>$row['accepted']));
+        $pending=array_values(array_filter($finalHistory,fn($row)=>!$row['accepted']));
+        $this->assertCount(1,$recorded);
+        $this->assertCount(1,$pending);
+        $this->assertSame('SOURCE_REVIEW_RECORDED_OUTSTANDING_CHECK_REQUIRED',$recorded[0]['state']);
         // Outstanding transit and damages require further reconciliation.
     }
 }
