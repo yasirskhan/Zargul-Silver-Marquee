@@ -270,7 +270,7 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         $this->assertSame('damage',$history[0]['kind']);
         $this->assertFalse($history[0]['financiallyResolved']);
         $this->assertSame(0,DB::table('finance_journals')->count());
-        $this->travelTo(\\Illuminate\\Support\\Carbon::parse('2028-01-02 12:00:00'));
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2028-01-02 12:00:00'));
         try {
             $overdueRows=app(\App\Services\HallInventoryLoanDraftReview::class)
                 ->recent($owner,$company->id,$src->id);
