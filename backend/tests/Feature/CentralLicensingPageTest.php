@@ -159,10 +159,15 @@ class CentralLicensingPageTest extends TestCase
         $page->set('requestedTermMonths','18')
             ->call('requestRenewalReview')->assertStatus(422);
         $this->assertDatabaseCount('central_support_outbox',1);
+        // Mount and set the selected term while the owner is authorized.
+        // After revocation, call the protected action directly: issuing a
+        // separate wire:set first destroys the revoked Livewire component
+        // and produces 404 instead of exercising the intended 403 gate.
+        $revokedPage=Livewire::test(Licensing::class)
+            ->set('requestedTermMonths','12');
         DB::table('company_memberships')->where('company_id',$company->id)
             ->where('user_id',$owner->id)->update(['role'=>'manager']);
-        $page->set('requestedTermMonths','12')
-            ->call('requestRenewalReview')->assertForbidden();
+        $revokedPage->call('requestRenewalReview')->assertForbidden();
         $this->assertDatabaseCount('central_support_outbox',1);
         $this->assertDatabaseCount('finance_journals',0);
         $this->assertDatabaseCount('central_signed_license_cache',0);
