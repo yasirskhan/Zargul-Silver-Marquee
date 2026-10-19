@@ -7,6 +7,9 @@ use App\Models\Hall;
 use App\Models\User;
 use App\Services\HallInventoryCatalogService;
 use App\Services\HallInventoryLoanDraftService;
+use App\Services\HallInventoryInternalLoanReturnService;
+use App\Services\HallInventoryInternalLoanReturnAcceptanceService;
+use App\Services\HallInventoryInternalLoanReturnReview;
 use App\Services\HallInventoryStocktakeService;
 use App\Services\TenantAccess;
 use BackedEnum;
@@ -132,6 +135,30 @@ final class HallInventory extends Page
     public $loanReceiptFile = null;
     #[Locked]
     public ?string $lastLoanReceiptReference = null;
+
+    #[Locked]
+    public string $returnLoanId = '';
+    #[Locked]
+    public string $returnBatchId = '';
+    #[Locked]
+    public array $returnEligibleLines = [];
+    public array $returnQuantities = [];
+    public $returnHandoverFile = null;
+    #[Locked]
+    public ?string $lastReturnBatchId = null;
+    #[Locked]
+    public array $returnSourceHistory = [];
+    #[Locked]
+    public string $returnAcceptBatchId = '';
+    #[Locked]
+    public string $returnAcceptanceId = '';
+    #[Locked]
+    public array $returnAcceptanceLines = [];
+    public array $returnConditionGood = [];
+    public array $returnConditionDamaged = [];
+    public $returnAcceptanceFile = null;
+    #[Locked]
+    public ?string $lastReturnAcceptanceId = null;
 
     #[Locked]
     public string $loanInlineRequestId = '';
@@ -287,6 +314,21 @@ final class HallInventory extends Page
         $this->loanReturnDate = '';
         $this->loanPurpose = '';
         $this->lastLoanReference = null;
+        $this->returnLoanId = '';
+        $this->returnBatchId = (string) Str::uuid();
+        $this->returnEligibleLines = [];
+        $this->returnQuantities = [];
+        $this->returnHandoverFile = null;
+        $this->lastReturnBatchId = null;
+        $this->returnSourceHistory = [];
+        $this->returnAcceptBatchId = '';
+        $this->returnAcceptanceId = (string) Str::uuid();
+        $this->returnAcceptanceLines = [];
+        $this->returnConditionGood = [];
+        $this->returnConditionDamaged = [];
+        $this->returnAcceptanceFile = null;
+        $this->lastReturnAcceptanceId = null;
+
         $this->loanReceiptLoanId = '';
         $this->loanReceiptRequestId = (string) Str::uuid();
         $this->loanReceiptLines = [];
@@ -570,6 +612,15 @@ final class HallInventory extends Page
         }
         $this->loanHistory = app(\App\Services\HallInventoryLoanDraftReview::class)
             ->recent($actor, $this->companyId, $this->hallId);
+        $this->returnSourceHistory=[];
+        if(config('inventory_controls.loan_returns_enabled') &&
+            config('inventory_controls.loan_return_acceptance_enabled')) {
+            $hall=Hall::query()->where('company_id',$this->companyId)
+                ->where('id',$this->hallId)->where('is_active',true)->first();
+            if($hall && app(TenantAccess::class)->canConfigureHall($actor,$hall))
+                $this->returnSourceHistory=app(HallInventoryInternalLoanReturnReview::class)
+                    ->sourceBatches($actor,$this->companyId,$this->hallId);
+        }
     }
 
     public function reloadCatalog(): void
@@ -808,6 +859,149 @@ final class HallInventory extends Page
         $this->loanReceiptLines=[];
         $this->loanReceiptMapping=[];
         $this->loanReceiptFile=null;
+        $this->reloadLoanHistory();
+    }
+
+
+    public function startInternalReturn(string $loanId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.loan_returns_enabled'),403);
+        $record=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($row):bool=>$row['id']===$loanId &&
+                ($row['viewRole']??'')==='receiving' &&
+                in_array(($row['status']??''),[
+                    'destination_received_return_pending',
+                    'partial_return_in_transit_source_ack_pending'
+                ],true));
+        abort_unless($record!==null,403);
+        $lines=app(HallInventoryInternalLoanReturnReview::class)->destinationLines(
+            $actor,$this->companyId,$this->hallId,$loanId);
+        abort_unless(collect($lines)->contains(fn($row)=>$row['returnableQuantity']>0),403);
+        $this->returnLoanId=$loanId;
+        $this->returnBatchId=(string)Str::uuid();
+        $this->returnEligibleLines=$lines;
+        $this->returnQuantities=[];
+        $this->returnHandoverFile=null;
+        $this->lastReturnBatchId=null;
+    }
+
+    public function sendInternalReturn():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.loan_returns_enabled'),403);
+        $this->validate([
+            'returnHandoverFile'=>'required|file|max:5120|mimes:jpg,jpeg,png,pdf',
+            'returnQuantities'=>'required|array'
+        ]);
+        $lines=app(HallInventoryInternalLoanReturnReview::class)->destinationLines(
+            $actor,$this->companyId,$this->hallId,$this->returnLoanId);
+        $bySource=collect($lines)->keyBy('sourceItemId');
+        $quantities=[];$revisions=[];
+        foreach($this->returnQuantities as $sourceId=>$raw) {
+            if(!is_string($sourceId)||!$bySource->has($sourceId)||
+                !is_string($raw)||!preg_match('/\A[1-9][0-9]{0,8}\z/D',$raw))
+                throw ValidationException::withMessages([
+                    'returnQuantities'=>'Select valid source items and positive whole quantities.'
+                ]);
+            $line=$bySource->get($sourceId);
+            $qty=(int)$raw;
+            if($qty>$line['returnableQuantity'])
+                throw ValidationException::withMessages([
+                    'returnQuantities'=>'Return quantity exceeds independently received usable stock.'
+                ]);
+            $quantities[$sourceId]=$qty;
+            $revisions[$line['destinationItemId']]=$line['revision'];
+        }
+        if(count($quantities)<1)
+            throw ValidationException::withMessages(['returnQuantities'=>'Select at least one item to return.']);
+        try {
+            $this->lastReturnBatchId=app(HallInventoryInternalLoanReturnService::class)
+                ->send($actor,$this->companyId,$this->returnLoanId,
+                    $this->returnBatchId,$quantities,$revisions,$this->returnHandoverFile);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['returnQuantities'=>$e->getMessage()]);
+        }
+        $this->returnLoanId='';
+        $this->returnBatchId=(string)Str::uuid();
+        $this->returnEligibleLines=[];
+        $this->returnQuantities=[];
+        $this->returnHandoverFile=null;
+        $this->reloadLoanHistory();
+    }
+
+    public function startReturnAcceptance(string $batchId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.loan_return_acceptance_enabled'),403);
+        $row=collect(app(HallInventoryInternalLoanReturnReview::class)->sourceBatches(
+            $actor,$this->companyId,$this->hallId))
+            ->first(fn($b):bool=>$b['batchId']===$batchId && !$b['accepted']);
+        abort_unless($row!==null,403);
+        $this->returnAcceptBatchId=$batchId;
+        $this->returnAcceptanceId=(string)Str::uuid();
+        $this->returnAcceptanceLines=$row['lines'];
+        $this->returnConditionGood=[];
+        $this->returnConditionDamaged=[];
+        $this->returnAcceptanceFile=null;
+        $this->lastReturnAcceptanceId=null;
+    }
+
+    public function submitReturnAcceptance():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.loan_return_acceptance_enabled'),403);
+        $batch=collect(app(HallInventoryInternalLoanReturnReview::class)->sourceBatches(
+            $actor,$this->companyId,$this->hallId))
+            ->first(fn($b):bool=>$b['batchId']===$this->returnAcceptBatchId && !$b['accepted']);
+        abort_unless($batch!==null,403);
+        $this->validate([
+            'returnAcceptanceFile'=>'required|file|max:5120|mimes:jpg,jpeg,png,pdf',
+            'returnConditionGood'=>'required|array',
+            'returnConditionDamaged'=>'required|array',
+        ]);
+        $conditions=[];$sourceRevisions=[];$destRevisions=[];
+        if(count($batch['lines'])<1)abort(403);
+        foreach($batch['lines'] as $line) {
+            $src=$line['sourceItemId'];$dest=$line['destinationItemId'];
+            $good=$this->returnConditionGood[$src]??null;
+            $damaged=$this->returnConditionDamaged[$src]??null;
+            foreach([$good,$damaged] as $value) {
+                if(!is_string($value)||!preg_match('/\A[0-9]{1,9}\z/D',$value))
+                    throw ValidationException::withMessages([
+                        'returnConditionGood'=>'Enter nonnegative whole physical counts for all return lines.'
+                    ]);
+            }
+            if((int)$good+(int)$damaged>$line['sentQuantity'])
+                throw ValidationException::withMessages([
+                    'returnConditionGood'=>'Accepted counts exceed returned physical shipment.'
+                ]);
+            $conditions[$src]=['good'=>(int)$good,'damaged'=>(int)$damaged];
+            $srcPos=DB::table('hall_inventory_positions')
+                ->where('company_id',$this->companyId)->where('hall_id',$this->hallId)
+                ->where('item_id',$src)->first(['revision']);
+            $dstPos=DB::table('hall_inventory_positions')
+                ->where('company_id',$this->companyId)
+                ->where('hall_id',$batch['destinationHallId'])
+                ->where('item_id',$dest)->first(['revision']);
+            $sourceRevisions[$src]=$srcPos?(int)$srcPos->revision:-1;
+            $destRevisions[$dest]=$dstPos?(int)$dstPos->revision:-1;
+        }
+        try {
+            $this->lastReturnAcceptanceId=app(HallInventoryInternalLoanReturnAcceptanceService::class)
+                ->accept($actor,$this->companyId,$this->returnAcceptBatchId,
+                    $this->returnAcceptanceId,$conditions,
+                    $sourceRevisions,$destRevisions,$this->returnAcceptanceFile);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['returnConditionGood'=>$e->getMessage()]);
+        }
+        $this->returnAcceptBatchId='';
+        $this->returnAcceptanceId=(string)Str::uuid();
+        $this->returnAcceptanceLines=[];
+        $this->returnConditionGood=[];
+        $this->returnConditionDamaged=[];
+        $this->returnAcceptanceFile=null;
         $this->reloadLoanHistory();
     }
 

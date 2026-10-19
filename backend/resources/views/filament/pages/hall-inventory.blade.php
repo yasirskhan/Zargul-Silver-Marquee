@@ -530,7 +530,7 @@
                     <div class="space-y-3">
                         @forelse($loanHistory as $loan)
                             <article wire:key="inventory-loan-summary-{{ $loan['id'] }}" class="space-y-2 rounded-lg border p-3 text-sm">
-                                <p class="font-medium">{{ $loan['purpose'] }} — {{ ($loan['viewRole'] ?? 'originating') === 'receiving' ? 'INCOMING REQUEST' : 'OUTGOING REQUEST' }} — {{ ($loan['status'] ?? 'draft_only') === 'destination_received_return_pending' ? 'DESTINATION RECEIVED / RETURNS PENDING' : (($loan['status'] ?? 'draft_only') === 'source_dispatched_receipt_pending' ? 'SOURCE DISPATCHED / DESTINATION RECEIPT PENDING' : 'DRAFT / NOT DISPATCHED') }}</p>
+                                <p class="font-medium">{{ $loan['purpose'] }} — {{ ($loan['viewRole'] ?? 'originating') === 'receiving' ? 'INCOMING REQUEST' : 'OUTGOING REQUEST' }} — {{ ($loan['status'] ?? 'draft_only') === 'partial_return_in_transit_source_ack_pending' ? 'PARTIAL RETURN SENT / SOURCE ACK PENDING' : (($loan['status'] ?? 'draft_only') === 'destination_received_return_pending' ? 'DESTINATION RECEIVED / RETURNS PENDING' : (($loan['status'] ?? 'draft_only') === 'source_dispatched_receipt_pending' ? 'SOURCE DISPATCHED / DESTINATION RECEIPT PENDING' : 'DRAFT / NOT DISPATCHED')) }}</p>
                                 <p>Reference: {{ $loan['id'] }}. Return expected: {{ $loan['expectedReturnDate'] }}.</p>
                                 <p>Source: {{ $loan['lendingHallName'] ?? $loan['externalPartnerName'] ?? 'Not assigned' }}.
                                    Destination: {{ $loan['borrowingHallName'] ?? $loan['externalPartnerName'] ?? 'Not assigned' }}.</p>
@@ -539,6 +539,15 @@
                                         <li>{{ $line['name'] }} — {{ $line['quantity'] }} {{ $line['unit'] }}</li>
                                     @endforeach
                                 </ul>
+                                @if(config('inventory_controls.loan_returns_enabled') &&
+                                    ($loan['viewRole'] ?? '') === 'receiving' &&
+                                    in_array(($loan['status'] ?? ''),[
+                                        'destination_received_return_pending',
+                                        'partial_return_in_transit_source_ack_pending'
+                                    ],true))
+                                    <button type="button" wire:click="startInternalReturn('{{ $loan['id'] }}')"
+                                        class="rounded-lg border px-3 py-2 text-sm">Prepare partial return shipment</button>
+                                @endif
                                 @if(config('inventory_controls.loan_receipt_enabled') &&
                                     config('inventory_controls.loan_dispatch_enabled') &&
                                     ($loan['viewRole'] ?? '') === 'receiving' &&
@@ -588,6 +597,99 @@
                 @if($lastLoanReceiptReference)
                     <p role="status" class="rounded-lg bg-amber-100 p-3 text-sm text-amber-900">
                         Receiving custody recorded: {{ $lastLoanReceiptReference }}. Source stock remains on loan until independently returned.
+                    </p>
+                @endif
+                @if(config('inventory_controls.loan_returns_enabled') && $returnLoanId !== '')
+                    <section class="space-y-3 rounded-xl border p-4" aria-label="Send partial physical borrowed return">
+                        <h3 class="font-semibold">Send a partial borrowed-stock return</h3>
+                        <p class="text-sm">This moves destination borrowed stock into transit only. The lender must independently inspect, accept and record condition.</p>
+                        <p class="text-xs">Loan: {{ $returnLoanId }}</p>
+                        @foreach($returnEligibleLines as $line)
+                            @if($line['returnableQuantity']>0)
+                                <label class="block space-y-1" wire:key="return-line-{{ $line['sourceItemId'] }}">
+                                    <span class="text-sm">{{ $line['name'] }} — available {{ $line['returnableQuantity'] }} {{ $line['unit'] }}</span>
+                                    <input type="number" min="1" max="{{ $line['returnableQuantity'] }}"
+                                        wire:model="returnQuantities.{{ $line['sourceItemId'] }}"
+                                        class="w-full rounded-lg border p-2 text-gray-900"
+                                        placeholder="Quantity to physically return">
+                                </label>
+                            @endif
+                        @endforeach
+                        <label class="block space-y-1"><span class="text-sm">Physical return handover PDF or photo</span>
+                            <input type="file" wire:model="returnHandoverFile" accept=".jpg,.jpeg,.png,.pdf"
+                                class="w-full rounded-lg border p-3">
+                        </label>
+                        @error('returnQuantities') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                        @error('returnHandoverFile') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                        <button type="button" wire:click="sendInternalReturn" class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">
+                            Record witnessed return shipment
+                        </button>
+                    </section>
+                @endif
+                @if($lastReturnBatchId)
+                    <p role="status" class="rounded-lg bg-amber-100 p-3 text-sm text-amber-900">
+                        Return shipment {{ $lastReturnBatchId }} is in transit. Lender condition review and physical acknowledgment remain required.
+                    </p>
+                @endif
+                @if(config('inventory_controls.loan_returns_enabled') &&
+                    config('inventory_controls.loan_return_acceptance_enabled'))
+                    <section class="space-y-3 rounded-xl border p-4" aria-label="Incoming physical return batches">
+                        <h3 class="font-semibold">Returned stock awaiting source-hall confirmation</h3>
+                        @forelse($returnSourceHistory as $batch)
+                            <article class="rounded-lg border p-3 text-sm" wire:key="return-source-batch-{{ $batch['batchId'] }}">
+                                <p>Loan {{ $batch['loanId'] }} / return {{ $batch['batchId'] }}</p>
+                                <p>{{ $batch['accepted'] ? 'REVIEW RECORDED / UNRESOLVED OBLIGATIONS MUST BE CHECKED' : 'IN TRANSIT / SOURCE ACKNOWLEDGMENT REQUIRED' }}</p>
+                                <ul class="list-inside list-disc">
+                                    @foreach($batch['lines'] as $line)
+                                        <li>{{ $line['name'] }} — {{ $line['sentQuantity'] }} {{ $line['unit'] }}</li>
+                                    @endforeach
+                                </ul>
+                                @if(!$batch['accepted'])
+                                    <button type="button" wire:click="startReturnAcceptance('{{ $batch['batchId'] }}')"
+                                        class="rounded-lg border px-3 py-2 text-sm">Review physically returned items</button>
+                                @endif
+                            </article>
+                        @empty
+                            <p class="text-sm text-gray-600 dark:text-gray-300">No source return shipments awaiting review.</p>
+                        @endforelse
+                    </section>
+                @endif
+                @if(config('inventory_controls.loan_return_acceptance_enabled') && $returnAcceptBatchId !== '')
+                    <section class="space-y-3 rounded-xl border p-4" aria-label="Accept returned physical stock by condition">
+                        <h3 class="font-semibold">Independent lender return condition count</h3>
+                        <p>Acceptance requires physical evidence. Any unaccounted quantity stays outstanding and cannot close the loan.</p>
+                        <p class="text-xs">Return batch: {{ $returnAcceptBatchId }}</p>
+                        @foreach($returnAcceptanceLines as $line)
+                            <div wire:key="accept-return-line-{{ $line['sourceItemId'] }}" class="space-y-2 rounded-lg border p-3">
+                                <p class="text-sm font-medium">{{ $line['name'] }} — shipped {{ $line['sentQuantity'] }} {{ $line['unit'] }}</p>
+                                <label class="block text-sm">Physically good quantity
+                                    <input type="number" min="0" max="{{ $line['sentQuantity'] }}"
+                                        wire:model="returnConditionGood.{{ $line['sourceItemId'] }}"
+                                        class="w-full rounded-lg border p-2 text-gray-900">
+                                </label>
+                                <label class="block text-sm">Physically damaged quantity
+                                    <input type="number" min="0" max="{{ $line['sentQuantity'] }}"
+                                        wire:model="returnConditionDamaged.{{ $line['sourceItemId'] }}"
+                                        class="w-full rounded-lg border p-2 text-gray-900">
+                                </label>
+                            </div>
+                        @endforeach
+                        <label class="block space-y-1"><span class="text-sm">Source physical inspection evidence (PDF or photo)</span>
+                            <input type="file" wire:model="returnAcceptanceFile" accept=".jpg,.jpeg,.png,.pdf"
+                                class="w-full rounded-lg border p-3">
+                        </label>
+                        @error('returnConditionGood') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                        @error('returnAcceptanceFile') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                        <button type="button" wire:click="submitReturnAcceptance"
+                            class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">
+                            Accept observed good/damaged return quantities
+                        </button>
+                    </section>
+                @endif
+                @if($lastReturnAcceptanceId)
+                    <p role="status" class="rounded-lg bg-amber-100 p-3 text-sm text-amber-900">
+                        Independent source return acknowledgment {{ $lastReturnAcceptanceId }} recorded.
+                        No loan completion or money settlement was inferred.
                     </p>
                 @endif
             </section>

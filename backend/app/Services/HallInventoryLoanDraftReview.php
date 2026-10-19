@@ -47,6 +47,14 @@ final class HallInventoryLoanDraftReview
                 $join->on('ld.company_id','=','d.company_id')
                     ->on('ld.loan_id','=','d.id');
             })
+            ->leftJoinSub(
+                DB::table('hall_inventory_internal_loan_return_batches')
+                    ->select(['company_id','loan_id'])
+                    ->selectRaw('COUNT(*) AS return_batch_count')
+                    ->groupBy('company_id','loan_id'),'rb',function($join):void {
+                    $join->on('rb.company_id','=','d.company_id')
+                        ->on('rb.loan_id','=','d.id');
+                })
             ->leftJoin('hall_inventory_internal_loan_receipts as lr', function ($join):void {
                 $join->on('lr.company_id','=','d.company_id')
                     ->on('lr.loan_id','=','d.id');
@@ -82,6 +90,7 @@ final class HallInventoryLoanDraftReview
                 'd.expected_return_date','d.purpose','d.created_at',
                 'ld.id as dispatch_id','ld.created_at as dispatched_at',
                 'lr.id as receipt_id','lr.created_at as received_at',
+                'rb.return_batch_count',
                 'p.name as external_partner_name',
                 'lh.name as lending_hall_name','bh.name as borrowing_hall_name',
             ]);
@@ -107,7 +116,9 @@ final class HallInventoryLoanDraftReview
                 'purpose'=>(string)$draft->purpose,
                 'createdAt'=>(string)$draft->created_at,
                 'status'=>$draft->receipt_id !== null
-                    ? 'destination_received_return_pending'
+                    ? ((int)($draft->return_batch_count??0)>0
+                        ? 'partial_return_in_transit_source_ack_pending'
+                        : 'destination_received_return_pending')
                     : ($draft->dispatch_id !== null
                         ? 'source_dispatched_receipt_pending' : 'draft_only'),
                 'viewRole'=>($draft->direction==='internal' &&
