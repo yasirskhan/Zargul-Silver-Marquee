@@ -99,6 +99,22 @@ class HallInventoryInternalLoanDispatchServiceTest extends TestCase
         }
         $this->assertSame(1,DB::table('hall_inventory_loan_dispatches')->count());
         $this->assertSame(2,DB::table('hall_inventory_loan_dispatch_lines')->count());
+        $alienItem=(string)Str::uuid();
+        $catalog->create($owner,$company->id,$source->id,$alienItem,
+            'Unrelated lamps','Lighting','piece',1,'Other valid source catalog item');
+        $firstMovement=DB::table('hall_inventory_movement_events')
+            ->where('event_kind','dispatch_owned_loan')->value('id');
+        try {
+            DB::transaction(function()use($company,$source,$dispatchId,$alienItem,$firstMovement):void {
+                DB::table('hall_inventory_loan_dispatch_lines')->insert([
+                    'id'=>(string)Str::uuid(),'company_id'=>$company->id,
+                    'dispatch_id'=>$dispatchId,'hall_id'=>$source->id,
+                    'item_id'=>$alienItem,'movement_id'=>$firstMovement,'quantity'=>1
+                ]);
+            });
+            $this->fail('Cross-item valid movement was bound to unrelated dispatch line.');
+        }catch(\Illuminate\Database\QueryException){}
+
         $this->assertSame(2,DB::table('hall_inventory_movement_events')
             ->where('event_kind','dispatch_owned_loan')->count());
         $this->assertSame(1,DB::table('audit_events')
