@@ -39,7 +39,8 @@ final class CentralStaffPortalHttpRouter
         private readonly ?CentralStaffVendorInvoiceDirectory $invoiceDirectory = null,
         private readonly ?CentralStaffVendorPlanPublisher $planPublisher = null,
         private readonly ?CentralStaffVendorPlanCatalogReader $planCatalog = null,
-        private readonly ?CentralStaffPortalHome $staffHome = null
+        private readonly ?CentralStaffPortalHome $staffHome = null,
+        private readonly ?CentralStaffCustomerDirectory $customerDirectory = null
     ) {}
 
     /**
@@ -112,6 +113,20 @@ final class CentralStaffPortalHttpRouter
             }
             return ['kind'=>'private_staff_home_html',
                 'html'=>$this->staffHome->render($bearer,$csrfHeader)];
+        }
+        if($uri==='/staff/customers/directory' && $this->customerDirectory!==null) {
+            if(!$this->exactFields($fields,['search']) ||
+                !is_string($fields['search'])) {
+                throw new RegistrationError('invalid_customer_directory_request',422);
+            }
+            if(!$this->boundary->permitsOwnAccountMutation(
+                    $server,$bearer,$csrfHeader)) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            $rows=$this->customerDirectory->search($bearer,$fields['search'],20);
+            return ['kind'=>'private_customer_directory_html',
+                'html'=>CentralStaffCustomerDirectoryRenderer::html(
+                    $rows,$csrfHeader,$fields['search'])];
         }
         if ($uri==='/staff/billing/invoices/issue' && $this->invoiceIssuer!==null) {
             if (!$this->exactFields($fields,

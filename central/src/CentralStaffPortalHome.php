@@ -60,6 +60,9 @@ final class CentralStaffPortalHome
             '<p>Use a known authorized customer ID. Access is checked again '.
             'for billing, licensing or support. No search across customers '.
             'or account information is exposed here.</p>'.
+            '<form method="post" action="/staff/customers/directory">'.$hidden.
+            '<input type="hidden" name="search" value="">'.
+            '<button type="submit">Find assigned customers</button></form>'.
             '<form method="post" action="/staff/dashboard">'.$hidden.
             '<label>Customer ID <input name="customer_id" type="text" '.
             'maxlength="36" pattern="[0-9a-fA-F-]{36}" required></label>'.
