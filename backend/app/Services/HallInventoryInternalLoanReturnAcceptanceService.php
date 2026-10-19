@@ -72,7 +72,7 @@ final class HallInventoryInternalLoanReturnAcceptanceService
         return DB::transaction(function()use($actor,$companyId,$batchId,$acceptanceId,
             $conditionBySource,$sourceRevisions,$destRevisions,$bytes,$size,$sha,$fingerprint,$disk,$key):string {
             $batch=DB::table('hall_inventory_internal_loan_return_batches')
-                ->where('company_id',$companyId)->where('id',$batchId)->lockForUpdate()->first();
+                ->where('company_id',$companyId)->where('id',$batchId)->first();
             if(!$batch)throw new ConflictHttpException('Original return batch was not found.');
             $draft=DB::table('hall_inventory_loan_drafts')
                 ->where('company_id',$companyId)->where('id',$batch->loan_id)
@@ -86,6 +86,13 @@ final class HallInventoryInternalLoanReturnAcceptanceService
             $halls=Hall::query()->where('company_id',$companyId)
                 ->whereIn('id',$hallIds)->where('is_active',true)
                 ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            // Lock draft, then both halls, then immutable return batch in a
+            // consistent order with destination return shipment transactions.
+            $batch=DB::table('hall_inventory_internal_loan_return_batches')
+                ->where('company_id',$companyId)->where('id',$batchId)
+                ->lockForUpdate()->first();
+            if(!$batch||$batch->loan_id!==$draft->id)
+                throw new ConflictHttpException('Return batch scope changed.');
             $source=$halls->get($draft->lending_hall_id);
             if($halls->count()!==2||!$source||!Auth::check()||
                 (int)Auth::id()!==(int)$actor->getKey()||

@@ -116,5 +116,63 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         // Source ownership stays ON LOAN until independent arrival/condition review.
         $this->assertSame(12,(int)DB::table('hall_inventory_positions')
             ->where('hall_id',$src->id)->where('item_id',$srcItem)->value('owned_on_loan'));
+        $acceptor=app(\\App\\Services\\HallInventoryInternalLoanReturnAcceptanceService::class);
+        $acceptance=(string)Str::uuid();
+        $conditions=[$srcItem=>['good'=>3,'damaged'=>1]];
+        $this->be($owner);
+        try {
+            $acceptor->accept($owner,$company->id,$first,$acceptance,
+                $conditions,[$srcItem=>1],[$dstItem=>3],$pdf());
+            $this->fail('Unreleased independent return acceptance posted stock.');
+        }catch(ConflictHttpException){}
+        config()->set('inventory_controls.loan_return_acceptance_enabled',true);
+        try {
+            $acceptor->accept($owner,$company->id,$first,$acceptance,
+                $conditions,[$srcItem=>0],[$dstItem=>3],$pdf());
+            $this->fail('Stale source return acceptance revision accepted.');
+        }catch(ConflictHttpException){}
+        $this->be($receiver);
+        try {
+            $acceptor->accept($receiver,$company->id,$first,$acceptance,
+                $conditions,[$srcItem=>1],[$dstItem=>3],$pdf());
+            $this->fail('Destination return sender self-accepted source stock.');
+        }catch(AuthorizationException){}
+        $this->be($owner);
+        $this->assertSame($acceptance,$acceptor->accept(
+            $owner,$company->id,$first,$acceptance,$conditions,
+            [$srcItem=>1],[$dstItem=>3],$pdf()));
+        $this->assertSame($acceptance,$acceptor->accept(
+            $owner,$company->id,$first,$acceptance,$conditions,
+            [$srcItem=>1],[$dstItem=>3],$pdf()));
+        $sourceAfter=DB::table('hall_inventory_positions')
+            ->where('hall_id',$src->id)->where('item_id',$srcItem)->first();
+        $destAfter=DB::table('hall_inventory_positions')
+            ->where('hall_id',$dest->id)->where('item_id',$dstItem)->first();
+        $this->assertSame(21,(int)$sourceAfter->owned_usable);
+        $this->assertSame(8,(int)$sourceAfter->owned_on_loan);
+        $this->assertSame(1,(int)$sourceAfter->owned_damaged);
+        $this->assertSame(4,(int)$destAfter->borrowed_usable);
+        $this->assertSame(4,(int)$destAfter->borrowed_transit);
+        $this->assertSame(0,(int)$destAfter->borrowed_damaged);
+        $this->assertSame(3,(int)$sourceAfter->revision);
+        $this->assertSame(4,(int)$destAfter->revision);
+        $this->assertSame(1,DB::table('hall_inventory_internal_loan_return_acceptances')->count());
+        $acceptedLine=DB::table('hall_inventory_internal_loan_return_acceptance_lines')->first();
+        $this->assertSame(3,(int)$acceptedLine->good_quantity);
+        $this->assertSame(1,(int)$acceptedLine->damaged_quantity);
+        $this->assertSame(1,(int)$acceptedLine->unresolved_quantity);
+        $this->assertSame(1,DB::table('hall_inventory_movement_events')
+            ->where('event_kind','return_owned_good')->count());
+        $this->assertSame(1,DB::table('hall_inventory_movement_events')
+            ->where('event_kind','return_owned_damaged')->count());
+        $this->assertSame(1,DB::table('hall_inventory_movement_events')
+            ->where('event_kind','confirm_borrowed_return')->count());
+        try{
+            $acceptor->accept($owner,$company->id,$first,$acceptance,
+                [$srcItem=>['good'=>4,'damaged'=>0]],[$srcItem=>1],[$dstItem=>3],$pdf());
+            $this->fail('Changed accepted return condition replayed.');
+        }catch(ConflictHttpException){}
+        $this->assertSame(0,DB::table('finance_journals')->count());
+        // Outstanding transit and damages require further reconciliation.
     }
 }
