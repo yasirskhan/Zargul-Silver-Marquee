@@ -119,7 +119,7 @@ class HallInventoryLivewireTest extends TestCase
             ->set('loanPurpose', 'Hall B evening wedding request')
             ->call('submitLoanDraft')->assertHasNoErrors()
             ->assertSee('Multi-item loan request saved')
-            ->assertSee('Saved borrowing requests (draft only)')
+            ->assertSee('Borrowing requests and source dispatch status')
             ->assertSee('Hall B evening wedding request')
             ->assertSee('50 piece')
             ->assertSee('100 piece');
