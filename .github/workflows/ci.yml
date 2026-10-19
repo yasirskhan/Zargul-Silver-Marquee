@@ -117,6 +117,7 @@ jobs:
           php central/tests/vendor_receiving_directory.php
           php central/tests/payment_eligibility.php
           php central/tests/staff_vendor_invoice_issuance.php
+          php central/tests/staff_vendor_plan_publisher.php
           php central/tests/domain_ownership.php
           php central/tests/license_term_calendar.php
           php central/tests/grant_signature_codec.php
