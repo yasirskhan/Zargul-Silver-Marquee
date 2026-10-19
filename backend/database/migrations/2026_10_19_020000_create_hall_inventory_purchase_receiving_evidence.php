@@ -8,7 +8,7 @@ return new class extends Migration {
     public function up():void {
         Schema::create('hall_inventory_purchase_receiving_evidence',function(Blueprint $t):void {
             $t->uuid('id')->primary();
-            $t->uuid('purchase_request_id')->unique();
+            $t->uuid('purchase_request_id')->unique('purchase_receiving_request_unique');
             $t->uuid('company_id'); $t->uuid('hall_id'); $t->uuid('item_id');
             $t->unsignedInteger('counted_quantity');
             $t->string('physical_evidence_reference',300);
