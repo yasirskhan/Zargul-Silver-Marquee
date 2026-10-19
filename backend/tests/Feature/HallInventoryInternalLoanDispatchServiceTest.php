@@ -97,6 +97,19 @@ class HallInventoryInternalLoanDispatchServiceTest extends TestCase
             $this->assertSame(0,(int)$pos->borrowed_usable);
             $this->assertSame(1,(int)$pos->revision);
         }
+        $review=app(\\App\\Services\\HallInventoryLoanDraftReview::class);
+        $sourceHistory=$review->recent($admin,$company->id,$source->id);
+        $destinationHistory=$review->recent($admin,$company->id,$dest->id);
+        $this->assertSame('source_dispatched_receipt_pending',$sourceHistory[0]['status']);
+        $this->assertTrue($sourceHistory[0]['stockMoved']);
+        $this->assertTrue($sourceHistory[0]['sourceDispatchRecorded']);
+        $this->assertFalse($sourceHistory[0]['destinationReceiptConfirmed']);
+        $this->assertSame('receiving',$destinationHistory[0]['viewRole']);
+        $this->assertSame('source_dispatched_receipt_pending',$destinationHistory[0]['status']);
+        $this->assertTrue($destinationHistory[0]['stockMoved']);
+        $this->assertFalse($destinationHistory[0]['destinationReceiptConfirmed']);
+        $this->assertNotNull($sourceHistory[0]['dispatchedAt']);
+        $this->assertSame(0,DB::table('finance_journals')->count());
         $this->assertSame(1,DB::table('hall_inventory_loan_dispatches')->count());
         $this->assertSame(2,DB::table('hall_inventory_loan_dispatch_lines')->count());
         $alienItem=(string)Str::uuid();

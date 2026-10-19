@@ -43,6 +43,10 @@ final class HallInventoryLoanDraftReview
         }
 
         $drafts=DB::table('hall_inventory_loan_drafts as d')
+            ->leftJoin('hall_inventory_loan_dispatches as ld', function ($join):void {
+                $join->on('ld.company_id','=','d.company_id')
+                    ->on('ld.loan_id','=','d.id');
+            })
             ->leftJoin('hall_inventory_external_partners as p', function ($join):void {
                 $join->on('p.id','=','d.external_partner_id')
                     ->on('p.company_id','=','d.company_id');
@@ -72,6 +76,7 @@ final class HallInventoryLoanDraftReview
             ->get([
                 'd.id','d.direction','d.lending_hall_id','d.borrowing_hall_id',
                 'd.expected_return_date','d.purpose','d.created_at',
+                'ld.id as dispatch_id','ld.created_at as dispatched_at',
                 'p.name as external_partner_name',
                 'lh.name as lending_hall_name','bh.name as borrowing_hall_name',
             ]);
@@ -96,10 +101,15 @@ final class HallInventoryLoanDraftReview
                 'expectedReturnDate'=>(string)$draft->expected_return_date,
                 'purpose'=>(string)$draft->purpose,
                 'createdAt'=>(string)$draft->created_at,
-                'status'=>'draft_only',
+                'status'=>$draft->dispatch_id !== null
+                    ? 'source_dispatched_receipt_pending' : 'draft_only',
                 'viewRole'=>($draft->direction==='internal' &&
                     $draft->borrowing_hall_id=== $hallId) ? 'receiving' : 'originating',
-                'stockMoved'=>false,
+                'stockMoved'=>$draft->dispatch_id !== null,
+                'sourceDispatchRecorded'=>$draft->dispatch_id !== null,
+                'destinationReceiptConfirmed'=>false,
+                'dispatchedAt'=>$draft->dispatched_at !== null
+                    ? (string)$draft->dispatched_at : null,
                 'lines'=>($lines->get($draft->id)??collect())->map(
                     static fn($line):array=>[
                         'name'=>(string)$line->item_name_snapshot,
