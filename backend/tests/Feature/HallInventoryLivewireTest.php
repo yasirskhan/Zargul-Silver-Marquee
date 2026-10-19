@@ -152,7 +152,7 @@ class HallInventoryLivewireTest extends TestCase
         $this->be($receiver);
         Livewire::test(HallInventory::class)
             ->assertSee('Marquee B')
-            ->assertDontSee('Marquee A')
+            ->assertSet('hallId', $destination->id)
             ->assertSee('Incoming chairs for destination')
             ->assertSee('INCOMING REQUEST')
             ->assertSee('DRAFT / NOT DISPATCHED');
