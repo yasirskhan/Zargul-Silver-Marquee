@@ -75,5 +75,7 @@ INV-012-FK-TEST,Distinct-parent PostgreSQL cross-binding regression coverage,12,
 
 INV-012-UI,Authenticated physical receiving and third-actor review forms,12,Implementation published CI pending,Livewire hall-scoped manager receiving and owner-admin review with independent actors validation logout role revocation stock and finance unchanged
 
-INV-013-VIS,Read-only receiving-hall internal loan draft visibility,12,Implementation published CI pending,Assigned receiving hall staff can inspect incoming internal multi-item drafts without authority to change lending hall owned stock; source/destination isolation and revocation tested; no dispatch or payment
-INV-013-UI,Incoming and outgoing loan draft owner manager labels,12,Prepared CI pending,Clearly identify incoming versus outgoing request on selected hall without implying dispatched owned borrowed stock; requires exact six-job CI
+INV-013-VIS,Read-only receiving-hall internal loan draft visibility,12,Verified foundation CI 39315865530,Assigned receiving hall staff can inspect incoming internal multi-item drafts without authority to change lending hall owned stock; source/destination isolation and revocation tested; no dispatch or payment
+INV-013-UI,Incoming and outgoing loan draft owner manager labels,12,Verified foundation CI 39316926171,Clearly identify incoming versus outgoing request on selected hall without implying dispatched owned borrowed stock; requires exact six-job CI
+
+INV-012-DOWNLOAD,Private purchase receiving evidence download by independent reviewer,12,Implementation published CI pending,Scoped owner admin-only actual bytes with digest check attachment-only secure headers immutable read audit; no verified supplier payment or certified source authenticity; CI 39317840329

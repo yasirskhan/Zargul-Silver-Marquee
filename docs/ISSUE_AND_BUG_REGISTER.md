@@ -107,3 +107,8 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Source/CI: `a4050b7d0714337de0791555e992b3f994d4ad12`, first run [39312723278](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39312723278) attempt 1, `authenticated-panel-e2e` failed waiting for operations TOTP input. Five other jobs were green.
 - Retry of the same job on attempt 2 passed without code change. Root cause NOT established; not proof of a product MFA bypass. Continue diagnostics before any browser acceptance stability remediation. Never skip MFA, hide assertion or loosen authentication. Production inventory flags remain OFF.
 - Status: INTERMITTENT / UNDER INVESTIGATION. Severity pending reproduction; no claim of corrected source.
+
+
+## 2026-10-19 — Read-only destination loan review milestone closed
+- New INV-013-VIS and INV-013-UI did not relax owning hall permissions, did not post inventory/finance, and received six-job CI success at `39b85575` (39315865530) and `67292f8f` (39316926171).
+- Previous intermittent browser operations MFA challenge issue remains NOT root-cause resolved. Prior retry passing is not evidence of a repaired product defect. Do not skip or relax TOTP.
