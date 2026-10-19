@@ -79,6 +79,11 @@ final class HallInventoryInternalLoanReturnService
                 ->where('company_id',$companyId)->where('loan_id',$loanId)
                 ->where('receiving_hall_id',$destination->id)->lockForUpdate()->first();
             if (!$receipt)throw new ConflictHttpException('Loan was not independently received.');
+            $sourceDispatch=DB::table('hall_inventory_loan_dispatches')
+                ->where('company_id',$companyId)->where('loan_id',$loanId)->first();
+            if (!$sourceDispatch || (int)$actor->getKey()===(int)$draft->created_by ||
+                (int)$actor->getKey()===(int)$sourceDispatch->dispatched_by)
+                throw new AuthorizationException('Source actors cannot independently return destination custody.');
             if (!$disk->exists((string)$receipt->evidence_storage_path))
                 throw new ConflictHttpException('Original receiving evidence is missing.');
             $receiptBytes=$disk->get((string)$receipt->evidence_storage_path);
