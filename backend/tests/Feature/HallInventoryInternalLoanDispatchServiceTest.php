@@ -100,8 +100,10 @@ class HallInventoryInternalLoanDispatchServiceTest extends TestCase
         $this->assertSame(1,DB::table('hall_inventory_loan_dispatches')->count());
         $this->assertSame(2,DB::table('hall_inventory_loan_dispatch_lines')->count());
         $alienItem=(string)Str::uuid();
+        $this->be($owner);
         $catalog->create($owner,$company->id,$source->id,$alienItem,
             'Unrelated lamps','Lighting','piece',1,'Other valid source catalog item');
+        $this->be($admin);
         $firstMovement=DB::table('hall_inventory_movement_events')
             ->where('event_kind','dispatch_owned_loan')->value('id');
         try {
