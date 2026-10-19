@@ -6,6 +6,10 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
     public function up():void {
+        // PostgreSQL requires an explicit unique target for composite scoped FK.
+        Schema::table('hall_inventory_purchase_requests',function(Blueprint $t):void {
+            $t->unique(['company_id','hall_id','id'],'purchase_file_parent_scope_unique');
+        });
         Schema::create('hall_inventory_purchase_evidence_files',function(Blueprint $t):void {
             $t->uuid('id')->primary();
             $t->uuid('company_id'); $t->uuid('hall_id');
@@ -28,5 +32,8 @@ return new class extends Migration {
         if(DB::table('hall_inventory_purchase_evidence_files')->exists())
             throw new RuntimeException('Purchase evidence files require archival before rollback.');
         Schema::dropIfExists('hall_inventory_purchase_evidence_files');
+        Schema::table('hall_inventory_purchase_requests',function(Blueprint $t):void {
+            $t->dropUnique('purchase_file_parent_scope_unique');
+        });
     }
 };
