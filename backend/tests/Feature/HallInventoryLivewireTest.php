@@ -429,4 +429,87 @@ class HallInventoryLivewireTest extends TestCase
         $this->assertSame(0,DB::table('finance_journals')->count());
     }
 
+
+    public function test_internal_partial_return_livewire_requires_independent_source_acknowledgement():void
+    {
+        [$company,$source,$destination,$sourceManager]=$this->fixture();
+        config()->set('inventory_controls.catalog_enabled',true);
+        config()->set('inventory_controls.loan_drafts_enabled',true);
+        config()->set('inventory_controls.loan_dispatch_enabled',true);
+        config()->set('inventory_controls.loan_receipt_enabled',true);
+        config()->set('inventory_controls.loan_returns_enabled',true);
+        config()->set('inventory_controls.loan_return_acceptance_enabled',true);
+        \Illuminate\Support\Facades\Storage::fake('local');
+        $owner=User::create(['name'=>'Return Source Approver',
+            'email'=>'return-ui-source-approver@example.test','password'=>'test-only']);
+        $owner->markEmailAsVerified();
+        CompanyMembership::create(['company_id'=>$company->id,
+            'user_id'=>$owner->id,'role'=>'owner']);
+        $receiver=User::create(['name'=>'Return Destination Manager',
+            'email'=>'return-ui-destination-manager@example.test','password'=>'test-only']);
+        $receiver->markEmailAsVerified();
+        $membership=CompanyMembership::create(['company_id'=>$company->id,
+            'user_id'=>$receiver->id,'role'=>'manager']);
+        HallAssignment::create(['company_id'=>$company->id,
+            'membership_id'=>$membership->id,'hall_id'=>$destination->id]);
+        $sourceItem=(string)\Illuminate\Support\Str::uuid();
+        $destItem=(string)\Illuminate\Support\Str::uuid();
+        $catalog=app(\App\Services\HallInventoryCatalogService::class);
+        $catalog->create($sourceManager,$company->id,$source->id,$sourceItem,
+            'Returned linen','Linen','piece',2,'Source loan catalog');
+        $this->be($owner);
+        $catalog->create($owner,$company->id,$destination->id,$destItem,
+            'Returned linen','Linen','piece',2,'Destination loan catalog');
+        DB::table('hall_inventory_positions')->insert([
+            'id'=>(string)\Illuminate\Support\Str::uuid(),'company_id'=>$company->id,
+            'hall_id'=>$source->id,'item_id'=>$sourceItem,
+            'owned_usable'=>20,'revision'=>0,'created_at'=>now(),'updated_at'=>now()
+        ]);
+        $loan=(string)\Illuminate\Support\Str::uuid();
+        $this->be($sourceManager);
+        app(\App\Services\HallInventoryLoanDraftService::class)->create(
+            $sourceManager,$company->id,$loan,'internal',$source->id,$destination->id,
+            [['itemId'=>$sourceItem,'quantity'=>6]],'2027-09-30',
+            'UI partial return with independent owner receipt');
+        $pdf=fn()=>\Illuminate\Http\UploadedFile::fake()->createWithContent(
+            'handover.pdf',"%PDF-1.4\\n1 0 obj\\n<<>>\\nendobj\\n%%EOF");
+        $this->be($owner);
+        app(\App\Services\HallInventoryInternalLoanDispatchService::class)->dispatch(
+            $owner,$company->id,$loan,(string)\Illuminate\Support\Str::uuid(),
+            [$sourceItem=>0],$pdf());
+        $this->be($receiver);
+        app(\App\Services\HallInventoryInternalLoanReceiptService::class)->receive(
+            $receiver,$company->id,$loan,(string)\Illuminate\Support\Str::uuid(),
+            [$sourceItem=>$destItem],[$destItem=>0],$pdf());
+        Livewire::test(HallInventory::class)
+            ->assertSet('hallId',$destination->id)
+            ->call('startInternalReturn',$loan)->assertHasNoErrors()
+            ->set('returnQuantities.'.$sourceItem,'4')
+            ->set('returnHandoverFile',$pdf())
+            ->call('sendInternalReturn')->assertHasNoErrors();
+        $batch=DB::table('hall_inventory_internal_loan_return_batches')->value('id');
+        $this->assertNotNull($batch);
+        $this->assertSame(2,(int)DB::table('hall_inventory_positions')
+            ->where('hall_id',$destination->id)->where('item_id',$destItem)->value('borrowed_usable'));
+        $this->assertSame(4,(int)DB::table('hall_inventory_positions')
+            ->where('hall_id',$destination->id)->where('item_id',$destItem)->value('borrowed_transit'));
+        $this->be($owner);
+        Livewire::test(HallInventory::class)
+            ->assertSet('hallId',$source->id)
+            ->call('startReturnAcceptance',$batch)->assertHasNoErrors()
+            ->set('returnConditionGood.'.$sourceItem,'3')
+            ->set('returnConditionDamaged.'.$sourceItem,'1')
+            ->set('returnAcceptanceFile',$pdf())
+            ->call('submitReturnAcceptance')->assertHasNoErrors();
+        $this->assertSame(1,DB::table('hall_inventory_internal_loan_return_acceptances')->count());
+        $this->assertSame(17,(int)DB::table('hall_inventory_positions')
+            ->where('hall_id',$source->id)->where('item_id',$sourceItem)->value('owned_usable'));
+        $this->assertSame(2,(int)DB::table('hall_inventory_positions')
+            ->where('hall_id',$source->id)->where('item_id',$sourceItem)->value('owned_on_loan'));
+        $this->assertSame(1,(int)DB::table('hall_inventory_positions')
+            ->where('hall_id',$source->id)->where('item_id',$sourceItem)->value('owned_damaged'));
+        $this->assertSame(0,DB::table('finance_journals')->count());
+        Livewire::test(HallInventory::class)->call('startReturnAcceptance',$batch)
+            ->assertForbidden();
+    }
 }
