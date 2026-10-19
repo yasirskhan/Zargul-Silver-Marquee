@@ -205,5 +205,21 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         $this->assertCount(1,$pending);
         $this->assertSame('SOURCE_REVIEW_RECORDED_OUTSTANDING_CHECK_REQUIRED',$recorded[0]['state']);
         // Outstanding transit and damages require further reconciliation.
+        // Source can independently acknowledge the second batch as well,
+        // but even after every batch has a review, unresolved original
+        // quantities and damage prohibit a completed-loan label.
+        $secondAcceptance=(string)Str::uuid();
+        $acceptor->accept($owner,$company->id,$second,$secondAcceptance,
+            [$srcItem=>['good'=>3,'damaged'=>0]],[$srcItem=>3],[$dstItem=>4],$pdf());
+        $loanRows=app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($owner,$company->id,$src->id);
+        $loanHistory=collect($loanRows)->firstWhere('id',$loan);
+        $this->assertSame('return_acknowledged_outstanding_reconciliation_required',
+            $loanHistory['status']);
+        $this->assertTrue($loanHistory['stockMoved']);
+        $this->assertSame(1,(int)DB::table('hall_inventory_positions')
+            ->where('hall_id',$dest->id)->where('item_id',$dstItem)->value('borrowed_transit'));
+        $this->assertSame(0,DB::table('finance_journals')->count());
+
     }
 }

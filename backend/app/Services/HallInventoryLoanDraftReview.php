@@ -49,9 +49,15 @@ final class HallInventoryLoanDraftReview
             })
             ->leftJoinSub(
                 DB::table('hall_inventory_internal_loan_return_batches')
-                    ->select(['company_id','loan_id'])
-                    ->selectRaw('COUNT(*) AS return_batch_count')
-                    ->groupBy('company_id','loan_id'),'rb',function($join):void {
+                    ->select(['hall_inventory_internal_loan_return_batches.company_id',
+                        'hall_inventory_internal_loan_return_batches.loan_id'])
+                    ->leftJoin('hall_inventory_internal_loan_return_acceptances as ra',function($join):void {
+                        $join->on('ra.company_id','=','hall_inventory_internal_loan_return_batches.company_id')
+                            ->on('ra.return_batch_id','=','hall_inventory_internal_loan_return_batches.id');
+                    })
+                    ->selectRaw('COUNT(*) AS return_batch_count, COUNT(ra.id) AS acknowledged_batch_count')
+                    ->groupBy('hall_inventory_internal_loan_return_batches.company_id',
+                        'hall_inventory_internal_loan_return_batches.loan_id'),'rb',function($join):void {
                     $join->on('rb.company_id','=','d.company_id')
                         ->on('rb.loan_id','=','d.id');
                 })
@@ -90,7 +96,7 @@ final class HallInventoryLoanDraftReview
                 'd.expected_return_date','d.purpose','d.created_at',
                 'ld.id as dispatch_id','ld.created_at as dispatched_at',
                 'lr.id as receipt_id','lr.created_at as received_at',
-                'rb.return_batch_count',
+                'rb.return_batch_count','rb.acknowledged_batch_count',
                 'p.name as external_partner_name',
                 'lh.name as lending_hall_name','bh.name as borrowing_hall_name',
             ]);
@@ -117,7 +123,9 @@ final class HallInventoryLoanDraftReview
                 'createdAt'=>(string)$draft->created_at,
                 'status'=>$draft->receipt_id !== null
                     ? ((int)($draft->return_batch_count??0)>0
-                        ? 'partial_return_in_transit_source_ack_pending'
+                        ? ((int)($draft->acknowledged_batch_count??0) < (int)$draft->return_batch_count
+                            ? 'partial_return_in_transit_source_ack_pending'
+                            : 'return_acknowledged_outstanding_reconciliation_required')
                         : 'destination_received_return_pending')
                     : ($draft->dispatch_id !== null
                         ? 'source_dispatched_receipt_pending' : 'draft_only'),
