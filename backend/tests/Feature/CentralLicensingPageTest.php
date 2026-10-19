@@ -209,7 +209,7 @@ class CentralLicensingPageTest extends TestCase
             $raw=json_encode($payload,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);
             return ['key_id'=>'synthetic-paid-renewal','payload'=>$encode($raw),
                 'signature'=>$encode(sodium_crypto_sign_detached(
-                    $purpose."\\n".$raw,sodium_crypto_sign_secretkey($keys)))];
+                    $purpose."\n".$raw,sodium_crypto_sign_secretkey($keys)))];
         };
         $version=1;
         $lastRequestTime=null;
