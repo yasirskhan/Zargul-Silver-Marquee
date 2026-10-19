@@ -98,3 +98,27 @@ a single effective role grant (approval only) and immutable role decision.
 The internal `/staff/team/role-requests` view and POST decision form are not
 public routes and are not registered in `central/public`. Customer owner and
 VenueDesk tenant sessions cannot approve HAFZATECH staff privileges.
+
+
+## HAFZATECH vendor subscription invoices (internal, NOT LIVE)
+
+A Billing Officer with an active central MFA session and customer-scoped
+`billing.invoice.issue` permission can, only after an independently approved
+operator release, issue six- or twelve-month invoices from the server's
+immutable versioned plan catalog and a currently assigned, verified receiving
+account of the exact same currency. The private invoice receipt and bounded
+customer-scoped invoice directory never disclose bank instructions, attachment
+keys, settlement references, signing keys or session credentials. Repeated
+requests using the same idempotency UUID return the same invoice, and a
+conflicting request is rejected. Plan versions are append-only: a changed
+price, currency, term or entitlement requires an entirely new version.
+
+Set `CENTRAL_VENDOR_INVOICE_ISSUANCE_ENABLED=false` by default. Even setting
+it to `true` is insufficient to expose functionality without the operator-
+approved constructor, trusted isolated vhost, current vendor MFA credentials,
+same-origin CSRF and role checks. No public endpoint has been deployed.
+Invoices alone never establish payment, produce settlement records or
+authorize license signing. Settlement requires independent reconciliation,
+separate authorized Billing Officer verification and the signed issuance
+chain. Do not activate any billing, payment, or license release flag without
+external operator approval and successful exact-source hosted CI.
