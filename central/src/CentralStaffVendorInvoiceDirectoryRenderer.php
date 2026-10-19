@@ -7,11 +7,15 @@ namespace Hafzatech\Central;
 final class CentralStaffVendorInvoiceDirectoryRenderer
 {
     /** @param array<int,array<string,mixed>> $rows */
-    public static function render(array $rows):string
+    public static function render(array $rows,string $customerId,string $csrf):string
     {
         if(count($rows)>25)throw new RegistrationError('invalid_invoice_directory_response');
         $e=static fn(mixed $s):string=>htmlspecialchars(
             is_scalar($s)?(string)$s:'',ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+        if(preg_match('/^[a-f0-9-]{36}$/D',$customerId)!==1 ||
+            preg_match('/^[a-f0-9]{64}$/D',$csrf)!==1) {
+            throw new RegistrationError('invalid_invoice_directory_response');
+        }
         $body='';
         foreach($rows as $row) {
             $body.='<tr><td>'.$e($row['invoice_number']??'').'</td>'.
@@ -21,9 +25,11 @@ final class CentralStaffVendorInvoiceDirectoryRenderer
                 ' minor units</td>'.
                 '<td>'.$e($row['issued_at']??'').'</td>'.
                 '<td><form method="post" action="/staff/billing/overview">'.
+                '<input type="hidden" name="staff_csrf" value="'.$e($csrf).'">'.
+                '<input type="hidden" name="customer_id" value="'.$e($customerId).'">'.
                 '<input type="hidden" name="invoice_id" value="'.
                 $e($row['invoice_id']??'').'">'.
-                '<button type="submit" disabled>Review through protected billing overview</button>'.
+                '<button type="submit">View verified billing status</button>'.
                 '</form></td></tr>';
         }
         if($body==='') $body='<tr><td colspan="6">No invoices recorded for this customer.</td></tr>';

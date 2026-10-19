@@ -35,7 +35,8 @@ final class CentralStaffPortalHttpRouter
         private readonly ?CentralStaffRoleDecisionService $roleDecisions = null,
         private readonly ?CentralStaffRoleRequestService $roleRequestWriter = null,
         private readonly ?CentralStaffActivationReadiness $activationReview = null,
-        private readonly ?CentralStaffVendorInvoiceIssuer $invoiceIssuer = null
+        private readonly ?CentralStaffVendorInvoiceIssuer $invoiceIssuer = null,
+        private readonly ?CentralStaffVendorInvoiceDirectory $invoiceDirectory = null
     ) {}
 
     /**
@@ -120,6 +121,23 @@ final class CentralStaffPortalHttpRouter
                 $fields['receiving_account_id'],$fields['request_id']);
             return ['kind'=>'private_vendor_invoice_issued_html',
                 'html'=>CentralStaffVendorInvoiceReceiptRenderer::render($issued)];
+        }
+        if($uri==='/staff/billing/invoices/recent' &&
+           $this->invoiceDirectory!==null) {
+            if(!$this->exactFields($fields,['customer_id']) ||
+               !is_string($fields['customer_id']??null) ||
+               !self::uuid($fields['customer_id'])) {
+                throw new RegistrationError('invalid_invoice_directory_request',422);
+            }
+            if(!$this->boundary->permitsMutation($server,$bearer,$csrfHeader,
+                    'billing.invoice.read',$fields['customer_id'])) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            $rows=$this->invoiceDirectory->listForCustomer(
+                $bearer,$fields['customer_id'],25);
+            return ['kind'=>'private_vendor_invoice_directory_html',
+                'html'=>CentralStaffVendorInvoiceDirectoryRenderer::render(
+                    $rows,$fields['customer_id'],$csrfHeader)];
         }
         if ($uri==='/staff/billing/overview') {
             if (!$this->exactFields($fields,['customer_id','invoice_id']) ||

@@ -33,6 +33,7 @@ foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
     'CentralStaffInvoicePaymentOverview','CentralStaffPaymentEvidenceReviewService',
     'CentralStaffPaymentEvidenceHttpAdapter','CentralStaffBillingDashboardRenderer',
     'CentralStaffVendorInvoiceIssuer','CentralStaffVendorInvoiceReceiptRenderer',
+    'CentralStaffVendorInvoiceDirectory','CentralStaffVendorInvoiceDirectoryRenderer',
     'CentralStaffPortalHttpRouter','CentralStaffPortalPrivateResponse',
     'CentralStaffLicenseQueueHtmlRenderer','CentralStaffCustomerLookup',
     'CentralStaffPortalDashboard','CentralStaffSupportTicketQueue',
@@ -466,6 +467,39 @@ try {
  $issuerHtml=$invoiceDashboard->render($issuer,$company,$issuerCsrf);
  paidSessionAssert(!str_contains($issuerHtml,'/staff/billing/invoices/issue'),
   'License Officer cannot see Billing Officer invoice issuance form');
+ $invoiceDirectory=new \Hafzatech\Central\CentralStaffVendorInvoiceDirectory(
+  $db,$queueAuth);
+ $invoiceDirectoryRouter=new \Hafzatech\Central\CentralStaffPortalHttpRouter(
+  $queueBoundary,$unusedBilling,true,invoiceDirectory:$invoiceDirectory);
+ $directoryHttp=$queueRequest;
+ $directoryHttp['REQUEST_URI']='/staff/billing/invoices/recent';
+ $list=$invoiceDirectoryRouter->dispatch(
+  $directoryHttp,$billingCookie,['customer_id'=>$company],$billingCsrf);
+ paidSessionAssert($list['kind']==='private_vendor_invoice_directory_html' &&
+  str_contains($list['html'],'/staff/billing/overview') &&
+  str_contains($list['html'],'name="staff_csrf"') &&
+  str_contains($list['html'],'name="invoice_id"') &&
+  str_contains($list['html'],'NOT paid') &&
+  !str_contains($list['html'],$billingSession),
+  'recent invoices private list with functional protected billing navigation');
+ $directoryResponse=(new \Hafzatech\Central\CentralStaffPortalPrivateResponse(true))
+  ->compose($list);
+ paidSessionAssert($directoryResponse['status']===200 &&
+  $directoryResponse['cookies']===[] &&
+  $directoryResponse['headers']['Cache-Control']==='no-store, private',
+  'invoice directory protected HTML with no caching and no cookies');
+ paidSessionDeny(fn()=>$invoiceDirectoryRouter->dispatch(
+  $directoryHttp,$issuerCookie,['customer_id'=>$company],$issuerCsrf),
+  'staff_portal_denied');
+ paidSessionDeny(fn()=>$invoiceDirectoryRouter->dispatch(
+  $directoryHttp,$billingCookie,['customer_id'=>$other],$billingCsrf),
+  'staff_portal_denied');
+ paidSessionDeny(fn()=>$invoiceDirectoryRouter->dispatch(
+  $directoryHttp,$billingCookie,['customer_id'=>$company,'secret'=>'bank'],
+  $billingCsrf),'invalid_invoice_directory_request');
+ paidSessionDeny(fn()=>$invoiceDirectoryRouter->dispatch(
+  $directoryHttp,$billingCookie,['customer_id'=>$company],str_repeat('0',64)),
+  'staff_portal_denied');
  $invoiceResponse=(new \Hafzatech\Central\CentralStaffPortalPrivateResponse(true))
   ->compose($invoicePage);
  paidSessionAssert($invoiceResponse['status']===200 &&

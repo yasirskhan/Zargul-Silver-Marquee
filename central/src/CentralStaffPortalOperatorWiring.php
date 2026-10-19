@@ -83,7 +83,8 @@ final class CentralStaffPortalOperatorWiring
             new CentralStaffRoleDecisionService($db,$sessions,$access,true),
             new CentralStaffRoleRequestService($db,$sessions,$access,true),
             new CentralStaffActivationReadiness($db,$sessions,$access,true),
-            $invoiceIssuer);
+            $invoiceIssuer,
+            new CentralStaffVendorInvoiceDirectory($db,$auth));
         return new CentralStaffPortalOperatorApp(
             new CentralStaffPortalOperatorKernel(
                 $router,new CentralStaffPortalPrivateResponse(true),true),

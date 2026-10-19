@@ -75,6 +75,7 @@ final class CentralStaffPortalDashboard
                 $forms.=$form('/staff/support/tickets','Support tickets');
             }
             if($billing) {
+                $forms.=$form('/staff/billing/invoices/recent','Recent subscription invoices');
                 $forms.='<form method="post" action="/staff/billing/overview">'.
                     $base.'<label>Invoice ID <input type="text" '.
                     'name="invoice_id" maxlength="36" required></label>'.

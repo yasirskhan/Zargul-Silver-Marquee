@@ -27,6 +27,7 @@ foreach([
  'CentralStaffPortalTeamDashboard','CentralStaffPortalAuditorDashboard','CentralStaffRoleReviewQueue',
  'CentralStaffRoleRequestService','CentralStaffRoleDecisionService',
  'CentralStaffVendorInvoiceIssuer','CentralStaffVendorInvoiceReceiptRenderer',
+ 'CentralStaffVendorInvoiceDirectory','CentralStaffVendorInvoiceDirectoryRenderer',
  'CentralStaffPortalHttpRouter',
  'CentralStaffPortalPrivateResponse','CentralStaffPortalFormRequest',
  'CentralStaffPortalOperatorKernel','CentralStaffPortalResponseEmitter',
