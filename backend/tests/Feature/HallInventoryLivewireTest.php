@@ -370,7 +370,7 @@ class HallInventoryLivewireTest extends TestCase
         config()->set('inventory_controls.loan_drafts_enabled',true);
         config()->set('inventory_controls.loan_dispatch_enabled',true);
         config()->set('inventory_controls.loan_receipt_enabled',true);
-        \Illuminate\Support\Facades\\Storage::fake('local');
+        \Illuminate\Support\Facades\Storage::fake('local');
         $owner=User::create(['name'=>'Independent Loan Dispatcher',
             'email'=>'livewire-loan-dispatcher@example.test','password'=>'test-only']);
         $owner->markEmailAsVerified();
@@ -383,30 +383,30 @@ class HallInventoryLivewireTest extends TestCase
             'user_id'=>$receiver->id,'role'=>'manager']);
         HallAssignment::create(['company_id'=>$company->id,
             'membership_id'=>$membership->id,'hall_id'=>$destination->id]);
-        $sourceItem=(string)\Illuminate\Support\\Str::uuid();
-        $destItem=(string)\Illuminate\Support\\Str::uuid();
-        $catalog=app(\App\Services\\HallInventoryCatalogService::class);
+        $sourceItem=(string)\Illuminate\Support\Str::uuid();
+        $destItem=(string)\Illuminate\Support\Str::uuid();
+        $catalog=app(\App\Services\HallInventoryCatalogService::class);
         $catalog->create($sourceManager,$company->id,$source->id,$sourceItem,
             'Loan chair covers','Furniture','piece',10,'Origin hall chair covers');
         $this->be($owner);
         $catalog->create($owner,$company->id,$destination->id,$destItem,
             'Loan chair covers','Furniture','piece',10,'Destination borrowed catalog');
         DB::table('hall_inventory_positions')->insert([
-            'id'=>(string)\Illuminate\Support\\Str::uuid(),'company_id'=>$company->id,
+            'id'=>(string)\Illuminate\Support\Str::uuid(),'company_id'=>$company->id,
             'hall_id'=>$source->id,'item_id'=>$sourceItem,
             'owned_usable'=>20,'revision'=>0,'created_at'=>now(),'updated_at'=>now()
         ]);
         $this->be($sourceManager);
-        $loanId=(string)\Illuminate\Support\\Str::uuid();
-        app(\App\Services\\HallInventoryLoanDraftService::class)->create(
+        $loanId=(string)\Illuminate\Support\Str::uuid();
+        app(\App\Services\HallInventoryLoanDraftService::class)->create(
             $sourceManager,$company->id,$loanId,'internal',$source->id,$destination->id,
             [['itemId'=>$sourceItem,'quantity'=>6]],'2027-09-30',
             'Real independent destination receipt panel');
-        $pdf=fn()=>\Illuminate\Http\\UploadedFile::fake()->createWithContent(
+        $pdf=fn()=>\Illuminate\Http\UploadedFile::fake()->createWithContent(
             'handover.pdf',"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF");
         $this->be($owner);
-        app(\App\Services\\HallInventoryInternalLoanDispatchService::class)->dispatch(
-            $owner,$company->id,$loanId,(string)\Illuminate\Support\\Str::uuid(),
+        app(\App\Services\HallInventoryInternalLoanDispatchService::class)->dispatch(
+            $owner,$company->id,$loanId,(string)\Illuminate\Support\Str::uuid(),
             [$sourceItem=>0],$pdf());
         $this->be($receiver);
         Livewire::test(HallInventory::class)
