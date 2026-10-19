@@ -37,7 +37,8 @@ final class CentralStaffPortalHttpRouter
         private readonly ?CentralStaffActivationReadiness $activationReview = null,
         private readonly ?CentralStaffVendorInvoiceIssuer $invoiceIssuer = null,
         private readonly ?CentralStaffVendorInvoiceDirectory $invoiceDirectory = null,
-        private readonly ?CentralStaffVendorPlanPublisher $planPublisher = null
+        private readonly ?CentralStaffVendorPlanPublisher $planPublisher = null,
+        private readonly ?CentralStaffVendorPlanCatalogReader $planCatalog = null
     ) {}
 
     /**
@@ -150,7 +151,8 @@ final class CentralStaffPortalHttpRouter
                 throw new RegistrationError('staff_portal_denied');
             }
             return ['kind'=>'private_vendor_plan_catalog_html',
-                'html'=>CentralStaffVendorPlanCatalogRenderer::form($csrfHeader)];
+                'html'=>CentralStaffVendorPlanCatalogRenderer::form(
+                    $csrfHeader,$this->planCatalog?->recent($bearer,25)??[])];
         }
         if($uri==='/staff/plans/publish' && $this->planPublisher!==null) {
             if(!$this->exactFields($fields,[

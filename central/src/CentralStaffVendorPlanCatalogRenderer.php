@@ -9,7 +9,7 @@ namespace Hafzatech\Central;
  */
 final class CentralStaffVendorPlanCatalogRenderer
 {
-    public static function form(string $csrf):string
+    public static function form(string $csrf,array $rows=[]):string
     {
         if(preg_match('/^[a-f0-9]{64}$/D',$csrf)!==1) {
             throw new RegistrationError('invalid_vendor_plan_response');
@@ -21,6 +21,25 @@ final class CentralStaffVendorPlanCatalogRenderer
         $id=substr($hex,0,8).'-'.substr($hex,8,4).'-'.
             substr($hex,12,4).'-'.substr($hex,16,4).'-'.substr($hex,20);
         $safe=htmlspecialchars($csrf,ENT_QUOTES,'UTF-8');
+        if(count($rows)>25)throw new RegistrationError('invalid_vendor_plan_response');
+        $escape=static fn(mixed $value):string=>htmlspecialchars(
+            is_scalar($value)?(string)$value:'',ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+        $history='';
+        foreach($rows as $row){
+            $history.='<tr><td>'.$escape($row['plan_code']??'').'</td>'.
+                '<td>'.$escape($row['version']??'').'</td>'.
+                '<td>'.$escape($row['term_months']??'').' months</td>'.
+                '<td>'.$escape($row['currency']??'').' '.
+                $escape($row['price_minor']??'').' minor units</td>'.
+                '<td>'.$escape($row['created_at']??'').'</td></tr>';
+        }
+        if($history===''){
+            $history='<tr><td colspan="5">No published versions found.</td></tr>';
+        }
+        $history='<h3>Recent immutable plan versions</h3><table><thead>'.
+            '<tr><th>Plan</th><th>Version</th><th>Term</th>'.
+            '<th>Price</th><th>Published</th></tr></thead>'.
+            '<tbody>'.$history.'</tbody></table>';
         return '<section aria-label="Private HAFZATECH plan catalog">'.
             '<h2>Publish a versioned VenueDesk subscription plan</h2>'.
             '<p>Plan changes create NEW immutable versions. They never verify funds, '.
@@ -42,7 +61,7 @@ final class CentralStaffVendorPlanCatalogRenderer
             '<label>Feature flags JSON <textarea name="features_json" maxlength="2048" '.
             'required>{"booking":true}</textarea></label>'.
             '<button type="submit">Publish next plan version</button>'.
-            '</form></section>';
+            '</form>'.$history.'</section>';
     }
 
     /** @param array<string,mixed> $row */

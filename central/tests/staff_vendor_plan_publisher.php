@@ -151,6 +151,18 @@ try {
         'publishing vendor plans never charges customers or issues invoices');
     // Protected INTERNAL plan administrator form and publish receipt;
     // vendor staff identity comes from secure cookie and current session.
+    $reader=new Hafzatech\Central\CentralStaffVendorPlanCatalogReader(
+        $db,$auth);
+    $recent=$reader->recent($writerSession,25);
+    $ownVersions=array_values(array_filter($recent,
+        fn(array $row):bool=>$row['plan_code']==='test_catalog_plan'));
+    planAssert(count($ownVersions)===2 &&
+        array_column($ownVersions,'version')!==[],
+        'audited Plan Administrator sees bounded historical version list');
+    planDeny(fn()=>$reader->recent($billingSession),
+        'vendor_plan_read_denied');
+    planDeny(fn()=>$reader->recent($writerSession,26),
+        'invalid_vendor_plan_catalog_request');
     $csrfService=new Hafzatech\Central\CentralStaffCsrfTokenService($db,$sessions);
     $writerCsrf=$csrfService->issue($writerSession);
     $billingCsrf=$csrfService->issue($billingSession);
@@ -166,7 +178,7 @@ try {
         new Hafzatech\Central\CentralStaffInvoicePaymentOverview(
             $db,$sessions,$auth),false);
     $router=new Hafzatech\Central\CentralStaffPortalHttpRouter(
-        $boundary,$billingAdapter,true,planPublisher:$on);
+        $boundary,$billingAdapter,true,planPublisher:$on,planCatalog:$reader);
     $server=[
         'HTTPS'=>'on','SERVER_PORT'=>'443',
         'HTTP_HOST'=>'lichall.hafzatech.com',
@@ -181,6 +193,8 @@ try {
     planAssert($form['kind']==='private_vendor_plan_catalog_html' &&
         str_contains($form['html'],'action="/staff/plans/publish"') &&
         str_contains($form['html'],'name="staff_csrf"') &&
+        str_contains($form['html'],'Recent immutable plan versions') &&
+        str_contains($form['html'],'test_catalog_plan') &&
         !str_contains($form['html'],$writerSession),
         'protected vendor Plan Administrator sees form, never cookie bearer');
     $writerOutput=(new Hafzatech\Central\CentralStaffPortalPrivateResponse(true))
