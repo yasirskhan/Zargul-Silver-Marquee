@@ -268,6 +268,41 @@ try {
         str_contains($homeReply['headers']['Content-Security-Policy'],
             "default-src 'none'"),
         'private home has no cookies, no cache and restrictive CSP');
+    // Real CURRENT MFA staff roles, never browser role claims, decide which
+    // operator navigation is visible. Distinct MFA staff credentials prove
+    // auditor and team roles cannot see plan-publishing controls.
+    $auditorId=planUuid();$teamId=planUuid();
+    foreach([
+        [$auditorId,'publisher-auditor@example.test','auditor'],
+        [$teamId,'publisher-team-admin@example.test','staff_administrator']
+    ] as [$person,$email,$role]) {
+        $users->execute(['id'=>$person,'email'=>$email,
+            'hash'=>password_hash($password,PASSWORD_ARGON2ID),
+            'secret'=>bin2hex($seed)]);
+        $roles->execute(['id'=>planUuid(),'staff'=>$person,'role'=>$role]);
+    }
+    $auditorSession=$sessions->login('publisher-auditor@example.test',
+        $password,planTotp($seed),'192.0.2.245');
+    $teamSession=$sessions->login('publisher-team-admin@example.test',
+        $password,planTotp($seed),'192.0.2.246');
+    planAssert(is_string($auditorSession)&&is_string($teamSession),
+        'separate auditor/team staff login uses real MFA sessions');
+    $auditorCsrf=$csrfService->issue($auditorSession);
+    $teamCsrf=$csrfService->issue($teamSession);
+    $auditorPage=$homeRouter->dispatch($homeServer,[
+        Hafzatech\Central\CentralStaffHttpPolicy::COOKIE_NAME=>$auditorSession
+    ],[],$auditorCsrf);
+    planAssert(str_contains($auditorPage['html'],'action="/staff/audit/dashboard"') &&
+        !str_contains($auditorPage['html'],'action="/staff/plans"') &&
+        !str_contains($auditorPage['html'],'action="/staff/team/dashboard"'),
+        'auditor sees only permitted global audit section');
+    $teamPage=$homeRouter->dispatch($homeServer,[
+        Hafzatech\Central\CentralStaffHttpPolicy::COOKIE_NAME=>$teamSession
+    ],[],$teamCsrf);
+    planAssert(str_contains($teamPage['html'],'action="/staff/team/dashboard"') &&
+        !str_contains($teamPage['html'],'action="/staff/plans"') &&
+        !str_contains($teamPage['html'],'action="/staff/audit/dashboard"'),
+        'team administrator cannot navigate pricing or independent audit');
     $billingHome=$homeRouter->dispatch($homeServer,$otherCookie,[],$billingCsrf);
     planAssert(!str_contains($billingHome['html'],'action="/staff/plans"') &&
         str_contains($billingHome['html'],'action="/staff/dashboard"'),
