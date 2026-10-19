@@ -745,7 +745,7 @@ final class HallInventory extends Page
         abort_unless(config('inventory_controls.loan_drafts_enabled') &&
             config('inventory_controls.loan_dispatch_enabled') &&
             config('inventory_controls.loan_receipt_enabled'),403);
-        $record=collect(app(\\App\\Services\\HallInventoryLoanDraftReview::class)
+        $record=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
             ->recent($actor,$this->companyId,$this->hallId))
             ->first(fn($loan):bool => $loan['id']===$loanId &&
                 ($loan['viewRole']??'')==='receiving' &&
@@ -765,7 +765,7 @@ final class HallInventory extends Page
         abort_unless(config('inventory_controls.loan_drafts_enabled') &&
             config('inventory_controls.loan_dispatch_enabled') &&
             config('inventory_controls.loan_receipt_enabled'),403);
-        $record=collect(app(\\App\\Services\\HallInventoryLoanDraftReview::class)
+        $record=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
             ->recent($actor,$this->companyId,$this->hallId))
             ->first(fn($loan):bool => $loan['id']===$this->loanReceiptLoanId &&
                 ($loan['viewRole']??'')==='receiving' &&
@@ -797,7 +797,7 @@ final class HallInventory extends Page
         }
         try {
             $this->lastLoanReceiptReference=app(
-                \\App\\Services\\HallInventoryInternalLoanReceiptService::class
+                \App\Services\HallInventoryInternalLoanReceiptService::class
             )->receive($actor,$this->companyId,$this->loanReceiptLoanId,
                 $this->loanReceiptRequestId,$map,$expected,$this->loanReceiptFile);
         }catch(InvalidArgumentException|ConflictHttpException $e) {
