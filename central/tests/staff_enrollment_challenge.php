@@ -66,6 +66,12 @@ $db->prepare("INSERT INTO central_staff_role_grants
  (id,staff_id,role,reason) VALUES(:id,:actor,'staff_administrator',
  'Synthetic independent global staff administration')")
  ->execute(['id'=>challengeUuid(),'actor'=>$admin]);
+// The unprivileged test viewer needs its own active role to obtain an MFA
+// session, without receiving the staff.create capability under test.
+$db->prepare("INSERT INTO central_staff_role_grants
+ (id,staff_id,role,reason) VALUES(:id,:staff,'support_agent',
+ 'Synthetic read-only staff session fixture')")
+ ->execute(['id'=>challengeUuid(),'staff'=>$viewer]);
 $event=$db->prepare("INSERT INTO central_staff_provision_events
  (actor_staff_id,target_staff_id,action,reason)
  VALUES(:actor,:target,'created_pending_mfa','Synthetic enrollment provenance')");
