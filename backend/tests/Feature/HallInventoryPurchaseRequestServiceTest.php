@@ -42,7 +42,13 @@ class HallInventoryPurchaseRequestServiceTest extends TestCase {
         $this->assertSame(0,DB::table('hall_inventory_movement_events')->count());
         $this->assertSame(0,DB::table('finance_journals')->count());
         try {
-            DB::table('hall_inventory_purchase_requests')->where('id',$id)->update(['quantity'=>99]);
+            // RefreshDatabase wraps each test in a PostgreSQL transaction.
+            // Isolate the intentional trigger failure in a nested savepoint so
+            // later assertions do not see an aborted outer transaction.
+            DB::transaction(function()use($id):void {
+                DB::table('hall_inventory_purchase_requests')
+                    ->where('id',$id)->update(['quantity'=>99]);
+            });
             $this->fail('Immutable evidence altered.');
         }catch(\Illuminate\Database\QueryException){}
         $other=Hall::create(['company_id'=>$c->id,'name'=>'Other Hall',

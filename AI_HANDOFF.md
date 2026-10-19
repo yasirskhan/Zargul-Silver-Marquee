@@ -267,3 +267,8 @@ Verify live branch/CI → reconcile current handoff + specific requirement/featu
 ## Phase 12 purchased-stock intake claim (2026-10-19)
 - New immutable, idempotent hall-scoped purchase request claim foundation behind OFF-by-default `VENUE_INVENTORY_PURCHASE_RECEIPTS_ENABLED`. Includes vendor/reference/evidence identifier, audit and PostgreSQL regression. NO purchase receipt accepted, stock position posted, vendor paid, or finance liability recorded by this claim.
 - This is pending exact new SHA six-job CI; not yet VERIFIED. Next add independent physical receiving evidence review, atomic revision-safe owned position movement, actual owner/manager UI and history.
+
+
+## Phase 12 purchased-stock test CI recovery
+- First published claim source `3d30a276` [CI 39268321434](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39268321434) FAILED Laravel suite (five other jobs passed). The intentional immutable-write rejection in the new regression was caught without a nested rollback, poisoning the RefreshDatabase PostgreSQL transaction; later insert reported SQLSTATE 25P02. This is a fixture transaction-scope bug, not permission or schema relaxation.
+- Successor isolates that expected failure inside a PostgreSQL savepoint and needs exact six-job hosted CI. BUG-20261019-006 records reproduction and fix. Inventory purchases stay release OFF; next independent physical receiving + revision-controlled posting + Filament UI remains unfinished.

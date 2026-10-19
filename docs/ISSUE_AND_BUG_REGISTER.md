@@ -72,3 +72,11 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Reproduction fixture: submit bytes `C3 28` (invalid UTF-8) in a synthetic MFA billing staff directory search. Expected typed `invalid_customer_directory_request`; original parser would let bytes reach the database.
 - Remedy: validate complete UTF-8 using `preg_match('//u',$prefix)===1` before parameterized query, and add PostgreSQL negative regression. Leave SQL bind, current role rechecks, 20-result bound, MFA, CSRF and default-OFF operator settings unchanged.
 - Status: VERIFIED at source `c4b6e8f036fb6235d6bf29b3529498b1d03541e4`, [hosted CI 39241117684](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39241117684) SUCCESS, all six required jobs. Default-OFF operator release remains unchanged.
+
+
+## BUG-20261019-006 — Immutable purchase-test assertion aborts PostgreSQL outer transaction
+- Affected: new Phase 12 purchase claim regression, source `3d30a276`, CI [39268321434](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39268321434) Laravel failed, five other jobs passed.
+- Reproduce: intentional immutable-row UPDATE raises QueryException during RefreshDatabase test; catching error without rollback leaves PostgreSQL outer transaction aborted and a later hall insert fails with SQLSTATE 25P02.
+- Root cause: regression test did not isolate the intentional failed SQL in a nested transactional savepoint.
+- Fix: nest the expected rejected UPDATE in DB::transaction so Laravel rolls back the inner savepoint before subsequent assertions. No changes to immutable database trigger, production authorization, money, quantity posting, or release flags.
+- Status: FIX PUBLISHED; must verify exact successor SHA six hosted jobs before VERIFIED.
