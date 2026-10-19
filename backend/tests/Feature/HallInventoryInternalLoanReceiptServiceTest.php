@@ -99,6 +99,18 @@ class HallInventoryInternalLoanReceiptServiceTest extends TestCase
             $this->fail('Source dispatcher self-received destination stock.');
         }catch(AuthorizationException){}
         $this->be($receiver);
+        $handoverPath=DB::table('hall_inventory_loan_dispatches')
+            ->where('id',$dispatchId)->value('evidence_storage_path');
+        $originalHandover=Storage::disk('local')->get($handoverPath);
+        Storage::disk('local')->put($handoverPath,'altered-physical-handover');
+        try {
+            $call($destMap,$destRevisions);
+            $this->fail('Tampered source handover evidence accepted at destination.');
+        } catch(ConflictHttpException) {}
+        $this->assertSame(0,DB::table('hall_inventory_internal_loan_receipts')->count());
+        $this->assertSame(0,DB::table('hall_inventory_positions')
+            ->where('hall_id',$dst->id)->count());
+        Storage::disk('local')->put($handoverPath,$originalHandover);
         $this->assertSame($receipt,$call($destMap,$destRevisions));
         $this->assertSame($receipt,$call($destMap,$destRevisions));
         $history=app(\App\Services\HallInventoryLoanDraftReview::class)
@@ -141,5 +153,12 @@ class HallInventoryInternalLoanReceiptServiceTest extends TestCase
         try{$call($conflicting,$destRevisions);$this->fail('Mapping replay changed.');}
         catch(ConflictHttpException){}
         $this->assertSame(0,DB::table('finance_journals')->count());
+        DB::table('company_memberships')->where('company_id',$company->id)
+            ->where('user_id',$receiver->id)->update(['is_active'=>false]);
+        try {
+            $call($destMap,$destRevisions);
+            $this->fail('Revoked receiving manager replayed a receipt.');
+        } catch(AuthorizationException) {}
+        $this->assertSame(1,DB::table('hall_inventory_internal_loan_receipts')->count());
     }
 }
