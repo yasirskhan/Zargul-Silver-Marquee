@@ -185,14 +185,55 @@ class HallInventoryLoanDraftServiceTest extends TestCase
         $this->assertFalse($items[0]['stockMoved']);
         $this->assertCount(2,$items[0]['lines']);
         $this->assertEqualsCanonicalizing([10,50],array_column($items[0]['lines'],'quantity'));
-        // Receiving hall does not gain authority over the source's draft.
-        $this->assertSame([],$review->recent($owner,$company->id,$b->id));
+        // A receiving hall can inspect an immutable incoming draft, not dispatch it.
+        $incoming=$review->recent($owner,$company->id,$b->id);
+        $this->assertCount(1,$incoming);
+        $this->assertSame('receiving',$incoming[0]['viewRole']);
+        $this->assertSame('draft_only',$incoming[0]['status']);
+        $this->assertFalse($incoming[0]['stockMoved']);
         $this->be($manager);
         $this->assertCount(1,$review->recent($manager,$company->id,$a->id));
         try{
             $review->recent($manager,$company->id,$b->id);
             $this->fail('Unassigned manager read the receiving hall.');
         }catch(AuthorizationException){}
+        $this->assertSame(0,DB::table('finance_journals')->count());
+    }
+
+
+    public function test_assigned_destination_manager_can_view_internal_incoming_draft_only():void
+    {
+        [$company,$a,$b,$owner,$sourceManager,$chair]=$this->fixture();
+        config()->set('inventory_controls.loan_drafts_enabled',true);
+        $loan=(string)Str::uuid();
+        app(HallInventoryLoanDraftService::class)->create($owner,$company->id,$loan,
+            'internal',$a->id,$b->id,[['itemId'=>$chair,'quantity'=>15]],
+            '2027-05-20','Borrow chairs for incoming event');
+        $dest=User::create(['name'=>'Receiving Manager',
+            'email'=>'receiving-manager@example.test','password'=>'test-only']);
+        $dest->markEmailAsVerified();
+        $membership=CompanyMembership::create(['company_id'=>$company->id,
+            'user_id'=>$dest->id,'role'=>'manager']);
+        HallAssignment::create(['company_id'=>$company->id,
+            'membership_id'=>$membership->id,'hall_id'=>$b->id]);
+        $this->be($dest);
+        $review=app(\App\Services\HallInventoryLoanDraftReview::class);
+        $incoming=$review->recent($dest,$company->id,$b->id);
+        $this->assertCount(1,$incoming);
+        $this->assertSame($loan,$incoming[0]['id']);
+        $this->assertSame('receiving',$incoming[0]['viewRole']);
+        $this->assertFalse($incoming[0]['stockMoved']);
+        try {
+            $review->recent($dest,$company->id,$a->id);
+            $this->fail('Receiving manager inspected unassigned source hall.');
+        } catch(AuthorizationException) {}
+        DB::table('hall_assignments')->where('membership_id',$membership->id)->delete();
+        try {
+            $review->recent($dest,$company->id,$b->id);
+            $this->fail('Revoked destination hall assignment still read incoming draft.');
+        } catch(AuthorizationException) {}
+        $this->assertSame(0,DB::table('hall_inventory_positions')->count());
+        $this->assertSame(0,DB::table('hall_inventory_movement_events')->count());
         $this->assertSame(0,DB::table('finance_journals')->count());
     }
 

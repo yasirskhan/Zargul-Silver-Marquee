@@ -12,7 +12,7 @@ use InvalidArgumentException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /**
- * Read-only inventory loan DRAFT review, strictly by originating/owning hall.
+ * Read-only inventory loan DRAFT review, scoped to authorized sending or receiving hall.
  *
  * This never dispatches, receives, transfers, reconciles or closes stock.
  * Vendor partner private contact and ciphertext are intentionally excluded.
@@ -59,6 +59,10 @@ final class HallInventoryLoanDraftReview
             ->where(function ($query) use ($hallId):void {
                 $query->where('d.lending_hall_id',$hallId)
                     ->orWhere(function ($q) use ($hallId):void {
+                        $q->where('d.direction','internal')
+                            ->where('d.borrowing_hall_id',$hallId);
+                    })
+                    ->orWhere(function ($q) use ($hallId):void {
                         $q->where('d.direction','external_in')
                             ->where('d.borrowing_hall_id',$hallId);
                     });
@@ -80,7 +84,7 @@ final class HallInventoryLoanDraftReview
             ->get(['loan_id','item_name_snapshot','unit_snapshot','requested_quantity'])
             ->groupBy('loan_id');
 
-        return $drafts->map(static function ($draft) use ($lines):array {
+        return $drafts->map(static function ($draft) use ($lines,$hallId):array {
             return [
                 'id'=>(string)$draft->id,
                 'direction'=>(string)$draft->direction,
@@ -93,6 +97,8 @@ final class HallInventoryLoanDraftReview
                 'purpose'=>(string)$draft->purpose,
                 'createdAt'=>(string)$draft->created_at,
                 'status'=>'draft_only',
+                'viewRole'=>($draft->direction==='internal' &&
+                    $draft->borrowing_hall_id=== $hallId) ? 'receiving' : 'originating',
                 'stockMoved'=>false,
                 'lines'=>($lines->get($draft->id)??collect())->map(
                     static fn($line):array=>[
