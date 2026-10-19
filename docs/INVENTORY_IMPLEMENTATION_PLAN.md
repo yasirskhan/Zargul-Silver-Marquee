@@ -27,3 +27,9 @@ Use separate feature flag; no real inventory or customer data until acceptance. 
 
 ### Exact verification update
 - Published history source `78ddd22486f3b257d6fa74e238eaa639e419a6b8` verified [CI 39242991304](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39242991304) SUCCESS all six required jobs. It reads saved stocktake evidence only under active assigned-hall permissions and exposes neither current owned balances nor approved variances. Next priority is a correct immutable owned-stock/borrowed-position movement book, followed by independently acknowledged dispatch, acceptance, partial return and closed-case proof.
+
+
+### Next safe position arithmetic foundation (October 19, 2026)
+- `HallInventoryPositionTransition` is a PURE typed candidate transition policy with six independent stock buckets: owned usable, owned on loan, owned damaged, borrowed usable, borrowed transit, borrowed damaged. Counter invariants prevent negatives, overflow, forged categories, unsupported events, and borrowed-as-owned classification. Borrowed return remains in transit until separate confirmation.
+- Isolated Laravel feature tests exercise 50 dispatched / 45 good + 5 damaged, 100 borrowed / 80 returned with 20 outstanding and 5 damaged, strict underflow, overflow, zero, unrecognized events and immutable caller input.
+- This is NOT a stock journal, actual count reconciliation, approval, physical handover, authorization or release. Never use this pure policy to post inventory alone; next implementation must add isolated hall-scoped immutable row-locked DB positions with independently reviewed receipts and authorization. All inventory production gates remain OFF. Verify exact six-job CI before calling the foundation VERIFIED.
