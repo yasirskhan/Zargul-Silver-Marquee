@@ -108,7 +108,7 @@
                 View past invoices and refunds
             </a>
             @if (config('central_control.support_enabled') === true)
-                <a href="{{ \\App\\Filament\\Pages\\SupportInbox::getUrl(['company'=>$companyId]) }}"
+                <a href="{{ \App\Filament\Pages\SupportInbox::getUrl(['company'=>$companyId]) }}"
                     class="inline-block rounded-lg border px-4 py-2 text-sm font-semibold">
                     Request renewal or contact HAFZATECH support
                 </a>

@@ -114,13 +114,13 @@ class CentralLicensingOverviewServiceTest extends TestCase
         // Synthetic state is persisted only through the authenticated
         // transport's success contract in production. Projection never
         // infers online success from the signed cache itself.
-        app(\\App\\Services\\CentralLicenseCheckSchedule::class)
+        app(\App\Services\CentralLicenseCheckSchedule::class)
             ->recordVerifiedSuccess(new DateTimeImmutable('2027-09-15T13:30:00Z'));
         $checked=$overview->snapshot(new DateTimeImmutable('2027-09-16T00:00:00Z'));
         $this->assertSame('2027-09-15T13:30:00Z',$checked['last_online_verified_at']);
         $this->assertSame('2027-09-30T13:30:00Z',$checked['next_routine_check_at']);
         $this->assertFalse($checked['online_check_due']);
-        app(\\App\\Services\\CentralLicenseCheckSchedule::class)
+        app(\App\Services\CentralLicenseCheckSchedule::class)
             ->recordFailure(new DateTimeImmutable('2027-09-16T00:00:00Z'),'network');
         $retry=$overview->snapshot(new DateTimeImmutable('2027-09-16T00:00:30Z'));
         $this->assertSame('2027-09-15T13:30:00Z',$retry['last_online_verified_at']);
