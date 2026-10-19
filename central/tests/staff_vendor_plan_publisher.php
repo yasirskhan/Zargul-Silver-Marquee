@@ -14,6 +14,7 @@ foreach([
     'CentralStaffCredentialVerifier','CentralStaffLoginRateLimiter',
     'CentralStaffSessionService','CentralStaffSessionAuthorization',
     'CentralStaffVendorPlanPublisher','CentralStaffVendorPlanCatalogRenderer',
+    'CentralStaffVendorPlanCatalogReader',
     'CentralStaffCsrfTokenService','CentralStaffHttpPolicy',
     'CentralStaffProtectedHttpBoundary',
     'CentralStaffPaymentEvidenceQueue','CentralStaffPaymentEvidenceReviewService',
