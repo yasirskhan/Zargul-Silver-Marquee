@@ -36,6 +36,19 @@ final class CentralStaffPortalPrivateResponse
             'Content-Security-Policy'=>
                 "default-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
         ];
+
+        if ($kind==='private_vendor_plan_catalog_html' ||
+            $kind==='private_vendor_plan_published_html') {
+            $html=$internal['html']??null;
+            $prefix=$kind==='private_vendor_plan_catalog_html'
+                ? '<section aria-label="Private HAFZATECH plan catalog">'
+                : '<section aria-label="Private HAFZATECH plan publication receipt">';
+            if(!is_string($html) || strlen($html)>262144 ||
+               !str_starts_with($html,$prefix)) {
+                throw new RegistrationError('invalid_staff_response');
+            }
+            return ['status'=>200,'headers'=>$headers,'cookies'=>[],'body'=>$html];
+        }
         if ($kind==='private_vendor_invoice_directory_html') {
             $html=$internal['html']??null;
             if(!is_string($html)||strlen($html)>262144 ||

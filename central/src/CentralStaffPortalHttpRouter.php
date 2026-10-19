@@ -36,7 +36,8 @@ final class CentralStaffPortalHttpRouter
         private readonly ?CentralStaffRoleRequestService $roleRequestWriter = null,
         private readonly ?CentralStaffActivationReadiness $activationReview = null,
         private readonly ?CentralStaffVendorInvoiceIssuer $invoiceIssuer = null,
-        private readonly ?CentralStaffVendorInvoiceDirectory $invoiceDirectory = null
+        private readonly ?CentralStaffVendorInvoiceDirectory $invoiceDirectory = null,
+        private readonly ?CentralStaffVendorPlanPublisher $planPublisher = null
     ) {}
 
     /**
@@ -138,6 +139,58 @@ final class CentralStaffPortalHttpRouter
             return ['kind'=>'private_vendor_invoice_directory_html',
                 'html'=>CentralStaffVendorInvoiceDirectoryRenderer::render(
                     $rows,$fields['customer_id'],$csrfHeader)];
+        }
+
+        if($uri==='/staff/plans' && $this->planPublisher!==null) {
+            if($fields!==[]) {
+                throw new RegistrationError('invalid_vendor_plan_request',422);
+            }
+            if(!$this->boundary->permitsMutation(
+                    $server,$bearer,$csrfHeader,'plan.version.create',null)) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            return ['kind'=>'private_vendor_plan_catalog_html',
+                'html'=>CentralStaffVendorPlanCatalogRenderer::form($csrfHeader)];
+        }
+        if($uri==='/staff/plans/publish' && $this->planPublisher!==null) {
+            if(!$this->exactFields($fields,[
+                    'request_id','plan_code','term_months','currency',
+                    'price_minor','max_halls','max_staff','features_json']) ||
+                !is_string($fields['request_id']??null) ||
+                !is_string($fields['plan_code']??null) ||
+                !is_string($fields['term_months']??null) ||
+                !is_string($fields['currency']??null) ||
+                !is_string($fields['price_minor']??null) ||
+                !is_string($fields['max_halls']??null) ||
+                !is_string($fields['max_staff']??null) ||
+                !is_string($fields['features_json']??null) ||
+                !self::uuid($fields['request_id']) ||
+                !in_array($fields['term_months'],['6','12'],true) ||
+                preg_match('/^[1-9][0-9]{0,5}$/D',$fields['max_halls'])!==1 ||
+                preg_match('/^[1-9][0-9]{0,5}$/D',$fields['max_staff'])!==1 ||
+                strlen($fields['features_json'])>2048) {
+                throw new RegistrationError('invalid_vendor_plan_request',422);
+            }
+            try{
+                $features=json_decode($fields['features_json'],
+                    true,16,JSON_THROW_ON_ERROR);
+            }catch(\JsonException){
+                throw new RegistrationError('invalid_vendor_plan_request',422);
+            }
+            if(!is_array($features)) {
+                throw new RegistrationError('invalid_vendor_plan_request',422);
+            }
+            if(!$this->boundary->permitsMutation($server,$bearer,$csrfHeader,
+                    'plan.version.create',null)) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            $result=$this->planPublisher->publish(
+                $bearer,$fields['request_id'],$fields['plan_code'],
+                (int)$fields['term_months'],$fields['currency'],
+                $fields['price_minor'],(int)$fields['max_halls'],
+                (int)$fields['max_staff'],$features);
+            return ['kind'=>'private_vendor_plan_published_html',
+                'html'=>CentralStaffVendorPlanCatalogRenderer::receipt($result)];
         }
         if ($uri==='/staff/billing/overview') {
             if (!$this->exactFields($fields,['customer_id','invoice_id']) ||
