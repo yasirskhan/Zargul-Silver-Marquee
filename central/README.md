@@ -122,3 +122,22 @@ authorize license signing. Settlement requires independent reconciliation,
 separate authorized Billing Officer verification and the signed issuance
 chain. Do not activate any billing, payment, or license release flag without
 external operator approval and successful exact-source hosted CI.
+
+
+## Plan Administrator: immutable subscription plan catalog (INTERNAL ONLY)
+
+A separately authenticated vendor Plan Administrator may, only when a trusted
+operator has independently enabled both service injection and
+`CENTRAL_VENDOR_PLAN_PUBLISH_ENABLED=true`, create six- and twelve-month
+versioned plans with validated currency, exact price in minor units, bounded
+hall/staff entitlements and boolean feature flags. All writes are serialized
+inside the dedicated HAFZATECH PostgreSQL database, with immutable
+request/actor/fingerprint audit records and replay conflict protection.
+Previously published versions cannot be modified or deleted; a price change
+always creates the next version. Invoice issuance chooses only the most
+recent published version and preserves idempotent pre-existing invoices.
+
+There is **no public plan-creation route**, default-on release, real staff
+provisioning, bank verification, charge or license signing here. Real MFA,
+HTTPS, audited operations, recovery and financial controls remain
+prerequisites before production activation.
