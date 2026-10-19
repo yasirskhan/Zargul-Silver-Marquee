@@ -6,6 +6,8 @@ return [
     'catalog_enabled' => (bool) env('VENUE_INVENTORY_CATALOG_ENABLED', false),
     'stocktakes_enabled' => (bool) env('VENUE_INVENTORY_STOCKTAKES_ENABLED', false),
     'loan_drafts_enabled' => (bool) env('VENUE_INVENTORY_LOAN_DRAFTS_ENABLED', false),
+    // Only independently approved, evidence-backed source dispatch. OFF in production.
+    'loan_dispatch_enabled' => (bool) env('VENUE_INVENTORY_LOAN_DISPATCH_ENABLED', false),
     // Independently reviewed opening count posting; OFF until physical
     // witness acceptance, authorization, concurrency and pilot signoff.
     'purchase_receipts_enabled' => (bool) env('VENUE_INVENTORY_PURCHASE_RECEIPTS_ENABLED', false),
