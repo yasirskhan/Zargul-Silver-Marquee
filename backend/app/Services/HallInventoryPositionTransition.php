@@ -35,18 +35,7 @@ final class HallInventoryPositionTransition
      */
     public function apply(array $position,string $event,int $quantity):array
     {
-        $names=array_keys($position);
-        sort($names,SORT_STRING);
-        $allowed=self::FIELDS;
-        sort($allowed,SORT_STRING);
-        if($names!==$allowed) {
-            throw new InvalidArgumentException('Inventory position must include exactly six ownership and custody buckets.');
-        }
-        foreach($position as $value) {
-            if(!is_int($value) || $value<0 || $value>1000000000) {
-                throw new InvalidArgumentException('Inventory position has invalid quantities.');
-            }
-        }
+        $this->validate($position);
         if(!array_key_exists($event,self::EVENTS) ||
             $quantity<1 || $quantity>100000000) {
             throw new InvalidArgumentException('Unknown inventory transition or invalid quantity.');
@@ -67,12 +56,26 @@ final class HallInventoryPositionTransition
         return $position;
     }
 
+    private function validate(array $position):void
+    {
+            $names=array_keys($position);
+            sort($names,SORT_STRING);
+            $allowed=self::FIELDS;
+            sort($allowed,SORT_STRING);
+            if($names!==$allowed) {
+                throw new InvalidArgumentException('Inventory position must include exactly six ownership and custody buckets.');
+            }
+            foreach($position as $value) {
+                if(!is_int($value) || $value<0 || $value>1000000000) {
+                    throw new InvalidArgumentException('Inventory position has invalid quantities.');
+                }
+            }
+    }
+
     /** Every typed count represents distinct buckets, NEVER borrowed-as-owned. */
     public function summary(array $position):array
     {
-        $valid=$this->apply($position,'opening_owned',1);
-        // Validation above is non-mutating to the caller's original array.
-        unset($valid);
+        $this->validate($position);
         return [
             'ownedTotal'=>$position['ownedUsable']+
                 $position['ownedOnLoan']+$position['ownedDamaged'],
