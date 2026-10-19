@@ -109,12 +109,16 @@ final class HallInventoryInternalLoanReceiptService
                 ->get(['l.item_id','l.item_name_snapshot','l.unit_snapshot',
                     'l.requested_quantity','dl.quantity as dispatched_quantity']);
             if ($lines->isEmpty()||$lines->count()!==count($destItemBySource)||
-                $lines->count()!==count($expectedRevisions)||
-                count(array_unique(array_values($destItemBySource)))!==$lines->count())
+                $lines->count()!==count($expectedRevisions))
                 throw new ConflictHttpException('Every dispatched item requires one mapped destination row.');
+            foreach($destItemBySource as $sourceId=>$destinationId) {
+                if (!is_string($sourceId)||!Str::isUuid($sourceId)||
+                    !is_string($destinationId)||!Str::isUuid($destinationId))
+                    throw new InvalidArgumentException('Invalid source/destination catalog mapping.');
+            }
             $ids=array_values($destItemBySource);
-            foreach($ids as $id)if(!is_string($id)||!Str::isUuid($id))
-                throw new InvalidArgumentException('Invalid mapped destination catalog item.');
+            if(count(array_unique($ids))!==$lines->count())
+                throw new ConflictHttpException('Duplicate receiving catalog item mapping.');
             sort($ids,SORT_STRING);
             $catalog=DB::table('hall_inventory_items')
                 ->where('company_id',$companyId)->where('hall_id',$dest->id)
