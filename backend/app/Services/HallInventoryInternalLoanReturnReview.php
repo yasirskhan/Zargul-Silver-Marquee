@@ -104,8 +104,13 @@ final class HallInventoryInternalLoanReturnReview
                 'b.created_at','b.returned_by','a.id as acceptance_id']);
         if($rows->isEmpty())return [];
         $all=DB::table('hall_inventory_internal_loan_return_lines as l')
+            ->join('hall_inventory_internal_loan_return_batches as batch',function($j):void {
+                $j->on('batch.company_id','=','l.company_id')
+                    ->on('batch.id','=','l.return_batch_id');
+            })
             ->join('hall_inventory_loan_draft_lines as d',function($j):void {
                 $j->on('d.company_id','=','l.company_id')
+                    ->on('d.loan_id','=','batch.loan_id')
                     ->on('d.item_id','=','l.source_item_id');
             })
             ->where('l.company_id',$companyId)
