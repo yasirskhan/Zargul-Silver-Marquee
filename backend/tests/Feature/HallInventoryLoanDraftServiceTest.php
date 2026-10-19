@@ -219,6 +219,23 @@ class HallInventoryLoanDraftServiceTest extends TestCase
         $review->recent($manager,$company->id,$b->id);
     }
 
+    public function test_loan_review_never_crosses_company_and_rejects_unbounded_requests():void
+    {
+        [$company,$a,$b,$owner,$manager,$chair]=$this->fixture();
+        config()->set('inventory_controls.loan_drafts_enabled',true);
+        $review=app(\App\Services\HallInventoryLoanDraftReview::class);
+        $this->assertSame([],$review->recent($owner,$company->id,$a->id,20));
+        try {
+            $review->recent($owner,$company->id,$a->id,21);
+            $this->fail('Unbounded inventory draft view was accepted.');
+        } catch (\InvalidArgumentException) {}
+        $foreign=Company::create(['name'=>'Other Business','slug'=>'other-loan-business']);
+        $otherHall=Hall::create(['company_id'=>$foreign->id,
+            'name'=>'Foreign Hall','slug'=>'foreign-inventory-hall','capacity'=>200]);
+        $this->expectException(AuthorizationException::class);
+        $review->recent($owner,$foreign->id,$otherHall->id);
+    }
+
     public function test_loan_review_release_gate_and_revoked_hall_assignment():void
     {
         [$company,$a,$b,$owner,$manager,$chair]=$this->fixture();
