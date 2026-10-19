@@ -238,6 +238,19 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         $this->assertSame(1,(int)DB::table('hall_inventory_positions')
             ->where('hall_id',$dest->id)->where('item_id',$dstItem)->value('borrowed_transit'));
         $this->assertSame(0,DB::table('finance_journals')->count());
+        $this->assertFalse($loanHistory['overdueWithOutstandingCustody']);
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2028-01-02 12:00:00'));
+        try {
+            $overdueRows=app(\App\Services\HallInventoryLoanDraftReview::class)
+                ->recent($owner,$company->id,$src->id);
+            $overdue=collect($overdueRows)->firstWhere('id',$loan);
+            $this->assertTrue($overdue['overdueWithOutstandingCustody']);
+            $this->assertSame(5,$overdue['returnReconciliation']['stillUnsettled']);
+            $this->assertFalse($overdue['returnReconciliation']['loanCompleted']);
+            $this->assertSame(0,DB::table('finance_journals')->count());
+        } finally {
+            $this->travelBack();
+        }
 
     }
 }

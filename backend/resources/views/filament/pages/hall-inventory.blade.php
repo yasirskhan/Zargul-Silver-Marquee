@@ -532,6 +532,9 @@
                             <article wire:key="inventory-loan-summary-{{ $loan['id'] }}" class="space-y-2 rounded-lg border p-3 text-sm">
                                 <p class="font-medium">{{ $loan['purpose'] }} — {{ ($loan['viewRole'] ?? 'originating') === 'receiving' ? 'INCOMING REQUEST' : 'OUTGOING REQUEST' }} — {{ ($loan['status'] ?? 'draft_only') === 'return_acknowledged_outstanding_reconciliation_required' ? 'RETURN ACKNOWLEDGED / OUTSTANDING RECONCILIATION REQUIRED' : (($loan['status'] ?? 'draft_only') === 'partial_return_in_transit_source_ack_pending' ? 'PARTIAL RETURN SENT / SOURCE ACK PENDING' : (($loan['status'] ?? 'draft_only') === 'destination_received_return_pending' ? 'DESTINATION RECEIVED / RETURNS PENDING' : (($loan['status'] ?? 'draft_only') === 'source_dispatched_receipt_pending' ? 'SOURCE DISPATCHED / DESTINATION RECEIPT PENDING' : 'DRAFT / NOT DISPATCHED'))) }}</p>
                                 <p>Reference: {{ $loan['id'] }}. Return expected: {{ $loan['expectedReturnDate'] }}.</p>
+                                @if($loan['overdueWithOutstandingCustody'] ?? false)
+                                    <p role="status" class="font-semibold text-amber-700 dark:text-amber-300">OVERDUE: dispatched inventory remains outstanding. Physical reconciliation required; no fee or loss has been assessed.</p>
+                                @endif
                                 @if(($loan['returnReconciliation'] ?? null) !== null)
                                     <p>Physical custody: received {{ $loan['returnReconciliation']['receivedQuantity'] }},
                                         sent back {{ $loan['returnReconciliation']['shippedQuantity'] }},

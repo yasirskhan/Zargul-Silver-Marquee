@@ -182,6 +182,13 @@ final class HallInventoryLoanDraftReview
                 'lendingHallName'=>$draft->lending_hall_name,
                 'borrowingHallName'=>$draft->borrowing_hall_name,
                 'expectedReturnDate'=>(string)$draft->expected_return_date,
+                // Informational only: a past due date has no charging or closure effect.
+                // Unshipped drafts are never labeled overdue physical custody.
+                'overdueWithOutstandingCustody'=>$draft->dispatch_id !== null
+                    && (string)$draft->expected_return_date < now()->toDateString()
+                    && ($draft->receipt_id === null || $reconciliation === null
+                        || $reconciliation['stillUnsettled'] > 0
+                        || $reconciliation['integrityWarning']),
                 'purpose'=>(string)$draft->purpose,
                 'createdAt'=>(string)$draft->created_at,
                 'status'=>$draft->receipt_id !== null
