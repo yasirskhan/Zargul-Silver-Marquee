@@ -1,4 +1,8 @@
 # VenueDesk — ACTIVE AI HANDOFF (2026-10-17)
+
+## OWNER-APPROVED BUG FIND-AND-FIX AND COMPLETE FEATURE POLICY (2026-10-18)
+Before coding read [docs/QUALITY_AND_BUG_REMEDIATION_POLICY.md](docs/QUALITY_AND_BUG_REMEDIATION_POLICY.md), and maintain [docs/ISSUE_AND_BUG_REGISTER.md](docs/ISSUE_AND_BUG_REGISTER.md). **Discover bugs proactively → reproduce → fix root cause → add regression → run complete hosted CI at exact SHA → verify.** Merely reporting an issue or publishing a fix with CI pending does NOT count as completed. Critical security/finance/isolation/integrity failures block release. Reconcile every approved feature ID against full user-facing workflows; never skip/weaken tests, omit scope, or leave defects silently unresolved. This is a policy-only change; no application bug was fixed by committing this text.
+
 **START HERE. This page is intentionally short to speed the next session.** The FULL historical handoff (no history discarded) is in [docs/AI_HANDOFF_ARCHIVE_2026-10-17.md](docs/AI_HANDOFF_ARCHIVE_2026-10-17.md). Review older details there only when a task requires historical verification.
 
 ## Mandatory boundaries

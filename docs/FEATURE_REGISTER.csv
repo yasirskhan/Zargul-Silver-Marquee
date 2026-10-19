@@ -64,3 +64,5 @@ CENT-006,Central support sync and client persistent unread messages,9.1,Signed s
 CENT-007,Signed revocation grace and verified local expiry enforcement,9.1,Approved not implemented,15 day check no invented offline cutoff immediate public maintenance and seven day backend grace
 CENT-008,Central domain migration software updates and operational recovery,9.1,Approved not implemented,Signed host move endpoint key rotation recover and backup compatible upgrades
 WIZ-001,Client ISO business currency IANA timezone and hall overrides,9.1,Approved not implemented,PKR INR USD many other currencies precision local schedule UTC audit cross DST
+QA-001,Verified complete end to end feature traceability,Cross-cutting,Owner approved mandatory policy,Every approved feature is traced to UI backend audit errors tests and exact SHA hosted CI before COMPLETE
+QA-002,Proactive bug detection root cause repair and regression gates,Cross-cutting,Owner approved mandatory policy,Failures require reproducible issue root cause fix regression exact SHA green CI and release blocker handling without weakening tests

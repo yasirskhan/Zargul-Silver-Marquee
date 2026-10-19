@@ -27,3 +27,6 @@ Signed grants not encryption alone; cryptographic identity per install; never ce
 
 ## Next session user command
 "Continue VenueDesk development in GitHub repository `yasirskhan/Zargul-Silver-Marquee` ONLY branch `chatgpt/phase0-foundation`, no Work mode. Read complete AI_HANDOFF.md, docs/CENTRAL_CONTROL_CENTER_V1.md, docs/FAST_DELIVERY_PLAN.md and commercial specification; check live HEAD/CI. Start the first unfinished central connection/security vertical batch, implement, test, commit, verify exact SHA, update handoff, and continue successive bounded batches. Never touch main or property-platform."
+
+## Mandatory bug remediation and complete feature gate — owner approved
+Follow [QUALITY_AND_BUG_REMEDIATION_POLICY.md](QUALITY_AND_BUG_REMEDIATION_POLICY.md) and maintain [ISSUE_AND_BUG_REGISTER.md](ISSUE_AND_BUG_REGISTER.md). Every batch actively tests failure cases; any real bug triggers reproduce → root-cause repair → regression test → exact-SHA all-required-jobs hosted CI. No fix is complete or feature release-ready while blocking defect/CI failure remains. Do not weaken tests or skip security. Link every approved feature to end-to-end acceptance and don't overfocus on micro-refinements at the expense of finishing complete safe workflows. External operational blockers remain explicitly OFF/blocked.
