@@ -79,6 +79,13 @@ final class HallInventoryInternalLoanReturnService
                 ->where('company_id',$companyId)->where('loan_id',$loanId)
                 ->where('receiving_hall_id',$destination->id)->lockForUpdate()->first();
             if (!$receipt)throw new ConflictHttpException('Loan was not independently received.');
+            if (!$disk->exists((string)$receipt->evidence_storage_path))
+                throw new ConflictHttpException('Original receiving evidence is missing.');
+            $receiptBytes=$disk->get((string)$receipt->evidence_storage_path);
+            if (!is_string($receiptBytes)||
+                strlen($receiptBytes)!==(int)$receipt->evidence_size||
+                !hash_equals((string)$receipt->evidence_sha256,hash('sha256',$receiptBytes)))
+                throw new ConflictHttpException('Original receiving evidence failed integrity verification.');
             $old=DB::table('hall_inventory_internal_loan_return_batches')
                 ->where('company_id',$companyId)->where('id',$batchId)->first();
             if ($old) {
