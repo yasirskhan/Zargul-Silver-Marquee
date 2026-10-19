@@ -282,3 +282,11 @@ Verify live branch/CI → reconcile current handoff + specific requirement/featu
 ## Prepared successor — purchased-stock request UI, pending prior history CI
 - New Filament inventory form for company/hall-scoped request submission and unverified read-only history, supplier evidence reference labeled unverified, no stock or financial effects. Resets form and request id across hall changes; server-side access rechecked. Livewire test covers manager submit, disabled gate UI and revoked role.
 - This successor is DETACHED. Wait for exact history `1af87bda` all-six CI success, then publish by SHA lease and run its own six-job CI. Do not enable production gates.
+
+
+## VERIFIED purchased-stock claim and manager screen — October 19, 2026
+- Claim foundation `3d30a276` exposed fixture PostgreSQL abort in run 39268321434. Test savepoint repair `e937c9a1907c318f802e2e1c9bd6bedad87368f4`, [CI 39269559226](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39269559226) SUCCESS all six jobs.
+- Hall-scoped read-only unverified purchase request review `1af87bda6bf7f7a5ba0202a449cc5e8b2b4fa2de`, [CI 39270693197](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39270693197) SUCCESS all six jobs.
+- Owner/manager hall inventory purchase-claim entry + read-only history, reset on hall switching, revoked-role Livewire regression `843ce833bd25532e8fbe9c67b0d718ad68974263`, [CI 39271792091](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39271792091) SUCCESS all six jobs.
+- IMPORTANT: All of this is intake CLAIM foundation only. No verified supplier document, independent physical receiving, purchase acceptance, stock addition, payable, payment or finance movement. `VENUE_INVENTORY_PURCHASE_RECEIPTS_ENABLED` remains default OFF. Actual receiving must use independent actors, proven quantity, immutable acceptance, row locking/revision, cross-hall authorization and atomic `acquire_owned` movement with tests before pilot.
+- Next: finish authenticated independent purchase RECEIVING and ownable stock movement; then separately complete loan dispatch, destination acknowledgment, partial return, final audit receipt. Update this handoff against live branch after every exact green batch.

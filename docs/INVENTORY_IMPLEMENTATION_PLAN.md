@@ -50,3 +50,9 @@ Use separate feature flag; no real inventory or customer data until acceptance. 
 ### Read-only opening review preparation
 - `HallInventoryOpeningReview::recent` reads up to 20 immutable opening physical-count requests, original hall-item snapshot, independent acceptance movement link and status for the exact active company/hall under the currently authenticated assigned manager/owner/admin. No other halls, bank, customer PII or financial ledger are accessed.
 - Pending means NOT BOOKED; accepted means an authorized immutable movement exists, NOT paid or remotely verified. Physical evidence remains linked to opening stocktake ID. Feature gate OFF by default, requires own source and PostgreSQL permission tests before release.
+
+
+### Purchased-stock request and unverified review verified (October 19, 2026)
+- Claims are immutable, bounded and hall-scoped with authorized actor, vendor/reference and evidence identifier, idempotent fingerprint, audit and separate default OFF gate. Claim does NOT post stock or money.
+- Service/regression test recovery `e937c9a1` [CI 39269559226](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39269559226), read-only history `1af87bda` [CI 39270693197](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39270693197) and Filament form/history `843ce833` [CI 39271792091](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39271792091) each passed all six hosted jobs.
+- NEXT: authenticated physical receiving evidence (not just an entered receipt string), independent acceptance, atomic row-locked revision-controlled acquired-owned posting, then return custody workflows. No release gate enablement.

@@ -97,3 +97,8 @@ production toggles merely because development CI passes.
 ### Phase 12 verified checkpoint — read-only loan drafts
 - Verified source `4fa961e063de40133df1c4534367e393c0f1f8ce`: [CI 39242040957](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39242040957) all six SUCCESS. Owner/assigned-manager hall draft history with item snapshots is implemented but default-disabled for production.
 - Read-only physical stocktake evidence history is being verified separately; no book-stock adjustments, owner approvals, independent handover acknowledgments, external evidence, partial returns or completion PDF are released.
+
+
+### Phase 12 purchase claim implementation checkpoint (October 19, 2026)
+- Independently default-OFF immutable purchased-stock claim request, read-only scoped review and owner/manager inventory form verified through source `843ce833`, [CI 39271792091](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39271792091), all six jobs green.
+- This records *unverified supplier claim and evidence references only*. Physical receiving, independent acceptance and atomic owned usable position credit remain NOT implemented; do not use as booked stock or financially settled purchase.

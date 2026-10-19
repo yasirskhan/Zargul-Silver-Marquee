@@ -79,4 +79,4 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Reproduce: intentional immutable-row UPDATE raises QueryException during RefreshDatabase test; catching error without rollback leaves PostgreSQL outer transaction aborted and a later hall insert fails with SQLSTATE 25P02.
 - Root cause: regression test did not isolate the intentional failed SQL in a nested transactional savepoint.
 - Fix: nest the expected rejected UPDATE in DB::transaction so Laravel rolls back the inner savepoint before subsequent assertions. No changes to immutable database trigger, production authorization, money, quantity posting, or release flags.
-- Status: FIX PUBLISHED; must verify exact successor SHA six hosted jobs before VERIFIED.
+- Status: VERIFIED at repair source `e937c9a1907c318f802e2e1c9bd6bedad87368f4`, [CI 39269559226](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39269559226) SUCCESS all six. Subsequent history/UI sources also six green.
