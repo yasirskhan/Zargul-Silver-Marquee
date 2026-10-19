@@ -54,3 +54,12 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Reproduction: a privileged PostgreSQL UPDATE of a synthetic plan version price or entitlement would previously be accepted, altering what the same version means after issuance. Normal staff HTTP clients have no such edit route. Risk comes from internal writes/migrations, not direct customer input.
 - Remedy: DETACHED schema `central/schema/028_vendor_plan_versions_immutable.sql` adds trigger using the established immutable audit rejection function. Regression UPDATE and DELETE attempts require SQLSTATE P0001; new versions may still be inserted normally. No retroactive data changes.
 - Status: FIX PREPARED, NOT PUBLISHED OR CI-VERIFIED. Publish only after earlier invoice directory CI is fully green; exact source and six-job run must be recorded.
+
+
+## BUG-20261019-004 — Superseded plan remains selectable for new vendor invoice
+- Affected: CENT-005; latest published immutable price and subscription plan-version selection.
+- Discovery: code review of `CentralStaffVendorInvoiceIssuer::offers` and `issue`; offer query included older versions and new invoices could issue lower legacy quotes after a newer same-code plan existed.
+- Severity: MEDIUM commercial integrity risk; HAFZATECH commercial live release gate OFF, no evidence of production exposure.
+- Reproduction: create `plan_code=issuer_test_6` version 1 price 12500 and version 2 price 13000; original logic offered both and issued fresh version1 invoice.
+- Remedy PREPARED DETACHED: show only maximum version per plan_code, reject fresh obsolete plan while preserving idempotent same-request previously issued invoices, assert original/new prices; never alter paid settlement or signed grants.
+- Status: FIX PREPARED, NOT CI-VERIFIED. Publish only after predecessor all-six green, then verify exact new six-job CI. No real vendor invoice release.

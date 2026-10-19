@@ -57,6 +57,10 @@ final class CentralStaffVendorInvoiceIssuer
                ON p.currency=a.receiving_currency
              WHERE c.id=:customer AND c.status='active'
                AND p.term_months IN (6,12) AND p.price_minor>0
+               AND NOT EXISTS (
+                   SELECT 1 FROM central_vendor_plan_versions newer
+                   WHERE newer.plan_code=p.plan_code AND newer.version>p.version
+               )
              ORDER BY p.plan_code,p.version DESC,a.display_label LIMIT 30"
         );
         $q->execute(['customer'=>$customerId]);
@@ -111,7 +115,7 @@ final class CentralStaffVendorInvoiceIssuer
                 throw new RegistrationError('vendor_invoice_customer_unavailable',404);
             }
             $q=$this->db->prepare(
-                'SELECT id,term_months,currency,price_minor,entitlements_snapshot
+                'SELECT id,plan_code,version,term_months,currency,price_minor,entitlements_snapshot
                  FROM central_vendor_plan_versions WHERE id=:plan FOR SHARE'
             );
             $q->execute(['plan'=>$planVersionId]);
@@ -174,6 +178,19 @@ final class CentralStaffVendorInvoiceIssuer
                     'term_months'=>(int)$plan['term_months'],
                     'status'=>$existing['status'],
                 ];
+            }
+
+            // Idempotent reuse of a previously issued invoice was handled
+            // above. A NEW invoice must use the current plan version.
+            // This prevents old browser forms issuing a lower historic quote
+            // after the vendor has published its successor version.
+            $q=$this->db->prepare(
+                'SELECT 1 FROM central_vendor_plan_versions
+                 WHERE plan_code=:code AND version>:version LIMIT 1'
+            );
+            $q->execute(['code'=>$plan['plan_code'],'version'=>$plan['version']]);
+            if($q->fetchColumn()!==false) {
+                throw new RegistrationError('vendor_invoice_plan_superseded',409);
             }
 
             $invoiceId=self::uuid();

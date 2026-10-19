@@ -155,6 +155,15 @@ try {
         invoiceIssueAssert($e->getCode()==='P0001',
             'immutable plan deletion refusal preserves invoice evidence');
     }
+    $first=$on->issue($billBearer,$customer,$planSix,$bank,$request);
+    invoiceIssueAssert($first['currency']==='USD'&&$first['total_minor']==='12500'
+        &&$first['term_months']===6&&$first['status']==='issued'
+        &&str_starts_with($first['invoice_number'],'HTZ-'),
+        'invoice price, currency, term, number derived from trusted versioned plan');
+    invoiceIssueAssert($on->issue($billBearer,$customer,$planSix,$bank,$request)===$first,
+        'exact same issued request is idempotent');
+    // A newly published plan version must not reprice existing invoices;
+    // repeat the original request successfully but deny any NEW old quote.
     // A revised quote is a new version with its own stable identifier,
     // never a silent change to the previously issued plan.
     $nextVersion=invoiceIssueUuid();
@@ -169,13 +178,23 @@ try {
     $oldPrice->execute(['plan'=>$planSix]);
     invoiceIssueAssert((int)$oldPrice->fetchColumn()===12500,
         'append-only new plan version does not retroactively alter old quote');
-    $first=$on->issue($billBearer,$customer,$planSix,$bank,$request);
-    invoiceIssueAssert($first['currency']==='USD'&&$first['total_minor']==='12500'
-        &&$first['term_months']===6&&$first['status']==='issued'
-        &&str_starts_with($first['invoice_number'],'HTZ-'),
-        'invoice price, currency, term, number derived from trusted versioned plan');
+
+    $visible=$on->offers($billBearer,$customer);
+    $visibleSix=array_values(array_filter($visible,
+        fn(array $offer):bool=>$offer['plan_code']==='issuer_test_6'));
+    invoiceIssueAssert(count($visibleSix)===1 &&
+        $visibleSix[0]['plan_version_id']===$nextVersion &&
+        (int)$visibleSix[0]['price_minor']===13000,
+        'only latest version appears in protected Billing Officer plan picker');
     invoiceIssueAssert($on->issue($billBearer,$customer,$planSix,$bank,$request)===$first,
-        'exact same issued request is idempotent');
+        'original invoice remains idempotent after price revision');
+    invoiceIssueDeny(fn()=>$on->issue($billBearer,$customer,$planSix,$bank,
+        invoiceIssueUuid()),'vendor_invoice_plan_superseded');
+    $new=$on->issue($billBearer,$customer,$nextVersion,$bank,invoiceIssueUuid());
+    invoiceIssueAssert($new['total_minor']==='13000' &&
+        $new['invoice_id']!==$first['invoice_id'],
+        'new invoice uses latest vendor plan price while old invoice is unchanged');
+
     invoiceIssueDeny(fn()=>$on->issue($billBearer,$customer,$planTwelve,$bank,$request),
         'vendor_invoice_request_conflict');
     $q=$db->prepare("SELECT i.customer_id,i.plan_version_id,i.currency,i.total_minor,
