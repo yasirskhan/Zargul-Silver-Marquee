@@ -19,7 +19,7 @@ class HallInventoryPurchaseReceivingScopeConstraintTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_privileged_sql_cannot_bind_receipt_to_other_hall_or_review_to_other_purchase(): void
+    public function test_privileged_sql_cannot_bind_receipt_to_other_item_or_review_to_other_purchase(): void
     {
         $c=Company::create(['name'=>'Purchase FK Company','slug'=>'purchase-fk-company']);
         $h=Hall::create(['company_id'=>$c->id,'name'=>'Purchase FK Hall','slug'=>'purchase-fk-hall','capacity'=>100]);
@@ -35,6 +35,9 @@ class HallInventoryPurchaseReceivingScopeConstraintTest extends TestCase
         $item=(string)Str::uuid();
         app(HallInventoryCatalogService::class)->create($owner,$c->id,$h->id,
             $item,'Scoped purchase chairs','Furniture','piece',2,'Scoped purchase item');
+        $otherItem=(string)Str::uuid();
+        app(HallInventoryCatalogService::class)->create($owner,$c->id,$h->id,
+            $otherItem,'Different scoped chairs','Furniture','piece',2,'Different scoped item');
         config()->set('inventory_controls.purchase_receipts_enabled',true);
         $request=(string)Str::uuid();
         app(HallInventoryPurchaseRequestService::class)->request($owner,$c->id,$h->id,
@@ -56,30 +59,30 @@ class HallInventoryPurchaseReceivingScopeConstraintTest extends TestCase
             'supplier-reference-scoped-two','Second scoped delivery pending');
         $this->be($receiver);
         try {
-            DB::transaction(function()use($c,$other,$item,$secondRequest,$receiver):void {
+            DB::transaction(function()use($c,$h,$otherItem,$secondRequest,$receiver):void {
                 DB::table('hall_inventory_purchase_receiving_evidence')->insert([
                     'id'=>(string)Str::uuid(),'purchase_request_id'=>$secondRequest,
-                    'company_id'=>$c->id,'hall_id'=>$other->id,'item_id'=>$item,
+                    'company_id'=>$c->id,'hall_id'=>$h->id,'item_id'=>$otherItem,
                     'counted_quantity'=>1,'physical_evidence_reference'=>'foreign-hall-proof',
-                    'condition_notes'=>'Foreign hall fake receiving record',
+                    'condition_notes'=>'Wrong item under valid same-hall catalog',
                     'receipt_fingerprint'=>str_repeat('a',64),'received_by'=>$receiver->id
                 ]);
             });
-            $this->fail('Foreign hall could bind to original purchase.');
+            $this->fail('Wrong item could bind to original purchase.');
         } catch(QueryException) {}
         $this->assertSame(1,DB::table('hall_inventory_purchase_receiving_evidence')->count());
 
         try {
-            DB::transaction(function()use($c,$other,$request,$receipt,$owner):void {
+            DB::transaction(function()use($c,$h,$secondRequest,$receipt,$owner):void {
                 DB::table('hall_inventory_purchase_receiving_reviews')->insert([
                     'id'=>(string)Str::uuid(),'receiving_evidence_id'=>$receipt,
-                    'company_id'=>$c->id,'hall_id'=>$other->id,
-                    'purchase_request_id'=>$request,'reviewed_by'=>$owner->id,
-                    'review_notes'=>'Foreign hall review must fail',
+                    'company_id'=>$c->id,'hall_id'=>$h->id,
+                    'purchase_request_id'=>$secondRequest,'reviewed_by'=>$owner->id,
+                    'review_notes'=>'Different valid purchase request must fail',
                     'review_fingerprint'=>str_repeat('b',64)
                 ]);
             });
-            $this->fail('Foreign hall could attest unrelated physical receiving.');
+            $this->fail('Unrelated valid purchase could claim same physical receiving.');
         } catch(QueryException) {}
         $this->assertSame(0,DB::table('hall_inventory_purchase_receiving_reviews')->count());
         $this->assertSame(0,DB::table('hall_inventory_positions')->count());

@@ -89,3 +89,11 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Reproduction: attempt a new valid purchase request and directly insert its receiving evidence with another hall ID, keeping a matching catalog item ID where possible; PostgreSQL should reject mismatched parent scope. Similarly a review with another hall or purchase ID must be rejected.
 - Repair: additive composite unique constraints and scoped composite foreign keys; negative PostgreSQL tests use a distinct valid purchase request to avoid a false positive from the unique one-receipt-per-request guard.
 - Status: FIX PUBLISHED — CI PENDING. Release OFF. Exact commit and six-job CI must be recorded before VERIFIED.
+
+
+## BUG-20261019-007 — Scope-FK negative test could pass for the wrong constraint
+- Affected: Phase 12 INV-012-FK PostgreSQL regression test.
+- Root cause: initial attempted cross-hall forged receipt used an item only catalogued in the original hall, so the existing item FK could reject it before the newly added scoped purchase FK was tested.
+- Impact: false confidence in defense-in-depth regression coverage, not evidence that new production constraints are ineffective. All release switches remain OFF.
+- Fix: test attempts mismatched item under the SAME valid hall, with a second previously unused purchase request, and mismatched review purchase binding without foreign-hall mismatch.
+- Status: FIX PUBLISHED — CI PENDING. Do not mark VERIFED until all six jobs pass on corrected SHA.
