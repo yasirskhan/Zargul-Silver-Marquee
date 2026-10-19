@@ -103,7 +103,7 @@
                                 <p class="text-xs">Immutable movement: {{ $opening['movementId'] }}</p>
                             @else
                                 <p class="text-xs font-semibold">PENDING: no owned quantity has been posted.</p>
-                                @if($this->canApproveOpening() && $opening['requestedBy'] !== (int) auth()->id())
+                                @if($this->canApproveOpening() && $opening['requestedBy'] !== (int) \Filament\Facades\Filament::auth()->id())
                                     <button type="button" wire:click="acceptOpeningRequest('{{ $opening['id'] }}')"
                                         class="rounded-lg border px-3 py-2 text-sm">
                                         Accept verified opening stock
