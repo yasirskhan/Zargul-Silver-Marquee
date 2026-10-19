@@ -42,6 +42,6 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Severity: LOW, test-isolation defect; production invoice service checks and immutable transaction passed before assertion; new issuance service remained DEFAULT OFF.
 - Actual vs expected: prior central tests seeded unrelated independently verified settlements and signed revisions in the shared isolated PostgreSQL test database. The new test erroneously counted all rows instead of only those belonging to the newly issued synthetic invoice.
 - Root cause: global fixture count instead of invoice-scoped query. Repair commit `86d57bf799d8dc6c0a5a5fbdce73da94466a9447` scopes settlement and paid-revision checks to exact invoice ID.
-- Status: FIX PUBLISHED — CI PENDING when recorded; [run 39191319746](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39191319746) five jobs were green, full laravel-postgres running. Must confirm final six-job success before VERIFIED.
+- Status: VERIFIED. Corrected source `86d57bf799d8dc6c0a5a5fbdce73da94466a9447` passed [run 39191319746](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39191319746) with all six hosted jobs SUCCESS, including central-postgres and full laravel-postgres. Unrelated fixture rows remain protected.
 - Security/finance: no authorization, billing permission, financial state, signed-issuance or release gates were weakened.
 - Next action: verify exact 86d57bf CI, preserve the original failed run, then verify follow-on protected internal staff invoice route/renderer separately.
