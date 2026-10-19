@@ -97,3 +97,7 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Impact: false confidence in defense-in-depth regression coverage, not evidence that new production constraints are ineffective. All release switches remain OFF.
 - Fix: test attempts mismatched item under the SAME valid hall, with a second previously unused purchase request, and mismatched review purchase binding without foreign-hall mismatch.
 - Status: FIX PUBLISHED — CI PENDING. Do not mark VERIFED until all six jobs pass on corrected SHA.
+
+
+## VERIFIED correction to BUG-20261019-007
+- Corrected source `2db2241936eef62092aaa7c68902f092789275de`, [CI 39304414245](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39304414245) SUCCESS all six jobs. Database composite-scope test no longer relies on catalog-item mismatch or duplicate request constraints. Production posting remains OFF.

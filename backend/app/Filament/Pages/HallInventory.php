@@ -71,6 +71,22 @@ final class HallInventory extends Page
     public string $purchaseEvidence = '';
     public string $purchaseReason = '';
 
+    public string $receivingPurchaseId = '';
+    public string $receivingQuantity = '';
+    public string $receivingEvidenceRef = '';
+    public string $receivingCondition = '';
+    #[Locked]
+    public string $receivingId = '';
+    public string $reviewReceiptId = '';
+    public string $reviewReceiptNotes = '';
+    #[Locked]
+    public string $receivingReviewId = '';
+    #[Locked]
+    public ?string $lastReceivingReference = null;
+    #[Locked]
+    public ?string $lastReceivingReviewReference = null;
+
+
     #[Locked]
     public array $openingHistory = [];
     #[Locked]
@@ -199,6 +215,8 @@ final class HallInventory extends Page
         $this->loanInlineRequestId = (string) Str::uuid();
         $this->openingRequestId = (string) Str::uuid();
         $this->purchaseRequestId = (string) Str::uuid();
+        $this->receivingId=(string)Str::uuid();
+        $this->receivingReviewId=(string)Str::uuid();
         $this->reloadCatalog();
     }
 
@@ -264,6 +282,16 @@ final class HallInventory extends Page
         $this->purchaseEvidence = '';
         $this->purchaseReason = '';
         $this->lastPurchaseReference = null;
+        $this->receivingPurchaseId = '';
+        $this->receivingQuantity = '';
+        $this->receivingEvidenceRef = '';
+        $this->receivingCondition = '';
+        $this->reviewReceiptId = '';
+        $this->reviewReceiptNotes = '';
+        $this->lastReceivingReference = null;
+        $this->lastReceivingReviewReference = null;
+        $this->receivingId = (string)Str::uuid();
+        $this->receivingReviewId = (string)Str::uuid();
         $this->purchaseRequestId = (string) Str::uuid();
         $this->openingRequestId = (string) Str::uuid();
         $this->createRequestId = (string) Str::uuid();
@@ -372,6 +400,68 @@ final class HallInventory extends Page
         $this->purchaseVendorReference='';
         $this->purchaseEvidence='';
         $this->purchaseReason='';
+        $this->reloadPurchaseHistory();
+    }
+
+
+    public function recordPhysicalPurchaseReceiving():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.purchase_receipts_enabled'),403);
+        $this->validate([
+            'receivingPurchaseId'=>'required|uuid',
+            'receivingQuantity'=>['required','regex:/\A[1-9][0-9]{0,8}\z/D'],
+            'receivingEvidenceRef'=>'required|string|min:8|max:300',
+            'receivingCondition'=>'required|string|min:5|max:500',
+        ]);
+        try {
+            $this->lastReceivingReference=app(\App\Services\HallInventoryPurchaseReceivingService::class)
+                ->record($actor,$this->companyId,$this->hallId,
+                    $this->receivingPurchaseId,$this->receivingId,
+                    (int)$this->receivingQuantity,$this->receivingEvidenceRef,
+                    $this->receivingCondition);
+        }catch(InvalidArgumentException|ConflictHttpException $e){
+            throw ValidationException::withMessages(['receivingPurchaseId'=>$e->getMessage()]);
+        }
+        $this->receivingId=(string)Str::uuid();
+        $this->receivingPurchaseId='';
+        $this->receivingQuantity='';
+        $this->receivingEvidenceRef='';
+        $this->receivingCondition='';
+        $this->reloadPurchaseHistory();
+    }
+
+    public function canReviewPurchaseReceiving():bool
+    {
+        $actor=Filament::auth()->user();
+        if (!config('inventory_controls.purchase_receipts_enabled')
+            || !$actor instanceof User || $this->companyId===null
+            || $this->hallId===null || !static::canAccess()
+            || !array_key_exists($this->hallId,$this->hallOptions())) return false;
+        $hall=Hall::query()->where('company_id',$this->companyId)
+            ->where('id',$this->hallId)->where('is_active',true)->first();
+        return $hall!==null && app(TenantAccess::class)->canConfigureHall($actor,$hall);
+    }
+
+    public function independentlyReviewPurchaseReceiving():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canReviewPurchaseReceiving(),403);
+        $this->validate([
+            'reviewReceiptId'=>'required|uuid',
+            'reviewReceiptNotes'=>'required|string|min:10|max:500',
+        ]);
+        try {
+            $this->lastReceivingReviewReference=app(\App\Services\HallInventoryPurchaseReceivingReviewService::class)
+                ->attest($actor,$this->companyId,$this->hallId,
+                    $this->reviewReceiptId,$this->receivingReviewId,
+                    $this->reviewReceiptNotes);
+        }catch(InvalidArgumentException|ConflictHttpException $e){
+            throw ValidationException::withMessages(['reviewReceiptId'=>$e->getMessage()]);
+        }
+        $this->receivingReviewId=(string)Str::uuid();
+        $this->reviewReceiptId='';
+        $this->reviewReceiptNotes='';
         $this->reloadPurchaseHistory();
     }
 

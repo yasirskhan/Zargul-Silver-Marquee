@@ -72,3 +72,5 @@ INV-012-REVIEW,Hall-scoped purchase receiving and independent review history,12,
 INV-012-FK,Database scope integrity for purchase receiving and review,12,Implementation published CI pending,Composite purchase and hall item foreign keys must block cross-scope privileged SQL writes while preserving immutable prior records
 
 INV-012-FK-TEST,Distinct-parent PostgreSQL cross-binding regression coverage,12,Implementation published CI pending,Two valid hall items and two valid purchase IDs must demonstrate that only new scoped composite FK rejects mismatched receiving and review records
+
+INV-012-UI,Authenticated physical receiving and third-actor review forms,12,Implementation published CI pending,Livewire hall-scoped manager receiving and owner-admin review with independent actors validation logout role revocation stock and finance unchanged

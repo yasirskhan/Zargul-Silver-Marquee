@@ -265,6 +265,61 @@ class HallInventoryLivewireTest extends TestCase
         $page->call('reloadPurchaseHistory')->assertForbidden();
     }
 
+
+    public function test_independent_purchase_receiving_and_third_actor_review_are_available_in_hall_ui_without_posting():void
+    {
+        [$company,$hall,$other,$manager,$membership]=$this->fixture();
+        config()->set('inventory_controls.catalog_enabled',true);
+        config()->set('inventory_controls.purchase_receipts_enabled',true);
+        $item=(string)\Illuminate\Support\Str::uuid();
+        app(\App\Services\HallInventoryCatalogService::class)->create(
+            $manager,$company->id,$hall->id,$item,'Purchase event tables',
+            'Furniture','piece',5,'New event tables');
+        $request=(string)\Illuminate\Support\Str::uuid();
+        app(\App\Services\HallInventoryPurchaseRequestService::class)->request(
+            $manager,$company->id,$hall->id,$item,$request,9,
+            'Table Seller','INV-TABLES-9','vendor-proof-reference',
+            'Physical receipt requested');
+        $receiver=User::create(['name'=>'Purchase Receiver',
+            'email'=>'purchase-ui-receiver@example.test','password'=>'test-only']);
+        $receiver->markEmailAsVerified();
+        CompanyMembership::create(['company_id'=>$company->id,
+            'user_id'=>$receiver->id,'role'=>'owner']);
+        $reviewer=User::create(['name'=>'Purchase Reviewer',
+            'email'=>'purchase-ui-reviewer@example.test','password'=>'test-only']);
+        $reviewer->markEmailAsVerified();
+        CompanyMembership::create(['company_id'=>$company->id,
+            'user_id'=>$reviewer->id,'role'=>'admin']);
+        $this->be($receiver);
+        Livewire::test(HallInventory::class)
+            ->assertSee('Record independently counted delivery')
+            ->set('receivingPurchaseId',$request)
+            ->set('receivingQuantity','9')
+            ->set('receivingEvidenceRef','physical-proof-9-tables')
+            ->set('receivingCondition','All nine tables counted in hall')
+            ->call('recordPhysicalPurchaseReceiving')->assertHasNoErrors()
+            ->assertSee('PHYSICAL RECEIVING ASSERTED / AWAITING INDEPENDENT REVIEW');
+        $receipt=DB::table('hall_inventory_purchase_receiving_evidence')
+            ->where('purchase_request_id',$request)->value('id');
+        $this->assertNotNull($receipt);
+        $this->assertSame(0,DB::table('hall_inventory_positions')->count());
+        $this->assertSame(0,DB::table('finance_journals')->count());
+        $this->be($reviewer);
+        Livewire::test(HallInventory::class)
+            ->assertSee('Owner/admin independent receiving review')
+            ->set('reviewReceiptId',$receipt)
+            ->set('reviewReceiptNotes','Independent reviewer confirms recorded count')
+            ->call('independentlyReviewPurchaseReceiving')->assertHasNoErrors()
+            ->assertSee('INDEPENDENT REVIEW RECORDED / NOT STOCK POSTED');
+        $this->assertSame(1,DB::table('hall_inventory_purchase_receiving_reviews')->count());
+        $this->assertSame(0,DB::table('hall_inventory_movement_events')->count());
+        $this->assertSame(0,DB::table('finance_journals')->count());
+        $this->be($manager);
+        Livewire::test(HallInventory::class)
+            ->assertSee('INDEPENDENT REVIEW RECORDED / NOT STOCK POSTED')
+            ->assertSee('Owned inventory posted: NO. Financially posted: NO.');
+    }
+
     public function test_manager_role_revocation_blocks_live_hall_inventory_actions(): void
     {
         [$company, $hall, , , $membership] = $this->fixture();

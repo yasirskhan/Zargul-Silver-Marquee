@@ -89,6 +89,61 @@
                 @if($lastPurchaseReference !== null)
                     <p role="status" class="text-sm">Purchase claim saved: {{ $lastPurchaseReference }}. No inventory or financial posting.</p>
                 @endif
+
+                <form wire:submit="recordPhysicalPurchaseReceiving" class="space-y-2 rounded-lg border p-3" aria-label="Record physical purchase receiving">
+                    <h3 class="font-semibold">Record independently counted delivery</h3>
+                    <p class="text-xs">Only a different authorized person can record the physical count. A typed evidence reference is not authenticated proof. No stock or money is posted.</p>
+                    <label class="block text-sm">Purchase claim
+                        <select wire:model="receivingPurchaseId" class="w-full rounded-lg border p-2 text-gray-900">
+                            <option value="">Choose pending purchase</option>
+                            @foreach($purchaseHistory as $purchase)
+                                @if($purchase['receivingEvidenceId'] === null && $purchase['requestedBy'] !== (int)\Filament\Facades\Filament::auth()->id())
+                                    <option value="{{ $purchase['id'] }}">{{ $purchase['itemName'] }} ({{ $purchase['quantity'] }})</option>
+                                @endif
+                            @endforeach
+                        </select>
+                    </label>
+                    <label class="block text-sm">Quantity physically counted
+                        <input wire:model="receivingQuantity" type="text" pattern="[1-9][0-9]*" class="w-full rounded-lg border p-2 text-gray-900">
+                    </label>
+                    <label class="block text-sm">Physical evidence reference (not verified)
+                        <input wire:model="receivingEvidenceRef" type="text" maxlength="300" class="w-full rounded-lg border p-2 text-gray-900">
+                    </label>
+                    <label class="block text-sm">Condition notes
+                        <input wire:model="receivingCondition" type="text" maxlength="500" class="w-full rounded-lg border p-2 text-gray-900">
+                    </label>
+                    @error('receivingPurchaseId') <p role="alert">{{ $message }}</p> @enderror
+                    <button type="submit" class="rounded-lg border px-3 py-2 text-sm">Record physical receiving assertion only</button>
+                </form>
+                @if($lastReceivingReference !== null)
+                    <p role="status" class="text-xs">Receiving record {{ $lastReceivingReference }} saved. No owned stock posted.</p>
+                @endif
+                @if($this->canReviewPurchaseReceiving())
+                    <form wire:submit="independentlyReviewPurchaseReceiving" class="space-y-2 rounded-lg border p-3" aria-label="Independently review physical receiving">
+                        <h3 class="font-semibold">Owner/admin independent receiving review</h3>
+                        <p class="text-xs">Must be a third actor, neither the requester nor receiver. Review is not final stock acceptance or payment.</p>
+                        <label class="block text-sm">Receiving assertion
+                            <select wire:model="reviewReceiptId" class="w-full rounded-lg border p-2 text-gray-900">
+                                <option value="">Choose pending review</option>
+                                @foreach($purchaseHistory as $purchase)
+                                    @if($purchase['receivingEvidenceId'] !== null && $purchase['independentReviewId'] === null
+                                        && $purchase['requestedBy'] !== (int)\Filament\Facades\Filament::auth()->id()
+                                        && $purchase['receivedBy'] !== (int)\Filament\Facades\Filament::auth()->id())
+                                        <option value="{{ $purchase['receivingEvidenceId'] }}">{{ $purchase['itemName'] }} (counted {{ $purchase['countedQuantity'] }})</option>
+                                    @endif
+                                @endforeach
+                            </select>
+                        </label>
+                        <label class="block text-sm">Review notes
+                            <input wire:model="reviewReceiptNotes" type="text" maxlength="500" class="w-full rounded-lg border p-2 text-gray-900">
+                        </label>
+                        @error('reviewReceiptId') <p role="alert">{{ $message }}</p> @enderror
+                        <button type="submit" class="rounded-lg border px-3 py-2 text-sm">Record independent review only</button>
+                    </form>
+                    @if($lastReceivingReviewReference !== null)
+                        <p role="status" class="text-xs">Review {{ $lastReceivingReviewReference }} saved. No inventory or money posted.</p>
+                    @endif
+                @endif
                 <h3 class="font-semibold">Purchased stock claim history</h3>
                 @forelse($purchaseHistory as $purchase)
                     <article class="rounded-lg border p-3" wire:key="purchase-claim-{{ $purchase['id'] }}">
