@@ -223,8 +223,20 @@ try {
     planDeny(fn()=>$router->dispatch(
         $publishServer,$cookie,$badJson,$writerCsrf),
         'invalid_vendor_plan_request');
+    $huge=$fields;$huge['features_json']=str_repeat('A',2049);
+    planDeny(fn()=>$router->dispatch(
+        $publishServer,$cookie,$huge,$writerCsrf),
+        'invalid_vendor_plan_request');
+    $forgedReceipt=['plan_version_id'=>planUuid(),'version'=>1,
+        'term_months'=>6,'currency'=>'<script>','price_minor'=>'1'];
+    planDeny(fn()=>Hafzatech\Central\CentralStaffVendorPlanCatalogRenderer::receipt(
+        $forgedReceipt),'invalid_vendor_plan_response');
     $db->prepare("UPDATE central_staff_role_grants SET revoked_at=now()
         WHERE staff_id=:staff")->execute(['staff'=>$writer]);
+    $revokedRequest=$fields;$revokedRequest['request_id']=planUuid();
+    planDeny(fn()=>$router->dispatch(
+        $publishServer,$cookie,$revokedRequest,$writerCsrf),'staff_portal_denied');
+
     $revokeArgs=$newArgs;$revokeArgs[1]=planUuid();
     planDeny(fn()=>$on->publish(...$revokeArgs),
         'vendor_plan_administrator_required');

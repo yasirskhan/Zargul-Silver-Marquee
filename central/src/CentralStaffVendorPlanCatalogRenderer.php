@@ -52,7 +52,8 @@ final class CentralStaffVendorPlanCatalogRenderer
         $actual=array_keys($row);sort($actual,SORT_STRING);
         if($actual!==$expected ||
             !is_string($row['plan_version_id']) ||
-            preg_match('/^[a-f0-9-]{36}$/D',$row['plan_version_id'])!==1 ||
+            preg_match('/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/D',
+                $row['plan_version_id'])!==1 ||
             !is_int($row['version']) || $row['version']<1 ||
             !in_array($row['term_months'],[6,12],true) ||
             !is_string($row['currency']) ||
