@@ -45,3 +45,8 @@ Use separate feature flag; no real inventory or customer data until acceptance. 
 - An immutable proposal records item, existing same-hall physical opening stocktake and positive quantity; no stock balance is changed when requested. The existing physical count's owned/usable line must EXACTLY match the proposed quantity; no invented stock or unverified purchase value.
 - A DISTINCT currently authorized owner/admin must approve before the first `opening_owned` movement can be posted. Acceptance is a separate immutable row referencing exact immutable movement and original request, not an editable approved checkbox. The unique per-item opening request prevents repeated re-opening to inflate owned goods. Production switch `VENUE_INVENTORY_OPENING_POSTING_ENABLED=false`.
 - These are schema prerequisites only until a secure deterministic locking service and PostgreSQL tests are complete. No data is inserted by migration, no revenue/expense recorded or payment posted.
+
+
+### Read-only opening review preparation
+- `HallInventoryOpeningReview::recent` reads up to 20 immutable opening physical-count requests, original hall-item snapshot, independent acceptance movement link and status for the exact active company/hall under the currently authenticated assigned manager/owner/admin. No other halls, bank, customer PII or financial ledger are accessed.
+- Pending means NOT BOOKED; accepted means an authorized immutable movement exists, NOT paid or remotely verified. Physical evidence remains linked to opening stocktake ID. Feature gate OFF by default, requires own source and PostgreSQL permission tests before release.

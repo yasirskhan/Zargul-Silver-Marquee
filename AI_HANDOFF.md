@@ -240,3 +240,8 @@ Verify live branch/CI → reconcile current handoff + specific requirement/featu
 ## DETACHED OPENING STOCK REGRESSION HARDENING
 - Atomic CAS on exact company/hall/item/position/revision 0 now requires one affected DB row; conflict causes entire audited receipt transaction rollback and no false event. Explicit owner-self-approval denial tested even when the requester has owner permissions and authenticated current session; independent admin must sign. Tests also cover independent manager+owner, duplicate request, reapproval, wrong hall/count, signed-free input provenance, immutable opening acceptance, zero finance side effects.
 - No public route/Filament posting page, payment journal or license activation added. Exact six-job CI needed after the parent position/journal migration and own follow-on publication; production posting gate OFF.
+
+
+## DETACHED PHASE 12 OPENING REVIEW FOUNDATION (2026-10-19 UTC)
+- Following default-OFF two-actor opening stock backend `afc2828cab3a2d384d9d285c2902b37315e6c9a0`, current [CI 39251496334](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39251496334) must verify six green at that exact parent source BEFORE review candidate can be published.
+- `HallInventoryOpeningReview` is a bounded (20), live-authenticated company/hall-scoped, no-write projection of immutable physical opening request and independently approved movement, with user-visible PENDING vs ACCEPTED states. It does not replace independent receipt, accrue finance charges or expose global stock. Add PostgreSQL hall-role/scope/revocation and UI tests before publishing; no production controls changed.
