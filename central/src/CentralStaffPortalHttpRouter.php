@@ -34,7 +34,8 @@ final class CentralStaffPortalHttpRouter
         private readonly ?CentralStaffRoleReviewQueue $roleReviewQueue = null,
         private readonly ?CentralStaffRoleDecisionService $roleDecisions = null,
         private readonly ?CentralStaffRoleRequestService $roleRequestWriter = null,
-        private readonly ?CentralStaffActivationReadiness $activationReview = null
+        private readonly ?CentralStaffActivationReadiness $activationReview = null,
+        private readonly ?CentralStaffVendorInvoiceIssuer $invoiceIssuer = null
     ) {}
 
     /**
@@ -96,6 +97,29 @@ final class CentralStaffPortalHttpRouter
                 'clear_cookie_options'=>array_replace(
                     CentralStaffHttpPolicy::cookieOptions(time()),['expires'=>1])
             ];
+        }
+        if ($uri==='/staff/billing/invoices/issue' && $this->invoiceIssuer!==null) {
+            if (!$this->exactFields($fields,
+                    ['customer_id','plan_version_id','receiving_account_id','request_id']) ||
+                !is_string($fields['customer_id']??null) ||
+                !is_string($fields['plan_version_id']??null) ||
+                !is_string($fields['receiving_account_id']??null) ||
+                !is_string($fields['request_id']??null) ||
+                !self::uuid($fields['customer_id']) ||
+                !self::uuid($fields['plan_version_id']) ||
+                !self::uuid($fields['receiving_account_id']) ||
+                !self::uuid($fields['request_id'])) {
+                throw new RegistrationError('invalid_vendor_invoice_request',422);
+            }
+            if (!$this->boundary->permitsMutation($server,$bearer,$csrfHeader,
+                    'billing.invoice.issue',$fields['customer_id'])) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            $issued=$this->invoiceIssuer->issue($bearer,
+                $fields['customer_id'],$fields['plan_version_id'],
+                $fields['receiving_account_id'],$fields['request_id']);
+            return ['kind'=>'private_vendor_invoice_issued_html',
+                'html'=>CentralStaffVendorInvoiceReceiptRenderer::render($issued)];
         }
         if ($uri==='/staff/billing/overview') {
             if (!$this->exactFields($fields,['customer_id','invoice_id']) ||

@@ -26,6 +26,7 @@ foreach([
  'CentralStaffOwnPasswordChange','CentralStaffPortalOwnPassword',
  'CentralStaffPortalTeamDashboard','CentralStaffPortalAuditorDashboard','CentralStaffRoleReviewQueue',
  'CentralStaffRoleRequestService','CentralStaffRoleDecisionService',
+ 'CentralStaffVendorInvoiceIssuer','CentralStaffVendorInvoiceReceiptRenderer',
  'CentralStaffPortalHttpRouter',
  'CentralStaffPortalPrivateResponse','CentralStaffPortalFormRequest',
  'CentralStaffPortalOperatorKernel','CentralStaffPortalResponseEmitter',
