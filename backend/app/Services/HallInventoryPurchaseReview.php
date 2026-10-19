@@ -23,7 +23,7 @@ final class HallInventoryPurchaseReview {
         if(!$hall||!Auth::check()||(int)Auth::id()!==(int)$actor->getKey()||
             !$this->access->canManageHallInventory($actor,$hall))
             throw new AuthorizationException('Purchase review denied.');
-        return DB::table('hall_inventory_purchase_requests as r')
+        $rows=DB::table('hall_inventory_purchase_requests as r')
             ->join('hall_inventory_items as i',function($join):void {
                 $join->on('i.company_id','=','r.company_id')
                     ->on('i.hall_id','=','r.hall_id')->on('i.id','=','r.item_id');
@@ -83,5 +83,19 @@ final class HallInventoryPurchaseReview {
                 'ownedStockPosted'=>$r->purchase_movement_id!==null,
                 'financiallyPosted'=>false,
             ])->all();
+        if ($rows===[])return [];
+        $attached=DB::table('hall_inventory_purchase_evidence_files')
+            ->where('company_id',$companyId)->where('hall_id',$hallId)
+            ->whereIn('purchase_request_id',array_column($rows,'id'))
+            ->get(['id','purchase_request_id','evidence_kind'])
+            ->groupBy('purchase_request_id');
+        foreach($rows as &$record) {
+            $record['privateAttachments']=($attached->get($record['id'])??collect())
+                ->map(static fn($file):array=>[
+                    'id'=>(string)$file->id,'kind'=>(string)$file->evidence_kind
+                ])->all();
+        }
+        unset($record);
+        return $rows;
     }
 }

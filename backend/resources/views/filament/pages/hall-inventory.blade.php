@@ -181,6 +181,16 @@
                         <p class="text-xs">Vendor: {{ $purchase['vendorName'] }} / {{ $purchase['vendorReference'] }}</p>
                         <p class="text-xs">Evidence reference (unverified): {{ $purchase['evidenceReference'] }}</p>
                         <p class="text-xs">Claim ID: {{ $purchase['id'] }}</p>
+                        @if(config('inventory_controls.purchase_evidence_upload_enabled') && $this->canReviewPurchaseReceiving())
+                            @foreach($purchase['privateAttachments'] ?? [] as $attachment)
+                                <a href="{{ route('inventory.purchase-evidence.download', [
+                                    'companyId'=>$companyId, 'hallId'=>$hallId,
+                                    'purchaseId'=>$purchase['id'], 'fileId'=>$attachment['id']
+                                ]) }}" class="text-sm underline">
+                                    Download {{ str_replace('_', ' ', $attachment['kind']) }} (private, unverified)
+                                </a>
+                            @endforeach
+                        @endif
                         @if(config('inventory_controls.purchase_stock_posting_enabled')
                             && $this->canReviewPurchaseReceiving()
                             && !$purchase['ownedStockPosted']

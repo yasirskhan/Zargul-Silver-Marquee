@@ -36,3 +36,8 @@ Route::post('/integrations/telegram/approval-webhook', function (\Illuminate\Htt
     }
     return response()->json(['ok' => true]);
 })->middleware('throttle:30,1');
+
+Route::get('/_private/hall-inventory/purchase-evidence/{companyId}/{hallId}/{purchaseId}/{fileId}',
+    \App\Http\Controllers\PrivatePurchaseEvidenceDownloadController::class)
+    ->whereUuid('companyId')->whereUuid('hallId')->whereUuid('purchaseId')->whereUuid('fileId')
+    ->middleware('throttle:20,1')->name('inventory.purchase-evidence.download');
