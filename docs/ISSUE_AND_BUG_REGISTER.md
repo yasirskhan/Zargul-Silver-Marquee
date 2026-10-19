@@ -34,3 +34,14 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Safe rollback / release gate: `central_control.activation_enabled` and `scheduled_checks_enabled` default OFF; previous confirmed source `1c94d1f7` and immutable signed local license remain intact until a verified safe update.
 - Next: retain rollback/retry coverage in regular releases and verify the signed customer license experience before enabling production signing. Original failed CI history remains in AI_HANDOFF archives.
 - Regression isolation: original first draft mixed rollback failure state into the existing normal cadence test; corrected separate RefreshDatabase test in `b0b43858` preserves all legacy assertions. Neither initial draft published.
+
+
+## BUG-20261019-002 — Synthetic invoice test counted unrelated settlements
+- Affected requirement: CENT-005; independent vendor billing and invoice creation regression.
+- First detected / source SHA / CI: `4873f21a915e8c3e159635842d9394e15b9b84ad`, [CI 39191227308](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39191227308); central-postgres FAILED at the no-false-settlement assertion in `central/tests/staff_vendor_invoice_issuance.php`.
+- Severity: LOW, test-isolation defect; production invoice service checks and immutable transaction passed before assertion; new issuance service remained DEFAULT OFF.
+- Actual vs expected: prior central tests seeded unrelated independently verified settlements and signed revisions in the shared isolated PostgreSQL test database. The new test erroneously counted all rows instead of only those belonging to the newly issued synthetic invoice.
+- Root cause: global fixture count instead of invoice-scoped query. Repair commit `86d57bf799d8dc6c0a5a5fbdce73da94466a9447` scopes settlement and paid-revision checks to exact invoice ID.
+- Status: FIX PUBLISHED — CI PENDING when recorded; [run 39191319746](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39191319746) five jobs were green, full laravel-postgres running. Must confirm final six-job success before VERIFIED.
+- Security/finance: no authorization, billing permission, financial state, signed-issuance or release gates were weakened.
+- Next action: verify exact 86d57bf CI, preserve the original failed run, then verify follow-on protected internal staff invoice route/renderer separately.
