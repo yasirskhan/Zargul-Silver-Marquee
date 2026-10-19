@@ -80,3 +80,12 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Root cause: regression test did not isolate the intentional failed SQL in a nested transactional savepoint.
 - Fix: nest the expected rejected UPDATE in DB::transaction so Laravel rolls back the inner savepoint before subsequent assertions. No changes to immutable database trigger, production authorization, money, quantity posting, or release flags.
 - Status: VERIFIED at repair source `e937c9a1907c318f802e2e1c9bd6bedad87368f4`, [CI 39269559226](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39269559226) SUCCESS all six. Subsequent history/UI sources also six green.
+
+
+## BUG-20261019-006 — Receiving relationships lack database-level hall/purchase scope
+- Affected requirement: Phase 12 immutable receiving/review integrity.
+- Discovery: Code review of the committed receiving and review migrations: each referenced parent ID was a valid single-column FK, but the child company/hall/item or purchase request columns were not all tied to that parent by a composite FK.
+- Severity: HIGH defense-in-depth data-integrity risk for privileged SQL imports/recovery, not an observed production exploit. Release gates remain OFF.
+- Reproduction: attempt a new valid purchase request and directly insert its receiving evidence with another hall ID, keeping a matching catalog item ID where possible; PostgreSQL should reject mismatched parent scope. Similarly a review with another hall or purchase ID must be rejected.
+- Repair: additive composite unique constraints and scoped composite foreign keys; negative PostgreSQL tests use a distinct valid purchase request to avoid a false positive from the unique one-receipt-per-request guard.
+- Status: FIX PUBLISHED — CI PENDING. Release OFF. Exact commit and six-job CI must be recorded before VERIFIED.

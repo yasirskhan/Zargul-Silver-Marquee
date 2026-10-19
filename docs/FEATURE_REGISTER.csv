@@ -68,3 +68,5 @@ QA-001,Verified complete end to end feature traceability,Cross-cutting,Owner app
 QA-002,Proactive bug detection root cause repair and regression gates,Cross-cutting,Owner approved mandatory policy,Failures require reproducible issue root cause fix regression exact SHA green CI and release blocker handling without weakening tests
 
 INV-012-REVIEW,Hall-scoped purchase receiving and independent review history,12,Implementation published CI pending,Read-only stage indicators for unverified claims receiving assertion and third-person review; never show stock or payment posted until separately authorized and verified
+
+INV-012-FK,Database scope integrity for purchase receiving and review,12,Implementation published CI pending,Composite purchase and hall item foreign keys must block cross-scope privileged SQL writes while preserving immutable prior records

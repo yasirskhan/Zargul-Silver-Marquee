@@ -316,3 +316,9 @@ Verify live branch/CI → reconcile current handoff + specific requirement/featu
 ## PHASE 12 PURCHASE RECEIVING STAGE VISIBILITY (2026-10-19)
 - Read-only hall purchase review now joins hall/item-scoped independent receiving and third-actor review records and accurately distinguishes claim, physical receipt assertion, and independent review. None can be labelled purchased inventory or verified financial payment. PostgreSQL end-to-end test creates three independent actors and checks stages, wrong-hall exclusion and no owned stock/payment posting.
 - Feature register INV-012-REVIEW added as CI PENDING; verify the exact pushed SHA and all six jobs before VERIFIED. Continue with genuine server-trusted evidence custody and reviewed acquisition posting. Release flags remain OFF.
+
+
+## PHASE 12 RECEIVING COMPOSITE DATABASE INTEGRITY (2026-10-19)
+- Prior purchase stage history source `876fc2d8273f62603c7914c7a8fcd65b09ac9e0e`, hosted [CI 39302195598](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39302195598) SUCCESS individually across all six jobs.
+- Next bounded integrity batch adds additive scoped composite foreign keys for existing immutable purchase requests → physical receiving evidence → independent review, with a PostgreSQL regression that forges a distinct valid request in a foreign hall, to avoid false positive from existing unique receipt guard. No release flags or finance posting are enabled.
+- Track BUG-20261019-006 and INV-012-FK as CI PENDING until exact new SHA passes all six jobs. Then continue evidence storage custody and independent `acquire_owned` posting and release gates; never misrepresent mere reviewed assertions as verified stock.
