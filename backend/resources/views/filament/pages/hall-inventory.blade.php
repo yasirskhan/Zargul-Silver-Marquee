@@ -53,6 +53,37 @@
             <button type="button" wire:click="reloadCatalog" class="rounded-lg border px-3 py-2 text-sm">Refresh items</button>
         </section>
 
+        @if(config('inventory_controls.opening_stock_posting_enabled'))
+            <section class="space-y-3 rounded-xl border p-4" aria-label="Opening stock independent review">
+                <h2 class="text-lg font-semibold">Opening stock: independent review</h2>
+                <p class="text-sm text-gray-600 dark:text-gray-300">
+                    A saved physical opening count alone is NOT owned stock.
+                    A different authorized owner/admin must accept its evidence;
+                    no invoice, purchase or payment is created here.
+                </p>
+                <div class="space-y-3">
+                    @forelse($openingHistory as $opening)
+                        <article class="rounded-lg border p-3" wire:key="opening-evidence-{{ $opening['id'] }}">
+                            <h3 class="font-semibold">{{ $opening['itemName'] }}</h3>
+                            <p>{{ $opening['quantity'] }} {{ $opening['unit'] }} — {{ $opening['status'] }}</p>
+                            <p class="text-xs">Physical count evidence: {{ $opening['physicalCountId'] }}</p>
+                            <p class="text-xs">Reason: {{ $opening['reason'] }}</p>
+                            @if($opening['movementId'] !== null)
+                                <p class="text-xs">Immutable movement: {{ $opening['movementId'] }}</p>
+                            @else
+                                <p class="text-xs font-semibold">PENDING: no owned quantity has been posted.</p>
+                            @endif
+                            <p class="text-xs">Financial posting: NONE</p>
+                        </article>
+                    @empty
+                        <p>No opening-count requests have been submitted for this hall.</p>
+                    @endforelse
+                </div>
+                <button type="button" wire:click="reloadOpeningHistory"
+                    class="rounded-lg border px-3 py-2 text-sm">Refresh opening review</button>
+            </section>
+        @endif
+
         <section class="space-y-4 rounded-xl border p-4" aria-label="Create hall inventory catalog item">
             <h2 class="text-lg font-semibold">Add a new item to this hall</h2>
             <div class="grid gap-3 md:grid-cols-2">

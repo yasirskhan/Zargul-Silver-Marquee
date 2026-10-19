@@ -58,6 +58,8 @@ final class HallInventory extends Page
     public ?string $lastLoanReference = null;
     #[Locked]
     public array $loanHistory = [];
+    #[Locked]
+    public array $openingHistory = [];
 
     public string $loanDirection = 'internal';
     public string $loanCounterpartHallId = '';
@@ -240,6 +242,17 @@ final class HallInventory extends Page
             ->recent($actor, $this->companyId, $this->hallId);
     }
 
+    public function reloadOpeningHistory(): void
+    {
+        $this->openingHistory = [];
+        $actor = $this->authorizeSelection();
+        if (! config('inventory_controls.opening_stock_posting_enabled')) {
+            return;
+        }
+        $this->openingHistory = app(\App\Services\HallInventoryOpeningReview::class)
+            ->recent($actor,$this->companyId,$this->hallId);
+    }
+
     public function reloadLoanHistory(): void
     {
         $this->loanHistory = [];
@@ -265,6 +278,7 @@ final class HallInventory extends Page
             ])->all();
         $this->reloadStocktakeHistory();
         $this->reloadLoanHistory();
+        $this->reloadOpeningHistory();
     }
 
     public function createItem(): void

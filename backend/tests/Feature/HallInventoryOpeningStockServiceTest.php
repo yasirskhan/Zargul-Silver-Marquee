@@ -98,6 +98,13 @@ class HallInventoryOpeningStockServiceTest extends TestCase
             $manager,$c->id,$hall->id,$item,$take,
             $request,50,'Physical stock opened'
         ));
+        $pending=app(\App\Services\HallInventoryOpeningReview::class)
+            ->recent($manager,$c->id,$hall->id);
+        $this->assertCount(1,$pending);
+        $this->assertSame('PENDING INDEPENDENT REVIEW',$pending[0]['status']);
+        $this->assertSame(50,$pending[0]['quantity']);
+        $this->assertNull($pending[0]['movementId']);
+        $this->assertFalse($pending[0]['financiallyPosted']);
         $this->assertSame(0,DB::table('hall_inventory_positions')->count());
         $this->assertSame(0,DB::table('hall_inventory_movement_events')->count());
         $this->assertSame(0,DB::table('finance_journals')->count());
@@ -119,6 +126,11 @@ class HallInventoryOpeningStockServiceTest extends TestCase
         $this->assertSame(50,(int)$event->quantity);
         $this->assertSame((int)$owner->id,(int)$event->actor_id);
         $this->assertSame(0,DB::table('finance_journals')->count());
+        $accepted=app(\App\Services\HallInventoryOpeningReview::class)
+            ->recent($owner,$c->id,$hall->id);
+        $this->assertCount(1,$accepted);
+        $this->assertSame('ACCEPTED / BOOKED',$accepted[0]['status']);
+        $this->assertSame($movement,$accepted[0]['movementId']);
 
         $this->be($admin);
         try {
