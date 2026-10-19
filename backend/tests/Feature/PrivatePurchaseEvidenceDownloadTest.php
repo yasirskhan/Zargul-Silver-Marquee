@@ -51,9 +51,11 @@ class PrivatePurchaseEvidenceDownloadTest extends TestCase
             'companyId'=>$company->id,'hallId'=>$hall->id,
             'purchaseId'=>$purchase,'fileId'=>$fileId
         ],false);
-        $this->get($uri)->assertOk()->assertSee($bytes,false)
+        $response=$this->get($uri);
+        $response->assertOk()
             ->assertHeader('Content-Type','application/octet-stream')
             ->assertHeader('X-Content-Type-Options','nosniff');
+        $this->assertSame($bytes,$response->getContent());
         $this->assertSame(1,DB::table('audit_events')
             ->where('action','hall_inventory.purchase_evidence_downloaded')->count());
         $this->be($outsider);
