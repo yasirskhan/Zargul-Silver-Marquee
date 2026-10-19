@@ -109,7 +109,70 @@ final class HallInventoryLoanDraftReview
             ->get(['loan_id','item_id','item_name_snapshot','unit_snapshot','requested_quantity'])
             ->groupBy('loan_id');
 
-        return $drafts->map(static function ($draft) use ($lines,$hallId):array {
+        // Private read-only per-loan physical custody reconciliation. Use
+        // actual independently acknowledged receipt lines, never catalog totals.
+        $loanIds=$drafts->pluck('id')->all();
+        $received=DB::table('hall_inventory_internal_loan_receipt_lines as rl')
+            ->join('hall_inventory_internal_loan_receipts as rec',function($j):void {
+                $j->on('rec.company_id','=','rl.company_id')
+                    ->on('rec.id','=','rl.receipt_id');
+            })
+            ->where('rec.company_id',$companyId)
+            ->whereIn('rec.loan_id',$loanIds)
+            ->select('rec.loan_id')
+            ->selectRaw('SUM(rl.quantity) AS received_quantity')
+            ->groupBy('rec.loan_id')->pluck('received_quantity','rec.loan_id');
+
+        $returns=DB::table('hall_inventory_internal_loan_return_batches as b')
+            ->join('hall_inventory_internal_loan_return_lines as l',function($j):void {
+                $j->on('l.company_id','=','b.company_id')
+                    ->on('l.return_batch_id','=','b.id');
+            })
+            ->leftJoin('hall_inventory_internal_loan_return_acceptances as a',function($j):void {
+                $j->on('a.company_id','=','b.company_id')
+                    ->on('a.return_batch_id','=','b.id');
+            })
+            ->leftJoin('hall_inventory_internal_loan_return_acceptance_lines as al',function($j):void {
+                $j->on('al.company_id','=','l.company_id')
+                    ->on('al.acceptance_id','=','a.id')
+                    ->on('al.source_item_id','=','l.source_item_id');
+            })
+            ->where('b.company_id',$companyId)->whereIn('b.loan_id',$loanIds)
+            ->select('b.loan_id')
+            ->selectRaw('SUM(l.quantity) AS shipped_quantity')
+            ->selectRaw('SUM(CASE WHEN a.id IS NULL THEN l.quantity ELSE 0 END) AS source_ack_pending')
+            ->selectRaw('SUM(COALESCE(al.good_quantity,0)) AS returned_good')
+            ->selectRaw('SUM(COALESCE(al.damaged_quantity,0)) AS returned_damaged')
+            ->selectRaw('SUM(COALESCE(al.unresolved_quantity,0)) AS unresolved_source')
+            ->selectRaw('SUM(CASE WHEN a.id IS NOT NULL AND al.id IS NULL THEN l.quantity ELSE 0 END) AS missing_review_lines')
+            ->groupBy('b.loan_id')->get()->keyBy('loan_id');
+
+        return $drafts->map(static function ($draft) use ($lines,$hallId,$received,$returns):array {
+            $receiptCount=(int)($received->get($draft->id)??0);
+            $stats=$returns->get($draft->id);
+            $shipped=$stats?(int)$stats->shipped_quantity:0;
+            $good=$stats?(int)$stats->returned_good:0;
+            $damaged=$stats?(int)$stats->returned_damaged:0;
+            $unresolved=$stats?(int)$stats->unresolved_source:0;
+            $pending=$stats?(int)$stats->source_ack_pending:0;
+            $missing=$stats?(int)$stats->missing_review_lines:0;
+            $reconciliation=($draft->direction==='internal' && $draft->receipt_id!==null)
+                ? [
+                    'receivedQuantity'=>$receiptCount,
+                    'shippedQuantity'=>$shipped,
+                    'notYetShipped'=>max(0,$receiptCount-$shipped),
+                    'sourceAcknowledgedGood'=>$good,
+                    'sourceAcknowledgedDamaged'=>$damaged,
+                    'sourceAcknowledgmentPending'=>$pending,
+                    'sourceUnresolved'=>$unresolved,
+                    'stillUnsettled'=>max(0,$receiptCount-$good-$damaged),
+                    'integrityWarning'=>$shipped>$receiptCount ||
+                        $good+$damaged+$unresolved+$pending+$missing!==$shipped ||
+                        $missing>0,
+                    'loanCompleted'=>false,
+                    'financiallySettled'=>false,
+                ] : null;
+
             return [
                 'id'=>(string)$draft->id,
                 'direction'=>(string)$draft->direction,
@@ -138,6 +201,7 @@ final class HallInventoryLoanDraftReview
                     ? (string)$draft->received_at : null,
                 'dispatchedAt'=>$draft->dispatched_at !== null
                     ? (string)$draft->dispatched_at : null,
+                'returnReconciliation'=>$reconciliation,
                 'lines'=>($lines->get($draft->id)??collect())->map(
                     static fn($line):array=>[
                         'itemId'=>(string)$line->item_id,

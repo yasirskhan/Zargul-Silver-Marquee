@@ -137,3 +137,9 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Impact: HIGH: incorrect physical custody interpretation and blocked legitimate partial return workflow. No automatic money posting or loan close observed.
 - Prepared repair: count source-acknowledged batches within exact loan/company and display `RETURN ACKNOWLEDGED / OUTSTANDING RECONCILIATION REQUIRED` instead of DRAFT; allow another physically witnessed return only where server evidence proves returnable borrowed usable; PostgreSQL and Livewire regressions for outstanding/damaged counts.
 - Status: REPAIR PREPARED, CI PENDING. Production loan gates stay disabled until exact six-job verification. Do not claim loan closure or settlement.
+
+## QA-20261019-RETURN-RECONCILIATION — Outstanding custody transparency
+- Scope: INV-013-OUTSTANDING. Existing immutable return/acceptance lines provide correct counts but owner/manager loan history does not yet combine quantities per loan to expose physical reconciliation outstanding across batches.
+- Risk: operational misreading of unreturned borrowed stock, return-in-transit, accepted damaged and unresolved physical amounts as a completed loan. Keep controls OFF and never infer financial settlement.
+- Prepared change: sum ONLY exact loan and company-scoped independent physical receipt and return evidence; expose total received, shipped, good, damaged, source acknowledgement pending, unresolved and not-yet-shipped counts; flag integrity mismatches; no stock or money writes. Test actual one-loan two-batch good/damaged/unresolved scenario.
+- Status: FEATURE PREPARATION, NOT A VERIFIED BUG FIX. Existing production loan release remains OFF.

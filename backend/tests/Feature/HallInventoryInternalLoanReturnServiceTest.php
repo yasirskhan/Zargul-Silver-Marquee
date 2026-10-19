@@ -223,6 +223,18 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         $this->assertSame('return_acknowledged_outstanding_reconciliation_required',
             $loanHistory['status']);
         $this->assertTrue($loanHistory['stockMoved']);
+        $summary=$loanHistory['returnReconciliation'];
+        $this->assertSame(12,$summary['receivedQuantity']);
+        $this->assertSame(8,$summary['shippedQuantity']);
+        $this->assertSame(4,$summary['notYetShipped']);
+        $this->assertSame(6,$summary['sourceAcknowledgedGood']);
+        $this->assertSame(1,$summary['sourceAcknowledgedDamaged']);
+        $this->assertSame(1,$summary['sourceUnresolved']);
+        $this->assertSame(0,$summary['sourceAcknowledgmentPending']);
+        $this->assertSame(5,$summary['stillUnsettled']);
+        $this->assertFalse($summary['integrityWarning']);
+        $this->assertFalse($summary['loanCompleted']);
+        $this->assertFalse($summary['financiallySettled']);
         $this->assertSame(1,(int)DB::table('hall_inventory_positions')
             ->where('hall_id',$dest->id)->where('item_id',$dstItem)->value('borrowed_transit'));
         $this->assertSame(0,DB::table('finance_journals')->count());
