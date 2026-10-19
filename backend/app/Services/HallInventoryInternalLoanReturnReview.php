@@ -113,10 +113,20 @@ final class HallInventoryInternalLoanReturnReview
                     ->on('d.loan_id','=','batch.loan_id')
                     ->on('d.item_id','=','l.source_item_id');
             })
+            ->leftJoin('hall_inventory_internal_loan_return_acceptances as a',function($j):void {
+                $j->on('a.company_id','=','l.company_id')
+                    ->on('a.return_batch_id','=','l.return_batch_id');
+            })
+            ->leftJoin('hall_inventory_internal_loan_return_acceptance_lines as al',function($j):void {
+                $j->on('al.company_id','=','l.company_id')
+                    ->on('al.acceptance_id','=','a.id')
+                    ->on('al.source_item_id','=','l.source_item_id');
+            })
             ->where('l.company_id',$companyId)
             ->whereIn('l.return_batch_id',$rows->pluck('id')->all())
             ->get(['l.return_batch_id','l.source_item_id','l.item_id',
-                'l.quantity','d.item_name_snapshot','d.unit_snapshot'])
+                'l.quantity','d.item_name_snapshot','d.unit_snapshot',
+                'al.good_quantity','al.damaged_quantity','al.unresolved_quantity'])
             ->groupBy('return_batch_id');
         return $rows->map(fn($batch):array=>[
             'batchId'=>(string)$batch->id,
@@ -134,7 +144,10 @@ final class HallInventoryInternalLoanReturnReview
                     'destinationItemId'=>(string)$line->item_id,
                     'name'=>(string)$line->item_name_snapshot,
                     'unit'=>(string)$line->unit_snapshot,
-                    'sentQuantity'=>(int)$line->quantity
+                    'sentQuantity'=>(int)$line->quantity,
+                    'goodQuantity'=>$line->good_quantity===null?null:(int)$line->good_quantity,
+                    'damagedQuantity'=>$line->damaged_quantity===null?null:(int)$line->damaged_quantity,
+                    'unresolvedQuantity'=>$line->unresolved_quantity===null?null:(int)$line->unresolved_quantity
                 ])->all()
         ])->all();
     }

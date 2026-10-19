@@ -511,5 +511,12 @@ class HallInventoryLivewireTest extends TestCase
         $this->assertSame(0,DB::table('finance_journals')->count());
         Livewire::test(HallInventory::class)->call('startReturnAcceptance',$batch)
             ->assertForbidden();
+        Livewire::test(HallInventory::class)->assertSee(
+            'RETURN ACKNOWLEDGED / OUTSTANDING RECONCILIATION REQUIRED');
+        $this->be($receiver);
+        Livewire::test(HallInventory::class)
+            ->assertSet('hallId',$destination->id)
+            ->assertSee('RETURN ACKNOWLEDGED / OUTSTANDING RECONCILIATION REQUIRED')
+            ->call('startInternalReturn',$loan)->assertHasNoErrors();
     }
 }

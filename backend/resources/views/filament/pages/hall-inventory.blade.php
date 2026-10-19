@@ -530,7 +530,7 @@
                     <div class="space-y-3">
                         @forelse($loanHistory as $loan)
                             <article wire:key="inventory-loan-summary-{{ $loan['id'] }}" class="space-y-2 rounded-lg border p-3 text-sm">
-                                <p class="font-medium">{{ $loan['purpose'] }} — {{ ($loan['viewRole'] ?? 'originating') === 'receiving' ? 'INCOMING REQUEST' : 'OUTGOING REQUEST' }} — {{ ($loan['status'] ?? 'draft_only') === 'partial_return_in_transit_source_ack_pending' ? 'PARTIAL RETURN SENT / SOURCE ACK PENDING' : (($loan['status'] ?? 'draft_only') === 'destination_received_return_pending' ? 'DESTINATION RECEIVED / RETURNS PENDING' : (($loan['status'] ?? 'draft_only') === 'source_dispatched_receipt_pending' ? 'SOURCE DISPATCHED / DESTINATION RECEIPT PENDING' : 'DRAFT / NOT DISPATCHED')) }}</p>
+                                <p class="font-medium">{{ $loan['purpose'] }} — {{ ($loan['viewRole'] ?? 'originating') === 'receiving' ? 'INCOMING REQUEST' : 'OUTGOING REQUEST' }} — {{ ($loan['status'] ?? 'draft_only') === 'return_acknowledged_outstanding_reconciliation_required' ? 'RETURN ACKNOWLEDGED / OUTSTANDING RECONCILIATION REQUIRED' : (($loan['status'] ?? 'draft_only') === 'partial_return_in_transit_source_ack_pending' ? 'PARTIAL RETURN SENT / SOURCE ACK PENDING' : (($loan['status'] ?? 'draft_only') === 'destination_received_return_pending' ? 'DESTINATION RECEIVED / RETURNS PENDING' : (($loan['status'] ?? 'draft_only') === 'source_dispatched_receipt_pending' ? 'SOURCE DISPATCHED / DESTINATION RECEIPT PENDING' : 'DRAFT / NOT DISPATCHED'))) }}</p>
                                 <p>Reference: {{ $loan['id'] }}. Return expected: {{ $loan['expectedReturnDate'] }}.</p>
                                 <p>Source: {{ $loan['lendingHallName'] ?? $loan['externalPartnerName'] ?? 'Not assigned' }}.
                                    Destination: {{ $loan['borrowingHallName'] ?? $loan['externalPartnerName'] ?? 'Not assigned' }}.</p>
@@ -543,7 +543,8 @@
                                     ($loan['viewRole'] ?? '') === 'receiving' &&
                                     in_array(($loan['status'] ?? ''),[
                                         'destination_received_return_pending',
-                                        'partial_return_in_transit_source_ack_pending'
+                                        'partial_return_in_transit_source_ack_pending',
+                                        'return_acknowledged_outstanding_reconciliation_required'
                                     ],true))
                                     <button type="button" wire:click="startInternalReturn('{{ $loan['id'] }}')"
                                         class="rounded-lg border px-3 py-2 text-sm">Prepare partial return shipment</button>
@@ -641,7 +642,14 @@
                                 <p>{{ $batch['accepted'] ? 'REVIEW RECORDED / UNRESOLVED OBLIGATIONS MUST BE CHECKED' : 'IN TRANSIT / SOURCE ACKNOWLEDGMENT REQUIRED' }}</p>
                                 <ul class="list-inside list-disc">
                                     @foreach($batch['lines'] as $line)
-                                        <li>{{ $line['name'] }} — {{ $line['sentQuantity'] }} {{ $line['unit'] }}</li>
+                                        <li>{{ $line['name'] }} — {{ $line['sentQuantity'] }} {{ $line['unit'] }}
+                                            @if($line['goodQuantity'] !== null)
+                                                (good {{ $line['goodQuantity'] }}, damaged {{ $line['damagedQuantity'] }},
+                                                unresolved {{ $line['unresolvedQuantity'] }}; not loan closure)
+                                            @else
+                                                (source count pending)
+                                            @endif
+                                        </li>
                                     @endforeach
                                 </ul>
                                 @if(!$batch['accepted'])

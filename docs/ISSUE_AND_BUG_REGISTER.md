@@ -130,3 +130,10 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Discovery: draft read-only return history joined immutable return lines to draft line snapshots by tenant and catalog item alone. A repeated source catalog item in a second unrelated loan could duplicate the displayed original batch line.
 - Fix: new join binds via the immutable batch's exact loan ID as well as company/item. Dedicated PostgreSQL regression creates another draft with the same item and checks the original return report remains a single line.
 - Source `d5883f9fc13234e25a34c62c0f1509e6ea96e58d`, CI [39326982956](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39326982956) PENDING six-job verification. No production gate enabled.
+
+## BUG-20261019-009 — Accepted return history can masquerade as unshipped DRAFT
+- Affected: Phase 12 INV-013 loan status read model and HallInventory private history.
+- Reproduction: independently ship and source-acknowledge all internal return batches while some original stock remains borrowed or unresolved. Prior read model always reported `partial_return_in_transit_source_ack_pending`; after new server status update, unmatched Blade fallback could report `DRAFT / NOT DISPATCHED`, and the receiving hall could lose the option to send the remaining usable stock.
+- Impact: HIGH: incorrect physical custody interpretation and blocked legitimate partial return workflow. No automatic money posting or loan close observed.
+- Prepared repair: count source-acknowledged batches within exact loan/company and display `RETURN ACKNOWLEDGED / OUTSTANDING RECONCILIATION REQUIRED` instead of DRAFT; allow another physically witnessed return only where server evidence proves returnable borrowed usable; PostgreSQL and Livewire regressions for outstanding/damaged counts.
+- Status: REPAIR PREPARED, CI PENDING. Production loan gates stay disabled until exact six-job verification. Do not claim loan closure or settlement.

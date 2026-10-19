@@ -204,6 +204,12 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         $this->assertCount(1,$recorded);
         $this->assertCount(1,$pending);
         $this->assertSame('SOURCE_REVIEW_RECORDED_OUTSTANDING_CHECK_REQUIRED',$recorded[0]['state']);
+        $this->assertSame(3,$recorded[0]['lines'][0]['goodQuantity']);
+        $this->assertSame(1,$recorded[0]['lines'][0]['damagedQuantity']);
+        $this->assertSame(1,$recorded[0]['lines'][0]['unresolvedQuantity']);
+        $this->assertNull($pending[0]['lines'][0]['goodQuantity']);
+        $this->assertNull($pending[0]['lines'][0]['damagedQuantity']);
+        $this->assertNull($pending[0]['lines'][0]['unresolvedQuantity']);
         // Outstanding transit and damages require further reconciliation.
         // Source can independently acknowledge the second batch as well,
         // but even after every batch has a review, unresolved original

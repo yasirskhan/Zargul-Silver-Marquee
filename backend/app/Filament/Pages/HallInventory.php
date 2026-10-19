@@ -873,7 +873,8 @@ final class HallInventory extends Page
                 ($row['viewRole']??'')==='receiving' &&
                 in_array(($row['status']??''),[
                     'destination_received_return_pending',
-                    'partial_return_in_transit_source_ack_pending'
+                    'partial_return_in_transit_source_ack_pending',
+                    'return_acknowledged_outstanding_reconciliation_required'
                 ],true));
         abort_unless($record!==null,403);
         $lines=app(HallInventoryInternalLoanReturnReview::class)->destinationLines(
