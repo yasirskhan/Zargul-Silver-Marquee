@@ -29,6 +29,8 @@ final class CentralStaffPortalAuditorDashboard
             '<p>Read-only access to immutable staff session, account action '.
             'and pending staff creation metadata. No operational changes.</p>'.
             '<nav aria-label="Auditor navigation">'.
+            '<form method="post" action="/staff/home">'.$hidden.
+            '<button type="submit">Back to staff home</button></form>'.
             '<form method="post" action="/staff/audit/staff">'.$hidden.
             '<label>Staff ID <input type="text" name="subject_staff_id" '.
             'maxlength="36" required></label>'.

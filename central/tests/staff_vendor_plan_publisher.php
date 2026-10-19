@@ -19,6 +19,7 @@ foreach([
     'CentralStaffProtectedHttpBoundary',
     'CentralStaffPaymentEvidenceQueue','CentralStaffPaymentEvidenceReviewService',
     'CentralStaffInvoicePaymentOverview','CentralStaffPaymentEvidenceHttpAdapter',
+    'CentralStaffPortalTeamDashboard','CentralStaffPortalAuditorDashboard',
     'CentralStaffPortalHttpRouter','CentralStaffPortalPrivateResponse'
 ] as $class)require dirname(__DIR__).'/src/'.$class.'.php';
 
@@ -303,6 +304,22 @@ try {
         !str_contains($teamPage['html'],'action="/staff/plans"') &&
         !str_contains($teamPage['html'],'action="/staff/audit/dashboard"'),
         'team administrator cannot navigate pricing or independent audit');
+    $teamDashboard=new Hafzatech\Central\CentralStaffPortalTeamDashboard($auth);
+    $auditorDashboard=new Hafzatech\Central\CentralStaffPortalAuditorDashboard($auth);
+    $teamDetail=$teamDashboard->render($teamSession,$teamCsrf);
+    $auditDetail=$auditorDashboard->render($auditorSession,$auditorCsrf);
+    planAssert(str_contains($teamDetail,'action="/staff/home"') &&
+        str_contains($teamDetail,'name="staff_csrf"') &&
+        !str_contains($teamDetail,$teamSession),
+        'current Team Administrator can navigate back without leaking bearer');
+    planAssert(str_contains($auditDetail,'action="/staff/home"') &&
+        str_contains($auditDetail,'name="staff_csrf"') &&
+        !str_contains($auditDetail,$auditorSession),
+        'current Auditor can navigate back without leaking bearer');
+    planDeny(fn()=>$auditorDashboard->render($teamSession,$teamCsrf),
+        'staff_auditor_dashboard_denied');
+    planDeny(fn()=>$teamDashboard->render($auditorSession,$auditorCsrf),
+        'staff_team_dashboard_denied');
     $billingHome=$homeRouter->dispatch($homeServer,$otherCookie,[],$billingCsrf);
     planAssert(!str_contains($billingHome['html'],'action="/staff/plans"') &&
         str_contains($billingHome['html'],'action="/staff/dashboard"'),

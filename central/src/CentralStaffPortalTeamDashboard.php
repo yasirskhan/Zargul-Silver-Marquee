@@ -45,6 +45,8 @@ final class CentralStaffPortalTeamDashboard
                  'name="target_staff_id" maxlength="36" required></label>'.
                  '<button type="submit">Review activation safeguards</button></form>'
                 :'').
+            '<form method="post" action="/staff/home">'.$hidden.
+            '<button type="submit">Back to staff home</button></form>'.
             '<form method="post" action="/staff/team/accounts">'.$hidden.
             '<button type="submit">Staff accounts</button></form>'.
             (getenv('CENTRAL_STAFF_ROLE_REQUEST_ENABLED')==='true'
