@@ -135,6 +135,26 @@ try {
     $db->prepare("UPDATE central_customer_provider_assignments SET enabled=true
         WHERE id=:id")->execute(['id'=>$bankAssignment]);
 
+    // A versioned commercial plan is an immutable price and entitlement
+    // promise, so renewal of that product must INSERT a new version.
+    // Existing paid invoices retain the exact historic quoted amount.
+    try {
+        $db->prepare("UPDATE central_vendor_plan_versions
+            SET price_minor=1 WHERE id=:plan")
+            ->execute(['plan'=>$planSix]);
+        throw new RuntimeException('Versioned plan price unexpectedly mutable');
+    } catch(PDOException $e) {
+        invoiceIssueAssert($e->getCode()==='P0001',
+            'immutable plan price trigger refuses historic repricing');
+    }
+    try {
+        $db->prepare("DELETE FROM central_vendor_plan_versions WHERE id=:plan")
+            ->execute(['plan'=>$planSix]);
+        throw new RuntimeException('Versioned plan unexpectedly deletable');
+    } catch(PDOException $e) {
+        invoiceIssueAssert($e->getCode()==='P0001',
+            'immutable plan deletion refusal preserves invoice evidence');
+    }
     $first=$on->issue($billBearer,$customer,$planSix,$bank,$request);
     invoiceIssueAssert($first['currency']==='USD'&&$first['total_minor']==='12500'
         &&$first['term_months']===6&&$first['status']==='issued'

@@ -45,3 +45,12 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Status: VERIFIED. Corrected source `86d57bf799d8dc6c0a5a5fbdce73da94466a9447` passed [run 39191319746](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39191319746) with all six hosted jobs SUCCESS, including central-postgres and full laravel-postgres. Unrelated fixture rows remain protected.
 - Security/finance: no authorization, billing permission, financial state, signed-issuance or release gates were weakened.
 - Next action: verify exact 86d57bf CI, preserve the original failed run, then verify follow-on protected internal staff invoice route/renderer separately.
+
+
+## BUG-20261019-003 — Commercial plan version price/entitlements lacked database immutability
+- Affected feature: CENT-005, vendor six/twelve-month plans, independent invoice issuance, signed license price/feature preservation.
+- Detected: schema review of `central/schema/004_vendor_payment_eligibility.sql`, no UPDATE/DELETE block on `central_vendor_plan_versions`, despite immutable plan-version pricing requirements and later reads by paid-license preparation.
+- Severity: HIGH data integrity risk if a privileged writer edits a previously quoted plan; no evidence that this occurred in production. Production invoice issuance remains disabled and the portal unprovisioned.
+- Reproduction: a privileged PostgreSQL UPDATE of a synthetic plan version price or entitlement would previously be accepted, altering what the same version means after issuance. Normal staff HTTP clients have no such edit route. Risk comes from internal writes/migrations, not direct customer input.
+- Remedy: DETACHED schema `central/schema/028_vendor_plan_versions_immutable.sql` adds trigger using the established immutable audit rejection function. Regression UPDATE and DELETE attempts require SQLSTATE P0001; new versions may still be inserted normally. No retroactive data changes.
+- Status: FIX PREPARED, NOT PUBLISHED OR CI-VERIFIED. Publish only after earlier invoice directory CI is fully green; exact source and six-job run must be recorded.
