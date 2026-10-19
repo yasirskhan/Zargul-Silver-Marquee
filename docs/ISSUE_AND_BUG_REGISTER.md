@@ -53,7 +53,7 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Severity: HIGH data integrity risk if a privileged writer edits a previously quoted plan; no evidence that this occurred in production. Production invoice issuance remains disabled and the portal unprovisioned.
 - Reproduction: a privileged PostgreSQL UPDATE of a synthetic plan version price or entitlement would previously be accepted, altering what the same version means after issuance. Normal staff HTTP clients have no such edit route. Risk comes from internal writes/migrations, not direct customer input.
 - Remedy: DETACHED schema `central/schema/028_vendor_plan_versions_immutable.sql` adds trigger using the established immutable audit rejection function. Regression UPDATE and DELETE attempts require SQLSTATE P0001; new versions may still be inserted normally. No retroactive data changes.
-- Status: FIX PREPARED, NOT PUBLISHED OR CI-VERIFIED. Publish only after earlier invoice directory CI is fully green; exact source and six-job run must be recorded.
+- Status: VERIFIED. Source `3c19e3ba3f59193bf201b5181aeec2070600a61c`, [CI 39194922044](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39194922044) SUCCESS all six hosted jobs including immutable plan update/delete and legitimate new-version tests. Operator releases remain default-OFF.
 
 
 ## BUG-20261019-004 — Superseded plan remains selectable for new vendor invoice
@@ -62,4 +62,4 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Severity: MEDIUM commercial integrity risk; HAFZATECH commercial live release gate OFF, no evidence of production exposure.
 - Reproduction: create `plan_code=issuer_test_6` version 1 price 12500 and version 2 price 13000; original logic offered both and issued fresh version1 invoice.
 - Remedy PREPARED DETACHED: show only maximum version per plan_code, reject fresh obsolete plan while preserving idempotent same-request previously issued invoices, assert original/new prices; never alter paid settlement or signed grants.
-- Status: FIX PREPARED, NOT CI-VERIFIED. Publish only after predecessor all-six green, then verify exact new six-job CI. No real vendor invoice release.
+- Status: VERIFIED. Source `39e132ad28da40eb6ab508a60a80ff3bdd824629`, [CI 39195553866](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39195553866) SUCCESS all six hosted jobs. Old request replay and latest-only new invoice selection tested; commercial live release remains OFF.
