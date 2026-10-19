@@ -9,6 +9,7 @@ return new class extends Migration {
         Schema::create('hall_inventory_loan_dispatches',function(Blueprint $t):void {
             $t->uuid('id')->primary();
             $t->uuid('company_id'); $t->uuid('loan_id');
+            $t->unique(['company_id','id'],'loan_dispatch_tenant_id_key');
             $t->uuid('lending_hall_id'); $t->uuid('borrowing_hall_id');
             $t->char('evidence_sha256',64);
             $t->unsignedInteger('evidence_size');
@@ -34,9 +35,6 @@ return new class extends Migration {
                 ->references('id')->on('hall_inventory_movement_events')->restrictOnDelete();
             $t->unique(['dispatch_id','item_id'],'loan_dispatch_line_unique_item');
             $t->unique('movement_id','loan_dispatch_line_unique_movement');
-        });
-        Schema::table('hall_inventory_loan_dispatches',function(Blueprint $t):void {
-            $t->unique(['company_id','id'],'loan_dispatch_tenant_id_key');
         });
         DB::statement('ALTER TABLE hall_inventory_loan_dispatch_lines ADD CONSTRAINT loan_dispatch_line_quantity_valid CHECK (quantity>0 AND quantity<=100000000)');
         foreach(['hall_inventory_loan_dispatches','hall_inventory_loan_dispatch_lines'] as $table) {
