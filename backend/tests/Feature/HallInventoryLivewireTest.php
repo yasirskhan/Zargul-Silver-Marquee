@@ -176,6 +176,59 @@ class HallInventoryLivewireTest extends TestCase
         $this->assertSame(0, DB::table('hall_inventory_loan_drafts')->count());
     }
 
+    public function test_opening_count_review_is_hall_scoped_and_reflects_independent_acceptance():void
+    {
+        [$company,$hall,$other,$manager,$membership]=$this->fixture();
+        config()->set('inventory_controls.catalog_enabled',true);
+        config()->set('inventory_controls.stocktakes_enabled',true);
+        config()->set('inventory_controls.opening_stock_posting_enabled',true);
+        $item=(string)\Illuminate\Support\Str::uuid();
+        app(\App\Services\HallInventoryCatalogService::class)->create(
+            $manager,$company->id,$hall->id,$item,
+            'Wedding Chairs','Furniture','piece',30,
+            'Approved catalogue entry'
+        );
+        $take=(string)\Illuminate\Support\Str::uuid();
+        app(\App\Services\HallInventoryStocktakeService::class)->submit(
+            $manager,$company->id,$hall->id,$take,'opening',[
+                ['itemId'=>$item,'ownership'=>'owned',
+                 'usableCount'=>50,'damagedCount'=>0],
+            ],'Witnessed opening chairs count'
+        );
+        $request=(string)\Illuminate\Support\Str::uuid();
+        app(\App\Services\HallInventoryOpeningStockService::class)->request(
+            $manager,$company->id,$hall->id,$item,$take,
+            $request,50,'Chairs present at opening'
+        );
+        Livewire::test(HallInventory::class)
+            ->assertSee('Opening stock: independent review')
+            ->assertSee('Wedding Chairs')
+            ->assertSee('PENDING INDEPENDENT REVIEW')
+            ->assertSee('Financial posting: NONE')
+            ->assertDontSee('ACCEPTED / BOOKED');
+        $owner=User::create(['name'=>'Reviewing Owner',
+            'email'=>'opening-ui-owner@example.test','password'=>'test-only']);
+        $owner->markEmailAsVerified();
+        CompanyMembership::create(['company_id'=>$company->id,
+            'user_id'=>$owner->id,'role'=>'owner']);
+        $this->be($owner);
+        app(\App\Services\HallInventoryOpeningStockService::class)->accept(
+            $owner,$company->id,$hall->id,$request
+        );
+        $this->be($manager);
+        Livewire::test(HallInventory::class)
+            ->assertSee('ACCEPTED / BOOKED')
+            ->assertSee('Immutable movement:')
+            ->assertSee('50 piece')
+            ->assertSee('Financial posting: NONE');
+        $this->assertSame(0,DB::table('finance_journals')->count());
+
+        $page=Livewire::test(HallInventory::class);
+        DB::table('company_memberships')->where('id',$membership->id)
+            ->update(['is_active'=>false]);
+        $page->call('reloadOpeningHistory')->assertForbidden();
+    }
+
     public function test_manager_role_revocation_blocks_live_hall_inventory_actions(): void
     {
         [$company, $hall, , , $membership] = $this->fixture();
