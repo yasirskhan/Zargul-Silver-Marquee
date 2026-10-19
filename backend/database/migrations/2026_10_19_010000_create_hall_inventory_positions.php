@@ -25,7 +25,7 @@ return new class extends Migration {
             $table->unsignedBigInteger('revision')->default(0);
             $table->timestampsTz();
             $table->unique(['company_id','hall_id','item_id']);
-            $table->unique(['company_id','hall_id','id']);
+            $table->unique(['company_id','hall_id','item_id','id']);
             $table->foreign(['company_id','hall_id','item_id'])
                 ->references(['company_id','hall_id','id'])
                 ->on('hall_inventory_items')->restrictOnDelete();
@@ -56,8 +56,10 @@ return new class extends Migration {
             $table->jsonb('after_values');
             $table->foreignId('actor_id')->constrained('users')->restrictOnDelete();
             $table->timestampTz('created_at')->useCurrent();
-            $table->foreign(['company_id','hall_id','position_id'])
-                ->references(['company_id','hall_id','id'])
+            // Bind the item ID to its exact position, not merely another
+            // item in the same company and hall.
+            $table->foreign(['company_id','hall_id','item_id','position_id'])
+                ->references(['company_id','hall_id','item_id','id'])
                 ->on('hall_inventory_positions')->restrictOnDelete();
             $table->foreign(['company_id','hall_id','item_id'])
                 ->references(['company_id','hall_id','id'])
