@@ -38,13 +38,25 @@ final class HallInventoryPurchaseReview {
                     ->on('pr.hall_id','=','r.hall_id')
                     ->on('pr.receiving_evidence_id','=','pe.id');
             })
+            ->leftJoin('hall_inventory_purchase_stock_acceptances as pa',function($join):void {
+                $join->on('pa.company_id','=','r.company_id')
+                    ->on('pa.hall_id','=','r.hall_id')
+                    ->on('pa.purchase_request_id','=','r.id');
+            })
+            ->leftJoin('hall_inventory_positions as ip',function($join):void {
+                $join->on('ip.company_id','=','r.company_id')
+                    ->on('ip.hall_id','=','r.hall_id')
+                    ->on('ip.item_id','=','r.item_id');
+            })
             ->where('r.company_id',$companyId)->where('r.hall_id',$hallId)
             ->orderByDesc('r.created_at')->orderByDesc('r.id')->limit($limit)
             ->get(['r.id','r.item_id','i.name as item_name','i.unit',
                 'r.quantity','r.vendor_name','r.vendor_reference',
                 'r.evidence_reference','r.reason','r.created_at','r.requested_by',
                 'pe.id as receipt_id','pe.counted_quantity','pe.received_by',
-                'pr.id as review_id','pr.reviewed_by'])
+                'pr.id as review_id','pr.reviewed_by',
+                'pa.movement_id as purchase_movement_id','pa.accepted_by',
+                'ip.revision as position_revision'])
             ->map(static fn($r):array=>[
                 'id'=>(string)$r->id,'itemId'=>(string)$r->item_id,
                 'itemName'=>(string)$r->item_name,'unit'=>(string)$r->unit,
@@ -58,12 +70,18 @@ final class HallInventoryPurchaseReview {
                 'receivedBy'=>$r->received_by===null?null:(int)$r->received_by,
                 'independentReviewId'=>$r->review_id===null?null:(string)$r->review_id,
                 'reviewedBy'=>$r->reviewed_by===null?null:(int)$r->reviewed_by,
-                'status'=>$r->review_id!==null
-                    ?'INDEPENDENT REVIEW RECORDED / NOT STOCK POSTED'
-                    :($r->receipt_id!==null
-                        ?'PHYSICAL RECEIVING ASSERTED / AWAITING INDEPENDENT REVIEW'
-                        :'UNVERIFIED CLAIM / AWAITING INDEPENDENT RECEIVING'),
-                'ownedStockPosted'=>false,'financiallyPosted'=>false,
+                'stockMovementId'=>$r->purchase_movement_id===null?null:(string)$r->purchase_movement_id,
+                'positionRevision'=>$r->position_revision===null?0:(int)$r->position_revision,
+                'acceptedBy'=>$r->accepted_by===null?null:(int)$r->accepted_by,
+                'status'=>$r->purchase_movement_id!==null
+                    ?'INDEPENDENTLY ACCEPTED / OWNED STOCK POSTED / NO FINANCIAL ENTRY'
+                    :($r->review_id!==null
+                        ?'INDEPENDENT REVIEW RECORDED / NOT STOCK POSTED'
+                        :($r->receipt_id!==null
+                            ?'PHYSICAL RECEIVING ASSERTED / AWAITING INDEPENDENT REVIEW'
+                            :'UNVERIFIED CLAIM / AWAITING INDEPENDENT RECEIVING')),
+                'ownedStockPosted'=>$r->purchase_movement_id!==null,
+                'financiallyPosted'=>false,
             ])->all();
     }
 }

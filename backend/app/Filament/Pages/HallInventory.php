@@ -19,10 +19,12 @@ use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
+use Livewire\WithFileUploads;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class HallInventory extends Page
 {
+    use WithFileUploads;
     protected string $view = 'filament.pages.hall-inventory';
     protected static string | BackedEnum | null $navigationIcon = Heroicon::OutlinedClipboardDocumentCheck;
     protected static ?string $navigationLabel = 'Hall inventory';
@@ -70,6 +72,17 @@ final class HallInventory extends Page
     public string $purchaseVendorReference = '';
     public string $purchaseEvidence = '';
     public string $purchaseReason = '';
+
+
+    public string $purchaseUploadPurchaseId = '';
+    public string $purchaseUploadKind = 'supplier_document';
+    public $purchaseUploadFile = null;
+    #[Locked]
+    public string $purchaseUploadId = '';
+    #[Locked]
+    public ?string $lastPurchaseUploadReference = null;
+    #[Locked]
+    public ?string $lastPurchaseMovementReference = null;
 
     public string $receivingPurchaseId = '';
     public string $receivingQuantity = '';
@@ -215,6 +228,7 @@ final class HallInventory extends Page
         $this->loanInlineRequestId = (string) Str::uuid();
         $this->openingRequestId = (string) Str::uuid();
         $this->purchaseRequestId = (string) Str::uuid();
+        $this->purchaseUploadId=(string)Str::uuid();
         $this->receivingId=(string)Str::uuid();
         $this->receivingReviewId=(string)Str::uuid();
         $this->reloadCatalog();
@@ -282,6 +296,12 @@ final class HallInventory extends Page
         $this->purchaseEvidence = '';
         $this->purchaseReason = '';
         $this->lastPurchaseReference = null;
+        $this->lastPurchaseUploadReference = null;
+        $this->lastPurchaseMovementReference = null;
+        $this->purchaseUploadPurchaseId = '';
+        $this->purchaseUploadKind = 'supplier_document';
+        $this->purchaseUploadFile = null;
+        $this->purchaseUploadId = (string) Str::uuid();
         $this->receivingPurchaseId = '';
         $this->receivingQuantity = '';
         $this->receivingEvidenceRef = '';
@@ -462,6 +482,45 @@ final class HallInventory extends Page
         $this->receivingReviewId=(string)Str::uuid();
         $this->reviewReceiptId='';
         $this->reviewReceiptNotes='';
+        $this->reloadPurchaseHistory();
+    }
+
+
+    public function uploadPurchaseEvidence():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.purchase_receipts_enabled') &&
+            config('inventory_controls.purchase_evidence_upload_enabled'),403);
+        $this->validate([
+            'purchaseUploadPurchaseId'=>'required|uuid',
+            'purchaseUploadKind'=>'required|in:supplier_document,receiving_photo',
+            'purchaseUploadFile'=>'required|file|max:5120|mimetypes:application/pdf,image/jpeg,image/png',
+        ]);
+        try {
+            $this->lastPurchaseUploadReference=app(\App\Services\HallInventoryPurchaseEvidenceFileService::class)
+                ->attach($actor,$this->companyId,$this->hallId,$this->purchaseUploadPurchaseId,
+                    $this->purchaseUploadId,$this->purchaseUploadKind,$this->purchaseUploadFile);
+        }catch(InvalidArgumentException|ConflictHttpException $e){
+            throw ValidationException::withMessages(['purchaseUploadFile'=>$e->getMessage()]);
+        }
+        $this->purchaseUploadId=(string)Str::uuid();
+        $this->purchaseUploadPurchaseId='';
+        $this->purchaseUploadFile=null;
+        $this->reloadPurchaseHistory();
+    }
+
+    public function acceptPurchasedStock(string $purchaseId,int $expectedRevision):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canReviewPurchaseReceiving() &&
+            config('inventory_controls.purchase_stock_posting_enabled') &&
+            Str::isUuid($purchaseId),403);
+        try {
+            $this->lastPurchaseMovementReference=app(\App\Services\HallInventoryPurchaseStockAcceptanceService::class)
+                ->accept($actor,$this->companyId,$this->hallId,$purchaseId,$expectedRevision);
+        }catch(InvalidArgumentException|ConflictHttpException $e){
+            throw ValidationException::withMessages(['purchaseHistory'=>$e->getMessage()]);
+        }
         $this->reloadPurchaseHistory();
     }
 

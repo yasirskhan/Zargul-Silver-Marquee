@@ -144,6 +144,35 @@
                         <p role="status" class="text-xs">Review {{ $lastReceivingReviewReference }} saved. No inventory or money posted.</p>
                     @endif
                 @endif
+
+                @if(config('inventory_controls.purchase_evidence_upload_enabled'))
+                    <form wire:submit="uploadPurchaseEvidence" class="space-y-2 rounded-lg border p-3" aria-label="Upload private purchase and receiving evidence">
+                        <h3 class="font-semibold">Attach original evidence privately</h3>
+                        <p class="text-xs">Only the original requester may attach the supplier document; only the independent receiver may attach the receiving photo. PDF/JPEG/PNG, at most 5 MB. Uploaded bytes are not independently authenticated supplier or payment proof.</p>
+                        <label class="block text-sm">Purchase claim
+                            <select wire:model="purchaseUploadPurchaseId" class="w-full rounded-lg border p-2 text-gray-900">
+                                <option value="">Select purchase</option>
+                                @foreach($purchaseHistory as $purchase)
+                                    <option value="{{ $purchase['id'] }}">{{ $purchase['itemName'] }} - {{ $purchase['id'] }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        <label class="block text-sm">Evidence type
+                            <select wire:model="purchaseUploadKind" class="w-full rounded-lg border p-2 text-gray-900">
+                                <option value="supplier_document">Supplier document (requester)</option>
+                                <option value="receiving_photo">Receiving photo (receiver, JPEG/PNG)</option>
+                            </select>
+                        </label>
+                        <label class="block text-sm">Original file
+                            <input type="file" wire:model="purchaseUploadFile" accept=".pdf,.jpg,.jpeg,.png" class="w-full rounded-lg border p-2">
+                        </label>
+                        @error('purchaseUploadFile') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                        <button type="submit" class="rounded-lg border px-3 py-2 text-sm">Save private evidence</button>
+                        @if($lastPurchaseUploadReference)
+                            <p role="status" class="text-xs">Private evidence saved: {{ $lastPurchaseUploadReference }}. No stock or payment was posted.</p>
+                        @endif
+                    </form>
+                @endif
                 <h3 class="font-semibold">Purchased stock claim history</h3>
                 @forelse($purchaseHistory as $purchase)
                     <article class="rounded-lg border p-3" wire:key="purchase-claim-{{ $purchase['id'] }}">
@@ -152,7 +181,18 @@
                         <p class="text-xs">Vendor: {{ $purchase['vendorName'] }} / {{ $purchase['vendorReference'] }}</p>
                         <p class="text-xs">Evidence reference (unverified): {{ $purchase['evidenceReference'] }}</p>
                         <p class="text-xs">Claim ID: {{ $purchase['id'] }}</p>
-                        <p class="text-xs">Owned inventory posted: NO. Financially posted: NO.</p>
+                        @if(config('inventory_controls.purchase_stock_posting_enabled')
+                            && $this->canReviewPurchaseReceiving()
+                            && !$purchase['ownedStockPosted']
+                            && $purchase['independentReviewId'] !== null
+                            && $purchase['reviewedBy'] === (int)\Filament\Facades\Filament::auth()->id())
+                            <button type="button" wire:click="acceptPurchasedStock('{{ $purchase['id'] }}', {{ $purchase['positionRevision'] }})"
+                                class="rounded-lg border px-3 py-2 text-sm">
+                                Accept purchased stock (no financial entry)
+                            </button>
+                        @endif
+
+                        <p class="text-xs">Owned inventory posted: {{ $purchase['ownedStockPosted'] ? 'YES' : 'NO' }}. Financially posted: NO.</p>
                     </article>
                 @empty
                     <p>No purchase receipt claims exist for this hall.</p>
