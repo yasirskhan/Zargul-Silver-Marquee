@@ -128,6 +128,39 @@ class HallInventoryLivewireTest extends TestCase
         $this->assertSame(0, DB::table('finance_journals')->count());
     }
 
+    public function test_destination_manager_sees_incoming_draft_without_lending_hall_access_or_stock_movement(): void
+    {
+        [$company,$source,$destination,$manager] = $this->fixture();
+        config()->set('inventory_controls.catalog_enabled', true);
+        config()->set('inventory_controls.loan_drafts_enabled', true);
+        $itemId=(string) \Illuminate\Support\Str::uuid();
+        app(\App\Services\HallInventoryCatalogService::class)->create(
+            $manager,$company->id,$source->id,$itemId,
+            'Incoming chairs','Furniture','piece',20,'Source hall catalog');
+        $loan=(string) \Illuminate\Support\Str::uuid();
+        app(\App\Services\HallInventoryLoanDraftService::class)->create(
+            $manager,$company->id,$loan,'internal',$source->id,$destination->id,
+            [['itemId'=>$itemId,'quantity'=>12]],'2027-05-20','Incoming chairs for destination');
+        $receiver=User::create(['name'=>'Destination Only Manager',
+            'email'=>'destination-manager@example.test','password'=>'test-only']);
+        $receiver->markEmailAsVerified();
+        $membership=CompanyMembership::create([
+            'company_id'=>$company->id,'user_id'=>$receiver->id,'role'=>'manager',
+        ]);
+        HallAssignment::create(['company_id'=>$company->id,
+            'membership_id'=>$membership->id,'hall_id'=>$destination->id]);
+        $this->be($receiver);
+        Livewire::test(HallInventory::class)
+            ->assertSee('Marquee B')
+            ->assertDontSee('Marquee A')
+            ->assertSee('Incoming chairs for destination')
+            ->assertSee('INCOMING REQUEST')
+            ->assertSee('DRAFT / NOT DISPATCHED');
+        $this->assertSame(0,DB::table('hall_inventory_positions')->count());
+        $this->assertSame(0,DB::table('hall_inventory_movement_events')->count());
+        $this->assertSame(0,DB::table('finance_journals')->count());
+    }
+
     public function test_external_establishment_name_is_saved_with_encrypted_contact_from_window(): void
     {
         [$company, $hall, , $manager] = $this->fixture();
