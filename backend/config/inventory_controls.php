@@ -12,6 +12,8 @@ return [
     'loan_receipt_enabled' => (bool) env('VENUE_INVENTORY_LOAN_RECEIPT_ENABLED', false),
     // Physical partial return dispatch does not itself acknowledge or close a loan.
     'loan_returns_enabled' => (bool) env('VENUE_INVENTORY_LOAN_RETURNS_ENABLED', false),
+    // Owner/admin independent physical return condition acceptance (default OFF).
+    'loan_return_acceptance_enabled' => (bool) env('VENUE_INVENTORY_LOAN_RETURN_ACCEPTANCE_ENABLED', false),
     // Independently reviewed opening count posting; OFF until physical
     // witness acceptance, authorization, concurrency and pilot signoff.
     'purchase_receipts_enabled' => (bool) env('VENUE_INVENTORY_PURCHASE_RECEIPTS_ENABLED', false),
