@@ -36,9 +36,14 @@ final class CentralStaffEnrollmentEvidenceService
            getenv('CENTRAL_STAFF_ENROLLMENT_EVIDENCE_ENABLED')!=='true') {
             throw new RegistrationError('staff_enrollment_evidence_not_enabled',503);
         }
+        // Bound attacker-controlled material before opening or locking a
+        // transaction. The signed verifier still checks canonical encoding.
         if(preg_match(self::UUID,$challengeId)!==1 ||
+           preg_match('/^[A-Za-z0-9_-]{43}$/D',$nonce)!==1 ||
            !is_string($attestation['payload']??null) ||
-           !is_string($attestation['signature']??null)) {
+           strlen($attestation['payload'])>5464 ||
+           !is_string($attestation['signature']??null) ||
+           strlen($attestation['signature'])>86) {
             throw new RegistrationError('invalid_staff_enrollment_evidence',422);
         }
         $reviewer=$this->sessions->staffFor($reviewerBearer);
@@ -98,7 +103,7 @@ final class CentralStaffEnrollmentEvidenceService
                 'SELECT target_staff_id,issued_by_staff_id,provider_key_id,
                         email_sha256,nonce_sha256
                  FROM central_staff_enrollment_challenges
-                 WHERE id=:id AND expires_at>now() FOR UPDATE');
+                 WHERE id=:id AND expires_at>clock_timestamp() FOR UPDATE');
             $challenge->execute(['id'=>$challengeId]);
             $claim=$challenge->fetch(PDO::FETCH_ASSOC);
             if(!$claim ||

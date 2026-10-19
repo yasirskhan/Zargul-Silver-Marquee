@@ -135,6 +135,16 @@ try {
  evidenceDeny(fn()=>$on->checkAndRecord($reviewerBearer,$c['challenge_id'],
    $c['nonce'],$proof),'staff_enrollment_evidence_not_enabled');
  putenv('CENTRAL_STAFF_ENROLLMENT_EVIDENCE_ENABLED=true');
+ // Cheap syntactic bounds reject oversized/invalid evidence before DB locks.
+ evidenceDeny(fn()=>$on->checkAndRecord($reviewerBearer,$c['challenge_id'],
+   str_repeat('x',200000),$proof),'invalid_staff_enrollment_evidence');
+ evidenceDeny(fn()=>$on->checkAndRecord($reviewerBearer,$c['challenge_id'],
+   $c['nonce'],array_replace($proof,['payload'=>str_repeat('A',5465)])),
+   'invalid_staff_enrollment_evidence');
+ evidenceDeny(fn()=>$on->checkAndRecord($reviewerBearer,$c['challenge_id'],
+   $c['nonce'],array_replace($proof,['signature'=>str_repeat('A',87)])),
+   'invalid_staff_enrollment_evidence');
+
  evidenceDeny(fn()=>$off->checkAndRecord($reviewerBearer,$c['challenge_id'],
    $c['nonce'],$proof),'staff_enrollment_evidence_not_enabled');
  evidenceDeny(fn()=>$on->checkAndRecord($issuerBearer,$c['challenge_id'],
