@@ -480,8 +480,18 @@ try {
   str_contains($list['html'],'name="staff_csrf"') &&
   str_contains($list['html'],'name="invoice_id"') &&
   str_contains($list['html'],'NOT paid') &&
-  !str_contains($list['html'],$billingSession),
-  'recent invoices private list with functional protected billing navigation');
+  !str_contains($list['html'],$billingSession) &&
+  !str_contains($list['html'],$provider),
+  'recent invoices private list with functional navigation but no bank or session details');
+ $hostileDirectory=\Hafzatech\Central\CentralStaffVendorInvoiceDirectoryRenderer::render([
+  ['invoice_id'=>$invoice,'invoice_number'=>'<script>alert(1)</script>',
+   'status'=>'issued','term_months'=>12,'total_minor'=>'21000',
+   'currency'=>'PKR','issued_at'=>'2026-10-19T00:00:00Z']
+ ],$company,$billingCsrf);
+ paidSessionAssert(!str_contains($hostileDirectory,'<script>') &&
+  str_contains($hostileDirectory,'&lt;script&gt;') &&
+  str_contains($hostileDirectory,'name="staff_csrf"'),
+  'hostile imported invoice references escaped and navigation protected');
  $directoryResponse=(new \Hafzatech\Central\CentralStaffPortalPrivateResponse(true))
   ->compose($list);
  paidSessionAssert($directoryResponse['status']===200 &&
