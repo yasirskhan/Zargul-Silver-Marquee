@@ -174,6 +174,131 @@ class CentralLicensingPageTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_owner_verify_downloads_signed_six_month_grant_and_future_paid_renewal(): void
+    {
+        config()->set('central_control.activation_enabled',true);
+        config()->set('central_control.manual_checks_enabled',true);
+        $company=Company::create(['name'=>'Signed Renewal Venue','slug'=>'signed-renewal-venue']);
+        $owner=User::create(['name'=>'Signed Renewal Owner',
+            'email'=>'signed-renewal-owner@example.test','password'=>'test-only']);
+        $owner->markEmailAsVerified();
+        CompanyMembership::create(['company_id'=>$company->id,
+            'user_id'=>$owner->id,'role'=>'owner']);
+        $installation=app(CentralInstallationIdentity::class)->initialize();
+        $customer=(string)Str::uuid();
+        $license=(string)Str::uuid();
+        DB::table('central_installation_activation')->insert([
+            'singleton_id'=>1,'installation_id'=>$installation['installation_id'],
+            'customer_id'=>$customer,'approved_domain'=>'signed-renewal.example.test',
+            'status'=>'registered_pending_license','central_registered_at'=>now(),
+            'created_at'=>now(),'updated_at'=>now(),
+        ]);
+        app(CentralInstallationCompanyScope::class)->bind($owner,$company->id);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->be($owner);
+        // Real operator signing custody is OFF. The HTTP fixture below
+        // simulates an independently paid, already approved vendor revision
+        // using disposable test-only Ed25519 private material.
+        $keys=sodium_crypto_sign_keypair();
+        $encode=static fn(string $raw):string=>
+            rtrim(strtr(base64_encode($raw),'+/','-_'),'=');
+        config()->set('central_control.trusted_signing_public_keys',[
+            'synthetic-paid-renewal'=>$encode(sodium_crypto_sign_publickey($keys)),
+        ]);
+        $sign=static function(array $payload,string $purpose)use($keys,$encode):array {
+            $raw=json_encode($payload,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);
+            return ['key_id'=>'synthetic-paid-renewal','payload'=>$encode($raw),
+                'signature'=>$encode(sodium_crypto_sign_detached(
+                    $purpose."\\n".$raw,sodium_crypto_sign_secretkey($keys)))];
+        };
+        $version=1;
+        $lastRequestTime=null;
+        Http::fake(['https://lichall.hafzatech.com/api/v1/installations/status'=>
+            function($request)use(&$version,&$lastRequestTime,$installation,
+                $customer,$license,$sign) {
+                $lastRequestTime=$request['request_time'];
+                $revision=$version==='tampered'?3:$version;
+                $grant=[
+                    'api_version'=>'v1','issuer'=>'HAFZATECH','product'=>'VenueDesk',
+                    'license_id'=>$license,'installation_id'=>$installation['installation_id'],
+                    'customer_id'=>$customer,'revision'=>$revision,
+                    'term_months'=>6,'edition'=>'standard',
+                    'approved_domains'=>['signed-renewal.example.test'],
+                    'not_before'=>$revision===1
+                        ? '2026-10-01T00:00:00Z' : '2027-04-01T00:00:00Z',
+                    'expires_at'=>$revision===1
+                        ? '2027-04-01T00:00:00Z' : '2027-10-01T00:00:00Z',
+                    'limits'=>['max_halls'=>2,'max_staff'=>10],
+                    'features'=>['booking'=>true],
+                ];
+                $receipt=[
+                    'api_version'=>'v1','issuer'=>'HAFZATECH',
+                    'installation_id'=>$installation['installation_id'],
+                    'customer_id'=>$customer,'nonce'=>$request['nonce'],
+                    'status'=>'signed_revision_pending_delivery',
+                    'revision'=>$revision,'issued_at'=>$request['request_time'],
+                ];
+                $signedGrant=$sign($grant,'HAFZATECH-LICENSE-GRANT-V1');
+                if($version==='tampered') {
+                    $signedGrant['signature']=rtrim(strtr(
+                        base64_encode(random_bytes(64)),'+/','-_'),'=');
+                }
+                return Http::response([
+                    'api_version'=>'v1',
+                    'registered_installation_id'=>$installation['installation_id'],
+                    'nonce'=>$request['nonce'],
+                    'status'=>'signed_revision_pending_delivery',
+                    'revision'=>$revision,
+                    'signed_receipt'=>$sign($receipt,'HAFZATECH-INSTALL-STATUS-RECEIPT-V1'),
+                    'signed_grant'=>$signedGrant,
+                ],200);
+            },
+        ]);
+        $view=Livewire::test(Licensing::class)
+            ->assertSet('summary.state','awaiting_signed_license');
+        $view->call('verifyLicense')
+            ->assertSet('verificationMessage',
+                'License signature and HAFZATECH online status verified.')
+            ->assertSet('summary.state','licensed')
+            ->assertSet('summary.revision',1)
+            ->assertSet('summary.expires_at','2027-04-01T00:00:00Z')
+            ->assertSet('summary.last_online_verified_at',$lastRequestTime);
+        $this->assertDatabaseCount('central_signed_license_cache',1);
+        $this->assertDatabaseCount('central_manual_license_check_attempts',1);
+        // Manual on-demand verification has its own one-minute cooldown;
+        // simulate its expiration without weakening production throttling.
+        DB::table('central_manual_license_check_attempts')
+            ->update(['requested_at'=>now()->subMinutes(2)]);
+        $version=2;
+        $view->call('verifyLicense')
+            ->assertSet('verificationMessage',
+                'License signature and HAFZATECH online status verified.')
+            ->assertSet('summary.state','licensed')
+            ->assertSet('summary.revision',1)
+            ->assertSet('summary.expires_at','2027-04-01T00:00:00Z')
+            ->assertSet('summary.renewal_revision',2)
+            ->assertSet('summary.renewal_starts_at','2027-04-01T00:00:00Z')
+            ->assertSet('summary.renewal_expires_at','2027-10-01T00:00:00Z')
+            ->assertSet('summary.last_online_verified_at',$lastRequestTime);
+        $this->assertSame(2,(int)DB::table('central_signed_license_cache')->value('revision'));
+        $this->assertSame(1,(int)DB::table('central_signed_license_cache')->value('previous_revision'));
+        $lastVerified=DB::table('central_license_check_state')->value('last_online_verified_at');
+        DB::table('central_manual_license_check_attempts')
+            ->update(['requested_at'=>now()->subMinutes(2)]);
+        $version='tampered';
+        $view->call('verifyLicense')
+            ->assertSet('verificationMessage',
+                'Unable to verify online now. Your locally signed license remains unchanged.')
+            ->assertSet('summary.renewal_revision',2)
+            ->assertSet('summary.renewal_expires_at','2027-10-01T00:00:00Z');
+        $this->assertSame($lastVerified,
+            DB::table('central_license_check_state')->value('last_online_verified_at'));
+        $this->assertSame(2,(int)DB::table('central_signed_license_cache')->value('revision'));
+        $this->assertDatabaseCount('central_signed_license_cache',1);
+        $this->assertDatabaseCount('finance_journals',0);
+        Http::assertSentCount(3);
+    }
+
     public function test_page_rechecks_role_revocation_before_another_livewire_call(): void
     {
         config()->set('central_control.activation_enabled',true);
