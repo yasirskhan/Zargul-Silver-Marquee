@@ -363,4 +363,70 @@ class HallInventoryLivewireTest extends TestCase
         $page->call('reloadCatalog')->assertForbidden();
         $this->assertSame(0, DB::table('hall_inventory_items')->count());
     }
+    public function test_destination_manager_confirms_real_internal_receipt_through_livewire_without_becoming_owner():void
+    {
+        [$company,$source,$destination,$sourceManager]=$this->fixture();
+        config()->set('inventory_controls.catalog_enabled',true);
+        config()->set('inventory_controls.loan_drafts_enabled',true);
+        config()->set('inventory_controls.loan_dispatch_enabled',true);
+        config()->set('inventory_controls.loan_receipt_enabled',true);
+        \\Illuminate\\Support\\Facades\\Storage::fake('local');
+        $owner=User::create(['name'=>'Independent Loan Dispatcher',
+            'email'=>'livewire-loan-dispatcher@example.test','password'=>'test-only']);
+        $owner->markEmailAsVerified();
+        CompanyMembership::create(['company_id'=>$company->id,
+            'user_id'=>$owner->id,'role'=>'owner']);
+        $receiver=User::create(['name'=>'Independent Destination Manager',
+            'email'=>'livewire-receiving-manager@example.test','password'=>'test-only']);
+        $receiver->markEmailAsVerified();
+        $membership=CompanyMembership::create(['company_id'=>$company->id,
+            'user_id'=>$receiver->id,'role'=>'manager']);
+        HallAssignment::create(['company_id'=>$company->id,
+            'membership_id'=>$membership->id,'hall_id'=>$destination->id]);
+        $sourceItem=(string)\\Illuminate\\Support\\Str::uuid();
+        $destItem=(string)\\Illuminate\\Support\\Str::uuid();
+        $catalog=app(\\App\\Services\\HallInventoryCatalogService::class);
+        $catalog->create($sourceManager,$company->id,$source->id,$sourceItem,
+            'Loan chair covers','Furniture','piece',10,'Origin hall chair covers');
+        $this->be($owner);
+        $catalog->create($owner,$company->id,$destination->id,$destItem,
+            'Loan chair covers','Furniture','piece',10,'Destination borrowed catalog');
+        DB::table('hall_inventory_positions')->insert([
+            'id'=>(string)\\Illuminate\\Support\\Str::uuid(),'company_id'=>$company->id,
+            'hall_id'=>$source->id,'item_id'=>$sourceItem,
+            'owned_usable'=>20,'revision'=>0,'created_at'=>now(),'updated_at'=>now()
+        ]);
+        $this->be($sourceManager);
+        $loanId=(string)\\Illuminate\\Support\\Str::uuid();
+        app(\\App\\Services\\HallInventoryLoanDraftService::class)->create(
+            $sourceManager,$company->id,$loanId,'internal',$source->id,$destination->id,
+            [['itemId'=>$sourceItem,'quantity'=>6]],'2027-09-30',
+            'Real independent destination receipt panel');
+        $pdf=fn()=>\\Illuminate\\Http\\UploadedFile::fake()->createWithContent(
+            'handover.pdf',"%PDF-1.4\\n1 0 obj\\n<<>>\\nendobj\\n%%EOF");
+        $this->be($owner);
+        app(\\App\\Services\\HallInventoryInternalLoanDispatchService::class)->dispatch(
+            $owner,$company->id,$loanId,(string)\\Illuminate\\Support\\Str::uuid(),
+            [$sourceItem=>0],$pdf());
+        $this->be($receiver);
+        Livewire::test(HallInventory::class)
+            ->assertSet('hallId',$destination->id)
+            ->assertSee('SOURCE DISPATCHED / DESTINATION RECEIPT PENDING')
+            ->call('startLoanReceipt',$loanId)
+            ->assertHasNoErrors()
+            ->assertSee('Confirm receiving-hall physical custody')
+            ->set('loanReceiptMapping.'.$sourceItem,$destItem)
+            ->set('loanReceiptFile',$pdf())
+            ->call('submitLoanReceipt')->assertHasNoErrors()
+            ->assertSee('DESTINATION RECEIVED / RETURNS PENDING');
+        $this->assertSame(6,(int)DB::table('hall_inventory_positions')
+            ->where('hall_id',$destination->id)->where('item_id',$destItem)->value('borrowed_usable'));
+        $this->assertSame(0,(int)DB::table('hall_inventory_positions')
+            ->where('hall_id',$destination->id)->where('item_id',$destItem)->value('owned_usable'));
+        $this->assertSame(6,(int)DB::table('hall_inventory_positions')
+            ->where('hall_id',$source->id)->where('item_id',$sourceItem)->value('owned_on_loan'));
+        $this->assertSame(1,DB::table('hall_inventory_internal_loan_receipts')->count());
+        $this->assertSame(0,DB::table('finance_journals')->count());
+    }
+
 }
