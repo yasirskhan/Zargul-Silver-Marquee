@@ -187,6 +187,28 @@ try {
     $check->execute(['target'=>$limited]);
     challengeCheck((int)$check->fetchColumn()===5,
         'rate-limited request never adds a new challenge audit record');
+    // A compromised GLOBAL issuer must not bypass recipient caps by
+    // spraying short-lived challenges across many different recipients.
+    // There are 12 issuer events above (one target, five limited, five
+    // older-than-24-hours, one reissue); only seven are in the last day.
+    // Inject thirteen more recent immutable events to reach the issuer cap.
+    $issuerTarget=challengeUuid();
+    $insert->execute(['id'=>$issuerTarget,
+        'email'=>'enrollment-issuer-cap@example.test',
+        'hash'=>password_hash($password,PASSWORD_ARGON2ID),
+        'mfa'=>'','enrolled'=>null,'status'=>'pending_mfa']);
+    $event->execute(['actor'=>$admin,'target'=>$issuerTarget]);
+    for($i=0;$i<13;$i++) {
+        $inject->execute(['id'=>challengeUuid(),'target'=>$limited,
+            'issuer'=>$admin,
+            'email'=>hash('sha256','enrollment-limited@example.test'),
+            'nonce'=>hash('sha256',random_bytes(32)),'age'=>'1 hour']);
+    }
+    challengeDeny(fn()=>$on->issue($adminBearer,$issuerTarget),
+        'staff_enrollment_issuer_rate_limited');
+    $check->execute(['target'=>$issuerTarget]);
+    challengeCheck((int)$check->fetchColumn()===0,
+        'issuer cap denies before writing challenge for a fresh target');
     $db->prepare('UPDATE central_staff_role_grants SET revoked_at=now()
         WHERE staff_id=:id')->execute(['id'=>$admin]);
     challengeDeny(fn()=>$on->issue($adminBearer,challengeUuid()),
