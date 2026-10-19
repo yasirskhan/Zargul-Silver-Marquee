@@ -13,7 +13,12 @@ foreach([
     'CentralStaffTotpVerifier','CentralStaffMfaChallenge',
     'CentralStaffCredentialVerifier','CentralStaffLoginRateLimiter',
     'CentralStaffSessionService','CentralStaffSessionAuthorization',
-    'CentralStaffVendorPlanPublisher'
+    'CentralStaffVendorPlanPublisher','CentralStaffVendorPlanCatalogRenderer',
+    'CentralStaffCsrfTokenService','CentralStaffHttpPolicy',
+    'CentralStaffProtectedHttpBoundary',
+    'CentralStaffPaymentEvidenceQueue','CentralStaffPaymentEvidenceReviewService',
+    'CentralStaffInvoicePaymentOverview','CentralStaffPaymentEvidenceHttpAdapter',
+    'CentralStaffPortalHttpRouter','CentralStaffPortalPrivateResponse'
 ] as $class)require dirname(__DIR__).'/src/'.$class.'.php';
 
 function planAssert(bool $ok,string $why):void {
@@ -144,6 +149,80 @@ try {
         'two'=>$second['plan_version_id']]);
     planAssert((int)$q->fetchColumn()===0,
         'publishing vendor plans never charges customers or issues invoices');
+    // Protected INTERNAL plan administrator form and publish receipt;
+    // vendor staff identity comes from secure cookie and current session.
+    $csrfService=new Hafzatech\Central\CentralStaffCsrfTokenService($db,$sessions);
+    $writerCsrf=$csrfService->issue($writerSession);
+    $billingCsrf=$csrfService->issue($billingSession);
+    planAssert(is_string($writerCsrf)&&is_string($billingCsrf),
+        'independent current session CSRF generated');
+    $boundary=new Hafzatech\Central\CentralStaffProtectedHttpBoundary(
+        $sessions,$csrfService,$auth,true);
+    $billingAdapter=new Hafzatech\Central\CentralStaffPaymentEvidenceHttpAdapter(
+        $db,$boundary,
+        new Hafzatech\Central\CentralStaffPaymentEvidenceQueue($db,$auth),
+        new Hafzatech\Central\CentralStaffPaymentEvidenceReviewService(
+            $db,$sessions,$auth),
+        new Hafzatech\Central\CentralStaffInvoicePaymentOverview(
+            $db,$sessions,$auth),false);
+    $router=new Hafzatech\Central\CentralStaffPortalHttpRouter(
+        $boundary,$billingAdapter,true,planPublisher:$on);
+    $server=[
+        'HTTPS'=>'on','SERVER_PORT'=>'443',
+        'HTTP_HOST'=>'lichall.hafzatech.com',
+        'HTTP_ORIGIN'=>'https://lichall.hafzatech.com',
+        'HTTP_SEC_FETCH_SITE'=>'same-origin',
+        'REQUEST_METHOD'=>'POST','REQUEST_URI'=>'/staff/plans',
+        'REMOTE_ADDR'=>'192.0.2.243'
+    ];
+    $cookie=[Hafzatech\Central\CentralStaffHttpPolicy::COOKIE_NAME=>$writerSession];
+    $otherCookie=[Hafzatech\Central\CentralStaffHttpPolicy::COOKIE_NAME=>$billingSession];
+    $form=$router->dispatch($server,$cookie,[],$writerCsrf);
+    planAssert($form['kind']==='private_vendor_plan_catalog_html' &&
+        str_contains($form['html'],'action="/staff/plans/publish"') &&
+        str_contains($form['html'],'name="staff_csrf"') &&
+        !str_contains($form['html'],$writerSession),
+        'protected vendor Plan Administrator sees form, never cookie bearer');
+    $writerOutput=(new Hafzatech\Central\CentralStaffPortalPrivateResponse(true))
+        ->compose($form);
+    planAssert($writerOutput['cookies']===[] &&
+        $writerOutput['headers']['Cache-Control']==='no-store, private',
+        'vendor plan entry form cannot be cached or set session cookie');
+    planDeny(fn()=>$router->dispatch($server,$otherCookie,[],$billingCsrf),
+        'staff_portal_denied');
+    $publishServer=$server;$publishServer['REQUEST_URI']='/staff/plans/publish';
+    $fields=['request_id'=>planUuid(),'plan_code'=>'portal_plan_catalog',
+        'term_months'=>'12','currency'=>'USD','price_minor'=>'25000',
+        'max_halls'=>'3','max_staff'=>'15','features_json'=>'{"booking":true}'];
+    $published=$router->dispatch($publishServer,$cookie,$fields,$writerCsrf);
+    planAssert($published['kind']==='private_vendor_plan_published_html' &&
+        str_contains($published['html'],'Plan version published') &&
+        str_contains($published['html'],'25000') &&
+        !str_contains($published['html'],$writerSession),
+        'separately gated MFA plan publisher produced safe private receipt');
+    $same=$router->dispatch($publishServer,$cookie,$fields,$writerCsrf);
+    planAssert($same===$published,
+        'idempotent staff POST reuses original published plan version');
+    $response=(new Hafzatech\Central\CentralStaffPortalPrivateResponse(true))
+        ->compose($published);
+    planAssert($response['cookies']===[] &&
+        $response['headers']['Cache-Control']==='no-store, private',
+        'published version never leaks tokens into response');
+    planDeny(fn()=>$router->dispatch(
+        $publishServer,$otherCookie,$fields,$billingCsrf),'staff_portal_denied');
+    planDeny(fn()=>$router->dispatch(
+        $publishServer,$cookie,$fields,str_repeat('0',64)),'staff_portal_denied');
+    $badOrigin=$publishServer;
+    $badOrigin['HTTP_ORIGIN']='https://malicious.example';
+    planDeny(fn()=>$router->dispatch(
+        $badOrigin,$cookie,$fields,$writerCsrf),'staff_portal_denied');
+    planDeny(fn()=>$router->dispatch(
+        $publishServer,$cookie,$fields+['paid'=>true],$writerCsrf),
+        'invalid_vendor_plan_request');
+    $badJson=$fields;$badJson['features_json']='{"booking":"paid"}';
+    planDeny(fn()=>$router->dispatch(
+        $publishServer,$cookie,$badJson,$writerCsrf),
+        'invalid_vendor_plan_request');
     $db->prepare("UPDATE central_staff_role_grants SET revoked_at=now()
         WHERE staff_id=:staff")->execute(['staff'=>$writer]);
     $revokeArgs=$newArgs;$revokeArgs[1]=planUuid();
