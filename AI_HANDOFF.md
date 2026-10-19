@@ -235,3 +235,8 @@ Verify live branch/CI → reconcile current handoff + specific requirement/featu
 ## DETACHED START — DUAL-CONTROL OPENING INVENTORY EVIDENCE (2026-10-19 UTC)
 - Follows hall position/movement schema `9dc16140b9203daaf0853103b3605d4aeb162c96` [CI 39250471604](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39250471604), which MUST pass all six hosted jobs before next publication.
 - New additive migration `2026_10_19_011000_create_hall_inventory_opening_evidence.php` stores immutable opening requests bound to current physical stocktake evidence and immutable independent acceptance referencing exact movement. Per-company/hall/item UNIQUE forbids second initial opening; no updates/deletes and no stock movement automatically. Default-OFF independent config `inventory_controls.opening_stock_posting_enabled` awaits service+tests and release readiness. Complete owner/manager experience and actual stock receipts remain NOT COMPLETE.
+
+
+## DETACHED OPENING STOCK REGRESSION HARDENING
+- Atomic CAS on exact company/hall/item/position/revision 0 now requires one affected DB row; conflict causes entire audited receipt transaction rollback and no false event. Explicit owner-self-approval denial tested even when the requester has owner permissions and authenticated current session; independent admin must sign. Tests also cover independent manager+owner, duplicate request, reapproval, wrong hall/count, signed-free input provenance, immutable opening acceptance, zero finance side effects.
+- No public route/Filament posting page, payment journal or license activation added. Exact six-job CI needed after the parent position/journal migration and own follow-on publication; production posting gate OFF.

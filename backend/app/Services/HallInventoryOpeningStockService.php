@@ -203,11 +203,16 @@ final class HallInventoryOpeningStockService
             $after=$this->positions->apply(
                 $oldBuckets,'opening_owned',(int)$request->quantity
             );
-            DB::table('hall_inventory_positions')
+            $changed=DB::table('hall_inventory_positions')
+                ->where('company_id',$companyId)->where('hall_id',$hallId)
+                ->where('item_id',$request->item_id)
                 ->where('id',$positionId)->where('revision',0)->update([
                     'owned_usable'=>$after['ownedUsable'],
                     'revision'=>1,'updated_at'=>now(),
                 ]);
+            if($changed!==1) {
+                throw new ConflictHttpException('Opening stock position revision changed.');
+            }
             $movementId=(string)Str::uuid();
             DB::table('hall_inventory_movement_events')->insert([
                 'id'=>$movementId,'company_id'=>$companyId,'hall_id'=>$hallId,

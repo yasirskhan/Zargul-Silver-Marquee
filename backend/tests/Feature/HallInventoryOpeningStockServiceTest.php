@@ -71,7 +71,7 @@ class HallInventoryOpeningStockServiceTest extends TestCase
         return $take;
     }
 
-    public function test_independent_opening_posts_one_immutable_audited_movement_after_real_physical_count():void
+    public function test_default_off_gate_rejects_requests_without_creating_stock():void
     {
         [$c,$hall,$other,$owner,$admin,$manager,$item]=$this->fixture();
         $service=app(HallInventoryOpeningStockService::class);
@@ -132,6 +132,29 @@ class HallInventoryOpeningStockServiceTest extends TestCase
             $this->fail('Second opening would inflate owned stock.');
         }catch(ConflictHttpException) {}
         $this->assertSame(50,(int)DB::table('hall_inventory_positions')
+            ->value('owned_usable'));
+        $this->assertSame(1,DB::table('hall_inventory_movement_events')->count());
+    }
+
+    public function test_owner_who_counted_stock_cannot_self_accept_even_with_owner_role():void
+    {
+        [$c,$hall,$other,$owner,$admin,$manager,$item]=$this->fixture();
+        // The requester holds owner privileges: independent acceptance
+        // still cannot be bypassed by self-approval.
+        $take=$this->openingCount($owner,$c->id,$hall->id,$item,10);
+        config()->set('inventory_controls.opening_stock_posting_enabled',true);
+        $service=app(HallInventoryOpeningStockService::class);
+        $request=(string)Str::uuid();
+        $service->request($owner,$c->id,$hall->id,$item,$take,
+            $request,10,'Owner personally counted stock');
+        try {
+            $service->accept($owner,$c->id,$hall->id,$request);
+            $this->fail('Owner approved their own stock count.');
+        }catch(AuthorizationException) {}
+        $this->be($admin);
+        $approved=$service->accept($admin,$c->id,$hall->id,$request);
+        $this->assertSame($approved,$service->accept($admin,$c->id,$hall->id,$request));
+        $this->assertSame(10,(int)DB::table('hall_inventory_positions')
             ->value('owned_usable'));
         $this->assertSame(1,DB::table('hall_inventory_movement_events')->count());
     }
