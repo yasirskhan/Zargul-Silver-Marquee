@@ -4,6 +4,7 @@ namespace App\Services;
 
 use DateTimeImmutable;
 use DateInterval;
+use DateTimeZone;
 use App\Models\User;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\DB;
@@ -58,6 +59,11 @@ final class CentralLicensingOverviewService
                 'edition'=>null,
                 'max_halls'=>null,
                 'max_staff'=>null,
+                'last_online_verified_at'=>null,
+                'next_routine_check_at'=>null,
+                'last_attempted_at'=>null,
+                'next_retry_at'=>null,
+                'last_failure_category'=>null,
             ];
         }
         $binding=DB::table('central_installation_activation')
@@ -66,9 +72,10 @@ final class CentralLicensingOverviewService
             return $this->withoutGrant('enrollment_required',false);
         }
         $due=$this->schedule->isDue($now);
+        $checks=$this->verificationHistory($binding->installation_id,$now);
         $stored=DB::table('central_signed_license_cache')->where('singleton_id',1)->first();
         if (! $stored) {
-            return $this->withoutGrant('awaiting_signed_license',$due);
+            return $this->withoutGrant('awaiting_signed_license',$due,$checks);
         }
         try {
             $verified=$this->cache->locallyVerified($binding->customer_id,
@@ -77,7 +84,7 @@ final class CentralLicensingOverviewService
         } catch (InvalidArgumentException | DecryptException | JsonException) {
             // Failed signature or altered encrypted cache never turns an
             // installation into an active paid license.
-            return $this->withoutGrant('invalid_signed_license',$due);
+            return $this->withoutGrant('invalid_signed_license',$due,$checks);
         }
         return [
             'state'=> $state['dashboard']==='grace' ? 'expired_grace' :
@@ -102,11 +109,49 @@ final class CentralLicensingOverviewService
             'edition'=>$verified['grant']['edition'],
             'max_halls'=>$verified['grant']['limits']['max_halls'],
             'max_staff'=>$verified['grant']['limits']['max_staff'],
+            ...$checks,
         ];
     }
 
-    /** @return array<string,mixed> */
-    private function withoutGrant(string $state,bool $due): array
+    /**
+     * Display only persisted independently verified ONLINE timestamps.
+     * This NEVER uses signed-cache acceptance time as evidence of central
+     * contact. A failed request retains the last authenticated success.
+     * Installation ID matching prevents stale check records being displayed
+     * after an approved recovery/reinstallation.
+     * @return array<string,string|null>
+     */
+    private function verificationHistory(string $installationId,DateTimeImmutable $now):array
+    {
+        $check=DB::table('central_license_check_state')
+            ->where('singleton_id',1)
+            ->where('installation_id',$installationId)->first();
+        $last=$check?->last_online_verified_at
+            ? new DateTimeImmutable($check->last_online_verified_at) : null;
+        $retry=$check?->next_retry_at
+            ? new DateTimeImmutable($check->next_retry_at) : null;
+        $failure=$check?->last_failure_category;
+        return [
+            'last_online_verified_at'=>$last ? self::utc($last) : null,
+            'next_routine_check_at'=>$last
+                ? self::utc($this->policy->nextCentralVerification($last,$now)) : null,
+            'last_attempted_at'=>$check?->last_attempted_at
+                ? self::utc(new DateTimeImmutable($check->last_attempted_at)) : null,
+            'next_retry_at'=>$retry && $retry>$now ? self::utc($retry) : null,
+            'last_failure_category'=>in_array($failure,
+                ['network','server','invalid_response'],true) ? $failure : null,
+        ];
+    }
+
+    private static function utc(DateTimeImmutable $at):string
+    {
+        return $at->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\\TH:i:s\\Z');
+    }
+
+    /** @param array<string,string|null> $checks
+     * @return array<string,mixed>
+     */
+    private function withoutGrant(string $state,bool $due,array $checks=[]): array
     {
         return [
             'state'=>$state,
@@ -124,6 +169,12 @@ final class CentralLicensingOverviewService
             'edition'=>null,
             'max_halls'=>null,
             'max_staff'=>null,
+            'last_online_verified_at'=>null,
+            'next_routine_check_at'=>null,
+            'last_attempted_at'=>null,
+            'next_retry_at'=>null,
+            'last_failure_category'=>null,
+            ...$checks,
         ];
     }
 }

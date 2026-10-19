@@ -33,6 +33,9 @@ class CentralLicensingOverviewServiceTest extends TestCase
         $this->assertNull($view['grace_ends_at']);
         $this->assertNull($view['edition']);
         $this->assertFalse($view['online_check_due']);
+        $this->assertNull($view['last_online_verified_at']);
+        $this->assertNull($view['next_routine_check_at']);
+        $this->assertNull($view['next_retry_at']);
         $this->assertSame($before,DB::table('central_license_check_state')->count());
     }
 
@@ -54,6 +57,9 @@ class CentralLicensingOverviewServiceTest extends TestCase
         $this->assertSame('maintenance',$state['public_policy']);
         $this->assertSame('restricted',$state['dashboard_policy']);
         $this->assertTrue($state['online_check_due']);
+        $this->assertNull($state['last_online_verified_at']);
+        $this->assertNull($state['next_routine_check_at']);
+        $this->assertNull($state['last_failure_category']);
         $this->assertDatabaseCount('central_license_check_state',0);
         $this->assertDatabaseCount('finance_journals',0);
     }
@@ -103,6 +109,25 @@ class CentralLicensingOverviewServiceTest extends TestCase
         $this->assertSame(2,$warning['max_halls']);
         $this->assertSame(10,$warning['max_staff']);
         $this->assertSame('open',$warning['public_policy']);
+        $this->assertNull($warning['last_online_verified_at'],
+            'A locally cached signature is NOT proof of vendor connectivity');
+        // Synthetic state is persisted only through the authenticated
+        // transport's success contract in production. Projection never
+        // infers online success from the signed cache itself.
+        app(\\App\\Services\\CentralLicenseCheckSchedule::class)
+            ->recordVerifiedSuccess(new DateTimeImmutable('2027-09-15T13:30:00Z'));
+        $checked=$overview->snapshot(new DateTimeImmutable('2027-09-16T00:00:00Z'));
+        $this->assertSame('2027-09-15T13:30:00Z',$checked['last_online_verified_at']);
+        $this->assertSame('2027-09-30T13:30:00Z',$checked['next_routine_check_at']);
+        $this->assertFalse($checked['online_check_due']);
+        app(\\App\\Services\\CentralLicenseCheckSchedule::class)
+            ->recordFailure(new DateTimeImmutable('2027-09-16T00:00:00Z'),'network');
+        $retry=$overview->snapshot(new DateTimeImmutable('2027-09-16T00:00:30Z'));
+        $this->assertSame('2027-09-15T13:30:00Z',$retry['last_online_verified_at']);
+        $this->assertSame('2027-09-16T00:01:00Z',$retry['next_retry_at']);
+        $this->assertSame('network',$retry['last_failure_category']);
+        $this->assertSame('2027-09-16T00:00:00Z',$retry['last_attempted_at']);
+        $this->assertDatabaseCount('finance_journals',0);
         $expired=$overview->snapshot(new DateTimeImmutable('2027-10-01T00:00:00Z'));
         $this->assertSame('expired_grace',$expired['state']);
         $this->assertSame('maintenance',$expired['public_policy']);
@@ -110,7 +135,7 @@ class CentralLicensingOverviewServiceTest extends TestCase
         $this->assertSame('2027-10-08T00:00:00Z',$expired['grace_ends_at']);
         $after=$overview->snapshot(new DateTimeImmutable('2027-10-08T00:00:00Z'));
         $this->assertSame('restricted',$after['dashboard_policy']);
-        $this->assertDatabaseCount('central_license_check_state',0);
+        $this->assertDatabaseCount('central_license_check_state',1);
         $this->assertDatabaseCount('finance_journals',0);
     }
 

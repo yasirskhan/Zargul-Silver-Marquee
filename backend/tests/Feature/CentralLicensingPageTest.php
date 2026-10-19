@@ -49,6 +49,10 @@ class CentralLicensingPageTest extends TestCase
             ->assertSet('companyId',$company->id)
             ->assertSet('summary.state','awaiting_signed_license')
             ->assertSee('License status')
+            ->assertSee('Last authenticated HAFZATECH verification (UTC)')
+            ->assertSee('Never verified online')
+            ->assertSee('Due now')
+            ->assertSee('Online renewal requests are not yet enabled.')
             ->assertSee('Verify License (central service not activated)')
             ->assertDontSee($foreign->name)
             ->assertSet('summary.revision',null);
@@ -79,6 +83,7 @@ class CentralLicensingPageTest extends TestCase
         Http::preventStrayRequests();
         Livewire::test(Licensing::class)->call('verifyLicense')->assertForbidden();
         Http::assertNothingSent();
+        $this->assertDatabaseCount('central_license_check_state',0);
         config()->set('central_control.manual_checks_enabled',true);
         Http::fake(['https://lichall.hafzatech.com/api/v1/installations/status'=>
             function ($request) use ($installation){

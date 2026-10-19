@@ -44,6 +44,35 @@
                     <dt class="text-sm">Central check due</dt>
                     <dd class="font-semibold">{{ $summary['online_check_due'] ? 'Yes' : 'No' }}</dd>
                 </div>
+                <div class="rounded-lg border p-4">
+                    <dt class="text-sm">Last authenticated HAFZATECH verification (UTC)</dt>
+                    <dd class="font-semibold">{{ $summary['last_online_verified_at'] ?? 'Never verified online' }}</dd>
+                </div>
+                <div class="rounded-lg border p-4">
+                    <dt class="text-sm">Next routine verification (UTC)</dt>
+                    <dd class="font-semibold">{{ $summary['next_routine_check_at'] ?? ($summary['online_check_due'] ? 'Due now' : 'Not scheduled') }}</dd>
+                </div>
+                <div class="rounded-lg border p-4">
+                    <dt class="text-sm">Most recent online attempt (UTC)</dt>
+                    <dd class="font-semibold">{{ $summary['last_attempted_at'] ?? 'No attempt recorded' }}</dd>
+                </div>
+                @if ($summary['last_failure_category'])
+                    <div class="rounded-lg border p-4">
+                        <dt class="text-sm">Last verification issue</dt>
+                        <dd class="font-semibold">{{ match ($summary['last_failure_category']) {
+                            'network' => 'Central service connection unavailable',
+                            'server' => 'Central service temporarily unavailable',
+                            'invalid_response' => 'Central response could not be authenticated',
+                            default => 'Verification unavailable',
+                        } }}</dd>
+                    </div>
+                @endif
+                @if ($summary['next_retry_at'])
+                    <div class="rounded-lg border p-4">
+                        <dt class="text-sm">Scheduled retry after (UTC)</dt>
+                        <dd class="font-semibold">{{ $summary['next_retry_at'] }}</dd>
+                    </div>
+                @endif
             </dl>
             @if (!empty($summary['license_id']))
                 <dl class="grid gap-3 sm:grid-cols-2" aria-label="Verified signed license identity">
@@ -65,6 +94,7 @@
                     </div>
                 </dl>
             @endif
+            <p class="text-xs">Local signature validation is not an online HAFZATECH check. Failed connections do not renew, revoke or erase an existing signed license. Normal online checks occur every 15 days; the Verify License button is a separate, owner-requested check.</p>
             @if ($summary['expiry_warning'])
                 <p role="alert">Your signed license is within 15 days of expiration. Contact HAFZATECH about renewal.</p>
             @endif
@@ -77,6 +107,15 @@
                 class="inline-block rounded-lg border px-4 py-2 text-sm font-semibold">
                 View past invoices and refunds
             </a>
+            @if (config('central_control.support_enabled') === true)
+                <a href="{{ \\App\\Filament\\Pages\\SupportInbox::getUrl(['company'=>$companyId]) }}"
+                    class="inline-block rounded-lg border px-4 py-2 text-sm font-semibold">
+                    Request renewal or contact HAFZATECH support
+                </a>
+                <p class="text-xs">A support request is not a payment confirmation or license renewal. Activation requires independently verified settlement and a signed revision.</p>
+            @else
+                <p class="text-sm">To renew, contact HAFZATECH using your existing support or billing contact. Online renewal requests are not yet enabled.</p>
+            @endif
             <div class="flex flex-wrap gap-3">
                 <button type="button" wire:click="refreshStatus" class="rounded-lg border px-4 py-2 text-sm">Refresh local status</button>
                 @if (config('central_control.activation_enabled') === true && config('central_control.manual_checks_enabled') === true)
