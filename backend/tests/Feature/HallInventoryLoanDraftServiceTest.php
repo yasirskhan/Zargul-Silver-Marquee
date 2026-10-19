@@ -166,4 +166,77 @@ class HallInventoryLoanDraftServiceTest extends TestCase
         $this->expectException(QueryException::class);
         DB::table('hall_inventory_loan_draft_lines')->where('loan_id',$id)->delete();
     }
+    public function test_read_only_loan_review_is_hall_scoped_and_preserves_item_snapshots(): void
+    {
+        [$company,$a,$b,$owner,$manager,$chair,$table]=$this->fixture();
+        config()->set('inventory_controls.loan_drafts_enabled',true);
+        $service=app(HallInventoryLoanDraftService::class);
+        $loan=(string) Str::uuid();
+        $service->create($owner,$company->id,$loan,'internal',$a->id,$b->id,
+            [['itemId'=>$chair,'quantity'=>50],['itemId'=>$table,'quantity'=>10]],
+            '2027-05-18','Borrow seats for wedding');
+        $review=app(\App\Services\HallInventoryLoanDraftReview::class);
+        $items=$review->recent($owner,$company->id,$a->id);
+        $this->assertCount(1,$items);
+        $this->assertSame($loan,$items[0]['id']);
+        $this->assertSame('Hall A',$items[0]['lendingHallName']);
+        $this->assertSame('Hall B',$items[0]['borrowingHallName']);
+        $this->assertSame('draft_only',$items[0]['status']);
+        $this->assertFalse($items[0]['stockMoved']);
+        $this->assertCount(2,$items[0]['lines']);
+        $this->assertSame([10,50],array_column($items[0]['lines'],'quantity'));
+        // Receiving hall does not gain authority over the source's draft.
+        $this->assertSame([],$review->recent($owner,$company->id,$b->id));
+        $this->be($manager);
+        $this->assertCount(1,$review->recent($manager,$company->id,$a->id));
+        try{
+            $review->recent($manager,$company->id,$b->id);
+            $this->fail('Unassigned manager read the receiving hall.');
+        }catch(AuthorizationException){}
+        $this->assertSame(0,DB::table('finance_journals')->count());
+    }
+
+    public function test_external_draft_review_excludes_ciphertext_and_rejects_revocation():void
+    {
+        [$company,$a,$b,$owner,$manager]=$this->fixture();
+        config()->set('inventory_controls.loan_drafts_enabled',true);
+        $jugs=(string)Str::uuid();
+        app(HallInventoryCatalogService::class)->create($owner,$company->id,
+            $b->id,$jugs,'Water Jugs','Serving','piece',30,'Outside hall catalog');
+        app(HallInventoryLoanDraftService::class)->create(
+            $owner,$company->id,(string)Str::uuid(),'external_in',null,$b->id,
+            [['itemId'=>$jugs,'quantity'=>20]],'2027-05-18','Borrow water jugs',
+            'Outside Venue','Manager Secret','0300-555-1234','External Road');
+        $review=app(\App\Services\HallInventoryLoanDraftReview::class);
+        $summary=$review->recent($owner,$company->id,$b->id);
+        $this->assertCount(1,$summary);
+        $this->assertSame('Outside Venue',$summary[0]['externalPartnerName']);
+        $this->assertStringNotContainsString('Manager Secret',json_encode($summary));
+        $this->assertStringNotContainsString('0300-555-1234',json_encode($summary));
+        $this->assertFalse($summary[0]['stockMoved']);
+        $this->expectException(AuthorizationException::class);
+        $this->be($manager);
+        $review->recent($manager,$company->id,$b->id);
+    }
+
+    public function test_loan_review_release_gate_and_revoked_hall_assignment():void
+    {
+        [$company,$a,$b,$owner,$manager,$chair]=$this->fixture();
+        $review=app(\App\Services\HallInventoryLoanDraftReview::class);
+        $this->expectException(ConflictHttpException::class);
+        $review->recent($owner,$company->id,$a->id);
+    }
+
+    public function test_loan_review_rechecks_persisted_hall_assignment():void
+    {
+        [$company,$a,$b,$owner,$manager,$chair]=$this->fixture();
+        config()->set('inventory_controls.loan_drafts_enabled',true);
+        $this->be($manager);
+        $review=app(\App\Services\HallInventoryLoanDraftReview::class);
+        $this->assertSame([],$review->recent($manager,$company->id,$a->id));
+        DB::table('hall_assignments')->where('hall_id',$a->id)->delete();
+        $this->expectException(AuthorizationException::class);
+        $review->recent($manager,$company->id,$a->id);
+    }
+
 }

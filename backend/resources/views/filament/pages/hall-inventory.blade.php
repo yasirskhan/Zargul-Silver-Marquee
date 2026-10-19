@@ -275,6 +275,30 @@
                         No inventory was dispatched or received. Await controlled handover and independent counts.
                     </p>
                 @endif
+                <div class="space-y-3 rounded-xl border p-4" aria-label="Saved borrowing requests awaiting handover">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <h3 class="font-semibold">Saved borrowing requests (draft only)</h3>
+                        <button type="button" wire:click="reloadLoanHistory" class="rounded-lg border px-3 py-2 text-sm">Refresh requests</button>
+                    </div>
+                    <p class="text-xs text-gray-600 dark:text-gray-300">These are recorded requests, NOT authorized handovers or proof of stock, payment, receipt, or completion. Up to 20 recent requests originating at the selected hall are visible.</p>
+                    <div class="space-y-3">
+                        @forelse($loanHistory as $loan)
+                            <article wire:key="inventory-loan-summary-{{ $loan['id'] }}" class="space-y-2 rounded-lg border p-3 text-sm">
+                                <p class="font-medium">{{ $loan['purpose'] }} — DRAFT / NOT DISPATCHED</p>
+                                <p>Reference: {{ $loan['id'] }}. Return expected: {{ $loan['expectedReturnDate'] }}.</p>
+                                <p>Source: {{ $loan['lendingHallName'] ?? $loan['externalPartnerName'] ?? 'Not assigned' }}.
+                                   Destination: {{ $loan['borrowingHallName'] ?? $loan['externalPartnerName'] ?? 'Not assigned' }}.</p>
+                                <ul class="list-inside list-disc">
+                                    @foreach($loan['lines'] as $line)
+                                        <li>{{ $line['name'] }} — {{ $line['quantity'] }} {{ $line['unit'] }}</li>
+                                    @endforeach
+                                </ul>
+                            </article>
+                        @empty
+                            <p class="text-sm text-gray-600 dark:text-gray-300">No loan drafts yet for this hall.</p>
+                        @endforelse
+                    </div>
+                </div>
             </section>
         @endif
     </div>

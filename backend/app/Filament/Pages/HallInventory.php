@@ -54,6 +54,8 @@ final class HallInventory extends Page
     public string $loanRequestId = '';
     #[Locked]
     public ?string $lastLoanReference = null;
+    #[Locked]
+    public array $loanHistory = [];
 
     public string $loanDirection = 'internal';
     public string $loanCounterpartHallId = '';
@@ -225,6 +227,17 @@ final class HallInventory extends Page
         $this->loanRequestId = (string) Str::uuid();
     }
 
+    public function reloadLoanHistory(): void
+    {
+        $this->loanHistory = [];
+        $actor = $this->authorizeSelection();
+        if (! config('inventory_controls.loan_drafts_enabled')) {
+            return;
+        }
+        $this->loanHistory = app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($actor, $this->companyId, $this->hallId);
+    }
+
     public function reloadCatalog(): void
     {
         $this->catalog = [];
@@ -237,6 +250,7 @@ final class HallInventory extends Page
                 'id' => $item->id, 'name' => $item->name, 'category' => $item->category,
                 'unit' => $item->unit, 'minimumQuantity' => (int) $item->minimum_quantity,
             ])->all();
+        $this->reloadLoanHistory();
     }
 
     public function createItem(): void
@@ -385,6 +399,7 @@ final class HallInventory extends Page
         $this->loanOutsidePhone = '';
         $this->loanOutsideAddress = '';
         $this->loanRequestId = (string) Str::uuid();
+        $this->reloadLoanHistory();
     }
 
     public function submitCount(): void

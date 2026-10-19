@@ -47,6 +47,14 @@ final class HallInventoryLoanDraftReview
                 $join->on('p.id','=','d.external_partner_id')
                     ->on('p.company_id','=','d.company_id');
             })
+            ->leftJoin('halls as lh', function ($join):void {
+                $join->on('lh.id','=','d.lending_hall_id')
+                    ->on('lh.company_id','=','d.company_id');
+            })
+            ->leftJoin('halls as bh', function ($join):void {
+                $join->on('bh.id','=','d.borrowing_hall_id')
+                    ->on('bh.company_id','=','d.company_id');
+            })
             ->where('d.company_id',$companyId)
             ->where(function ($query) use ($hallId):void {
                 $query->where('d.lending_hall_id',$hallId)
@@ -61,6 +69,7 @@ final class HallInventoryLoanDraftReview
                 'd.id','d.direction','d.lending_hall_id','d.borrowing_hall_id',
                 'd.expected_return_date','d.purpose','d.created_at',
                 'p.name as external_partner_name',
+                'lh.name as lending_hall_name','bh.name as borrowing_hall_name',
             ]);
         if($drafts->isEmpty())return [];
 
@@ -78,6 +87,8 @@ final class HallInventoryLoanDraftReview
                 'lendingHallId'=>$draft->lending_hall_id,
                 'borrowingHallId'=>$draft->borrowing_hall_id,
                 'externalPartnerName'=>$draft->external_partner_name,
+                'lendingHallName'=>$draft->lending_hall_name,
+                'borrowingHallName'=>$draft->borrowing_hall_name,
                 'expectedReturnDate'=>(string)$draft->expected_return_date,
                 'purpose'=>(string)$draft->purpose,
                 'createdAt'=>(string)$draft->created_at,

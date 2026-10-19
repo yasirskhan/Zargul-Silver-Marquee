@@ -114,7 +114,11 @@ class HallInventoryLivewireTest extends TestCase
             ->set('loanReturnDate', '2027-04-30')
             ->set('loanPurpose', 'Hall B evening wedding request')
             ->call('submitLoanDraft')->assertHasNoErrors()
-            ->assertSee('Multi-item loan request saved');
+            ->assertSee('Multi-item loan request saved')
+            ->assertSee('Saved borrowing requests (draft only)')
+            ->assertSee('Hall B evening wedding request')
+            ->assertSee('50 piece')
+            ->assertSee('100 piece');
         $this->assertSame(1, DB::table('hall_inventory_loan_drafts')->count());
         $this->assertSame(2, DB::table('hall_inventory_loan_draft_lines')->count());
         $this->assertSame(0, DB::table('finance_journals')->count());
