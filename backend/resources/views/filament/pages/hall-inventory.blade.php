@@ -516,11 +516,11 @@
                         <h3 class="font-semibold">Saved borrowing requests (draft only)</h3>
                         <button type="button" wire:click="reloadLoanHistory" class="rounded-lg border px-3 py-2 text-sm">Refresh requests</button>
                     </div>
-                    <p class="text-xs text-gray-600 dark:text-gray-300">These are recorded requests, NOT authorized handovers or proof of stock, payment, receipt, or completion. Up to 20 recent requests originating at the selected hall are visible.</p>
+                    <p class="text-xs text-gray-600 dark:text-gray-300">These are recorded requests, NOT authorized handovers or proof of stock, payment, receipt, or completion. Up to 20 recent requests originating at or internally addressed to the selected hall are visible. Incoming drafts are read-only and require separate witnessed dispatch and receiving.</p>
                     <div class="space-y-3">
                         @forelse($loanHistory as $loan)
                             <article wire:key="inventory-loan-summary-{{ $loan['id'] }}" class="space-y-2 rounded-lg border p-3 text-sm">
-                                <p class="font-medium">{{ $loan['purpose'] }} — DRAFT / NOT DISPATCHED</p>
+                                <p class="font-medium">{{ $loan['purpose'] }} — {{ ($loan['viewRole'] ?? 'originating') === 'receiving' ? 'INCOMING REQUEST' : 'OUTGOING REQUEST' }} — DRAFT / NOT DISPATCHED</p>
                                 <p>Reference: {{ $loan['id'] }}. Return expected: {{ $loan['expectedReturnDate'] }}.</p>
                                 <p>Source: {{ $loan['lendingHallName'] ?? $loan['externalPartnerName'] ?? 'Not assigned' }}.
                                    Destination: {{ $loan['borrowingHallName'] ?? $loan['externalPartnerName'] ?? 'Not assigned' }}.</p>
