@@ -92,3 +92,8 @@ constitute a deployed staff website. DNS/TLS/proxy, KMS-backed credentials,
 bank settlement verification, real HSM signer, operator recovery and
 production release certification are still blockers. Never switch on the
 production toggles merely because development CI passes.
+
+
+### Phase 12 verified checkpoint — read-only loan drafts
+- Verified source `4fa961e063de40133df1c4534367e393c0f1f8ce`: [CI 39242040957](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39242040957) all six SUCCESS. Owner/assigned-manager hall draft history with item snapshots is implemented but default-disabled for production.
+- Read-only physical stocktake evidence history is being verified separately; no book-stock adjustments, owner approvals, independent handover acknowledgments, external evidence, partial returns or completion PDF are released.
