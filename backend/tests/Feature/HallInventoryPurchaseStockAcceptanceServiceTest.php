@@ -53,7 +53,8 @@ class HallInventoryPurchaseStockAcceptanceServiceTest extends TestCase {
         $receipt=(string)Str::uuid();
         app(HallInventoryPurchaseReceivingService::class)->record($receiver,$c->id,$hall->id,
             $purchase,$receipt,18,'delivery-photo-unverified','Eighteen chairs good');
-        $files->attach($receiver,$c->id,$hall->id,$purchase,(string)Str::uuid(),'receiving_photo',\n            UploadedFile::fake()->createWithContent('receiving.png',base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLJ5QAAAABJRU5ErkJggg==')));
+        $files->attach($receiver,$c->id,$hall->id,$purchase,(string)Str::uuid(),'receiving_photo',
+            UploadedFile::fake()->createWithContent('receiving.png',base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLJ5QAAAABJRU5ErkJggg==')));
         $this->be($approver);
         app(HallInventoryPurchaseReceivingReviewService::class)->attest(
             $approver,$c->id,$hall->id,$receipt,(string)Str::uuid(),
