@@ -526,11 +526,11 @@
                         <h3 class="font-semibold">Borrowing requests and source dispatch status</h3>
                         <button type="button" wire:click="reloadLoanHistory" class="rounded-lg border px-3 py-2 text-sm">Refresh requests</button>
                     </div>
-                    <p class="text-xs text-gray-600 dark:text-gray-300">A source-dispatched request means stock left the lending hall, NOT that the receiving hall confirmed delivery. Drafts have not moved stock. Neither state proves payment, return or completion. Up to 20 requests in the selected hall are shown.</p>
+                    <p class="text-xs text-gray-600 dark:text-gray-300">A source-dispatched request means owned stock left the lending hall. Destination received means independent borrowed custody has been recorded, NOT that items were returned. Drafts have not moved stock. No status proves payment or loan completion. Up to 20 requests in the selected hall are shown.</p>
                     <div class="space-y-3">
                         @forelse($loanHistory as $loan)
                             <article wire:key="inventory-loan-summary-{{ $loan['id'] }}" class="space-y-2 rounded-lg border p-3 text-sm">
-                                <p class="font-medium">{{ $loan['purpose'] }} — {{ ($loan['viewRole'] ?? 'originating') === 'receiving' ? 'INCOMING REQUEST' : 'OUTGOING REQUEST' }} — {{ ($loan['status'] ?? 'draft_only') === 'source_dispatched_receipt_pending' ? 'SOURCE DISPATCHED / DESTINATION RECEIPT PENDING' : 'DRAFT / NOT DISPATCHED' }}</p>
+                                <p class="font-medium">{{ $loan['purpose'] }} — {{ ($loan['viewRole'] ?? 'originating') === 'receiving' ? 'INCOMING REQUEST' : 'OUTGOING REQUEST' }} — {{ ($loan['status'] ?? 'draft_only') === 'destination_received_return_pending' ? 'DESTINATION RECEIVED / RETURNS PENDING' : (($loan['status'] ?? 'draft_only') === 'source_dispatched_receipt_pending' ? 'SOURCE DISPATCHED / DESTINATION RECEIPT PENDING' : 'DRAFT / NOT DISPATCHED') }}</p>
                                 <p>Reference: {{ $loan['id'] }}. Return expected: {{ $loan['expectedReturnDate'] }}.</p>
                                 <p>Source: {{ $loan['lendingHallName'] ?? $loan['externalPartnerName'] ?? 'Not assigned' }}.
                                    Destination: {{ $loan['borrowingHallName'] ?? $loan['externalPartnerName'] ?? 'Not assigned' }}.</p>
