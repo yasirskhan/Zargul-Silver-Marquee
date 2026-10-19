@@ -157,8 +157,8 @@ final class HallInventoryInternalLoanDispatchService
                     ]);
                     DB::table('hall_inventory_loan_dispatch_lines')->insert([
                         'id'=>(string)Str::uuid(),'company_id'=>$companyId,
-                        'dispatch_id'=>$dispatchId,'item_id'=>$line->item_id,
-                        'movement_id'=>$movementId,'quantity'=>$qty
+                        'dispatch_id'=>$dispatchId,'hall_id'=>$draft->lending_hall_id,
+                        'item_id'=>$line->item_id,'movement_id'=>$movementId,'quantity'=>$qty
                     ]);
                 }
                 DB::table('audit_events')->insert([

@@ -6,10 +6,14 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
     public function up():void {
+        Schema::table('hall_inventory_movement_events',function(Blueprint $t):void {
+            $t->unique(['company_id','hall_id','item_id','id'],'loan_dispatch_movement_scope_key');
+        });
         Schema::create('hall_inventory_loan_dispatches',function(Blueprint $t):void {
             $t->uuid('id')->primary();
             $t->uuid('company_id'); $t->uuid('loan_id');
             $t->unique(['company_id','id'],'loan_dispatch_tenant_id_key');
+            $t->unique(['company_id','id','lending_hall_id'],'loan_dispatch_parent_scope_key');
             $t->uuid('lending_hall_id'); $t->uuid('borrowing_hall_id');
             $t->char('evidence_sha256',64);
             $t->unsignedInteger('evidence_size');
@@ -27,12 +31,14 @@ return new class extends Migration {
         Schema::create('hall_inventory_loan_dispatch_lines',function(Blueprint $t):void {
             $t->uuid('id')->primary();
             $t->uuid('company_id');$t->uuid('dispatch_id');
-            $t->uuid('item_id'); $t->uuid('movement_id');
+            $t->uuid('hall_id'); $t->uuid('item_id'); $t->uuid('movement_id');
             $t->unsignedInteger('quantity');
-            $t->foreign(['company_id','dispatch_id'],'loan_dispatch_line_parent_fk')
-                ->references(['company_id','id'])->on('hall_inventory_loan_dispatches')->restrictOnDelete();
-            $t->foreign('movement_id','loan_dispatch_line_movement_fk')
-                ->references('id')->on('hall_inventory_movement_events')->restrictOnDelete();
+            $t->foreign(['company_id','dispatch_id','hall_id'],'loan_dispatch_line_parent_fk')
+                ->references(['company_id','id','lending_hall_id'])
+                ->on('hall_inventory_loan_dispatches')->restrictOnDelete();
+            $t->foreign(['company_id','hall_id','item_id','movement_id'],'loan_dispatch_line_movement_fk')
+                ->references(['company_id','hall_id','item_id','id'])
+                ->on('hall_inventory_movement_events')->restrictOnDelete();
             $t->unique(['dispatch_id','item_id'],'loan_dispatch_line_unique_item');
             $t->unique('movement_id','loan_dispatch_line_unique_movement');
         });
@@ -46,5 +52,8 @@ return new class extends Migration {
             throw new RuntimeException('Immutable dispatch custody must be archived before rollback.');
         Schema::dropIfExists('hall_inventory_loan_dispatch_lines');
         Schema::dropIfExists('hall_inventory_loan_dispatches');
+        Schema::table('hall_inventory_movement_events',function(Blueprint $t):void {
+            $t->dropUnique('loan_dispatch_movement_scope_key');
+        });
     }
 };
