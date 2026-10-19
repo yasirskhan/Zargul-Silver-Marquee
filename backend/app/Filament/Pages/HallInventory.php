@@ -161,6 +161,21 @@ final class HallInventory extends Page
     public ?string $lastReturnAcceptanceId = null;
 
     #[Locked]
+    public string $incidentLoanId = '';
+    #[Locked]
+    public string $incidentRequestId = '';
+    #[Locked]
+    public array $incidentLines = [];
+    #[Locked]
+    public array $incidentHistory = [];
+    public string $incidentItemId = '';
+    public string $incidentKind = 'damage';
+    public string $incidentQuantity = '';
+    public string $incidentReason = '';
+    #[Locked]
+    public ?string $lastIncidentId = null;
+
+    #[Locked]
     public string $loanInlineRequestId = '';
     public ?string $loanInlineRowKey = null;
     public string $loanInlineName = '';
@@ -314,6 +329,15 @@ final class HallInventory extends Page
         $this->loanReturnDate = '';
         $this->loanPurpose = '';
         $this->lastLoanReference = null;
+        $this->incidentLoanId = '';
+        $this->incidentRequestId = (string) Str::uuid();
+        $this->incidentLines = [];
+        $this->incidentHistory = [];
+        $this->incidentItemId = '';
+        $this->incidentKind = 'damage';
+        $this->incidentQuantity = '';
+        $this->incidentReason = '';
+        $this->lastIncidentId = null;
         $this->returnLoanId = '';
         $this->returnBatchId = (string) Str::uuid();
         $this->returnEligibleLines = [];
@@ -1003,6 +1027,60 @@ final class HallInventory extends Page
         $this->returnConditionGood=[];
         $this->returnConditionDamaged=[];
         $this->returnAcceptanceFile=null;
+        $this->reloadLoanHistory();
+    }
+
+    public function startLoanIncident(string $loanId): void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.loan_incidents_enabled'),403);
+        $hall=Hall::query()->where('company_id',$this->companyId)
+            ->where('id',$this->hallId)->where('is_active',true)->first();
+        abort_unless($hall && app(TenantAccess::class)->canConfigureHall($actor,$hall),403);
+        $loan=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($row):bool=>$row['id']===$loanId &&
+                $row['direction']==='internal' &&
+                $row['lendingHallId']===$this->hallId &&
+                $row['destinationReceiptConfirmed']);
+        abort_unless($loan!==null,403);
+        $this->incidentLoanId=$loanId;
+        $this->incidentRequestId=(string) Str::uuid();
+        $this->incidentLines=$loan['lines'];
+        $this->incidentItemId='';
+        $this->incidentKind='damage';
+        $this->incidentQuantity='';
+        $this->incidentReason='';
+        $this->incidentHistory=app(\App\Services\HallInventoryLoanIncidentService::class)
+            ->history($actor,$this->companyId,$this->hallId,$loanId);
+    }
+
+    public function submitLoanIncident(): void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.loan_incidents_enabled'),403);
+        $this->validate([
+            'incidentItemId'=>'required|uuid',
+            'incidentKind'=>'required|in:damage,missing,dispute',
+            'incidentQuantity'=>'required|integer|min:1|max:100000000',
+            'incidentReason'=>'required|string|min:10|max:500',
+        ]);
+        if(!collect($this->incidentLines)->contains(
+            fn($row):bool=>$row['itemId']===$this->incidentItemId))
+            abort(403);
+        try {
+            $this->lastIncidentId=app(\App\Services\HallInventoryLoanIncidentService::class)
+                ->report($actor,$this->companyId,$this->incidentLoanId,
+                    $this->incidentRequestId,$this->incidentItemId,
+                    $this->incidentKind,(int)$this->incidentQuantity,$this->incidentReason);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['incidentQuantity'=>$e->getMessage()]);
+        }
+        $this->incidentRequestId=(string)Str::uuid();
+        $this->incidentReason='';
+        $this->incidentQuantity='';
+        $this->incidentHistory=app(\App\Services\HallInventoryLoanIncidentService::class)
+            ->history($actor,$this->companyId,$this->hallId,$this->incidentLoanId);
         $this->reloadLoanHistory();
     }
 

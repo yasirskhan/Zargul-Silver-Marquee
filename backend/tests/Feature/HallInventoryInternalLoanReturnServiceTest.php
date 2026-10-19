@@ -239,7 +239,38 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
             ->where('hall_id',$dest->id)->where('item_id',$dstItem)->value('borrowed_transit'));
         $this->assertSame(0,DB::table('finance_journals')->count());
         $this->assertFalse($loanHistory['overdueWithOutstandingCustody']);
-        $this->travelTo(\Illuminate\Support\Carbon::parse('2028-01-02 12:00:00'));
+        $incidentSvc=app(\App\Services\HallInventoryLoanIncidentService::class);
+        $incidentId=(string)Str::uuid();
+        try {
+            $incidentSvc->report($owner,$company->id,$loan,$incidentId,
+                $srcItem,'damage',1,'Physically damaged tray at return.');
+            $this->fail('Unreleased incident recording was allowed.');
+        }catch(ConflictHttpException){}
+        config()->set('inventory_controls.loan_incidents_enabled',true);
+        $this->assertSame($incidentId,$incidentSvc->report(
+            $owner,$company->id,$loan,$incidentId,$srcItem,'damage',1,
+            'Physically damaged tray at return.'));
+        $this->assertSame($incidentId,$incidentSvc->report(
+            $owner,$company->id,$loan,$incidentId,$srcItem,'damage',1,
+            'Physically damaged tray at return.'));
+        try {
+            $incidentSvc->report($owner,$company->id,$loan,(string)Str::uuid(),
+                $srcItem,'damage',2,'Inflated damage count should fail.');
+            $this->fail('Incident inflated damaged quantity.');
+        }catch(ConflictHttpException){}
+        $this->be($receiver);
+        try {
+            $incidentSvc->report($receiver,$company->id,$loan,(string)Str::uuid(),
+                $srcItem,'missing',1,'Unauthorized borrowing manager report.');
+            $this->fail('Borrower issued a source incident.');
+        }catch(AuthorizationException){}
+        $this->be($owner);
+        $history=$incidentSvc->history($owner,$company->id,$src->id,$loan);
+        $this->assertCount(1,$history);
+        $this->assertSame('damage',$history[0]['kind']);
+        $this->assertFalse($history[0]['financiallyResolved']);
+        $this->assertSame(0,DB::table('finance_journals')->count());
+        $this->travelTo(\\Illuminate\\Support\\Carbon::parse('2028-01-02 12:00:00'));
         try {
             $overdueRows=app(\App\Services\HallInventoryLoanDraftReview::class)
                 ->recent($owner,$company->id,$src->id);

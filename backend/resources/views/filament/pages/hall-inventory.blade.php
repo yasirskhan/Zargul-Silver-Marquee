@@ -532,6 +532,9 @@
                             <article wire:key="inventory-loan-summary-{{ $loan['id'] }}" class="space-y-2 rounded-lg border p-3 text-sm">
                                 <p class="font-medium">{{ $loan['purpose'] }} — {{ ($loan['viewRole'] ?? 'originating') === 'receiving' ? 'INCOMING REQUEST' : 'OUTGOING REQUEST' }} — {{ ($loan['status'] ?? 'draft_only') === 'return_acknowledged_outstanding_reconciliation_required' ? 'RETURN ACKNOWLEDGED / OUTSTANDING RECONCILIATION REQUIRED' : (($loan['status'] ?? 'draft_only') === 'partial_return_in_transit_source_ack_pending' ? 'PARTIAL RETURN SENT / SOURCE ACK PENDING' : (($loan['status'] ?? 'draft_only') === 'destination_received_return_pending' ? 'DESTINATION RECEIVED / RETURNS PENDING' : (($loan['status'] ?? 'draft_only') === 'source_dispatched_receipt_pending' ? 'SOURCE DISPATCHED / DESTINATION RECEIPT PENDING' : 'DRAFT / NOT DISPATCHED'))) }}</p>
                                 <p>Reference: {{ $loan['id'] }}. Return expected: {{ $loan['expectedReturnDate'] }}.</p>
+                                @if(config('inventory_controls.loan_incidents_enabled') && $loan['direction'] === 'internal' && $loan['lendingHallId'] === $hallId && $loan['destinationReceiptConfirmed'])
+                                    <button type="button" wire:click="startLoanIncident('{{ $loan['id'] }}')" class="rounded-lg border px-3 py-2 text-sm">Review damage, missing or disputed items</button>
+                                @endif
                                 @if($loan['overdueWithOutstandingCustody'] ?? false)
                                     <p role="status" class="font-semibold text-amber-700 dark:text-amber-300">OVERDUE: dispatched inventory remains outstanding. Physical reconciliation required; no fee or loss has been assessed.</p>
                                 @endif
@@ -579,6 +582,44 @@
                         @endforelse
                     </div>
                 </div>
+                @if(config('inventory_controls.loan_incidents_enabled') && $incidentLoanId !== '')
+                    <section class="space-y-3 rounded-xl border p-4" aria-label="Record inventory loan incident">
+                        <h3 class="font-semibold">Independent incident report</h3>
+                        <p class="text-sm">Evidence only. Reports do not assess charges, settle damage, transfer inventory or close the loan.</p>
+                        <p>Loan: {{ $incidentLoanId }}</p>
+                        <label class="block">Source item
+                            <select wire:model="incidentItemId" class="w-full rounded-lg border p-2 text-gray-900">
+                                <option value="">Choose loan item</option>
+                                @foreach($incidentLines as $line)
+                                    <option value="{{ $line['itemId'] }}">{{ $line['name'] }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        <label class="block">Incident type
+                            <select wire:model="incidentKind" class="w-full rounded-lg border p-2 text-gray-900">
+                                <option value="damage">Damaged</option>
+                                <option value="missing">Missing / outstanding</option>
+                                <option value="dispute">Disputed custody</option>
+                            </select>
+                        </label>
+                        <label class="block">Affected quantity
+                            <input wire:model="incidentQuantity" type="number" min="1" class="w-full rounded-lg border p-2 text-gray-900">
+                        </label>
+                        <label class="block">Incident explanation (10 to 500 characters)
+                            <textarea wire:model="incidentReason" class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                        </label>
+                        @error('incidentQuantity') <p role="alert">{{ $message }}</p> @enderror
+                        @error('incidentReason') <p role="alert">{{ $message }}</p> @enderror
+                        <button type="button" wire:click="submitLoanIncident" class="rounded-lg border px-3 py-2">Record immutable incident</button>
+                        @if($lastIncidentId)<p>Recorded incident: {{ $lastIncidentId }}. Financial resolution remains pending.</p>@endif
+                        <h4 class="font-semibold">Existing reports</h4>
+                        @forelse($incidentHistory as $incident)
+                            <p wire:key="incident-{{ $incident['id'] }}">{{ $incident['kind'] }}: {{ $incident['quantity'] }} units, {{ $incident['reason'] }} (report {{ $incident['id'] }})</p>
+                        @empty
+                            <p>No incident reports recorded.</p>
+                        @endforelse
+                    </section>
+                @endif
                 @if(config('inventory_controls.loan_receipt_enabled') &&
                     config('inventory_controls.loan_dispatch_enabled') && $loanReceiptLoanId !== '')
                     <section class="space-y-3 rounded-xl border p-4" aria-label="Confirm independent internal loan arrival">
