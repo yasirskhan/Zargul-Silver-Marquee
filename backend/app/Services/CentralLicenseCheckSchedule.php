@@ -25,12 +25,22 @@ final class CentralLicenseCheckSchedule
         $state = DB::table('central_license_check_state')->where('singleton_id', 1)->first();
         if ($manual) return true; // Manual Verify bypasses 15-day routine cadence, not separate UI rate limiting.
         $now = $now->setTimezone(new DateTimeZone('UTC'));
-        if ($state?->next_retry_at &&
-            $now < new DateTimeImmutable($state->next_retry_at)) return false;
         $last = $state?->last_online_verified_at
             ? new DateTimeImmutable($state->last_online_verified_at) : null;
-        // A clock rollback must not postpone a central check for months/years.
-        if ($last !== null && $now < $last->modify('-5 minutes')) return true;
+        $rollback = $last !== null && $now < $last->modify('-5 minutes');
+        if ($rollback) {
+            $lastAttempt = $state?->last_attempted_at
+                ? new DateTimeImmutable($state->last_attempted_at) : null;
+            // The FIRST newly detected rollback needs a prompt verification,
+            // even if an old future outage retry is still recorded. Once a
+            // retry was attempted in the rolled-back clock window, honor the
+            // bounded backoff instead of hammering central every job run.
+            if ($lastAttempt === null ||
+                $lastAttempt >= $last->modify('-5 minutes')) return true;
+        }
+        if ($state?->next_retry_at &&
+            $now < new DateTimeImmutable($state->next_retry_at)) return false;
+        if ($rollback) return true;
         return $now >= $this->policy->nextCentralVerification($last, $now);
     }
 

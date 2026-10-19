@@ -47,6 +47,23 @@ class CentralLicenseCheckScheduleTest extends TestCase
 
     }
 
+    public function test_clock_rollback_still_honors_backoff_after_first_forced_check(): void
+    {
+        config()->set('central_control.activation_enabled',true);
+        app(CentralInstallationIdentity::class)->initialize();
+        $service=app(CentralLicenseCheckSchedule::class);
+        $service->recordVerifiedSuccess(new DateTimeImmutable('2026-10-01T00:00:00Z'));
+        $service->recordFailure(new DateTimeImmutable('2026-10-16T00:00:00Z'),'network');
+        $rolledBack=new DateTimeImmutable('2026-09-30T00:00:00Z');
+        $this->assertTrue($service->isDue($rolledBack),
+            'First rollback bypasses a stale future retry.');
+        $service->recordFailure($rolledBack,'network');
+        $this->assertFalse($service->isDue($rolledBack->modify('+30 seconds')),
+            'Repeated rollback must not bypass retry backoff.');
+        $this->assertTrue($service->isDue($rolledBack->modify('+2 minutes')),
+            'Due check resumes after bounded retry interval.');
+    }
+
     public function test_disabled_installation_never_checks_or_mutates_tracking_state(): void
     {
         config()->set('central_control.activation_enabled', false);
