@@ -155,6 +155,20 @@ try {
         invoiceIssueAssert($e->getCode()==='P0001',
             'immutable plan deletion refusal preserves invoice evidence');
     }
+    // A revised quote is a new version with its own stable identifier,
+    // never a silent change to the previously issued plan.
+    $nextVersion=invoiceIssueUuid();
+    $db->prepare("INSERT INTO central_vendor_plan_versions
+        (id,plan_code,version,term_months,currency,price_minor,entitlements_snapshot)
+        VALUES(:id,'issuer_test_6',2,6,'USD',13000,:features)")
+        ->execute(['id'=>$nextVersion,'features'=>json_encode([
+            'max_halls'=>3,'max_staff'=>15,'features'=>['booking'=>true],
+        ],JSON_THROW_ON_ERROR)]);
+    $oldPrice=$db->prepare(
+        'SELECT price_minor FROM central_vendor_plan_versions WHERE id=:plan');
+    $oldPrice->execute(['plan'=>$planSix]);
+    invoiceIssueAssert((int)$oldPrice->fetchColumn()===12500,
+        'append-only new plan version does not retroactively alter old quote');
     $first=$on->issue($billBearer,$customer,$planSix,$bank,$request);
     invoiceIssueAssert($first['currency']==='USD'&&$first['total_minor']==='12500'
         &&$first['term_months']===6&&$first['status']==='issued'
