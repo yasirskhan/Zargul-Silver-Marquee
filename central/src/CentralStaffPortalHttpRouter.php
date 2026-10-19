@@ -204,7 +204,7 @@ final class CentralStaffPortalHttpRouter
                 $fields['price_minor'],(int)$fields['max_halls'],
                 (int)$fields['max_staff'],$features);
             return ['kind'=>'private_vendor_plan_published_html',
-                'html'=>CentralStaffVendorPlanCatalogRenderer::receipt($result)];
+                'html'=>CentralStaffVendorPlanCatalogRenderer::receipt($result,$csrfHeader)];
         }
         if ($uri==='/staff/billing/overview') {
             if (!$this->exactFields($fields,['customer_id','invoice_id']) ||

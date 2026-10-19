@@ -61,11 +61,15 @@ final class CentralStaffVendorPlanCatalogRenderer
             '<label>Feature flags JSON <textarea name="features_json" maxlength="2048" '.
             'required>{"booking":true}</textarea></label>'.
             '<button type="submit">Publish next plan version</button>'.
-            '</form>'.$history.'</section>';
+            '</form>'.$history.
+            '<form method="post" action="/staff/home">'.
+            '<input type="hidden" name="staff_csrf" value="'.$safe.'">'.
+            '<button type="submit">Back to staff home</button></form>'.
+            '</section>';
     }
 
     /** @param array<string,mixed> $row */
-    public static function receipt(array $row):string
+    public static function receipt(array $row,?string $csrf=null):string
     {
         $expected=['currency','plan_version_id','price_minor','term_months','version'];
         $actual=array_keys($row);sort($actual,SORT_STRING);
@@ -82,6 +86,12 @@ final class CentralStaffVendorPlanCatalogRenderer
             throw new RegistrationError('invalid_vendor_plan_response');
         }
         $e=static fn(string $s):string=>htmlspecialchars($s,ENT_QUOTES,'UTF-8');
+        if($csrf!==null && preg_match('/^[a-f0-9]{64}$/D',$csrf)!==1) {
+            throw new RegistrationError('invalid_vendor_plan_response');
+        }
+        $home=$csrf===null?'':'<form method="post" action="/staff/home">'.
+            '<input type="hidden" name="staff_csrf" value="'.$e($csrf).'">'.
+            '<button type="submit">Back to staff home</button></form>';
         return '<section aria-label="Private HAFZATECH plan publication receipt">'.
             '<h2>Plan version published</h2>'.
             '<p>Version '.$row['version'].' / '.$row['term_months'].' months</p>'.
@@ -89,6 +99,6 @@ final class CentralStaffVendorPlanCatalogRenderer
             '<p>Price '.$e($row['currency']).' '.$e($row['price_minor']).
             ' minor units</p>'.
             '<p>This does not invoice customers, verify funds, change existing '.
-            'paid entitlements or sign license grants.</p></section>';
+            'paid entitlements or sign license grants.</p>'.$home.'</section>';
     }
 }

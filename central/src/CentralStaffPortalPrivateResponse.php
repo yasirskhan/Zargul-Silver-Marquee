@@ -238,7 +238,11 @@ final class CentralStaffPortalPrivateResponse
                 '<meta name="staff-csrf-token" content="'.$creds['csrf'].'">'.
                 '</head><body><main><h1>HAFZATECH staff</h1>'.
                 '<p>Authenticated. Private staff functions require separate '.
-                'current role and customer authorization.</p></main></body></html>';
+                'current role and customer authorization.</p>'.
+                '<form method="post" action="/staff/home">'.
+                '<input type="hidden" name="staff_csrf" value="'.$creds['csrf'].'">'.
+                '<button type="submit">Open Central Control Center</button>'.
+                '</form></main></body></html>';
             return ['status'=>200,'headers'=>$headers,'cookies'=>[[
                 'name'=>CentralStaffHttpPolicy::COOKIE_NAME,
                 'value'=>$creds['cookie_value'],

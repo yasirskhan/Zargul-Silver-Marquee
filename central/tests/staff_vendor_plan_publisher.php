@@ -292,6 +292,24 @@ try {
     }finally{
         putenv('CENTRAL_VENDOR_PLAN_PUBLISH_ENABLED=true');
     }
+    $loginResponse=(new Hafzatech\Central\CentralStaffPortalPrivateResponse(true))
+        ->compose(['kind'=>'internal_login','credentials'=>[
+            'cookie_name'=>Hafzatech\Central\CentralStaffHttpPolicy::COOKIE_NAME,
+            'cookie_value'=>$writerSession,
+            'cookie_options'=>Hafzatech\Central\CentralStaffHttpPolicy::cookieOptions(time()),
+            'csrf'=>$writerCsrf,
+        ]]);
+    planAssert($loginResponse['status']===200 &&
+        count($loginResponse['cookies'])===1 &&
+        $loginResponse['cookies'][0]['options']['httponly']===true &&
+        str_contains($loginResponse['body'],'action="/staff/home"') &&
+        str_contains($loginResponse['body'],'name="staff_csrf"') &&
+        !str_contains($loginResponse['body'],$writerSession),
+        'successful MFA login offers POST navigation without exposing bearer');
+    planAssert(str_contains($form['html'],'action="/staff/home"') &&
+        str_contains($published['html'],'action="/staff/home"') &&
+        !str_contains($published['html'],$writerSession),
+        'Plan Administrator form and receipt return safely to staff home');
     $db->prepare("UPDATE central_staff_role_grants SET revoked_at=now()
         WHERE staff_id=:staff")->execute(['staff'=>$writer]);
     planDeny(fn()=>$homeRouter->dispatch(
