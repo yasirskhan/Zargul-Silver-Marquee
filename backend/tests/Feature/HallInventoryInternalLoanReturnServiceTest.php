@@ -101,6 +101,12 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
             $this->fail('Destination-only manager could read lender return review.');
         }catch(AuthorizationException){}
         $this->be($owner);
+        // An independent loan reusing the same catalog item must not
+        // multiply or leak this return batch's line snapshots.
+        app(HallInventoryLoanDraftService::class)->create($owner,$company->id,
+            (string)Str::uuid(),'internal',$src->id,$dest->id,
+            [['itemId'=>$srcItem,'quantity'=>2]],'2027-11-20',
+            'Another loan with matching catalog item');
         $sourceBatches=$read->sourceBatches($owner,$company->id,$src->id);
         $this->assertCount(1,$sourceBatches);
         $this->assertSame('IN_TRANSIT_SOURCE_ACK_PENDING',$sourceBatches[0]['state']);
