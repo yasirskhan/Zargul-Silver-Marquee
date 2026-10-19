@@ -48,30 +48,40 @@ final class CentralStaffEnrollmentEvidenceService
         }
         $this->db->beginTransaction();
         try {
-            $actor=$this->db->prepare(
-                'SELECT id FROM central_staff_users WHERE id=:id FOR UPDATE');
-            $actor->execute(['id'=>$reviewer]);
-            if($actor->fetchColumn()!==$reviewer) {
+            // Challenge journal rows are immutable. Resolve issuer/target
+            // before acquiring staff locks, then lock both administrators in
+            // deterministic order. A concurrent role revocation must not
+            // turn a previously checked role into an accepted audit receipt.
+            $identity=$this->db->prepare(
+                'SELECT target_staff_id,issued_by_staff_id
+                 FROM central_staff_enrollment_challenges WHERE id=:id');
+            $identity->execute(['id'=>$challengeId]);
+            $identities=$identity->fetch(PDO::FETCH_ASSOC);
+            if(!$identities) {
+                throw new RegistrationError('staff_enrollment_evidence_unavailable',404);
+            }
+            $target=$identities['target_staff_id'];
+            $issuer=$identities['issued_by_staff_id'];
+            if($reviewer===$target || $reviewer===$issuer) {
                 throw new RegistrationError('staff_enrollment_evidence_denied');
             }
+            $authorizers=[$reviewer,$issuer];
+            sort($authorizers,SORT_STRING);
+            $lockStaff=$this->db->prepare(
+                'SELECT id FROM central_staff_users WHERE id=:id FOR UPDATE');
             $grants=$this->db->prepare(
                 'SELECT id FROM central_staff_role_grants
                  WHERE staff_id=:id AND revoked_at IS NULL ORDER BY id FOR SHARE');
-            $grants->execute(['id'=>$reviewer]);
-            $grants->fetchAll(PDO::FETCH_ASSOC);
-            if(!$this->access->permits($reviewer,'staff.create',null,true)) {
-                throw new RegistrationError('staff_enrollment_evidence_denied');
-            }
-            $targetLookup=$this->db->prepare(
-                'SELECT target_staff_id FROM central_staff_enrollment_challenges
-                 WHERE id=:id');
-            $targetLookup->execute(['id'=>$challengeId]);
-            $target=$targetLookup->fetchColumn();
-            if(!is_string($target)) {
-                throw new RegistrationError('staff_enrollment_evidence_unavailable',404);
-            }
-            if($reviewer===$target) {
-                throw new RegistrationError('staff_enrollment_evidence_denied');
+            foreach($authorizers as $staffId) {
+                $lockStaff->execute(['id'=>$staffId]);
+                if($lockStaff->fetchColumn()!==$staffId) {
+                    throw new RegistrationError('staff_enrollment_evidence_denied');
+                }
+                $grants->execute(['id'=>$staffId]);
+                $grants->fetchAll(PDO::FETCH_ASSOC);
+                if(!$this->access->permits($staffId,'staff.create',null,true)) {
+                    throw new RegistrationError('staff_enrollment_evidence_denied');
+                }
             }
             $targetLock=$this->db->prepare(
                 "SELECT u.email FROM central_staff_users u
@@ -93,9 +103,7 @@ final class CentralStaffEnrollmentEvidenceService
             $claim=$challenge->fetch(PDO::FETCH_ASSOC);
             if(!$claim ||
                $claim['target_staff_id']!==$target ||
-               $claim['issued_by_staff_id']===$reviewer ||
-               !$this->access->permits(
-                    $claim['issued_by_staff_id'],'staff.create',null,true)) {
+               $claim['issued_by_staff_id']!==$issuer) {
                 throw new RegistrationError('staff_enrollment_evidence_denied');
             }
             if(!hash_equals($claim['email_sha256'],hash('sha256',$email)) ||
