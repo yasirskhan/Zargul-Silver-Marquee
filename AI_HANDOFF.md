@@ -272,3 +272,8 @@ Verify live branch/CI → reconcile current handoff + specific requirement/featu
 ## Phase 12 purchased-stock test CI recovery
 - First published claim source `3d30a276` [CI 39268321434](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39268321434) FAILED Laravel suite (five other jobs passed). The intentional immutable-write rejection in the new regression was caught without a nested rollback, poisoning the RefreshDatabase PostgreSQL transaction; later insert reported SQLSTATE 25P02. This is a fixture transaction-scope bug, not permission or schema relaxation.
 - Successor isolates that expected failure inside a PostgreSQL savepoint and needs exact six-job hosted CI. BUG-20261019-006 records reproduction and fix. Inventory purchases stay release OFF; next independent physical receiving + revision-controlled posting + Filament UI remains unfinished.
+
+
+## Prepared successor: purchase claim history (detached until predecessor green)
+- Adds HallInventoryPurchaseReview and scoped PostgreSQL read test with OFF gate, strict hall authorization, unverified claim label and no stock/payment assertions. This is deliberately NOT an accepted physical receipt or financial invoice.
+- Publish only after predecessor `e937c9a1` all-six CI green and live branch matches expected SHA. Then run new exact six jobs and continue independent receiving.
