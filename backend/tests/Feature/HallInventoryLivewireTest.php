@@ -196,10 +196,14 @@ class HallInventoryLivewireTest extends TestCase
             ],'Witnessed opening chairs count'
         );
         $request=(string)\Illuminate\Support\Str::uuid();
-        app(\App\Services\HallInventoryOpeningStockService::class)->request(
-            $manager,$company->id,$hall->id,$item,$take,
-            $request,50,'Chairs present at opening'
-        );
+        Livewire::test(HallInventory::class)
+            ->set('openingItemId',$item)
+            ->set('openingStocktakeId',$take)
+            ->set('openingQuantity','50')
+            ->set('openingReason','Chairs present at opening')
+            ->call('submitOpeningRequest')->assertHasNoErrors()
+            ->assertSee('Opening evidence request saved:');
+        $request=DB::table('hall_inventory_opening_requests')->value('id');
         Livewire::test(HallInventory::class)
             ->assertSee('Opening stock: independent review')
             ->assertSee('Wedding Chairs')
@@ -212,9 +216,10 @@ class HallInventoryLivewireTest extends TestCase
         CompanyMembership::create(['company_id'=>$company->id,
             'user_id'=>$owner->id,'role'=>'owner']);
         $this->be($owner);
-        app(\App\Services\HallInventoryOpeningStockService::class)->accept(
-            $owner,$company->id,$hall->id,$request
-        );
+        Livewire::test(HallInventory::class)
+            ->assertSee('Accept verified opening stock')
+            ->call('acceptOpeningRequest',$request)->assertHasNoErrors()
+            ->assertSee('ACCEPTED / BOOKED');
         $this->be($manager);
         Livewire::test(HallInventory::class)
             ->assertSee('ACCEPTED / BOOKED')

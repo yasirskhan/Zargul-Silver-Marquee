@@ -61,6 +61,37 @@
                     A different authorized owner/admin must accept its evidence;
                     no invoice, purchase or payment is created here.
                 </p>
+                <form wire:submit="submitOpeningRequest" class="space-y-3 rounded-lg border p-3">
+                    <h3 class="font-semibold">Request independent verification of opening stock</h3>
+                    <p class="text-xs">First record an OWNED, zero-damage opening physical count for the same hall.
+                        This request cannot post stock until a different authorized owner/admin accepts.</p>
+                    <label class="block space-y-1"><span class="text-sm">Catalog item</span>
+                        <select wire:model="openingItemId" class="w-full rounded-lg border p-2 text-gray-900">
+                            <option value="">Choose item</option>
+                            @foreach($catalog as $item)
+                                <option value="{{ $item['id'] }}">{{ $item['name'] }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label class="block space-y-1"><span class="text-sm">Opening physical count reference (UUID)</span>
+                        <input wire:model="openingStocktakeId" type="text" maxlength="36"
+                            class="w-full rounded-lg border p-2 text-gray-900" required>
+                    </label>
+                    <label class="block space-y-1"><span class="text-sm">Good-condition item quantity</span>
+                        <input wire:model="openingQuantity" type="text" pattern="[1-9][0-9]*"
+                            class="w-full rounded-lg border p-2 text-gray-900" required>
+                    </label>
+                    <label class="block space-y-1"><span class="text-sm">Reason and evidence notes</span>
+                        <input wire:model="openingReason" type="text" maxlength="500"
+                            class="w-full rounded-lg border p-2 text-gray-900" required>
+                    </label>
+                    <button type="submit" class="rounded-lg border px-3 py-2 text-sm">
+                        Request separate approval (no stock posted)
+                    </button>
+                </form>
+                @if($lastOpeningReference !== null)
+                    <p class="text-sm">Opening evidence request saved: {{ $lastOpeningReference }}</p>
+                @endif
                 <div class="space-y-3">
                     @forelse($openingHistory as $opening)
                         <article class="rounded-lg border p-3" wire:key="opening-evidence-{{ $opening['id'] }}">
@@ -72,6 +103,12 @@
                                 <p class="text-xs">Immutable movement: {{ $opening['movementId'] }}</p>
                             @else
                                 <p class="text-xs font-semibold">PENDING: no owned quantity has been posted.</p>
+                                @if($this->canApproveOpening() && $opening['requestedBy'] !== (int) auth()->id())
+                                    <button type="button" wire:click="acceptOpeningRequest('{{ $opening['id'] }}')"
+                                        class="rounded-lg border px-3 py-2 text-sm">
+                                        Accept verified opening stock
+                                    </button>
+                                @endif
                             @endif
                             <p class="text-xs">Financial posting: NONE</p>
                         </article>

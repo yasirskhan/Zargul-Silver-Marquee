@@ -60,6 +60,15 @@ final class HallInventory extends Page
     public array $loanHistory = [];
     #[Locked]
     public array $openingHistory = [];
+    #[Locked]
+    public string $openingRequestId = '';
+    #[Locked]
+    public ?string $lastOpeningReference = null;
+
+    public string $openingItemId = '';
+    public string $openingStocktakeId = '';
+    public string $openingQuantity = '';
+    public string $openingReason = '';
 
     public string $loanDirection = 'internal';
     public string $loanCounterpartHallId = '';
@@ -175,6 +184,7 @@ final class HallInventory extends Page
         $this->countRequestId = (string) Str::uuid();
         $this->loanRequestId = (string) Str::uuid();
         $this->loanInlineRequestId = (string) Str::uuid();
+        $this->openingRequestId = (string) Str::uuid();
         $this->reloadCatalog();
     }
 
@@ -226,6 +236,13 @@ final class HallInventory extends Page
         $this->loanInlineUnit = 'piece';
         $this->loanInlineMinimumQuantity = '0';
         $this->loanInlineRequestId = (string) Str::uuid();
+        $this->openingItemId = '';
+        $this->openingStocktakeId = '';
+        $this->openingQuantity = '';
+        $this->openingReason = '';
+        $this->lastOpeningReference = null;
+        $this->openingHistory = [];
+        $this->openingRequestId = (string) Str::uuid();
         $this->createRequestId = (string) Str::uuid();
         $this->countRequestId = (string) Str::uuid();
         $this->loanRequestId = (string) Str::uuid();
@@ -240,6 +257,67 @@ final class HallInventory extends Page
         }
         $this->stocktakeHistory = app(\App\Services\HallInventoryStocktakeReview::class)
             ->recent($actor, $this->companyId, $this->hallId);
+    }
+
+    public function canApproveOpening(): bool
+    {
+        $actor = Filament::auth()->user();
+        if (! config('inventory_controls.opening_stock_posting_enabled')
+            || ! $actor instanceof User || $this->companyId === null
+            || $this->hallId === null || ! static::canAccess()
+            || ! array_key_exists($this->hallId,$this->hallOptions())) {
+            return false;
+        }
+        $hall = Hall::query()->where('company_id',$this->companyId)
+            ->where('id',$this->hallId)->where('is_active',true)->first();
+        return $hall !== null &&
+            app(TenantAccess::class)->canConfigureHall($actor,$hall);
+    }
+
+    public function submitOpeningRequest(): void
+    {
+        $actor = $this->authorizeSelection();
+        abort_unless(config('inventory_controls.opening_stock_posting_enabled'),403);
+        $this->validate([
+            'openingItemId'=>'required|uuid',
+            'openingStocktakeId'=>'required|uuid',
+            'openingQuantity'=>['required','regex:/\\A[1-9][0-9]{0,8}\\z/D'],
+            'openingReason'=>'required|string|min:5|max:500',
+        ]);
+        try {
+            $this->lastOpeningReference=app(\App\Services\HallInventoryOpeningStockService::class)
+                ->request($actor,$this->companyId,$this->hallId,
+                    $this->openingItemId,$this->openingStocktakeId,
+                    $this->openingRequestId,(int)$this->openingQuantity,
+                    $this->openingReason);
+        }catch(InvalidArgumentException|ConflictHttpException $e){
+            throw ValidationException::withMessages([
+                'openingItemId'=>$e->getMessage(),
+            ]);
+        }
+        $this->openingRequestId=(string)Str::uuid();
+        $this->openingItemId='';
+        $this->openingStocktakeId='';
+        $this->openingQuantity='';
+        $this->openingReason='';
+        $this->reloadOpeningHistory();
+    }
+
+    public function acceptOpeningRequest(string $requestId): void
+    {
+        $actor = $this->authorizeSelection();
+        abort_unless($this->canApproveOpening() &&
+            config('inventory_controls.opening_stock_posting_enabled') &&
+            Str::isUuid($requestId),403);
+        try {
+            app(\App\Services\HallInventoryOpeningStockService::class)
+                ->accept($actor,$this->companyId,$this->hallId,$requestId);
+        }catch(InvalidArgumentException|ConflictHttpException $e){
+            throw ValidationException::withMessages([
+                'openingHistory'=>$e->getMessage(),
+            ]);
+        }
+        $this->reloadOpeningHistory();
     }
 
     public function reloadOpeningHistory(): void
