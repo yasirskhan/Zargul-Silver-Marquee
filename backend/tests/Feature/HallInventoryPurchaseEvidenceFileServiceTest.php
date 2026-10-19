@@ -74,6 +74,20 @@ class HallInventoryPurchaseEvidenceFileServiceTest extends TestCase {
                 UploadedFile::fake()->createWithContent('different.pdf','%PDF-1.5\nchanged'));
             $this->fail('Different bytes reused evidence key.');
         }catch(ConflictHttpException){}
+        // Independent owner may inspect only integrity-checked metadata.
+        $this->assertTrue($service->verify($requester,$company->id,$hall->id,
+            $purchase,$id)['bytesIntact']);
+        try {
+            $service->verify($requester,$company->id,$other->id,$purchase,$id);
+            $this->fail('Foreign hall private evidence readable.');
+        } catch(ConflictHttpException) {}
+        $this->be($receiver);
+        Storage::disk('local')->put($row->storage_path,'tampered bytes');
+        try {
+            $service->verify($receiver,$company->id,$hall->id,$purchase,$id);
+            $this->fail('Tampered retained bytes verified.');
+        } catch(ConflictHttpException) {}
+        $this->be($requester);
         $this->assertSame(0,DB::table('hall_inventory_positions')->count());
         $this->assertSame(0,DB::table('hall_inventory_movement_events')->count());
         $this->assertSame(0,DB::table('finance_journals')->count());

@@ -97,4 +97,46 @@ final class HallInventoryPurchaseEvidenceFileService
             return $fileId;
         },3);
     }
+    /**
+     * Reviewer-facing integrity check. Returns metadata, never a public URL or
+     * raw bytes. A passing hash proves retained bytes match their upload only.
+     */
+    public function verify(User $reviewer,string $companyId,string $hallId,
+        string $purchaseId,string $fileId):array
+    {
+        if (!config('inventory_controls.purchase_receipts_enabled') ||
+            !config('inventory_controls.purchase_evidence_upload_enabled'))
+            throw new ConflictHttpException('Private purchase evidence is disabled.');
+        if (!Str::isUuid($companyId)||!Str::isUuid($hallId)||
+            !Str::isUuid($purchaseId)||!Str::isUuid($fileId))
+            throw new InvalidArgumentException('Invalid evidence lookup scope.');
+        $hall=Hall::query()->where('company_id',$companyId)->where('id',$hallId)
+            ->where('is_active',true)->first();
+        if (!$hall || !Auth::check() || (int)Auth::id()!==(int)$reviewer->getKey() ||
+            !$this->access->canConfigureHall($reviewer,$hall))
+            throw new AuthorizationException('Private evidence verification denied.');
+        $row=DB::table('hall_inventory_purchase_evidence_files')
+            ->where('company_id',$companyId)->where('hall_id',$hallId)
+            ->where('purchase_request_id',$purchaseId)->where('id',$fileId)->first();
+        if (!$row)throw new ConflictHttpException('Scoped private evidence not found.');
+        $disk=Storage::disk('local');
+        if (!$disk->exists($row->storage_path))
+            throw new ConflictHttpException('Private evidence missing; do not accept stock.');
+        $bytes=$disk->get($row->storage_path);
+        if (!is_string($bytes) || strlen($bytes)!==(int)$row->size_bytes ||
+            !hash_equals((string)$row->sha256,hash('sha256',$bytes)))
+            throw new ConflictHttpException('Private evidence integrity failure; do not accept stock.');
+        return [
+            'id'=>(string)$row->id,
+            'kind'=>(string)$row->evidence_kind,
+            'sha256'=>(string)$row->sha256,
+            'sizeBytes'=>(int)$row->size_bytes,
+            'bytesIntact'=>true,
+            'supplierAuthenticityVerified'=>false,
+            'physicalReceiptVerified'=>false,
+            'paymentVerified'=>false,
+            'stockPosted'=>false,
+        ];
+    }
+
 }
