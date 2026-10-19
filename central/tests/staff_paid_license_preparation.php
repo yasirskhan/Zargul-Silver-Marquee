@@ -417,6 +417,63 @@ paidSessionAssert(str_contains($billingDashboard['html'],'Billing Officer') &&
  !str_contains($billingDashboard['html'],'action="/staff/licenses/pending"') &&
  !str_contains($billingDashboard['html'],'<h2>License Officer</h2>'),
  'current Billing Officer sees only billing module and no license signing');
+// Protected INTERNAL vendor invoice issue operation. It uses the same MFA
+// session cookie, two-secret CSRF and same-origin boundary as every operator
+// mutation. Even when an invoice is issued, no money or signed license moves.
+$invoiceIssuer=new \Hafzatech\Central\CentralStaffVendorInvoiceIssuer(
+ $db,$sessions,$queueAuth,true);
+$invoiceRouter=new \Hafzatech\Central\CentralStaffPortalHttpRouter(
+ $queueBoundary,$unusedBilling,true,invoiceIssuer:$invoiceIssuer);
+$invoiceHttp=$queueRequest;
+$invoiceHttp['REQUEST_URI']='/staff/billing/invoices/issue';
+$invoiceFields=['customer_id'=>$company,'plan_version_id'=>$plan,
+ 'receiving_account_id'=>$provider,'request_id'=>paidSessionUuid()];
+putenv('CENTRAL_VENDOR_INVOICE_ISSUANCE_ENABLED=false');
+paidSessionDeny(fn()=>$invoiceRouter->dispatch(
+ $invoiceHttp,$billingCookie,$invoiceFields,$billingCsrf),
+ 'vendor_invoice_issuance_not_enabled');
+putenv('CENTRAL_VENDOR_INVOICE_ISSUANCE_ENABLED=true');
+try {
+ $invoicePage=$invoiceRouter->dispatch(
+  $invoiceHttp,$billingCookie,$invoiceFields,$billingCsrf);
+ paidSessionAssert($invoicePage['kind']==='private_vendor_invoice_issued_html' &&
+  str_contains($invoicePage['html'],'HAFZATECH subscription invoice') &&
+  str_contains($invoicePage['html'],'21000') &&
+  str_contains($invoicePage['html'],'NOT verified payment') &&
+  !str_contains($invoicePage['html'],$billingSession) &&
+  !str_contains($invoicePage['html'],$billingCsrf),
+  'staff issued real fixed-price invoice with safe private receipt only');
+ $invoiceResponse=(new \Hafzatech\Central\CentralStaffPortalPrivateResponse(true))
+  ->compose($invoicePage);
+ paidSessionAssert($invoiceResponse['status']===200 &&
+  $invoiceResponse['cookies']===[] &&
+  $invoiceResponse['headers']['Cache-Control']==='no-store, private',
+  'vendor invoice receipt private, no cookies, no caching');
+ $again=$invoiceRouter->dispatch($invoiceHttp,
+  $billingCookie,$invoiceFields,$billingCsrf);
+ paidSessionAssert($again===$invoicePage,
+  'browser retry reuses original invoice without posting a second one');
+ paidSessionDeny(fn()=>$invoiceRouter->dispatch(
+  $invoiceHttp,$issuerCookie,$invoiceFields,$issuerCsrf),
+  'staff_portal_denied');
+ paidSessionDeny(fn()=>$invoiceRouter->dispatch(
+  $invoiceHttp,$billingCookie,$invoiceFields,str_repeat('0',64)),
+  'staff_portal_denied');
+ paidSessionDeny(fn()=>$invoiceRouter->dispatch(
+  $invoiceHttp,$billingCookie,$invoiceFields+['price_minor'=>1],$billingCsrf),
+  'invalid_vendor_invoice_request');
+ $badInvoiceOrigin=$invoiceHttp;
+ $badInvoiceOrigin['HTTP_ORIGIN']='https://fake.example.test';
+ paidSessionDeny(fn()=>$invoiceRouter->dispatch(
+  $badInvoiceOrigin,$billingCookie,$invoiceFields,$billingCsrf),
+  'staff_portal_denied');
+ paidSessionDeny(fn()=>\Hafzatech\Central\CentralStaffVendorInvoiceReceiptRenderer::render(
+  ['invoice_id'=>paidSessionUuid(),'invoice_number'=>'<script>',
+   'currency'=>'USD','total_minor'=>'1','term_months'=>6,'status'=>'issued']),
+  'invalid_vendor_invoice_receipt');
+}finally{
+ putenv('CENTRAL_VENDOR_INVOICE_ISSUANCE_ENABLED=false');
+}
 $dashboardWire=(new \Hafzatech\Central\CentralStaffPortalPrivateResponse(true))
  ->compose($billingDashboard);
 paidSessionAssert($dashboardWire['cookies']===[] &&
