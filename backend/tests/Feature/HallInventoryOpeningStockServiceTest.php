@@ -148,6 +148,39 @@ class HallInventoryOpeningStockServiceTest extends TestCase
         $this->assertSame(1,DB::table('hall_inventory_movement_events')->count());
     }
 
+    public function test_pending_opening_cannot_post_when_release_switch_is_disabled():void
+    {
+        [$company,$hall,$other,$owner,$admin,$manager,$item]=$this->fixture();
+        $count=$this->openingCount($manager,$company->id,$hall->id,$item,25);
+        config()->set('inventory_controls.opening_stock_posting_enabled',true);
+        $service=app(HallInventoryOpeningStockService::class);
+        $request=(string)Str::uuid();
+        $service->request($manager,$company->id,$hall->id,$item,$count,
+            $request,25,'Verified opening switch test');
+
+        $this->be($owner);
+        config()->set('inventory_controls.opening_stock_posting_enabled',false);
+        try {
+            $service->accept($owner,$company->id,$hall->id,$request);
+            $this->fail('Disabled feature unexpectedly posted a pending opening.');
+        } catch (ConflictHttpException) {
+            $this->assertSame(0,DB::table('hall_inventory_positions')->count());
+            $this->assertSame(0,DB::table('hall_inventory_movement_events')->count());
+            $this->assertSame(0,DB::table('hall_inventory_opening_acceptances')->count());
+            $this->assertSame(0,DB::table('finance_journals')->count());
+        }
+
+        config()->set('inventory_controls.opening_stock_posting_enabled',true);
+        $movement=$service->accept($owner,$company->id,$hall->id,$request);
+        $this->assertSame($movement,$service->accept(
+            $owner,$company->id,$hall->id,$request));
+        $this->assertSame(25,(int)DB::table('hall_inventory_positions')
+            ->value('owned_usable'));
+        $this->assertSame(1,DB::table('hall_inventory_movement_events')->count());
+        $this->assertSame(1,DB::table('hall_inventory_opening_acceptances')->count());
+        $this->assertSame(0,DB::table('finance_journals')->count());
+    }
+
     public function test_owner_who_counted_stock_cannot_self_accept_even_with_owner_role():void
     {
         [$c,$hall,$other,$owner,$admin,$manager,$item]=$this->fixture();
