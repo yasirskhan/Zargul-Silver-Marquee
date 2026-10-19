@@ -169,13 +169,9 @@ class HallInventoryStocktakeServiceTest extends TestCase
         $this->assertTrue($rows[0]['evidenceOnly']);
         $this->assertFalse($rows[0]['adjustmentPosted']);
         $this->assertCount(3,$rows[0]['lines']);
-        $this->assertSame([0,2,3],array_values(array_map(
-            static fn($line)=>$line['damaged'],
-            (function()use($rows) {
-                $values=array_column($rows[0]['lines'],'damaged');sort($values);return array_map(
-                    static fn($n)=>['damaged'=>$n],$values);
-            })()
-        )));
+        $damageCounts=array_column($rows[0]['lines'],'damaged');
+        sort($damageCounts);
+        $this->assertSame([0,2,3],$damageCounts);
         $this->assertSame(0,DB::table('finance_journals')->count());
         $this->expectException(AuthorizationException::class);
         $review->recent($manager,$company->id,$other->id);
