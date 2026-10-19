@@ -21,7 +21,8 @@ final class CentralStaffCustomerDirectory
     /** @return array<int,array{id:string,legal_name:string}> */
     public function search(string $bearer,string $prefix='',int $limit=20):array
     {
-        if(strlen($prefix)>64 || preg_match('/[\x00-\x1F\x7F]/',$prefix)===1 ||
+        if(strlen($prefix)>64 || preg_match('//u',$prefix)!==1 ||
+            preg_match('/[\x00-\x1F\x7F]/',$prefix)===1 ||
             $limit<1 || $limit>20) {
             throw new RegistrationError('invalid_customer_directory_request',422);
         }

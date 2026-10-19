@@ -387,6 +387,8 @@ paidSessionDeny(fn()=>$directory->search(str_repeat('0',64),'Foreign'),
  'staff_session_required');
 paidSessionDeny(fn()=>$directory->search($billingSession,str_repeat('z',65)),
  'invalid_customer_directory_request');
+paidSessionDeny(fn()=>$directory->search($billingSession,"\xC3\x28"),
+ 'invalid_customer_directory_request');
 $escapedName=\Hafzatech\Central\CentralStaffCustomerDirectoryRenderer::html([
  ['id'=>$other,'legal_name'=>'<script>alert(1)</script>']
 ],$foreignCsrf,'<tag>');

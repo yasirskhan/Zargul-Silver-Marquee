@@ -63,3 +63,12 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Reproduction: create `plan_code=issuer_test_6` version 1 price 12500 and version 2 price 13000; original logic offered both and issued fresh version1 invoice.
 - Remedy PREPARED DETACHED: show only maximum version per plan_code, reject fresh obsolete plan while preserving idempotent same-request previously issued invoices, assert original/new prices; never alter paid settlement or signed grants.
 - Status: VERIFIED. Source `39e132ad28da40eb6ab508a60a80ff3bdd824629`, [CI 39195553866](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39195553866) SUCCESS all six hosted jobs. Old request replay and latest-only new invoice selection tested; commercial live release remains OFF.
+
+
+## BUG-20261019-005 — Vendor directory search accepts invalid UTF-8 into PostgreSQL
+- Affected: protected staff customer name directory; CENT-004.
+- Severity: LOW, validation/availability robustness; no observed customer leakage and operator vhost OFF.
+- Source detection: `CentralStaffCustomerDirectory::search` validated byte length and control bytes but did not explicitly check input encoding before passing a bound search prefix to PostgreSQL's UTF-8 string operations. Malformed user input could cause an unhandled database character-sequence error rather than typed 422.
+- Reproduction fixture: submit bytes `C3 28` (invalid UTF-8) in a synthetic MFA billing staff directory search. Expected typed `invalid_customer_directory_request`; original parser would let bytes reach the database.
+- Remedy: validate complete UTF-8 using `preg_match('//u',$prefix)===1` before parameterized query, and add PostgreSQL negative regression. Leave SQL bind, current role rechecks, 20-result bound, MFA, CSRF and default-OFF operator settings unchanged.
+- Status: PREPARED DETACHED. New exact six-job hosted CI required; do not label VERIFIED unless fixed SHA has passed all six.
