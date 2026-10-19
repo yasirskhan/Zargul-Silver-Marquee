@@ -539,12 +539,57 @@
                                         <li>{{ $line['name'] }} — {{ $line['quantity'] }} {{ $line['unit'] }}</li>
                                     @endforeach
                                 </ul>
+                                @if(config('inventory_controls.loan_receipt_enabled') &&
+                                    config('inventory_controls.loan_dispatch_enabled') &&
+                                    ($loan['viewRole'] ?? '') === 'receiving' &&
+                                    ($loan['status'] ?? '') === 'source_dispatched_receipt_pending')
+                                    <button type="button" wire:click="startLoanReceipt('{{ $loan['id'] }}')"
+                                        class="rounded-lg border px-3 py-2 text-sm">Record independent receiving count</button>
+                                @endif
                             </article>
                         @empty
                             <p class="text-sm text-gray-600 dark:text-gray-300">No loan drafts yet for this hall.</p>
                         @endforelse
                     </div>
                 </div>
+                @if(config('inventory_controls.loan_receipt_enabled') &&
+                    config('inventory_controls.loan_dispatch_enabled') && $loanReceiptLoanId !== '')
+                    <section class="space-y-3 rounded-xl border p-4" aria-label="Confirm independent internal loan arrival">
+                        <h3 class="font-semibold">Confirm receiving-hall physical custody</h3>
+                        <p class="text-sm">This records borrowed inventory, not owned purchases or completed returns. Verify each line and attach a physical receiving photograph or PDF.</p>
+                        <p class="text-xs">Internal loan: {{ $loanReceiptLoanId }}</p>
+                        @foreach($loanReceiptLines as $line)
+                            <label class="block space-y-1" wire:key="receive-line-{{ $line['itemId'] }}">
+                                <span class="text-sm">{{ $line['name'] }} — {{ $line['quantity'] }} {{ $line['unit'] }}</span>
+                                <select wire:model="loanReceiptMapping.{{ $line['itemId'] }}"
+                                    class="w-full rounded-lg border p-3 text-gray-900">
+                                    <option value="">Select matching item in receiving hall</option>
+                                    @foreach($catalog as $item)
+                                        @if($item['name']===$line['name'] && $item['unit']===$line['unit'])
+                                            <option value="{{ $item['id'] }}">{{ $item['name'] }} ({{ $item['unit'] }})</option>
+                                        @endif
+                                    @endforeach
+                                </select>
+                            </label>
+                        @endforeach
+                        <label class="block space-y-1">
+                            <span class="text-sm">Independent receiving photograph or PDF (5 MB maximum)</span>
+                            <input type="file" wire:model="loanReceiptFile" accept=".jpg,.jpeg,.png,.pdf"
+                                class="w-full rounded-lg border p-3">
+                        </label>
+                        @error('loanReceiptFile') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                        @error('loanReceiptMapping') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                        <button type="button" wire:click="submitLoanReceipt"
+                            class="rounded-lg bg-emerald-800 px-4 py-2 text-sm font-medium text-white">
+                            Confirm physically received stock
+                        </button>
+                    </section>
+                @endif
+                @if($lastLoanReceiptReference)
+                    <p role="status" class="rounded-lg bg-amber-100 p-3 text-sm text-amber-900">
+                        Receiving custody recorded: {{ $lastLoanReceiptReference }}. Source stock remains on loan until independently returned.
+                    </p>
+                @endif
             </section>
         @endif
     </div>

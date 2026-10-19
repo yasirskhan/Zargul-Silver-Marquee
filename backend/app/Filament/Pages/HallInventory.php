@@ -123,6 +123,17 @@ final class HallInventory extends Page
     public array $loanRows = [];
 
     #[Locked]
+    public string $loanReceiptLoanId = '';
+    #[Locked]
+    public string $loanReceiptRequestId = '';
+    #[Locked]
+    public array $loanReceiptLines = [];
+    public array $loanReceiptMapping = [];
+    public $loanReceiptFile = null;
+    #[Locked]
+    public ?string $lastLoanReceiptReference = null;
+
+    #[Locked]
     public string $loanInlineRequestId = '';
     public ?string $loanInlineRowKey = null;
     public string $loanInlineName = '';
@@ -276,6 +287,12 @@ final class HallInventory extends Page
         $this->loanReturnDate = '';
         $this->loanPurpose = '';
         $this->lastLoanReference = null;
+        $this->loanReceiptLoanId = '';
+        $this->loanReceiptRequestId = (string) Str::uuid();
+        $this->loanReceiptLines = [];
+        $this->loanReceiptMapping = [];
+        $this->loanReceiptFile = null;
+        $this->lastLoanReceiptReference = null;
         $this->loanInlineRowKey = null;
         $this->loanInlineName = '';
         $this->loanInlineCategory = 'Crockery';
@@ -719,6 +736,78 @@ final class HallInventory extends Page
         $this->loanOutsidePhone = '';
         $this->loanOutsideAddress = '';
         $this->loanRequestId = (string) Str::uuid();
+        $this->reloadLoanHistory();
+    }
+
+    public function startLoanReceipt(string $loanId): void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.loan_drafts_enabled') &&
+            config('inventory_controls.loan_dispatch_enabled') &&
+            config('inventory_controls.loan_receipt_enabled'),403);
+        $record=collect(app(\\App\\Services\\HallInventoryLoanDraftReview::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($loan):bool => $loan['id']===$loanId &&
+                ($loan['viewRole']??'')==='receiving' &&
+                ($loan['status']??'')==='source_dispatched_receipt_pending');
+        abort_unless($record!==null,403);
+        $this->loanReceiptLoanId=$loanId;
+        $this->loanReceiptRequestId=(string)Str::uuid();
+        $this->loanReceiptLines=$record['lines'];
+        $this->loanReceiptMapping=[];
+        $this->loanReceiptFile=null;
+        $this->lastLoanReceiptReference=null;
+    }
+
+    public function submitLoanReceipt(): void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.loan_drafts_enabled') &&
+            config('inventory_controls.loan_dispatch_enabled') &&
+            config('inventory_controls.loan_receipt_enabled'),403);
+        $record=collect(app(\\App\\Services\\HallInventoryLoanDraftReview::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($loan):bool => $loan['id']===$this->loanReceiptLoanId &&
+                ($loan['viewRole']??'')==='receiving' &&
+                ($loan['status']??'')==='source_dispatched_receipt_pending');
+        abort_unless($record!==null,403);
+        $this->validate([
+            'loanReceiptFile'=>'required|file|max:5120|mimes:jpg,jpeg,png,pdf',
+            'loanReceiptMapping'=>'required|array',
+        ]);
+        $expected=[];
+        $map=[];
+        $lines=$record['lines'];
+        if(count($lines)<1 || count($this->loanReceiptMapping)!==count($lines))
+            throw ValidationException::withMessages([
+                'loanReceiptMapping'=>'Map every dispatched item to a receiving-hall catalog item.'
+            ]);
+        foreach($lines as $line) {
+            $sourceId=$line['itemId'];
+            $destId=$this->loanReceiptMapping[$sourceId]??null;
+            if(!is_string($destId)||!Str::isUuid($destId))
+                throw ValidationException::withMessages([
+                    'loanReceiptMapping'=>'Select an active receiving-hall item for every source item.'
+                ]);
+            $map[$sourceId]=$destId;
+            $position=DB::table('hall_inventory_positions')
+                ->where('company_id',$this->companyId)->where('hall_id',$this->hallId)
+                ->where('item_id',$destId)->first(['revision']);
+            $expected[$destId]=$position?(int)$position->revision:0;
+        }
+        try {
+            $this->lastLoanReceiptReference=app(
+                \\App\\Services\\HallInventoryInternalLoanReceiptService::class
+            )->receive($actor,$this->companyId,$this->loanReceiptLoanId,
+                $this->loanReceiptRequestId,$map,$expected,$this->loanReceiptFile);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['loanReceiptMapping'=>$e->getMessage()]);
+        }
+        $this->loanReceiptLoanId='';
+        $this->loanReceiptRequestId=(string)Str::uuid();
+        $this->loanReceiptLines=[];
+        $this->loanReceiptMapping=[];
+        $this->loanReceiptFile=null;
         $this->reloadLoanHistory();
     }
 

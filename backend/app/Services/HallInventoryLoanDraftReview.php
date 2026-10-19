@@ -91,7 +91,7 @@ final class HallInventoryLoanDraftReview
             ->where('company_id',$companyId)
             ->whereIn('loan_id',$drafts->pluck('id')->all())
             ->orderBy('loan_id')->orderBy('item_name_snapshot')->orderBy('item_id')
-            ->get(['loan_id','item_name_snapshot','unit_snapshot','requested_quantity'])
+            ->get(['loan_id','item_id','item_name_snapshot','unit_snapshot','requested_quantity'])
             ->groupBy('loan_id');
 
         return $drafts->map(static function ($draft) use ($lines,$hallId):array {
@@ -121,6 +121,7 @@ final class HallInventoryLoanDraftReview
                     ? (string)$draft->dispatched_at : null,
                 'lines'=>($lines->get($draft->id)??collect())->map(
                     static fn($line):array=>[
+                        'itemId'=>(string)$line->item_id,
                         'name'=>(string)$line->item_name_snapshot,
                         'unit'=>(string)$line->unit_snapshot,
                         'quantity'=>(int)$line->requested_quantity,
