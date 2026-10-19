@@ -177,6 +177,23 @@ class HallInventoryStocktakeServiceTest extends TestCase
         $review->recent($manager,$company->id,$other->id);
     }
 
+    public function test_history_read_gate_off_and_cross_company_are_denied():void
+    {
+        [$company,$hall,$other,$manager]=$this->fixture();
+        $review=app(\App\Services\HallInventoryStocktakeReview::class);
+        try{
+            $review->recent($manager,$company->id,$hall->id);
+            $this->fail('Unreleased history view accepted.');
+        }catch(ConflictHttpException){}
+        config()->set('inventory_controls.stocktakes_enabled',true);
+        $foreign=Company::create(['name'=>'Other Count Company',
+            'slug'=>'other-count-review-business']);
+        $foreignHall=Hall::create(['company_id'=>$foreign->id,
+            'name'=>'Foreign Count Hall','slug'=>'foreign-count-review-hall','capacity'=>200]);
+        $this->expectException(AuthorizationException::class);
+        $review->recent($manager,$foreign->id,$foreignHall->id);
+    }
+
     public function test_history_rejects_revoked_staff_and_unbounded_result_count():void
     {
         [$company,$hall,$other,$manager,$membership]=$this->fixture();
