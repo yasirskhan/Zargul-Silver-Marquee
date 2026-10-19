@@ -139,6 +139,26 @@
                         Count submitted for review. Reference {{ $lastCountReference }}. Inventory balances were not adjusted.
                     </p>
                 @endif
+                <section class="space-y-3 rounded-xl border p-4" aria-label="Hall physical count history">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <h3 class="font-semibold">Physical count history (evidence only)</h3>
+                        <button type="button" wire:click="reloadStocktakeHistory" class="rounded-lg border px-3 py-2 text-sm">Refresh count history</button>
+                    </div>
+                    <p class="text-xs text-gray-600 dark:text-gray-300">Review the selected hall's last 20 immutable counts. Owned and borrowed quantities are separate. No discrepancy has been approved or book balance adjusted.</p>
+                    @forelse($stocktakeHistory as $record)
+                        <article wire:key="stocktake-history-{{ $record['id'] }}" class="space-y-2 rounded-lg border p-3 text-sm">
+                            <p class="font-medium">{{ str_replace('_',' ',$record['auditKind']) }} — UNRECONCILED PHYSICAL COUNT</p>
+                            <p>Reference {{ $record['id'] }}. Counted at {{ $record['countedAt'] }}. {{ $record['reason'] }}</p>
+                            <ul class="list-inside list-disc">
+                                @foreach($record['lines'] as $line)
+                                    <li>{{ $line['name'] }} ({{ $line['ownership'] }}): {{ $line['usable'] }} usable, {{ $line['damaged'] }} damaged — {{ $line['unit'] }}</li>
+                                @endforeach
+                            </ul>
+                        </article>
+                    @empty
+                        <p class="text-sm text-gray-600 dark:text-gray-300">No saved physical counts for this hall yet.</p>
+                    @endforelse
+                </section>
             </section>
         @endif
 

@@ -84,7 +84,11 @@ class HallInventoryLivewireTest extends TestCase
             ->set('auditKind', 'post_event')
             ->set('auditReason', 'After party manager count recorded')
             ->call('submitCount')->assertHasNoErrors()
-            ->assertSee('Count submitted for review');
+            ->assertSee('Count submitted for review')
+            ->assertSee('Physical count history (evidence only)')
+            ->assertSee('Water Jugs')
+            ->assertSee('30 usable, 2 damaged')
+            ->assertSee('5 usable, 0 damaged');
 
         $this->assertSame(1, DB::table('hall_inventory_stocktakes')->count());
         $this->assertSame(2, DB::table('hall_inventory_stocktake_lines')->count());

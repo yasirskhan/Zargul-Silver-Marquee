@@ -40,6 +40,8 @@ final class HallInventory extends Page
     public string $countRequestId = '';
     #[Locked]
     public ?string $lastCountReference = null;
+    #[Locked]
+    public array $stocktakeHistory = [];
 
     public string $itemName = '';
     public string $itemCategory = 'Crockery';
@@ -227,6 +229,17 @@ final class HallInventory extends Page
         $this->loanRequestId = (string) Str::uuid();
     }
 
+    public function reloadStocktakeHistory(): void
+    {
+        $this->stocktakeHistory = [];
+        $actor = $this->authorizeSelection();
+        if (! config('inventory_controls.stocktakes_enabled')) {
+            return;
+        }
+        $this->stocktakeHistory = app(\App\Services\HallInventoryStocktakeReview::class)
+            ->recent($actor, $this->companyId, $this->hallId);
+    }
+
     public function reloadLoanHistory(): void
     {
         $this->loanHistory = [];
@@ -250,6 +263,7 @@ final class HallInventory extends Page
                 'id' => $item->id, 'name' => $item->name, 'category' => $item->category,
                 'unit' => $item->unit, 'minimumQuantity' => (int) $item->minimum_quantity,
             ])->all();
+        $this->reloadStocktakeHistory();
         $this->reloadLoanHistory();
     }
 
@@ -436,5 +450,6 @@ final class HallInventory extends Page
         $this->countRows = [];
         $this->auditReason = '';
         $this->countRequestId = (string) Str::uuid();
+        $this->reloadStocktakeHistory();
     }
 }

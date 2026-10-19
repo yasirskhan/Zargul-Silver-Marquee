@@ -150,4 +150,50 @@ class HallInventoryStocktakeServiceTest extends TestCase
             [['itemId'=>$spoons, 'ownership'=>'owned','usableCount'=>100,'damagedCount'=>0]],
             'Cross company should be denied');
     }
+    public function test_history_reads_hall_counts_without_approving_stock_or_disclosing_other_halls():void
+    {
+        [$company,$hall,$other,$manager,$membership,$spoons,$chairs]=$this->fixture();
+        config()->set('inventory_controls.stocktakes_enabled',true);
+        $requestId=(string)Str::uuid();
+        app(HallInventoryStocktakeService::class)->submit($manager,$company->id,
+            $hall->id,$requestId,'monthly',[
+                ['itemId'=>$spoons,'ownership'=>'owned','usableCount'=>180,'damagedCount'=>3],
+                ['itemId'=>$spoons,'ownership'=>'borrowed','usableCount'=>15,'damagedCount'=>0],
+                ['itemId'=>$chairs,'ownership'=>'owned','usableCount'=>300,'damagedCount'=>2],
+            ],'Monthly physical count awaiting independent reconciliation');
+        $review=app(\App\Services\HallInventoryStocktakeReview::class);
+        $rows=$review->recent($manager,$company->id,$hall->id);
+        $this->assertCount(1,$rows);
+        $this->assertSame($requestId,$rows[0]['id']);
+        $this->assertSame('monthly',$rows[0]['auditKind']);
+        $this->assertTrue($rows[0]['evidenceOnly']);
+        $this->assertFalse($rows[0]['adjustmentPosted']);
+        $this->assertCount(3,$rows[0]['lines']);
+        $this->assertSame([0,2,3],array_values(array_map(
+            static fn($line)=>$line['damaged'],
+            (function()use($rows) {
+                $values=array_column($rows[0]['lines'],'damaged');sort($values);return array_map(
+                    static fn($n)=>['damaged'=>$n],$values);
+            })()
+        )));
+        $this->assertSame(0,DB::table('finance_journals')->count());
+        $this->expectException(AuthorizationException::class);
+        $review->recent($manager,$company->id,$other->id);
+    }
+
+    public function test_history_rejects_revoked_staff_and_unbounded_result_count():void
+    {
+        [$company,$hall,$other,$manager,$membership]=$this->fixture();
+        config()->set('inventory_controls.stocktakes_enabled',true);
+        $review=app(\App\Services\HallInventoryStocktakeReview::class);
+        try{
+            $review->recent($manager,$company->id,$hall->id,21);
+            $this->fail('Unbounded stocktake history accepted.');
+        }catch(\InvalidArgumentException){}
+        DB::table('company_memberships')->where('id',$membership->id)
+            ->update(['is_active'=>false]);
+        $this->expectException(AuthorizationException::class);
+        $review->recent($manager,$company->id,$hall->id);
+    }
+
 }
