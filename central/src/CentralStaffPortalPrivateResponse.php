@@ -37,6 +37,15 @@ final class CentralStaffPortalPrivateResponse
                 "default-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
         ];
 
+        if ($kind==='private_staff_home_html') {
+            $html=$internal['html']??null;
+            if (!is_string($html) || strlen($html)>262144 ||
+                !str_starts_with($html,
+                    '<section aria-label="Private HAFZATECH staff home">')) {
+                throw new RegistrationError('invalid_staff_response');
+            }
+            return ['status'=>200,'headers'=>$headers,'cookies'=>[],'body'=>$html];
+        }
         if ($kind==='private_vendor_plan_catalog_html' ||
             $kind==='private_vendor_plan_published_html') {
             $html=$internal['html']??null;

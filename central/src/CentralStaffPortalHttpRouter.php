@@ -38,7 +38,8 @@ final class CentralStaffPortalHttpRouter
         private readonly ?CentralStaffVendorInvoiceIssuer $invoiceIssuer = null,
         private readonly ?CentralStaffVendorInvoiceDirectory $invoiceDirectory = null,
         private readonly ?CentralStaffVendorPlanPublisher $planPublisher = null,
-        private readonly ?CentralStaffVendorPlanCatalogReader $planCatalog = null
+        private readonly ?CentralStaffVendorPlanCatalogReader $planCatalog = null,
+        private readonly ?CentralStaffPortalHome $staffHome = null
     ) {}
 
     /**
@@ -100,6 +101,17 @@ final class CentralStaffPortalHttpRouter
                 'clear_cookie_options'=>array_replace(
                     CentralStaffHttpPolicy::cookieOptions(time()),['expires'=>1])
             ];
+        }
+        if($uri==='/staff/home' && $this->staffHome!==null) {
+            if($fields!==[]) {
+                throw new RegistrationError('invalid_staff_home_request',422);
+            }
+            if(!$this->boundary->permitsOwnAccountMutation(
+                    $server,$bearer,$csrfHeader)) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            return ['kind'=>'private_staff_home_html',
+                'html'=>$this->staffHome->render($bearer,$csrfHeader)];
         }
         if ($uri==='/staff/billing/invoices/issue' && $this->invoiceIssuer!==null) {
             if (!$this->exactFields($fields,

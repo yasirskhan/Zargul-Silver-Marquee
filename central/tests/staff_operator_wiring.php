@@ -29,7 +29,7 @@ foreach([
  'CentralStaffVendorInvoiceIssuer','CentralStaffVendorInvoiceReceiptRenderer',
  'CentralStaffVendorInvoiceDirectory','CentralStaffVendorInvoiceDirectoryRenderer',
  'CentralStaffVendorPlanPublisher','CentralStaffVendorPlanCatalogRenderer',
- 'CentralStaffVendorPlanCatalogReader',
+ 'CentralStaffVendorPlanCatalogReader','CentralStaffPortalHome',
  'CentralStaffPortalHttpRouter',
  'CentralStaffPortalPrivateResponse','CentralStaffPortalFormRequest',
  'CentralStaffPortalOperatorKernel','CentralStaffPortalResponseEmitter',

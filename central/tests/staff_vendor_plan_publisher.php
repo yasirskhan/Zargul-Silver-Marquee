@@ -14,7 +14,7 @@ foreach([
     'CentralStaffCredentialVerifier','CentralStaffLoginRateLimiter',
     'CentralStaffSessionService','CentralStaffSessionAuthorization',
     'CentralStaffVendorPlanPublisher','CentralStaffVendorPlanCatalogRenderer',
-    'CentralStaffVendorPlanCatalogReader',
+    'CentralStaffVendorPlanCatalogReader','CentralStaffPortalHome',
     'CentralStaffCsrfTokenService','CentralStaffHttpPolicy',
     'CentralStaffProtectedHttpBoundary',
     'CentralStaffPaymentEvidenceQueue','CentralStaffPaymentEvidenceReviewService',
@@ -246,8 +246,57 @@ try {
         'term_months'=>6,'currency'=>'<script>','price_minor'=>'1'];
     planDeny(fn()=>Hafzatech\Central\CentralStaffVendorPlanCatalogRenderer::receipt(
         $forgedReceipt),'invalid_vendor_plan_response');
+    $homeService=new Hafzatech\Central\CentralStaffPortalHome(
+        $sessions,$auth);
+    $homeRouter=new Hafzatech\Central\CentralStaffPortalHttpRouter(
+        $boundary,$billingAdapter,true,staffHome:$homeService);
+    $homeServer=$server;$homeServer['REQUEST_URI']='/staff/home';
+    $home=$homeRouter->dispatch($homeServer,$cookie,[],$writerCsrf);
+    planAssert($home['kind']==='private_staff_home_html' &&
+        str_contains($home['html'],'action="/staff/plans"') &&
+        str_contains($home['html'],'action="/staff/dashboard"') &&
+        str_contains($home['html'],'action="/staff/session/logout"') &&
+        !str_contains($home['html'],'action="/staff/team/dashboard"') &&
+        !str_contains($home['html'],'action="/staff/audit/dashboard"') &&
+        !str_contains($home['html'],$writerSession),
+        'Plan Administrator home offers only current capability navigation');
+    $homeReply=(new Hafzatech\Central\CentralStaffPortalPrivateResponse(true))
+        ->compose($home);
+    planAssert($homeReply['status']===200 &&
+        $homeReply['cookies']===[] &&
+        $homeReply['headers']['Cache-Control']==='no-store, private' &&
+        str_contains($homeReply['headers']['Content-Security-Policy'],
+            "default-src 'none'"),
+        'private home has no cookies, no cache and restrictive CSP');
+    $billingHome=$homeRouter->dispatch($homeServer,$otherCookie,[],$billingCsrf);
+    planAssert(!str_contains($billingHome['html'],'action="/staff/plans"') &&
+        str_contains($billingHome['html'],'action="/staff/dashboard"'),
+        'Billing Officer cannot discover privileged plan publishing action');
+    planDeny(fn()=>$homeRouter->dispatch(
+        $homeServer,$cookie,['role'=>'super_administrator'],$writerCsrf),
+        'invalid_staff_home_request');
+    planDeny(fn()=>$homeRouter->dispatch(
+        $homeServer,$cookie,[],str_repeat('0',64)),'staff_portal_denied');
+    $homeBadOrigin=$homeServer;
+    $homeBadOrigin['HTTP_ORIGIN']='https://untrusted.example';
+    planDeny(fn()=>$homeRouter->dispatch(
+        $homeBadOrigin,$cookie,[],$writerCsrf),'staff_portal_denied');
+    $homeGet=$homeServer;$homeGet['REQUEST_METHOD']='GET';
+    planDeny(fn()=>$homeRouter->dispatch(
+        $homeGet,$cookie,[],$writerCsrf),'staff_portal_denied');
+    putenv('CENTRAL_VENDOR_PLAN_PUBLISH_ENABLED=false');
+    try{
+        $gatedHome=$homeRouter->dispatch($homeServer,$cookie,[],$writerCsrf);
+        planAssert(!str_contains($gatedHome['html'],'action="/staff/plans"'),
+            'unreleased plan publishing is hidden even for authorized staff');
+    }finally{
+        putenv('CENTRAL_VENDOR_PLAN_PUBLISH_ENABLED=true');
+    }
     $db->prepare("UPDATE central_staff_role_grants SET revoked_at=now()
         WHERE staff_id=:staff")->execute(['staff'=>$writer]);
+    planDeny(fn()=>$homeRouter->dispatch(
+        $homeServer,$cookie,[],$writerCsrf),'staff_portal_denied');
+
     $revokedRequest=$fields;$revokedRequest['request_id']=planUuid();
     planDeny(fn()=>$router->dispatch(
         $publishServer,$cookie,$revokedRequest,$writerCsrf),'staff_portal_denied');
