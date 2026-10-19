@@ -37,6 +37,10 @@ jobs:
           test -s assets/editor.css
           test -s docs/decisions/ADR-0001-platform-and-cms.md
           test -s docs/WEBSITE_CMS_DESIGN.md
+          test -s docs/DEVELOPMENT_EFFICIENCY.md
+          test -s docs/QUALITY_AND_BUG_REMEDIATION_POLICY.md
+          test -s docs/ISSUE_AND_BUG_REGISTER.md
+          test -s docs/AI_HANDOFF_ARCHIVE_2026-10-18.md
           test -s docs/DEVELOPMENT_PROTOCOL.md
       - name: Check JS syntax
         run: |
@@ -153,6 +157,11 @@ jobs:
           extensions: mbstring, pdo_pgsql, pgsql, intl, zip, bcmath, gd
           coverage: none
           tools: composer:v2
+      - name: Cache Composer download archives by lockfile
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer/files
+          key: composer-php83-${{ runner.os }}-${{ hashFiles('backend/composer.lock') }}
       - name: Install locked dependencies and isolated test key
         run: |
           composer install --no-interaction --no-progress --prefer-dist
@@ -190,6 +199,11 @@ jobs:
           tools: composer:v2
       - name: Validate PHP dependency manifest
         run: composer validate --no-check-publish
+      - name: Cache Composer download archives by lockfile
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer/files
+          key: composer-php83-${{ runner.os }}-${{ hashFiles('backend/composer.lock') }}
       - name: Install reproducible locked PHP dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
       - name: Prepare isolated CI environment
@@ -239,8 +253,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Cache pinned Playwright npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-playwright-${{ runner.os }}-1.56.1
       - name: Install pinned Playwright test tooling
         run: npm install --no-save --no-audit --no-fund @playwright/test@1.56.1
+      - name: Cache pinned Playwright Chromium binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: chromium-playwright-${{ runner.os }}-1.56.1
       - name: Install Chromium browser and dependencies
         run: npx playwright install --with-deps chromium
       - name: Exercise public website editor prototype in desktop and phone browsers
@@ -290,6 +314,11 @@ jobs:
           extensions: mbstring, pdo_pgsql, pgsql, intl, zip, bcmath, gd
           coverage: none
           tools: composer:v2
+      - name: Cache Composer download archives by lockfile
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer/files
+          key: composer-php83-${{ runner.os }}-${{ hashFiles('backend/composer.lock') }}
       - name: Install exact PHP dependencies
         working-directory: backend
         run: composer install --no-interaction --no-progress --prefer-dist
@@ -314,8 +343,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Cache pinned Playwright npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-playwright-${{ runner.os }}-1.56.1
       - name: Install pinned authenticated browser tooling
         run: npm install --no-save --no-audit --no-fund @playwright/test@1.56.1
+      - name: Cache pinned Playwright Chromium binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: chromium-playwright-${{ runner.os }}-1.56.1
       - name: Install Chromium for authenticated acceptance
         run: npx playwright install --with-deps chromium
       - name: Browser verify owner password TOTP and proposal editing

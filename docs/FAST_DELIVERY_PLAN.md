@@ -30,3 +30,6 @@ Signed grants not encryption alone; cryptographic identity per install; never ce
 
 ## Mandatory bug remediation and complete feature gate — owner approved
 Follow [QUALITY_AND_BUG_REMEDIATION_POLICY.md](QUALITY_AND_BUG_REMEDIATION_POLICY.md) and maintain [ISSUE_AND_BUG_REGISTER.md](ISSUE_AND_BUG_REGISTER.md). Every batch actively tests failure cases; any real bug triggers reproduce → root-cause repair → regression test → exact-SHA all-required-jobs hosted CI. No fix is complete or feature release-ready while blocking defect/CI failure remains. Do not weaken tests or skip security. Link every approved feature to end-to-end acceptance and don't overfocus on micro-refinements at the expense of finishing complete safe workflows. External operational blockers remain explicitly OFF/blocked.
+
+## Development efficiency (owner approved 2026-10-18)
+See [DEVELOPMENT_EFFICIENCY.md](DEVELOPMENT_EFFICIENCY.md). Full SIX hosted jobs remain required; CI now caches lockfile/pinned-version download assets while retaining install/test commands. Group coherent vertical implementations, perform targeted cheap preflight, fix CI reds, keep short active AI_HANDOFF with full archival history and do not lose any approved feature or security/finance safeguards. Never cancel needed exact SHA validation.
