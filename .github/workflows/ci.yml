@@ -105,6 +105,7 @@ jobs:
           php central/tests/staff_provisioning.php
           php central/tests/staff_identity_attestation.php
           php central/tests/staff_enrollment_challenge.php
+          php central/tests/staff_enrollment_evidence.php
           php central/tests/staff_role_requests.php
           php central/tests/staff_own_password_change.php
           php central/tests/staff_password_change_audit_reader.php
