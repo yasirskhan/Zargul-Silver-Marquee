@@ -116,7 +116,7 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         // Source ownership stays ON LOAN until independent arrival/condition review.
         $this->assertSame(12,(int)DB::table('hall_inventory_positions')
             ->where('hall_id',$src->id)->where('item_id',$srcItem)->value('owned_on_loan'));
-        $acceptor=app(\\App\\Services\\HallInventoryInternalLoanReturnAcceptanceService::class);
+        $acceptor=app(\App\Services\HallInventoryInternalLoanReturnAcceptanceService::class);
         $acceptance=(string)Str::uuid();
         $conditions=[$srcItem=>['good'=>3,'damaged'=>1]];
         $this->be($owner);
