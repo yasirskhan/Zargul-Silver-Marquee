@@ -149,6 +149,44 @@ try {
     challengeCheck($row['status']==='pending_mfa' &&
         $row['mfa_enrolled_at']===null,
         'challenge never activates credentials');
+    // Immutable synthetic fixtures emulate EXPIRED, not deleted/replayed,
+    // challenges. The rolling 24-hour count must still block rapid reissue.
+    $limited=challengeUuid();$oldEnough=challengeUuid();
+    foreach([[$limited,'enrollment-limited@example.test'],
+             [$oldEnough,'enrollment-old@example.test']] as [$who,$email]) {
+        $insert->execute(['id'=>$who,'email'=>$email,
+            'hash'=>password_hash($password,PASSWORD_ARGON2ID),
+            'mfa'=>'','enrolled'=>null,'status'=>'pending_mfa']);
+        $event->execute(['actor'=>$admin,'target'=>$who]);
+    }
+    $inject=$db->prepare(
+        "INSERT INTO central_staff_enrollment_challenges
+         (id,target_staff_id,issued_by_staff_id,provider_key_id,
+          email_sha256,nonce_sha256,issued_at,expires_at)
+         VALUES(:id,:target,:issuer,'synthetic-provider',:email,:nonce,
+                now()-(:age)::interval,now()-(:age)::interval+interval '5 minutes')"
+    );
+    foreach([[$limited,'1 hour'],[$oldEnough,'2 days']] as [$who,$age]){
+        for($i=0;$i<5;$i++){
+            $inject->execute([
+                'id'=>challengeUuid(),'target'=>$who,'issuer'=>$admin,
+                'email'=>hash('sha256',$who===$limited
+                    ? 'enrollment-limited@example.test'
+                    : 'enrollment-old@example.test'),
+                'nonce'=>hash('sha256',random_bytes(32)),'age'=>$age]);
+        }
+    }
+    challengeDeny(fn()=>$on->issue($adminBearer,$limited),
+        'staff_enrollment_challenge_rate_limited');
+    $oldIssue=$on->issue($adminBearer,$oldEnough);
+    challengeCheck($oldIssue['staff_id']===$oldEnough &&
+        $oldIssue['activation_allowed']===false,
+        'expired older-than-24-hour events no longer consume issuance cap');
+    $check=$db->prepare('SELECT count(*) FROM central_staff_enrollment_challenges
+        WHERE target_staff_id=:target');
+    $check->execute(['target'=>$limited]);
+    challengeCheck((int)$check->fetchColumn()===5,
+        'rate-limited request never adds a new challenge audit record');
     $db->prepare('UPDATE central_staff_role_grants SET revoked_at=now()
         WHERE staff_id=:id')->execute(['id'=>$admin]);
     challengeDeny(fn()=>$on->issue($adminBearer,challengeUuid()),

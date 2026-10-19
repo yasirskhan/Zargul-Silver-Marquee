@@ -82,6 +82,20 @@ final class CentralStaffEnrollmentChallengeService
             if($open->fetchColumn()!==false) {
                 throw new RegistrationError('staff_enrollment_challenge_pending',409);
             }
+            // The target row remains locked until commit, serializing
+            // concurrent issuers. Allow at most five challenge issues per
+            // pending recipient in a rolling 24-hour period, INCLUDING
+            // expired entries. Avoid brute-force resends and audit floods.
+            $recent=$this->db->prepare(
+                "SELECT count(*) FROM central_staff_enrollment_challenges
+                 WHERE target_staff_id=:id
+                   AND issued_at>now()-interval '24 hours'"
+            );
+            $recent->execute(['id'=>$targetId]);
+            if((int)$recent->fetchColumn()>=5) {
+                throw new RegistrationError(
+                    'staff_enrollment_challenge_rate_limited',429);
+            }
             $nonce=rtrim(strtr(base64_encode(random_bytes(32)),'+/','-_'),'=');
             $id=self::uuid();
             $q=$this->db->prepare(
