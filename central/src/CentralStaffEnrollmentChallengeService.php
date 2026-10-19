@@ -96,6 +96,20 @@ final class CentralStaffEnrollmentChallengeService
                 throw new RegistrationError(
                     'staff_enrollment_challenge_rate_limited',429);
             }
+            // The recipient limit alone does not stop one compromised
+            // administrator from distributing challenges over many pending
+            // identities. Bound the issuer's own 24-hour activity as well.
+            // Count immutable expired records to prevent repeated issuance.
+            $issuerRecent=$this->db->prepare(
+                "SELECT count(*) FROM central_staff_enrollment_challenges
+                 WHERE issued_by_staff_id=:issuer
+                   AND issued_at>now()-interval '24 hours'"
+            );
+            $issuerRecent->execute(['issuer'=>$actor]);
+            if((int)$issuerRecent->fetchColumn()>=20) {
+                throw new RegistrationError(
+                    'staff_enrollment_issuer_rate_limited',429);
+            }
             $nonce=rtrim(strtr(base64_encode(random_bytes(32)),'+/','-_'),'=');
             $id=self::uuid();
             $q=$this->db->prepare(
