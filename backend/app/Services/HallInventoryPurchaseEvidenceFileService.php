@@ -38,7 +38,7 @@ final class HallInventoryPurchaseEvidenceFileService
         $mime=(new \finfo(FILEINFO_MIME_TYPE))->file($path);
         if (!in_array($mime,['image/jpeg','image/png','application/pdf'],true))
             throw new InvalidArgumentException('Unsupported evidence content.');
-        $sha=hash_file('sha256',$path);
+        if ($kind==='receiving_photo' && !in_array($mime,['image/jpeg','image/png'],true))\n            throw new InvalidArgumentException('Receiving photo must be a JPEG or PNG image.');\n        $sha=hash_file('sha256',$path);
         if (!is_string($sha))throw new ConflictHttpException('Cannot hash evidence.');
         $storage=Storage::disk('local');
         $key='private/hall-purchase-evidence/'.$companyId.'/'.$hallId.'/'.$purchaseId.'/'.$fileId;
