@@ -169,8 +169,16 @@ try {
     } catch(PDOException $e) {
         invoiceIssueAssert($e->getCode()==='P0001','immutable audit trigger');
     }
-    $count=(int)$db->query('SELECT count(*) FROM central_vendor_verified_settlements')->fetchColumn();
-    $revisions=(int)$db->query('SELECT count(*) FROM central_paid_license_revisions')->fetchColumn();
+    // Other independently tested vendor invoices may already have settled
+    // in this shared CI database. Assert NO movement for this exact invoice.
+    $settlementCount=$db->prepare(
+        'SELECT count(*) FROM central_vendor_verified_settlements WHERE invoice_id=:id');
+    $settlementCount->execute(['id'=>$first['invoice_id']]);
+    $count=(int)$settlementCount->fetchColumn();
+    $revisionCount=$db->prepare(
+        'SELECT count(*) FROM central_paid_license_revisions WHERE invoice_id=:id');
+    $revisionCount->execute(['id'=>$first['invoice_id']]);
+    $revisions=(int)$revisionCount->fetchColumn();
     invoiceIssueAssert($count===0 && $revisions===0,
         'invoice never verifies money or creates signed entitlements');
     $db->prepare("UPDATE central_staff_role_grants SET revoked_at=now()
