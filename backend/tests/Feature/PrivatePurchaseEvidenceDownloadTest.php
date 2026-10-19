@@ -65,7 +65,7 @@ class PrivatePurchaseEvidenceDownloadTest extends TestCase
             'companyId'=>$company->id,'hallId'=>$other->id,
             'purchaseId'=>$purchase,'fileId'=>$fileId
         ],false);
-        $this->get($wrongHall)->assertForbidden();
+        $this->get($wrongHall)->assertStatus(409);
         config()->set('inventory_controls.purchase_evidence_upload_enabled',false);
         $this->get($uri)->assertStatus(409);
         config()->set('inventory_controls.purchase_evidence_upload_enabled',true);
