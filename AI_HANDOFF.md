@@ -277,3 +277,8 @@ Verify live branch/CI → reconcile current handoff + specific requirement/featu
 ## Prepared successor: purchase claim history (detached until predecessor green)
 - Adds HallInventoryPurchaseReview and scoped PostgreSQL read test with OFF gate, strict hall authorization, unverified claim label and no stock/payment assertions. This is deliberately NOT an accepted physical receipt or financial invoice.
 - Publish only after predecessor `e937c9a1` all-six CI green and live branch matches expected SHA. Then run new exact six jobs and continue independent receiving.
+
+
+## Prepared successor — purchased-stock request UI, pending prior history CI
+- New Filament inventory form for company/hall-scoped request submission and unverified read-only history, supplier evidence reference labeled unverified, no stock or financial effects. Resets form and request id across hall changes; server-side access rechecked. Livewire test covers manager submit, disabled gate UI and revoked role.
+- This successor is DETACHED. Wait for exact history `1af87bda` all-six CI success, then publish by SHA lease and run its own six-job CI. Do not enable production gates.

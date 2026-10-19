@@ -234,6 +234,37 @@ class HallInventoryLivewireTest extends TestCase
         $page->call('reloadOpeningHistory')->assertForbidden();
     }
 
+
+    public function test_purchase_claim_ui_is_default_off_and_manager_can_submit_without_stock_posting():void
+    {
+        [$company,$hall,$other,$manager,$membership]=$this->fixture();
+        config()->set('inventory_controls.catalog_enabled',true);
+        $item=(string)\Illuminate\Support\Str::uuid();
+        app(\App\Services\HallInventoryCatalogService::class)->create(
+            $manager,$company->id,$hall->id,$item,'Purchase Dining Tables',
+            'Furniture','piece',5,'Request catalog addition');
+        Livewire::test(HallInventory::class)->assertDontSee('Purchased stock: receiving requested');
+        config()->set('inventory_controls.purchase_receipts_enabled',true);
+        $page=Livewire::test(HallInventory::class)
+            ->assertSee('Purchased stock: receiving requested')
+            ->set('purchaseItemId',$item)
+            ->set('purchaseQuantity','12')
+            ->set('purchaseVendor','Dining Table Supplier')
+            ->set('purchaseVendorReference','INV-325')
+            ->set('purchaseEvidence','sha256:dining-tables-fixture')
+            ->set('purchaseReason','New dining table delivery review')
+            ->call('submitPurchaseRequest')->assertHasNoErrors()
+            ->assertSee('Purchase claim saved:')
+            ->assertSee('UNVERIFIED CLAIM / AWAITING INDEPENDENT RECEIVING')
+            ->assertSee('Owned inventory posted: NO');
+        $this->assertSame(1,DB::table('hall_inventory_purchase_requests')->count());
+        $this->assertSame(0,DB::table('hall_inventory_movement_events')->count());
+        $this->assertSame(0,DB::table('finance_journals')->count());
+        DB::table('company_memberships')->where('id',$membership->id)
+            ->update(['is_active'=>false]);
+        $page->call('reloadPurchaseHistory')->assertForbidden();
+    }
+
     public function test_manager_role_revocation_blocks_live_hall_inventory_actions(): void
     {
         [$company, $hall, , , $membership] = $this->fixture();

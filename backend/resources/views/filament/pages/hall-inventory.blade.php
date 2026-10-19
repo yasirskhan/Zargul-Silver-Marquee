@@ -53,6 +53,59 @@
             <button type="button" wire:click="reloadCatalog" class="rounded-lg border px-3 py-2 text-sm">Refresh items</button>
         </section>
 
+
+        @if(config('inventory_controls.purchase_receipts_enabled'))
+            <section class="space-y-3 rounded-xl border p-4" aria-label="Purchased stock request and receipt history">
+                <h2 class="text-lg font-semibold">Purchased stock: receiving requested</h2>
+                <p class="text-sm">Record a purchasing claim for independent physical receiving. An invoice or reference here is NOT verified payment or proof of delivered goods. Saving this request posts no owned inventory or financial journal.</p>
+                <form wire:submit="submitPurchaseRequest" class="grid gap-3 rounded-lg border p-3 md:grid-cols-2">
+                    <label class="space-y-1"><span class="text-sm">Hall inventory item</span>
+                        <select wire:model="purchaseItemId" class="w-full rounded-lg border p-2 text-gray-900" required>
+                            <option value="">Select item</option>
+                            @foreach($catalog as $item)
+                                <option value="{{ $item['id'] }}">{{ $item['name'] }} ({{ $item['unit'] }})</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label class="space-y-1"><span class="text-sm">Quantity delivered or expected</span>
+                        <input wire:model="purchaseQuantity" type="text" pattern="[1-9][0-9]*" class="w-full rounded-lg border p-2 text-gray-900" required>
+                    </label>
+                    <label class="space-y-1"><span class="text-sm">Supplier / vendor name</span>
+                        <input wire:model="purchaseVendor" type="text" maxlength="200" class="w-full rounded-lg border p-2 text-gray-900" required>
+                    </label>
+                    <label class="space-y-1"><span class="text-sm">Supplier document reference</span>
+                        <input wire:model="purchaseVendorReference" type="text" maxlength="160" class="w-full rounded-lg border p-2 text-gray-900" required>
+                    </label>
+                    <label class="space-y-1 md:col-span-2"><span class="text-sm">Evidence reference / document fingerprint (not authenticated)</span>
+                        <input wire:model="purchaseEvidence" type="text" maxlength="300" class="w-full rounded-lg border p-2 text-gray-900" required>
+                    </label>
+                    <label class="space-y-1 md:col-span-2"><span class="text-sm">Receiving request reason</span>
+                        <input wire:model="purchaseReason" type="text" maxlength="500" class="w-full rounded-lg border p-2 text-gray-900" required>
+                    </label>
+                    @error('purchaseItemId') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                    @error('purchaseQuantity') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                    <button type="submit" class="rounded-lg border px-3 py-2 text-sm">Submit unverified purchase claim</button>
+                </form>
+                @if($lastPurchaseReference !== null)
+                    <p role="status" class="text-sm">Purchase claim saved: {{ $lastPurchaseReference }}. No inventory or financial posting.</p>
+                @endif
+                <h3 class="font-semibold">Purchased stock claim history</h3>
+                @forelse($purchaseHistory as $purchase)
+                    <article class="rounded-lg border p-3" wire:key="purchase-claim-{{ $purchase['id'] }}">
+                        <p class="font-semibold">{{ $purchase['itemName'] }}: {{ $purchase['quantity'] }} {{ $purchase['unit'] }}</p>
+                        <p class="text-sm">{{ $purchase['status'] }}</p>
+                        <p class="text-xs">Vendor: {{ $purchase['vendorName'] }} / {{ $purchase['vendorReference'] }}</p>
+                        <p class="text-xs">Evidence reference (unverified): {{ $purchase['evidenceReference'] }}</p>
+                        <p class="text-xs">Claim ID: {{ $purchase['id'] }}</p>
+                        <p class="text-xs">Owned inventory posted: NO. Financially posted: NO.</p>
+                    </article>
+                @empty
+                    <p>No purchase receipt claims exist for this hall.</p>
+                @endforelse
+                <button type="button" wire:click="reloadPurchaseHistory" class="rounded-lg border px-3 py-2 text-sm">Refresh purchase claims</button>
+            </section>
+        @endif
+
         @if(config('inventory_controls.opening_stock_posting_enabled'))
             <section class="space-y-3 rounded-xl border p-4" aria-label="Opening stock independent review">
                 <h2 class="text-lg font-semibold">Opening stock: independent review</h2>

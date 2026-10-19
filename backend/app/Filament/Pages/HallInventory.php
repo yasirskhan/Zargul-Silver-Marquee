@@ -59,6 +59,19 @@ final class HallInventory extends Page
     #[Locked]
     public array $loanHistory = [];
     #[Locked]
+    public array $purchaseHistory = [];
+    #[Locked]
+    public string $purchaseRequestId = '';
+    #[Locked]
+    public ?string $lastPurchaseReference = null;
+    public string $purchaseItemId = '';
+    public string $purchaseQuantity = '';
+    public string $purchaseVendor = '';
+    public string $purchaseVendorReference = '';
+    public string $purchaseEvidence = '';
+    public string $purchaseReason = '';
+
+    #[Locked]
     public array $openingHistory = [];
     #[Locked]
     public string $openingRequestId = '';
@@ -185,6 +198,7 @@ final class HallInventory extends Page
         $this->loanRequestId = (string) Str::uuid();
         $this->loanInlineRequestId = (string) Str::uuid();
         $this->openingRequestId = (string) Str::uuid();
+        $this->purchaseRequestId = (string) Str::uuid();
         $this->reloadCatalog();
     }
 
@@ -242,6 +256,15 @@ final class HallInventory extends Page
         $this->openingReason = '';
         $this->lastOpeningReference = null;
         $this->openingHistory = [];
+        $this->purchaseHistory = [];
+        $this->purchaseItemId = '';
+        $this->purchaseQuantity = '';
+        $this->purchaseVendor = '';
+        $this->purchaseVendorReference = '';
+        $this->purchaseEvidence = '';
+        $this->purchaseReason = '';
+        $this->lastPurchaseReference = null;
+        $this->purchaseRequestId = (string) Str::uuid();
         $this->openingRequestId = (string) Str::uuid();
         $this->createRequestId = (string) Str::uuid();
         $this->countRequestId = (string) Str::uuid();
@@ -320,6 +343,47 @@ final class HallInventory extends Page
         $this->reloadOpeningHistory();
     }
 
+    public function submitPurchaseRequest():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.purchase_receipts_enabled'),403);
+        $this->validate([
+            'purchaseItemId'=>'required|uuid',
+            'purchaseQuantity'=>['required','regex:/\A[1-9][0-9]{0,8}\z/D'],
+            'purchaseVendor'=>'required|string|min:2|max:200',
+            'purchaseVendorReference'=>'required|string|min:2|max:160',
+            'purchaseEvidence'=>'required|string|min:8|max:300',
+            'purchaseReason'=>'required|string|min:5|max:500',
+        ]);
+        try {
+            $this->lastPurchaseReference=app(\App\Services\HallInventoryPurchaseRequestService::class)
+                ->request($actor,$this->companyId,$this->hallId,
+                    $this->purchaseItemId,$this->purchaseRequestId,
+                    (int)$this->purchaseQuantity,$this->purchaseVendor,
+                    $this->purchaseVendorReference,$this->purchaseEvidence,
+                    $this->purchaseReason);
+        }catch(InvalidArgumentException|ConflictHttpException $e){
+            throw ValidationException::withMessages(['purchaseItemId'=>$e->getMessage()]);
+        }
+        $this->purchaseRequestId=(string)Str::uuid();
+        $this->purchaseItemId='';
+        $this->purchaseQuantity='';
+        $this->purchaseVendor='';
+        $this->purchaseVendorReference='';
+        $this->purchaseEvidence='';
+        $this->purchaseReason='';
+        $this->reloadPurchaseHistory();
+    }
+
+    public function reloadPurchaseHistory():void
+    {
+        $this->purchaseHistory=[];
+        $actor=$this->authorizeSelection();
+        if(!config('inventory_controls.purchase_receipts_enabled'))return;
+        $this->purchaseHistory=app(\App\Services\HallInventoryPurchaseReview::class)
+            ->recent($actor,$this->companyId,$this->hallId);
+    }
+
     public function reloadOpeningHistory(): void
     {
         $this->openingHistory = [];
@@ -357,6 +421,7 @@ final class HallInventory extends Page
         $this->reloadStocktakeHistory();
         $this->reloadLoanHistory();
         $this->reloadOpeningHistory();
+        $this->reloadPurchaseHistory();
     }
 
     public function createItem(): void
