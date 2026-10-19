@@ -4,6 +4,7 @@ namespace Tests\Feature;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\Hall;
+use App\Models\HallAssignment;
 use App\Models\User;
 use App\Services\HallInventoryCatalogService;
 use App\Services\HallInventoryPurchaseRequestService;
@@ -60,7 +61,21 @@ class PrivatePurchaseEvidenceDownloadTest extends TestCase
             ->where('action','hall_inventory.purchase_evidence_downloaded')->count());
         $this->be($outsider);
         $this->get($uri)->assertForbidden();
+        $manager=User::create(['name'=>'Assigned Manager',
+            'email'=>'private-manager@example.test','password'=>'test-only']);
+        $manager->markEmailAsVerified();
+        $managerMembership=CompanyMembership::create([
+            'company_id'=>$company->id,'user_id'=>$manager->id,'role'=>'manager']);
+        HallAssignment::create(['company_id'=>$company->id,
+            'membership_id'=>$managerMembership->id,'hall_id'=>$hall->id]);
+        $this->be($manager);
+        $this->get($uri)->assertForbidden();
         $this->be($owner);
+        DB::table('company_memberships')->where('user_id',$owner->id)
+            ->where('company_id',$company->id)->update(['is_active'=>false]);
+        $this->get($uri)->assertForbidden();
+        DB::table('company_memberships')->where('user_id',$owner->id)
+            ->where('company_id',$company->id)->update(['is_active'=>true]);
         $wrongHall=route('inventory.purchase-evidence.download',[
             'companyId'=>$company->id,'hallId'=>$other->id,
             'purchaseId'=>$purchase,'fileId'=>$fileId
