@@ -491,9 +491,16 @@ try {
  paidSessionDeny(fn()=>$invoiceDirectoryRouter->dispatch(
   $directoryHttp,$issuerCookie,['customer_id'=>$company],$issuerCsrf),
   'staff_portal_denied');
- paidSessionDeny(fn()=>$invoiceDirectoryRouter->dispatch(
-  $directoryHttp,$billingCookie,['customer_id'=>$other],$billingCsrf),
-  'staff_portal_denied');
+ // Billing Officer is intentionally GLOBAL in this synthetic fixture;
+ // customer B is authorized, but must never receive A's invoices.
+ $foreignDirectory=$invoiceDirectoryRouter->dispatch(
+  $directoryHttp,$billingCookie,['customer_id'=>$other],$billingCsrf);
+ paidSessionAssert($foreignDirectory['kind']==='private_vendor_invoice_directory_html' &&
+  str_contains($foreignDirectory['html'],'No invoices recorded') &&
+  !str_contains($foreignDirectory['html'],$invoice),
+  'global Billing Officer cannot leak another customer invoice into foreign listing');
+ paidSessionDeny(fn()=>$invoiceDirectory->listForCustomer(
+  $foreignSession,$company),'staff_invoice_directory_denied');
  paidSessionDeny(fn()=>$invoiceDirectoryRouter->dispatch(
   $directoryHttp,$billingCookie,['customer_id'=>$company,'secret'=>'bank'],
   $billingCsrf),'invalid_invoice_directory_request');
