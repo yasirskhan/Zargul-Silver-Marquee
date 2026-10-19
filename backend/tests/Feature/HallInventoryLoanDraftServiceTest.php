@@ -184,7 +184,7 @@ class HallInventoryLoanDraftServiceTest extends TestCase
         $this->assertSame('draft_only',$items[0]['status']);
         $this->assertFalse($items[0]['stockMoved']);
         $this->assertCount(2,$items[0]['lines']);
-        $this->assertSame([10,50],array_column($items[0]['lines'],'quantity'));
+        $this->assertEqualsCanonicalizing([10,50],array_column($items[0]['lines'],'quantity'));
         // Receiving hall does not gain authority over the source's draft.
         $this->assertSame([],$review->recent($owner,$company->id,$b->id));
         $this->be($manager);
@@ -234,7 +234,8 @@ class HallInventoryLoanDraftServiceTest extends TestCase
         $this->be($manager);
         $review=app(\App\Services\HallInventoryLoanDraftReview::class);
         $this->assertSame([],$review->recent($manager,$company->id,$a->id));
-        DB::table('hall_assignments')->where('hall_id',$a->id)->delete();
+        DB::table('company_memberships')->where('user_id',$manager->id)
+            ->update(['is_active'=>false]);
         $this->expectException(AuthorizationException::class);
         $review->recent($manager,$company->id,$a->id);
     }

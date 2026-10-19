@@ -47,7 +47,7 @@ PAY-010,Per client manual wallet QR and official merchant API integrations,11,Ap
 FIN-010,Named accounts and accountable money movement,11,Approved not implemented,Bank wallet check cash custody signatures independent acknowledgments and idempotent balanced ledger
 STAFF-010,Staff wages vendors utilities purchasing and spend limits,11,Approved not implemented,Per manager caps invoices receipts cash expenses owner approvals and audit
 RPT-010,Complete financial operational and permission scoped reports,11,Approved not implemented,Event hall wage banking receivables payables earnings audit and exports
-INV-001,Strict hall owned item catalog and stock movement audit,12,Approved not implemented,Manager create item inline stocktake post event monthly quarterly and missing item investigation
+INV-001,Strict hall owned item catalog and stock movement audit,12,Approved not implemented,Manager create item inline stocktake post event monthly quarterly and missing item investigation; Prepared hall/tenant-scoped immutable draft loan review UI with source/destination and item snapshots; no release; six-job CI pending.
 INV-002,Internal and external multi item borrowing and counted returns,12,Approved not implemented,Lender borrower confirmations partial returns damaged missing overdue and independent acceptance
 INV-003,Matched borrowing automatic verification and numbered receipt,12,Approved not implemented,Close only all item rows in good condition confirmed and financially reconciled
 NEWS-001,Central news and update announcements,13,Approved not implemented,Per client edition and role targeting incremental self hosted sync and read tracking
