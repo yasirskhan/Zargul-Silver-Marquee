@@ -101,3 +101,9 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 
 ## VERIFIED correction to BUG-20261019-007
 - Corrected source `2db2241936eef62092aaa7c68902f092789275de`, [CI 39304414245](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39304414245) SUCCESS all six jobs. Database composite-scope test no longer relies on catalog-item mismatch or duplicate request constraints. Production posting remains OFF.
+
+
+## QA-20261019-OPS-MFA — Intermittent operations browser MFA challenge not visible
+- Source/CI: `a4050b7d0714337de0791555e992b3f994d4ad12`, first run [39312723278](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39312723278) attempt 1, `authenticated-panel-e2e` failed waiting for operations TOTP input. Five other jobs were green.
+- Retry of the same job on attempt 2 passed without code change. Root cause NOT established; not proof of a product MFA bypass. Continue diagnostics before any browser acceptance stability remediation. Never skip MFA, hide assertion or loosen authentication. Production inventory flags remain OFF.
+- Status: INTERMITTENT / UNDER INVESTIGATION. Severity pending reproduction; no claim of corrected source.
