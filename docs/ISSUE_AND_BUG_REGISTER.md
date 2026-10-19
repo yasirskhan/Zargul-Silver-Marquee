@@ -121,3 +121,12 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Root cause: read-model omitted immutable `hall_inventory_loan_dispatches` scoped join and view ignored status.
 - Repair: scoped left join, distinguish `source_dispatched_receipt_pending` from `draft_only`, flag actual source movement without falsely claiming destination confirmation, and make UI show server-derived stage. Add PostgreSQL source/destination regression assertions to dispatch test.
 - Status: FIX PUBLISHED — CI PENDING. Source `bd1b247c` [CI 39322244021](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39322244021); UI `d4e8f847` [CI 39322329883](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39322329883). Six-job exact-SHA required. No production switches enabled.
+
+## BUG-20261019-008 — Resolved false DRAFT label after dispatched stock
+- Source `2bff6f3d099a454ad91df0311a93e0f0317ebb20`, CI [39323304935](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39323304935) SUCCESS all six. Source movement now shown as actually dispatched, never incorrectly marked received or completed.
+- The initial syntax regression and outdated Livewire heading assertion from that repair were reproduced and corrected in the same verified source; no test was removed.
+
+## QA-20261019-INTERNAL-RETURN — Review join cross-loan isolation regression
+- Discovery: draft read-only return history joined immutable return lines to draft line snapshots by tenant and catalog item alone. A repeated source catalog item in a second unrelated loan could duplicate the displayed original batch line.
+- Fix: new join binds via the immutable batch's exact loan ID as well as company/item. Dedicated PostgreSQL regression creates another draft with the same item and checks the original return report remains a single line.
+- Source `d5883f9fc13234e25a34c62c0f1509e6ea96e58d`, CI [39326982956](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39326982956) PENDING six-job verification. No production gate enabled.
