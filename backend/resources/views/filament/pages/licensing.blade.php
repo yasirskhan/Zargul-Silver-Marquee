@@ -107,6 +107,26 @@
                 class="inline-block rounded-lg border px-4 py-2 text-sm font-semibold">
                 View past invoices and refunds
             </a>
+            @if (config('central_control.activation_enabled') === true && config('central_control.support_enabled') === true)
+                <div class="rounded-lg border p-4 space-y-3" aria-label="Request a HAFZATECH license review">
+                    <p class="font-semibold">Request a six-month or annual license review</p>
+                    <p class="text-sm">This sends a private support request for billing review. HAFZATECH must separately confirm payment and issue a signed license. This button cannot extend a subscription.</p>
+                    <label class="block space-y-1">
+                        <span class="text-sm font-medium">Requested term</span>
+                        <select wire:model="requestedTermMonths" class="w-full rounded-lg border p-3 text-gray-900">
+                            <option value="6">Six months</option>
+                            <option value="12">One year</option>
+                        </select>
+                    </label>
+                    <button type="button" wire:click="requestRenewalReview" wire:loading.attr="disabled" wire:target="requestRenewalReview"
+                        class="rounded-lg border px-4 py-2 text-sm font-semibold">
+                        Send license review request
+                    </button>
+                    @if ($renewalReviewMessage)
+                        <p role="status" aria-live="polite" class="text-sm">{{ $renewalReviewMessage }}</p>
+                    @endif
+                </div>
+            @endif
             @if (config('central_control.support_enabled') === true)
                 <a href="{{ \App\Filament\Pages\SupportInbox::getUrl(['company'=>$companyId]) }}"
                     class="inline-block rounded-lg border px-4 py-2 text-sm font-semibold">

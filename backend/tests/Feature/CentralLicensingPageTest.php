@@ -110,6 +110,65 @@ class CentralLicensingPageTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_owner_requests_idempotent_six_month_license_review_without_payment_or_network(): void
+    {
+        config()->set('central_control.activation_enabled',true);
+        $company=Company::create(['name'=>'Renewal Contact Venue','slug'=>'renewal-contact-venue']);
+        $owner=User::create(['name'=>'Review Owner',
+            'email'=>'review-owner@example.test','password'=>'test-only']);
+        $owner->markEmailAsVerified();
+        CompanyMembership::create(['company_id'=>$company->id,
+            'user_id'=>$owner->id,'role'=>'owner']);
+        $installation=app(CentralInstallationIdentity::class)->initialize();
+        DB::table('central_installation_activation')->insert([
+            'singleton_id'=>1,'installation_id'=>$installation['installation_id'],
+            'customer_id'=>(string)Str::uuid(),'approved_domain'=>'review.example.test',
+            'status'=>'registered_pending_license','central_registered_at'=>now(),
+            'created_at'=>now(),'updated_at'=>now(),
+        ]);
+        app(CentralInstallationCompanyScope::class)->bind($owner,$company->id);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->be($owner);
+        Http::preventStrayRequests();
+        $page=Livewire::test(Licensing::class);
+        $page->call('requestRenewalReview')->assertForbidden();
+        $this->assertDatabaseCount('central_support_outbox',0);
+        config()->set('central_control.support_enabled',true);
+        $page=Livewire::test(Licensing::class)
+            ->assertSee('Send license review request')
+            ->set('requestedTermMonths','6')
+            ->call('requestRenewalReview')
+            ->assertSet('renewalReviewMessage',
+                'License review request recorded in the private support queue. No payment or renewal has been approved.');
+        $this->assertDatabaseCount('central_support_outbox',1);
+        $saved=DB::table('central_support_outbox')->first();
+        $this->assertSame($company->id,$saved->company_id);
+        $this->assertSame($installation['installation_id'],$saved->installation_id);
+        $this->assertSame($owner->id,(int)$saved->created_by);
+        $plaintext=\Illuminate\Support\Facades\Crypt::decryptString($saved->encrypted_body);
+        $this->assertStringContainsString('6-month license',$plaintext);
+        $this->assertStringContainsString('not_yet_issued',$plaintext);
+        $this->assertStringContainsString('does not confirm payment',$plaintext);
+        $this->assertStringNotContainsString($plaintext,$saved->encrypted_body);
+        // Repeat browser submit, including a new mounted session, remains
+        // the SAME deterministic support request, not a second invoice.
+        $page->call('requestRenewalReview');
+        Livewire::test(Licensing::class)->set('requestedTermMonths','6')
+            ->call('requestRenewalReview');
+        $this->assertDatabaseCount('central_support_outbox',1);
+        $page->set('requestedTermMonths','18')
+            ->call('requestRenewalReview')->assertStatus(422);
+        $this->assertDatabaseCount('central_support_outbox',1);
+        DB::table('company_memberships')->where('company_id',$company->id)
+            ->where('user_id',$owner->id)->update(['role'=>'manager']);
+        $page->set('requestedTermMonths','12')
+            ->call('requestRenewalReview')->assertForbidden();
+        $this->assertDatabaseCount('central_support_outbox',1);
+        $this->assertDatabaseCount('finance_journals',0);
+        $this->assertDatabaseCount('central_signed_license_cache',0);
+        Http::assertNothingSent();
+    }
+
     public function test_page_rechecks_role_revocation_before_another_livewire_call(): void
     {
         config()->set('central_control.activation_enabled',true);

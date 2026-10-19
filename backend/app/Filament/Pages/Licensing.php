@@ -36,6 +36,11 @@ final class Licensing extends Page
     #[Locked]
     public ?string $verificationMessage = null;
 
+    public string $requestedTermMonths = '12';
+
+    #[Locked]
+    public ?string $renewalReviewMessage = null;
+
     /** @return array<string,string> */
     private static function allowedCompanies(User $actor): array
     {
@@ -86,6 +91,32 @@ final class Licensing extends Page
 
     public function updatedCompanyId(): void
     {
+        $this->verificationMessage=null;
+        $this->renewalReviewMessage=null;
+        $this->refreshStatus();
+    }
+
+    /**
+     * Explicit owner renewal CONTACT request through encrypted local support.
+     * No money, subscription or signed entitlement can be issued here.
+     */
+    public function requestRenewalReview():void
+    {
+        $this->renewalReviewMessage=null;
+        $actor=Filament::auth()->user();
+        abort_unless($actor instanceof User && $this->companyId!==null &&
+            static::canAccess() &&
+            array_key_exists($this->companyId,$this->companyOptions()),403);
+        abort_unless(in_array($this->requestedTermMonths,['6','12'],true),422);
+        try {
+            app(\App\Services\CentralOwnerLicenseReviewRequest::class)->queue(
+                $actor,$this->companyId,(int)$this->requestedTermMonths);
+            $this->renewalReviewMessage='License review request recorded in the private support queue. No payment or renewal has been approved.';
+        } catch (\Illuminate\Auth\Access\AuthorizationException) {
+            abort(403);
+        } catch (\InvalidArgumentException) {
+            $this->renewalReviewMessage='Unable to request review for this license. Contact HAFZATECH support.';
+        }
         $this->refreshStatus();
     }
 
