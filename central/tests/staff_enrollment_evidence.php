@@ -180,6 +180,31 @@ try {
     'staff_id'=>$targetStale,'email_sha256'=>hash('sha256','evidence-stale@example.test'),
     'nonce'=>$stale['nonce'],'issued_at'=>$now,'expires_at'=>$now+240
  ]);
+ // A second independently MFA-authenticated reviewer held valid GLOBAL
+ // staff.create authority when the challenge was issued. Revoking that
+ // authority must deny review before any evidence receipt is created.
+ $revokedReviewer=evidenceUuid();
+ $insert->execute(['id'=>$revokedReviewer,
+    'email'=>'evidence-revoked-reviewer@example.test',
+    'hash'=>password_hash($password,PASSWORD_ARGON2ID),
+    'seed'=>bin2hex($seed),
+    'enrolled'=>gmdate('Y-m-d H:i:sP'),'status'=>'active']);
+ $grant->execute(['id'=>evidenceUuid(),'staff'=>$revokedReviewer]);
+ $revokedBearer=$sessions->login('evidence-revoked-reviewer@example.test',
+    $password,$otp,'192.0.2.196');
+ evidenceCheck(is_string($revokedBearer) &&
+    $access->permits($revokedReviewer,'staff.create',null,true),
+    'second reviewer begins with valid independent GLOBAL MFA role');
+ $db->prepare('UPDATE central_staff_role_grants SET revoked_at=now()
+    WHERE staff_id=:id')->execute(['id'=>$revokedReviewer]);
+ evidenceDeny(fn()=>$on->checkAndRecord($revokedBearer,$stale['challenge_id'],
+    $stale['nonce'],evidenceEnvelope($claim,$secret)),
+    'staff_enrollment_evidence_denied');
+ $count=$db->prepare('SELECT count(*) FROM central_staff_enrollment_evidence_checks
+     WHERE challenge_id=:id');
+ $count->execute(['id'=>$stale['challenge_id']]);
+ evidenceCheck((int)$count->fetchColumn()===0,
+    'revoked reviewer cannot persist a proof-check receipt');
  $db->prepare('UPDATE central_staff_role_grants SET revoked_at=now()
     WHERE staff_id=:id')->execute(['id'=>$issuer]);
  evidenceDeny(fn()=>$on->checkAndRecord($reviewerBearer,$stale['challenge_id'],
