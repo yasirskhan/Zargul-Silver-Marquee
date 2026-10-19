@@ -86,6 +86,24 @@ class HallInventoryPositionSchemaTest extends TestCase
         ] as $name){
             $this->assertContains($name,$constraints);
         }
+        $constraints=DB::select(
+            "SELECT pg_get_constraintdef(c.oid) AS definition
+             FROM pg_constraint c
+             JOIN pg_class t ON t.oid=c.conrelid
+             WHERE t.relname='hall_inventory_movement_events'
+               AND c.contype='f'"
+        );
+        $definitions=implode(' ',array_map(
+            static fn($row):string=>(string)$row->definition,$constraints));
+        $this->assertStringContainsString(
+            'FOREIGN KEY (company_id, hall_id, item_id, position_id)',
+            $definitions,
+            'Journal must bind actor evidence to the exact item position.'
+        );
+        $this->assertStringContainsString(
+            'REFERENCES hall_inventory_positions(company_id, hall_id, item_id, id)',
+            $definitions
+        );
         $trigger=DB::table('pg_trigger as tg')
             ->join('pg_class as t','t.oid','=','tg.tgrelid')
             ->where('t.relname','hall_inventory_movement_events')

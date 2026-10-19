@@ -225,3 +225,8 @@ Verify live branch/CI → reconcile current handoff + specific requirement/featu
 ## DETACHED POSITION SQL TEST GATE (2026-10-19 UTC)
 - `HallInventoryPositionSchemaTest` in full hosted Laravel/PostgreSQL suite creates a real current owner/company/hall/catalog item and asserts zero automatic inventory positions or finance journals, then SQL default zero in six separate ownership/custody buckets and revision. It also checks database constraints on negative/overflow/type/revision and real immutable audit trigger registry on append-only hall movement events. This is evidence foundation only, NOT a stock-posting service.
 - Do not publish until predecessor pure arithmetic source exact all-six CI green, then run own all-six suite. Code/release remains OFF; next migration/provider work must enforce deterministic locks, current hall privileges, separate physical evidence and financial approval.
+
+
+## PHASE 12 MISMATCH PREVENTION — DETACHED SCHEMA CORRECTION
+- Code review caught a potential cross-item book-history mismatch: separate item FK and hall position FK permitted a journal event from item A to claim a position of item B within the SAME tenant/hall. Corrected movement FK is now the exact composite `(company_id,hall_id,item_id,position_id)` referencing `hall_inventory_positions(company_id,hall_id,item_id,id)`. This is foundational ledger-integrity protection, not a live migration, and prevents fabricated item association at database level.
+- `HallInventoryPositionSchemaTest` now checks actual PostgreSQL foreign-key definition, alongside immutable trigger and six-bucket bounds. Must run all six hosted jobs at the exact published successor SHA and keep the entire inventory posting feature OFF until separate physical-evidence/authorization acceptance.
