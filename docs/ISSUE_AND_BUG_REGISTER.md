@@ -112,3 +112,12 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 ## 2026-10-19 — Read-only destination loan review milestone closed
 - New INV-013-VIS and INV-013-UI did not relax owning hall permissions, did not post inventory/finance, and received six-job CI success at `39b85575` (39315865530) and `67292f8f` (39316926171).
 - Previous intermittent browser operations MFA challenge issue remains NOT root-cause resolved. Prior retry passing is not evidence of a repaired product defect. Do not skip or relax TOTP.
+
+
+## BUG-20261019-008 — Dispatched internal loan incorrectly shown as DRAFT / NOT DISPATCHED
+- Affected: Phase 12 hall loan history and owner/manager inventory interface.
+- Severity: HIGH operational custody misstatement: `HallInventoryLoanDraftReview::recent` returned `draft_only` and `stockMoved=false` unconditionally, even after `HallInventoryInternalLoanDispatchService` posted source stock to `owned_on_loan`. Blade UI independently hardcoded DRAFT / NOT DISPATCHED.
+- Reproduction: create two-item internal draft, independently source-dispatch with actual evidence, then view lending or receiving hall history; old history/UI incorrectly reported no physical dispatch.
+- Root cause: read-model omitted immutable `hall_inventory_loan_dispatches` scoped join and view ignored status.
+- Repair: scoped left join, distinguish `source_dispatched_receipt_pending` from `draft_only`, flag actual source movement without falsely claiming destination confirmation, and make UI show server-derived stage. Add PostgreSQL source/destination regression assertions to dispatch test.
+- Status: FIX PUBLISHED — CI PENDING. Source `bd1b247c` [CI 39322244021](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39322244021); UI `d4e8f847` [CI 39322329883](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39322329883). Six-job exact-SHA required. No production switches enabled.
