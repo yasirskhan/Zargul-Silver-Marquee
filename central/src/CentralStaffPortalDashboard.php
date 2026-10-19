@@ -13,7 +13,8 @@ final class CentralStaffPortalDashboard
 {
     public function __construct(
         private readonly CentralStaffSessionAuthorization $authorization,
-        private readonly CentralStaffCustomerLookup $customers
+        private readonly CentralStaffCustomerLookup $customers,
+        private readonly ?CentralStaffVendorInvoiceIssuer $invoiceIssuer=null
     ) {}
 
     public function render(string $sessionBearer,string $customerId,?string $csrf=null): string
@@ -79,6 +80,43 @@ final class CentralStaffPortalDashboard
                     'name="invoice_id" maxlength="36" required></label>'.
                     '<button type="submit">Billing overview</button></form>';
             }
+            if($billing && $this->invoiceIssuer!==null &&
+                getenv('CENTRAL_VENDOR_INVOICE_ISSUANCE_ENABLED')==='true' &&
+                $this->authorization->permits(
+                    $sessionBearer,'billing.invoice.issue',$customerId)) {
+                $offers=$this->invoiceIssuer->offers($sessionBearer,$customerId);
+                $forms.='<section aria-label="Vendor invoice offers">'.
+                    '<h3>Issue a HAFZATECH subscription invoice</h3>'.
+                    '<p>Invoices are UNPAID until independent settlement verification. '.
+                    'Issuing an invoice never renews a license.</p>';
+                foreach($offers as $offer) {
+                    $plan=htmlspecialchars((string)$offer['plan_version_id'],
+                        ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+                    $accountId=htmlspecialchars((string)$offer['receiving_account_id'],
+                        ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+                    $label=htmlspecialchars((string)$offer['plan_code'],
+                        ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+                    $receiver=htmlspecialchars((string)$offer['display_label'],
+                        ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+                    $price=htmlspecialchars((string)$offer['price_minor'],
+                        ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+                    $currency=htmlspecialchars((string)$offer['currency'],
+                        ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+                    $requestId=self::uuid();
+                    $forms.='<form method="post" action="/staff/billing/invoices/issue">'.
+                        $base.
+                        '<input type="hidden" name="plan_version_id" value="'.$plan.'">'.
+                        '<input type="hidden" name="receiving_account_id" value="'.$accountId.'">'.
+                        '<input type="hidden" name="request_id" value="'.$requestId.'">'.
+                        '<button type="submit">Issue '.$label.' '.
+                        (int)$offer['term_months'].' months, '.$currency.' '.
+                        $price.' minor units via '.$receiver.'</button></form>';
+                }
+                if($offers===[]) {
+                    $forms.='<p>No eligible active plan and verified receiving account.</p>';
+                }
+                $forms.='</section>';
+            }
             $forms.='<form method="post" action="/staff/account/password/change">'.
                 '<input type="hidden" name="staff_csrf" value="'.$safeCsrf.'">'.
                 '<label>Current password <input type="password" '.
@@ -94,5 +132,15 @@ final class CentralStaffPortalDashboard
         return '<section aria-label="Private HAFZATECH staff dashboard">'.
             '<h1>HAFZATECH Staff</h1><p>Selected customer: '.$name.
             ' ('.$id.')</p>'.$sections.$forms.'</section>';
+    }
+
+    private static function uuid():string
+    {
+        $b=random_bytes(16);
+        $b[6]=chr((ord($b[6])&15)|64);
+        $b[8]=chr((ord($b[8])&63)|128);
+        $h=bin2hex($b);
+        return substr($h,0,8).'-'.substr($h,8,4).'-'.
+            substr($h,12,4).'-'.substr($h,16,4).'-'.substr($h,20);
     }
 }

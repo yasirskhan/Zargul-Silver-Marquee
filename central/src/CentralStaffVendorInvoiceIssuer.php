@@ -25,6 +25,57 @@ final class CentralStaffVendorInvoiceIssuer
         private readonly bool $enabled=false
     ) {}
 
+    /**
+     * Read-only eligible plan and receiving-account choices for a CURRENT
+     * MFA Billing Officer. Do not return plaintext/encoded bank instructions
+     * or installation secrets. Issuance performs all checks again under locks.
+     * @return array<int,array<string,mixed>>
+     */
+    public function offers(string $staffBearer,string $customerId):array
+    {
+        if(!$this->enabled || getenv('CENTRAL_VENDOR_INVOICE_ISSUANCE_ENABLED')!=='true') {
+            throw new RegistrationError('vendor_invoice_issuance_not_enabled',503);
+        }
+        if(preg_match(self::UUID,$customerId)!==1 ||
+            !$this->authorization->permits(
+                $staffBearer,'billing.invoice.issue',$customerId)) {
+            throw new RegistrationError('billing_invoice_issuer_required');
+        }
+        $q=$this->db->prepare(
+            "SELECT p.id AS plan_version_id,p.plan_code,p.version,p.term_months,
+                    p.currency,p.price_minor,p.entitlements_snapshot,
+                    a.id AS receiving_account_id,a.display_label
+             FROM vendor_customers c
+             JOIN central_customer_provider_assignments m
+               ON m.customer_id=c.id AND m.enabled=true
+               AND m.effective_from<=now()
+               AND (m.effective_to IS NULL OR m.effective_to>now())
+             JOIN central_vendor_receiving_accounts a
+               ON a.id=m.receiving_account_id AND a.status='verified'
+               AND a.provider_kind<>'paypal'
+             JOIN central_vendor_plan_versions p
+               ON p.currency=a.receiving_currency
+             WHERE c.id=:customer AND c.status='active'
+               AND p.term_months IN (6,12) AND p.price_minor>0
+             ORDER BY p.plan_code,p.version DESC,a.display_label LIMIT 30"
+        );
+        $q->execute(['customer'=>$customerId]);
+        $out=[];
+        foreach($q->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $benefits=json_decode((string)$row['entitlements_snapshot'],
+                true,32,JSON_THROW_ON_ERROR);
+            if(!is_array($benefits) ||
+                !is_int($benefits['max_halls']??null) ||
+                !is_int($benefits['max_staff']??null) ||
+                $benefits['max_halls']<1 || $benefits['max_staff']<1 ||
+                !is_array($benefits['features']??null)) continue;
+            unset($row['entitlements_snapshot']);
+            $row['term_months']=(int)$row['term_months'];
+            $out[]=$row;
+        }
+        return $out;
+    }
+
     /** @return array{invoice_id:string,invoice_number:string,currency:string,total_minor:string,term_months:int,status:string} */
     public function issue(string $staffBearer,string $customerId,string $planVersionId,
         string $receivingAccountId,string $requestId):array

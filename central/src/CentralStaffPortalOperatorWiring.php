@@ -57,7 +57,8 @@ final class CentralStaffPortalOperatorWiring
             new CentralStaffPaymentEvidenceReviewService($db,$sessions,$auth),
             new CentralStaffInvoicePaymentOverview($db,$sessions,$auth),true);
         $customers=new CentralStaffCustomerLookup($db,$auth);
-        $dashboard=new CentralStaffPortalDashboard($auth,$customers);
+        $invoiceIssuer=new CentralStaffVendorInvoiceIssuer($db,$sessions,$auth,true);
+        $dashboard=new CentralStaffPortalDashboard($auth,$customers,$invoiceIssuer);
         $support=new CentralStaffSupportTicketQueue($db,$auth);
         $audit=new CentralStaffPortalAuditHistoryPage(
             new CentralStaffSessionAuditReader($db,$auth),
@@ -82,7 +83,7 @@ final class CentralStaffPortalOperatorWiring
             new CentralStaffRoleDecisionService($db,$sessions,$access,true),
             new CentralStaffRoleRequestService($db,$sessions,$access,true),
             new CentralStaffActivationReadiness($db,$sessions,$access,true),
-            new CentralStaffVendorInvoiceIssuer($db,$sessions,$auth,true));
+            $invoiceIssuer);
         return new CentralStaffPortalOperatorApp(
             new CentralStaffPortalOperatorKernel(
                 $router,new CentralStaffPortalPrivateResponse(true),true),

@@ -443,6 +443,29 @@ try {
   !str_contains($invoicePage['html'],$billingSession) &&
   !str_contains($invoicePage['html'],$billingCsrf),
   'staff issued real fixed-price invoice with safe private receipt only');
+ $offers=$invoiceIssuer->offers($billingSession,$company);
+ $eligible=array_values(array_filter($offers,
+  static fn(array $v):bool=>$v['plan_version_id']===$plan &&
+   $v['receiving_account_id']===$provider &&
+   $v['currency']==='PKR' && (int)$v['term_months']===12));
+ paidSessionAssert(count($eligible)===1 &&
+  !isset($eligible[0]['encrypted_instructions']),
+  'eligible plan and assigned receiver visible without banking secrets');
+ paidSessionDeny(fn()=>$invoiceIssuer->offers($issuer,$company),
+  'billing_invoice_issuer_required');
+ $invoiceDashboard=new \Hafzatech\Central\CentralStaffPortalDashboard(
+  $queueAuth,$customerReader,$invoiceIssuer);
+ $invoiceDashboardHtml=$invoiceDashboard->render(
+  $billingSession,$company,$billingCsrf);
+ paidSessionAssert(str_contains($invoiceDashboardHtml,'/staff/billing/invoices/issue') &&
+  str_contains($invoiceDashboardHtml,$plan) &&
+  str_contains($invoiceDashboardHtml,$provider) &&
+  str_contains($invoiceDashboardHtml,'21000') &&
+  !str_contains($invoiceDashboardHtml,$billingSession),
+  'only Billing Officer dashboard sees eligible server-priced invoice choices');
+ $issuerHtml=$invoiceDashboard->render($issuer,$company,$issuerCsrf);
+ paidSessionAssert(!str_contains($issuerHtml,'/staff/billing/invoices/issue'),
+  'License Officer cannot see Billing Officer invoice issuance form');
  $invoiceResponse=(new \Hafzatech\Central\CentralStaffPortalPrivateResponse(true))
   ->compose($invoicePage);
  paidSessionAssert($invoiceResponse['status']===200 &&
