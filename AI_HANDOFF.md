@@ -457,3 +457,7 @@ Verify live branch/CI → reconcile current handoff + specific requirement/featu
 
 ## EXTERNAL BORROWED PHYSICAL INTAKE CI RECOVERY (2026-10-20)
 - New external-in receipt migration published at `b38cc3e8aeca83750577a9519f97421b6654c1a8`, CI 39428306646 blocked two jobs by SQLSTATE 42601 before tests: `venuedesk_guard_external_in_count` uses invalid singular dollar delimiter `$ ... $` instead of PostgreSQL `$$ ... $$`. The other guard had correct delimiters. Fix just that statement's opening/closing pair, keeping both exact scope/immutability triggers and tests. Subsequent six-job CI must pass on exact successor SHA before verification; external-in remains default-OFF.
+
+
+## 2026-10-20 EXTERNAL INBOUND SQL QUOTE FINAL CORRECTION
+- On CI 39428562572, migration remained unchanged despite documentation-only commit `273cd67f...` because JavaScript String.replace replacement string treats `$$` as escaped literal `$`. Repaired deterministically with a callback replacer so BOTH SQL dollar-quote delimiters in `venuedesk_guard_external_in_count` persist as actual `$$`, and verified new git blob SHA differs from original BEFORE publishing. Integrity guard and test retained. Repeat all 6 CI jobs on the new exact SHA.

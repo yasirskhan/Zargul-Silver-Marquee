@@ -210,3 +210,5 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 
 ## BUG-20261020-018 — External receipt SQL trigger delimiter malformed
 - CI 39428306646 @ b38cc3e8 blocked migration in laravel-postgres and authenticated-panel-e2e (SQLSTATE 42601). Cause: function body delimiter singular `$` instead of `$$`. Repair both delimiter sites without dropping or weakening guard. All six jobs must pass on new exact SHA. Production release OFF.
+
+- Follow-up BUG-20261020-018: prior purported fix was docs-only because JS replacement-text `$$` collapses to `$`. Corrected using replacement callback, verified old/new blob SHA mismatch and direct SQL source bytes; six-job CI still required.

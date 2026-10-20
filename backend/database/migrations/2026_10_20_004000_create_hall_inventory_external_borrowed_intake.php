@@ -68,7 +68,7 @@ return new class extends Migration {
             DB::statement("CREATE TRIGGER immutable_{$table} BEFORE UPDATE OR DELETE
                 ON {$table} FOR EACH ROW EXECUTE FUNCTION venuedesk_immutable_history()");
         DB::unprepared(<<<'SQL'
-CREATE OR REPLACE FUNCTION venuedesk_guard_external_in_count() RETURNS trigger LANGUAGE plpgsql AS $
+CREATE OR REPLACE FUNCTION venuedesk_guard_external_in_count() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM hall_inventory_external_in_receipts r
@@ -88,7 +88,7 @@ BEGIN
         RAISE EXCEPTION 'External borrowed physical count must match its own loan and hall item';
     END IF;
     RETURN NEW;
-END $;
+END $$;
 SQL);
         DB::statement('CREATE TRIGGER guard_external_in_count
             BEFORE INSERT ON hall_inventory_external_in_receipt_lines
