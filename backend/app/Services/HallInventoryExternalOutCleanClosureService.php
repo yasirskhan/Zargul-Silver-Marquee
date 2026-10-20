@@ -106,6 +106,7 @@ final class HallInventoryExternalOutCleanClosureService {
                 ->where('hall_id',$hallId)->orderBy('id')->lockForUpdate()->get();
             if($batches->isEmpty())throw new ConflictHttpException('Outside owned loan has no actual partner-signed return.');
             $reviewIds=[];
+            $usedPhysicalMovements=[];
             foreach($batches as $batch){
                 if($batch->dispatch_id!==$dispatch->id||
                     (int)$batch->received_by===(int)$closer->getKey())
@@ -125,7 +126,13 @@ final class HallInventoryExternalOutCleanClosureService {
                     ->where('review_id',$review->id)
                     ->get(['item_id','good_quantity','damaged_quantity',
                         'unresolved_quantity','good_movement_id'])->keyBy('item_id');
-                if($received->isEmpty()||$received->count()!==$assessed->count())
+                $rawReceivedCount=DB::table('hall_inventory_external_out_return_lines')
+                    ->where('company_id',$companyId)->where('receipt_id',$batch->id)->count();
+                $rawAssessedCount=DB::table('hall_inventory_external_out_return_review_lines')
+                    ->where('company_id',$companyId)->where('receipt_id',$batch->id)
+                    ->where('review_id',$review->id)->count();
+                if($received->isEmpty()||$received->count()!==$rawReceivedCount||
+                    $assessed->count()!==$rawAssessedCount||$received->count()!==$assessed->count())
                     throw new ConflictHttpException('A signed outside return lacks exact inspected lines.');
                 foreach($received as $itemId=>$line){
                     if(!array_key_exists((string)$itemId,$totals)||
@@ -136,6 +143,9 @@ final class HallInventoryExternalOutCleanClosureService {
                         (int)$r->damaged_quantity!==0||
                         (int)$r->unresolved_quantity!==0||!$r->good_movement_id)
                         throw new ConflictHttpException('Damaged or unresolved outside-owned custody cannot close CLEAN.');
+                    if(isset($usedPhysicalMovements[(string)$r->good_movement_id]))
+                        throw new ConflictHttpException('One posted physical movement cannot evidence multiple return batches.');
+                    $usedPhysicalMovements[(string)$r->good_movement_id]=true;
                     $move=DB::table('hall_inventory_movement_events')
                         ->where('company_id',$companyId)->where('hall_id',$hallId)
                         ->where('item_id',$itemId)->where('id',$r->good_movement_id)
