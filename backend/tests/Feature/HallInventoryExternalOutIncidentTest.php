@@ -594,6 +594,55 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
             ->assertSee('Non-clean loan reconciliation (read-only)')
             ->assertSee('Physically unreturned: 3')
             ->assertSee('Final non-clean closure: BLOCKED');
+        // Physical ownership disposal is independent of counterparty financial
+        // recovery and requires a third owner beyond reporter and incident reviewer.
+        $writeoffs=app(\App\Services\HallInventoryNoncleanWriteoffService::class);
+        try {
+            $writeoffs->propose($owner,$company->id,$hall->id,$report,
+                (string)Str::uuid(),1,'Written off only after physical damage investigation');
+            $this->fail('Default-off physical write-off permitted.');
+        } catch (ConflictHttpException) {}
+        config()->set('inventory_controls.loan_nonclean_writeoffs_enabled',true);
+        $this->be($owner);
+        Livewire::test(HallInventory::class)->set('hallId',$hall->id)
+            ->call('startFinancialClaims',$loan)->assertHasNoErrors()
+            ->assertSee('Independent abnormal physical write-off approval')
+            ->set('noncleanWriteoffIncidentId',$report)
+            ->set('noncleanWriteoffQuantity','1')
+            ->set('noncleanWriteoffReason','Actual unusable outside-owned table after separate physical review')
+            ->call('submitNoncleanWriteoff')->assertHasNoErrors();
+        $proposal=DB::table('hall_inventory_nonclean_writeoff_proposals')
+            ->where('company_id',$company->id)->where('incident_id',$report)->first();
+        $this->assertNotNull($proposal);
+        $this->assertSame(0,DB::table('hall_inventory_nonclean_writeoff_decisions')->count());
+        $this->be($reviewer);
+        try {
+            $writeoffs->decide($reviewer,$company->id,$hall->id,$proposal->id,
+                (string)Str::uuid(),'approved','I reviewed the original incident too');
+            $this->fail('Incident reviewer self-approved physical write-off.');
+        } catch (AuthorizationException) {}
+        $independent=User::create(['name'=>'Third Independent Owner',
+            'email'=>'external-writeoff-third@example.test','password'=>'test-only']);
+        $independent->markEmailAsVerified();
+        CompanyMembership::create(['company_id'=>$company->id,
+            'user_id'=>$independent->id,'role'=>'owner']);
+        $this->be($independent);
+        Livewire::test(HallInventory::class)->set('hallId',$hall->id)
+            ->call('startFinancialClaims',$loan)->assertHasNoErrors()
+            ->set('noncleanWriteoffDecisionProposalId',$proposal->id)
+            ->set('noncleanWriteoffDecision','approved')
+            ->set('noncleanWriteoffDecisionReason','Independent confirmed physical damage and approved actual owned stock retirement')
+            ->call('decideNoncleanWriteoff')->assertHasNoErrors();
+        $posted=DB::table('hall_inventory_nonclean_writeoff_decisions')
+            ->where('proposal_id',$proposal->id)->first();
+        $this->assertSame('approved',$posted->decision);
+        $movement=DB::table('hall_inventory_movement_events')->where('id',$posted->movement_id)->first();
+        $this->assertSame('writeoff_owned_damaged',$movement->event_kind);
+        $after=DB::table('hall_inventory_positions')->where('item_id',$item)->first();
+        $this->assertSame(0,(int)$after->owned_damaged);
+        $this->assertSame(3,(int)$after->owned_on_loan);
+        $this->assertSame(0,DB::table('hall_inventory_external_out_clean_closures')->count());
+        $this->assertSame(0,DB::table('hall_inventory_financial_recovery_reversals')->count());
         $this->assertSame(0,DB::table('hall_inventory_external_out_clean_closures')->count());
     }
 }

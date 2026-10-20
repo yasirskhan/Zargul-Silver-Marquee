@@ -333,6 +333,20 @@ final class HallInventory extends Page
     #[Locked]
     public array $noncleanReconciliation = [];
     #[Locked]
+    public array $noncleanWriteoffHistory = [];
+    #[Locked]
+    public array $noncleanWriteoffEligible = [];
+    #[Locked]
+    public string $noncleanWriteoffProposalId = '';
+    #[Locked]
+    public string $noncleanWriteoffDecisionId = '';
+    public string $noncleanWriteoffIncidentId = '';
+    public string $noncleanWriteoffQuantity = '';
+    public string $noncleanWriteoffReason = '';
+    public string $noncleanWriteoffDecisionProposalId = '';
+    public string $noncleanWriteoffDecision = 'rejected';
+    public string $noncleanWriteoffDecisionReason = '';
+    #[Locked]
     public string $financialRecoveryRequestId = '';
     public string $financialRecoveryObligationId = '';
     public string $financialRecoveryAmountMinor = '';
@@ -2219,6 +2233,13 @@ final class HallInventory extends Page
                 $row['externalOutApproved']);
         abort_unless($loan!==null,403);
         $this->financialClaimLoanId=$loanId;
+        $this->noncleanWriteoffProposalId=(string)Str::uuid();
+        $this->noncleanWriteoffDecisionId=(string)Str::uuid();
+        $this->noncleanWriteoffIncidentId='';
+        $this->noncleanWriteoffQuantity='';
+        $this->noncleanWriteoffReason='';
+        $this->noncleanWriteoffDecisionProposalId='';
+        $this->noncleanWriteoffDecisionReason='';
         $this->financialRecoveryRequestId=(string)Str::uuid();
         $this->financialRecoveryReviewId=(string)Str::uuid();
         $this->financialRecoveryReversalId=(string)Str::uuid();
@@ -2261,6 +2282,16 @@ final class HallInventory extends Page
         abort_unless($this->canManageFinancialClaims() &&
             $this->financialClaimLoanId!=='',403);
         $this->noncleanReconciliation = [];
+        $this->noncleanWriteoffHistory=[];
+        $this->noncleanWriteoffEligible=[];
+        if(config('inventory_controls.loan_nonclean_writeoffs_enabled') &&
+            config('inventory_controls.loan_nonclean_reconciliation_enabled')) {
+            $writer=app(\App\Services\HallInventoryNoncleanWriteoffService::class);
+            $this->noncleanWriteoffHistory=$writer->history($actor,$this->companyId,
+                $this->hallId,$this->financialClaimLoanId);
+            $this->noncleanWriteoffEligible=$writer->eligible($actor,$this->companyId,
+                $this->hallId,$this->financialClaimLoanId);
+        }
         if(config('inventory_controls.loan_nonclean_reconciliation_enabled')) {
             $this->noncleanReconciliation=app(\App\Services\HallInventoryNoncleanReconciliationService::class)
                 ->report($actor,$this->companyId,$this->hallId,$this->financialClaimLoanId);
@@ -2312,6 +2343,46 @@ final class HallInventory extends Page
                 'kind'=>(string)$row->kind,
                 'quantity'=>(int)$row->quantity
             ])->all();
+    }
+
+    public function submitNoncleanWriteoff():void {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canManageFinancialClaims() &&
+            config('inventory_controls.loan_nonclean_writeoffs_enabled') &&
+            $this->financialClaimLoanId!=='',403);
+        $this->validate([
+            'noncleanWriteoffIncidentId'=>'required|uuid',
+            'noncleanWriteoffQuantity'=>['required','regex:/\A[1-9][0-9]{0,8}\z/D'],
+            'noncleanWriteoffReason'=>'required|string|min:10|max:500'
+        ]);
+        app(\App\Services\HallInventoryNoncleanWriteoffService::class)->propose(
+            $actor,$this->companyId,$this->hallId,$this->noncleanWriteoffIncidentId,
+            $this->noncleanWriteoffProposalId,(int)$this->noncleanWriteoffQuantity,
+            $this->noncleanWriteoffReason);
+        $this->noncleanWriteoffProposalId=(string)Str::uuid();
+        $this->noncleanWriteoffIncidentId='';
+        $this->noncleanWriteoffQuantity='';
+        $this->noncleanWriteoffReason='';
+        $this->reloadFinancialClaims($actor);
+    }
+    public function decideNoncleanWriteoff():void {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canManageFinancialClaims() &&
+            config('inventory_controls.loan_nonclean_writeoffs_enabled') &&
+            $this->financialClaimLoanId!=='',403);
+        $this->validate([
+            'noncleanWriteoffDecisionProposalId'=>'required|uuid',
+            'noncleanWriteoffDecision'=>'required|in:approved,rejected',
+            'noncleanWriteoffDecisionReason'=>'required|string|min:10|max:500'
+        ]);
+        app(\App\Services\HallInventoryNoncleanWriteoffService::class)->decide(
+            $actor,$this->companyId,$this->hallId,$this->noncleanWriteoffDecisionProposalId,
+            $this->noncleanWriteoffDecisionId,$this->noncleanWriteoffDecision,
+            $this->noncleanWriteoffDecisionReason);
+        $this->noncleanWriteoffDecisionId=(string)Str::uuid();
+        $this->noncleanWriteoffDecisionProposalId='';
+        $this->noncleanWriteoffDecisionReason='';
+        $this->reloadFinancialClaims($actor);
     }
 
     public function submitFinancialClaim():void

@@ -150,11 +150,34 @@ final class HallInventoryNoncleanReconciliationService
                 $items[$id]['unresolved']+=$unresolved;
             }
         }
+        // Authorized loss disposal changes stock ownership, not physical
+        // return evidence or automatically accepted cash recovery.
+        $writtenOff=[];
+        if(config('inventory_controls.loan_nonclean_writeoffs_enabled')) {
+            $posted=DB::table('hall_inventory_nonclean_writeoff_proposals as p')
+                ->join('hall_inventory_nonclean_writeoff_decisions as d',function($j):void {
+                    $j->on('d.company_id','=','p.company_id')->on('d.proposal_id','=','p.id');
+                })->where('p.company_id',$companyId)->where('p.hall_id',$hallId)
+                ->where('p.loan_id',$loanId)->where('d.decision','approved')
+                ->get(['p.item_id','p.kind','p.quantity']);
+            foreach($posted as $w) {
+                $item=(string)$w->item_id;
+                if(!isset($items[$item]))throw new ConflictHttpException('Write-off references another physical loan item.');
+                $writtenOff[$item][$w->kind]=($writtenOff[$item][$w->kind]??0)+(int)$w->quantity;
+            }
+        }
         foreach($items as &$item){
             $item['unreturned']=$item['dispatched']-$item['received'];
             // Unresolved returns and unreviewed receipts cannot be cleared
             // from the on-loan custody bucket by a read-only summary.
-            $item['onLoan']=$item['dispatched']-$item['good']-$item['damaged'];
+            $id=$item['itemId'];
+            $item['writtenOffMissing']=(int)($writtenOff[$id]['missing']??0);
+            $item['writtenOffDamaged']=(int)($writtenOff[$id]['damage']??0);
+            if($item['writtenOffMissing']>$item['unreturned']||
+                $item['writtenOffDamaged']>$item['damaged'])
+                throw new ConflictHttpException('Physical write-off exceeds independently supported loss evidence.');
+            $item['onLoan']=$item['dispatched']-$item['good']-$item['damaged']
+                -$item['writtenOffMissing'];
         }
         unset($item);
         $incidentReports=DB::table('hall_inventory_loan_incident_reports')

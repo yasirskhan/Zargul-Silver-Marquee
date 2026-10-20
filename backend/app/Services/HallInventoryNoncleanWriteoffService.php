@@ -191,6 +191,44 @@ final class HallInventoryNoncleanWriteoffService {
             return $decisionId;
         },3);
     }
+    public function history(User $actor,string $companyId,string $hallId,string $loanId):array {
+        $this->gate();$this->ids($companyId,$hallId,$loanId);
+        $this->scope($actor,$companyId,$hallId);
+        if(!DB::table('hall_inventory_loan_drafts')->where('company_id',$companyId)
+            ->where('id',$loanId)->where('lending_hall_id',$hallId)
+            ->where('direction','external_out')->exists())
+            throw new AuthorizationException('Outside owned physical write-off history is hall private.');
+        return DB::table('hall_inventory_nonclean_writeoff_proposals as p')
+            ->leftJoin('hall_inventory_nonclean_writeoff_decisions as d',function($j):void {
+                $j->on('d.company_id','=','p.company_id')->on('d.proposal_id','=','p.id');
+            })->where('p.company_id',$companyId)->where('p.hall_id',$hallId)
+            ->where('p.loan_id',$loanId)->orderBy('p.created_at')->orderBy('p.id')
+            ->get(['p.id','p.incident_id','p.item_id','p.kind','p.quantity','p.reason',
+                'p.proposed_by','d.decision','d.decided_by','d.movement_id'])
+            ->map(static fn($r):array=>[
+                'id'=>(string)$r->id,'incidentId'=>(string)$r->incident_id,
+                'itemId'=>(string)$r->item_id,'kind'=>(string)$r->kind,
+                'quantity'=>(int)$r->quantity,'reason'=>(string)$r->reason,
+                'proposedBy'=>(int)$r->proposed_by,'decision'=>$r->decision,
+                'decidedBy'=>$r->decided_by,'movementId'=>$r->movement_id
+            ])->all();
+    }
+    public function eligible(User $actor,string $companyId,string $hallId,string $loanId):array {
+        $this->history($actor,$companyId,$hallId,$loanId);
+        return DB::table('hall_inventory_loan_incident_reports as i')
+            ->join('hall_inventory_loan_incident_decisions as d',function($j):void {
+                $j->on('d.company_id','=','i.company_id')->on('d.report_id','=','i.id');
+            })->leftJoin('hall_inventory_nonclean_writeoff_proposals as p',function($j):void {
+                $j->on('p.company_id','=','i.company_id')->on('p.incident_id','=','i.id');
+            })->where('i.company_id',$companyId)->where('i.source_hall_id',$hallId)
+            ->where('i.loan_id',$loanId)->where('d.decision','substantiated')
+            ->whereIn('i.kind',['damage','missing'])->whereNull('p.id')
+            ->get(['i.id','i.source_item_id','i.kind','i.quantity'])
+            ->map(static fn($r):array=>[
+                'id'=>(string)$r->id,'itemId'=>(string)$r->source_item_id,
+                'kind'=>(string)$r->kind,'quantity'=>(int)$r->quantity
+            ])->all();
+    }
     private function audit(User $actor,string $companyId,string $action,string $id,string $loanId,array $data):void {
         DB::table('audit_events')->insert([
             'id'=>(string)Str::uuid(),'company_id'=>$companyId,'actor_id'=>$actor->getKey(),

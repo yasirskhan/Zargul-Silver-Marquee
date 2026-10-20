@@ -1014,13 +1014,61 @@
                                 <p>Original expected partner return date: {{ $noncleanReconciliation['expectedReturnDate'] }}. Due-date disputes need separate hall-local assessment.</p>
                                 <p role="status">Final non-clean closure: BLOCKED. No write-off, custody disposal, financial waiver or numbered final certificate has been authorized by this view.</p>
                                 @foreach($noncleanReconciliation['items'] as $physical)
-                                    <p wire:key="nonclean-{{ $physical['itemId'] }}">Item {{ $physical['itemId'] }}: dispatched {{ $physical['dispatched'] }}, good {{ $physical['good'] }}, damaged {{ $physical['damaged'] }}, unresolved {{ $physical['unresolved'] }}, pending independent review {{ $physical['pendingReview'] }}. Physically unreturned: {{ $physical['unreturned'] }}. On-loan custody outstanding: {{ $physical['onLoan'] }}.</p>
+                                    <p wire:key="nonclean-{{ $physical['itemId'] }}">Item {{ $physical['itemId'] }}: dispatched {{ $physical['dispatched'] }}, good {{ $physical['good'] }}, damaged {{ $physical['damaged'] }}, unresolved {{ $physical['unresolved'] }}, pending independent review {{ $physical['pendingReview'] }}. Physically unreturned: {{ $physical['unreturned'] }}. On-loan custody outstanding: {{ $physical['onLoan'] }}. Written off missing {{ $physical['writtenOffMissing'] }}, written off damaged {{ $physical['writtenOffDamaged'] }} (financial liability unchanged).</p>
                                 @endforeach
                                 <p>Incident reports: {{ $noncleanReconciliation['incidentReports'] }}; awaiting independent incident review: {{ $noncleanReconciliation['unreviewedIncidents'] }}. Any outstanding incident requires authorized individual disposition before final closure.</p>
                                 @foreach($noncleanReconciliation['obligations'] as $id=>$amount)
                                     <p wire:key="nonclean-money-{{ $id }}">Independently authorized obligation {{ $id }}: {{ $amount['currency'] }} {{ $amount['amountMinor'] }} minor units; independently verified net collected {{ $amount['paidMinor'] }}, unverified pending {{ $amount['pendingMinor'] }}, outstanding {{ $amount['remainingMinor'] }}.</p>
                                 @endforeach
                                 <p>Physical and financial summaries are informational only, not authority to post stock, recognize a receivable, waive a dispute or close this loan.</p>
+                                @if(config('inventory_controls.loan_nonclean_writeoffs_enabled'))
+                                    <h4 class="font-semibold">Independent abnormal physical write-off approval</h4>
+                                    <p>Write-off permanently removes confirmed lost or damaged owned units from book custody. It never cancels partner debt, confirms payment, or closes a loan. A different owner must authorize it.</p>
+                                    @if(count($noncleanWriteoffEligible)>0)
+                                        <label>Independently substantiated physical incident
+                                            <select wire:model="noncleanWriteoffIncidentId" class="w-full rounded-lg border p-2 text-gray-900">
+                                                <option value="">Choose substantiated loss</option>
+                                                @foreach($noncleanWriteoffEligible as $incident)
+                                                    <option value="{{ $incident['id'] }}">{{ $incident['kind'] }}: {{ $incident['quantity'] }} units ({{ $incident['id'] }})</option>
+                                                @endforeach
+                                            </select>
+                                        </label>
+                                        <label>Exact quantity to dispose
+                                            <input wire:model="noncleanWriteoffQuantity" type="number" min="1" class="w-full rounded-lg border p-2 text-gray-900">
+                                        </label>
+                                        <label>Physical loss disposition reason
+                                            <textarea wire:model="noncleanWriteoffReason" class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                                        </label>
+                                        <button type="button" wire:click="submitNoncleanWriteoff" class="rounded-lg border p-2">Request independent stock write-off review</button>
+                                    @endif
+                                    <h5>Immutable physical disposition queue</h5>
+                                    @foreach($noncleanWriteoffHistory as $case)
+                                        <article wire:key="writeoff-{{ $case['id'] }}" class="rounded-lg border p-2 text-sm">
+                                            <p>{{ $case['kind'] }}: {{ $case['quantity'] }} units. {{ $case['decision'] ?? 'PENDING independent approval' }}</p>
+                                            <p>Proposal {{ $case['id'] }}; verified movement {{ $case['movementId'] ?? 'none' }}.</p>
+                                        </article>
+                                    @endforeach
+                                    <label>Pending physical proposal to independently decide
+                                        <select wire:model="noncleanWriteoffDecisionProposalId" class="w-full rounded-lg border p-2 text-gray-900">
+                                            <option value="">Choose pending proposal</option>
+                                            @foreach($noncleanWriteoffHistory as $case)
+                                                @if($case['decision'] === null)
+                                                    <option value="{{ $case['id'] }}">{{ $case['kind'] }}: {{ $case['quantity'] }} units ({{ $case['id'] }})</option>
+                                                @endif
+                                            @endforeach
+                                        </select>
+                                    </label>
+                                    <label>Independent decision
+                                        <select wire:model="noncleanWriteoffDecision" class="w-full rounded-lg border p-2 text-gray-900">
+                                            <option value="rejected">Reject</option>
+                                            <option value="approved">Approve witnessed stock disposal</option>
+                                        </select>
+                                    </label>
+                                    <label>Independent review reason
+                                        <textarea wire:model="noncleanWriteoffDecisionReason" class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                                    </label>
+                                    <button type="button" wire:click="decideNoncleanWriteoff" class="rounded-lg border p-2">Record independent physical disposition decision</button>
+                                @endif
                             </section>
                         @endif
                         <p class="text-sm">Loan {{ $financialClaimLoanId }}. Record only evidence-backed proposed amounts in the currency's smallest units (for USD, cents). An internal collection approval is NOT a partner admission, invoice, receivable, payment, stock write-off or final settlement.</p>

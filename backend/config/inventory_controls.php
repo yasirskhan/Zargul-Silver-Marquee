@@ -37,6 +37,8 @@ return [
     // Read-only external-owned abnormal custody and verified money reconciliation.
     // Never authorizes write-off, financial waiver or non-clean closure. OFF.
     'loan_nonclean_reconciliation_enabled' => (bool) env('VENUE_INVENTORY_NONCLEAN_RECONCILIATION_ENABLED', false),
+    // Independently verified, two-owner non-clean physical write-off posting; never waives money. OFF.
+    'loan_nonclean_writeoffs_enabled' => (bool) env('VENUE_INVENTORY_NONCLEAN_WRITEOFFS_ENABLED', false),
     // Entirely clean internal loans only; independently reconciled numbered PDF.
     'loan_clean_closure_enabled' => (bool) env('VENUE_INVENTORY_LOAN_CLEAN_CLOSURE_ENABLED', false),
     // Hall-owned goods lent outside: independent signed handover and owner approval. OFF.
