@@ -543,6 +543,35 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
         $this->assertSame(1,$snapshot['unreviewedIncidents']);
         $this->assertSame(25000,$snapshot['obligations'][$obligationId]['amountMinor']);
         $this->assertSame(0,$snapshot['obligations'][$obligationId]['paidMinor']);
+        // Duplicate return evidence must fail closed at either the immutable SQL
+        // boundary or the independent physical reconciliation boundary.
+        $returnLine=(array)DB::table('hall_inventory_external_out_return_lines')
+            ->where('receipt_id',$receipt)->where('item_id',$item)->first();
+        $this->assertNotEmpty($returnLine);
+        try {
+            DB::transaction(function () use ($returnLine,$reconciliation,$reviewer,$company,$hall,$loan):void {
+                $duplicate=$returnLine;
+                $duplicate['id']=(string)Str::uuid();
+                DB::table('hall_inventory_external_out_return_lines')->insert($duplicate);
+                $reconciliation->report($reviewer,$company->id,$hall->id,$loan);
+                $this->fail('Duplicate physical return line accepted.');
+            });
+        } catch (\\Illuminate\\Database\\QueryException|ConflictHttpException) {}
+        // A movement may not be reused as proof of two differently classified
+        // returned batches, even if a writer attempts to alter reviewed evidence.
+        $reviewLine=DB::table('hall_inventory_external_out_return_review_lines')
+            ->where('receipt_id',$receipt)->where('item_id',$item)->first();
+        $this->assertNotNull($reviewLine);
+        try {
+            DB::transaction(function () use ($reviewLine,$reconciliation,$reviewer,$company,$hall,$loan):void {
+                DB::table('hall_inventory_external_out_return_review_lines')
+                    ->where('id',$reviewLine->id)
+                    ->update(['damaged_movement_id'=>$reviewLine->good_movement_id]);
+                $reconciliation->report($reviewer,$company->id,$hall->id,$loan);
+                $this->fail('Reused inventory movement accepted for another condition.');
+            });
+        } catch (\\Illuminate\\Database\\QueryException|ConflictHttpException) {}
+        $this->assertSame(1,$reconciliation->report($reviewer,$company->id,$hall->id,$loan)['items'][0]['good']);
         // A manager, even assigned to this exact hall, must not see a
         // private owner financial settlement and physical loss report.
         $this->be($drafter);
