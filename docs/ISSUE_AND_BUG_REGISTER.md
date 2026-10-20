@@ -193,3 +193,7 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 
 ## BUG-20261020-016 — PG RefreshDatabase replay duplicate variance guard function
 - Failing CI `39379060119` @ `8d12a19b`, PostgreSQL SQLSTATE[42723], 611 failures caused by migration trying to CREATE already-present `venuedesk_guard_variance_reclassification` across test database rebuilds. Use CREATE OR REPLACE to keep the same guard enforced while allowing replay. No weakening foreign keys or dropping guard. FIX PUBLISHED, CI PENDING.
+
+
+## BUG-20261020-017 — Two incorrect negative regression assertions, legitimate stronger denials
+- CI 39425980820 @ 7d55c6d0, 5/6 PASS, laravel-postgres 627 pass/2 fail/3 risky. Failure 1: revoked user gets Filament route-level 404 not Livewire action 403. Failure 2: immutable forged variance provenance is rejected by SQL BEFORE INSERT guard P0001, not later FK name. Correct tests to assert route NotFound and recognized SQL guard-or-FK rejection respectively, retaining all negative security checks. Product code unchanged; six-job CI pending.

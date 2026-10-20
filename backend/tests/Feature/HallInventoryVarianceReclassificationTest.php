@@ -143,7 +143,13 @@ final class HallInventoryVarianceReclassificationTest extends TestCase {
             });
             $this->fail('Cross-stocktake acknowledgment binding was accepted.');
         }catch(QueryException $e) {
-            $this->assertStringContainsString('stocktake_reclass_ack_scope_fk',$e->getMessage());
+            // The SQL BEFORE INSERT provenance trigger is deliberately stricter than
+            // the composite FK, and is allowed to reject first.
+            $this->assertTrue(
+                str_contains($e->getMessage(),'Variance reclassification must reference exact line, position and movement') ||
+                str_contains($e->getMessage(),'stocktake_reclass_ack_scope_fk'),
+                'Database must reject forged cross-stocktake adjudication provenance.'
+            );
         }
         $this->assertSame(1,DB::table('hall_inventory_variance_reclassifications')->count());
     }

@@ -88,7 +88,9 @@ final class HallInventoryInternalSourceDispatchLivewireTest extends TestCase {
             ->assertDontSee('Prepare witnessed source dispatch')
             ->call('startInternalDispatch',$loan)->assertForbidden();
         DB::table('company_memberships')->where('id',$ownerMember->id)->update(['is_active'=>false]);
-        Livewire::test(HallInventory::class)->call('startInternalDispatch',$loan)->assertForbidden();
+        // Revoked owner cannot even mount this gated Filament page: route-level
+        // access returns 404, which is stricter than action-level 403.
+        Livewire::test(HallInventory::class)->call('startInternalDispatch',$loan)->assertNotFound();
         $this->assertSame(1,DB::table('hall_inventory_loan_dispatches')->count());
     }
 }

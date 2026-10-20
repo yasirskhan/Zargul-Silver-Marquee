@@ -432,3 +432,7 @@ Verify live branch/CI → reconcile current handoff + specific requirement/featu
 
 ## 2026-10-20 MIGRATION REPLAY RECOVERY (CI FAILED)
 - Hosted CI `39379060119` on `8d12a19ba382ba95361f75f9a4275e74e15bcc84`: five jobs PASS, laravel-postgres FAIL. Root cause PostgreSQL 42723 Duplicate function `venuedesk_guard_variance_reclassification` when Laravel RefreshDatabase repeatedly replays migration `2026_10_20_003000_guard_hall_inventory_variance_reclassification_scope.php`. Repair CREATE OR REPLACE for same immutable-scoping guard definition, retains all strict FK and authorization logic. New exact-SHA 6-job CI REQUIRED. Continue INV-016 external-in after verified.
+
+
+## 2026-10-20 PHASE 12 CI REGRESSION REPAIR AFTER PG MIGRATION REPLAY FIX
+- Hosted CI run 39425980820 on exact `7d55c6d0f4bf00df82f03904c246d88e31834c9d`: five green jobs, laravel-postgres 627 passed, 3 risky, TWO new test expectations incorrect. `HallInventoryInternalSourceDispatchLivewireTest.php:91` revoked membership blocks Filament mount with route-level 404 (stronger than expected action-level 403). AssertNotFound for revoked user; preserve denial. `HallInventoryVarianceReclassificationTest.php:146` SQL BEFORE INSERT integrity trigger rejects forged cross-stocktake data before composite FK does; assert named trigger violation OR equivalent named FK, with both remaining enforced. No product release gates, permissions, triggers or test cases removed. New exact SHA CI six-job verification required; external inbound candidate prepared but uncommitted until green.
