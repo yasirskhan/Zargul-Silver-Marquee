@@ -278,7 +278,8 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
             $reviewId,'document_integrity_confirmed',
             'Stored signed partner document matches submitted bytes but signer needs verification'));
         $private=$partner->download($reviewer,$company->id,$hall->id,$loan,$document);
-        $this->assertSame('private, no-store',$private->headers->get('Cache-Control'));
+        $this->assertContains('private',array_map('trim',explode(',',(string)$private->headers->get('Cache-Control'))));
+        $this->assertContains('no-store',array_map('trim',explode(',',(string)$private->headers->get('Cache-Control'))));
         $this->assertSame('nosniff',$private->headers->get('X-Content-Type-Options'));
         $docHistory=$partner->history($reviewer,$company->id,$hall->id,$loan);
         $this->assertCount(1,$docHistory);

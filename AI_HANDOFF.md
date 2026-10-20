@@ -528,3 +528,7 @@ Verify live branch/CI → reconcile current handoff + specific requirement/featu
 - Additional detached negative PostgreSQL/Livewire test hardening validates exact same evidence replay with same UUID, rejects second duplicate UUID, denies foreign-hall history/download and forged SQL evidence scope, refuses hash-tampered private downloads and immutable record updates, preserves zero finance postings. These are regression candidates, not CI-verified yet.
 
 - New counterparty documentary source published after exact green predecessor, protected by expected branch-head SHA. Its own six-job hosted CI must be verified before marking the new feature complete; future payment/obligation/non-clean workflow remains open and all production switches OFF.
+
+
+## PHASE 12 PARTNER EVIDENCE CI HEADER ASSERTION REPAIR (2026-10-20)
+- Run 39487452294 on exact source f92372fb: five of six required jobs SUCCESS, laravel-postgres FAILED with 634 passed, 1 failed, 3 risky. Only failing test expected literal cache header ordering 'private, no-store', but the Symfony HTTP header store normalized it as 'no-store, private'. Private no-store semantics were intact. Replace only that exact-string order-sensitive assertion with two independent cache directive membership assertions. Retain no-store/private, nosniff, audit, tenant scoping, immutable evidence and tamper negative tests. Require new six-job hosted CI before marking the partner evidence feature VERIFIED. Production gates stay OFF.

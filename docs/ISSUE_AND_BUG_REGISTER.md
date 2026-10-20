@@ -256,3 +256,8 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 ## INV-FIN-20261020-027 — No independent private counterparty documentary position or review
 - Follow-on candidate to provisional owner claim desk: append-only outside-partner correspondence with exact company/hall/loan/claim/currency SQL binding, private 5 MB PDF/photo SHA-256 evidence, owner-recorded claimed acceptance/dispute/counteroffer positions, independent owner integrity review and hash-checked no-store download. Duplicate replay and self-review blocked. Never infer signer identity, legal debt, settlement, payment or finance journal from recorded correspondence.
 - Status: PUBLISHED CI PENDING after exact predecessor verification; six-job hosted CI required on successor. All production controls remain OFF. Actual obligation/collection/nonclean closure pending.
+
+
+## BUG-20261020-029 — Partner document private Cache-Control header order test mismatch
+- Hosted CI 39487452294 @ f92372fb: laravel-postgres 634 passed, 1 failed, 3 risky; five other required jobs success. At ExternalOutIncidentTest.php:281 the secure Symfony response returned `no-store, private`, not the asserted `private, no-store`. Both required directives were present. This is a brittle assertion, not a privacy regression.
+- Repair candidate independently asserts `private` and `no-store` cache directives regardless of order, and leaves production code, headers, access checks and all negative security tests unchanged. Exact-SHA six-job CI pending; production OFF.
