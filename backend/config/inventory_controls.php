@@ -5,6 +5,8 @@ return [
     // unavailable until independent counting and finance gates are certified.
     'catalog_enabled' => (bool) env('VENUE_INVENTORY_CATALOG_ENABLED', false),
     'stocktakes_enabled' => (bool) env('VENUE_INVENTORY_STOCKTAKES_ENABLED', false),
+    // Read-only per-hall owned and borrowed book balance, OFF until pilot acceptance.
+    'position_reports_enabled' => (bool) env('VENUE_INVENTORY_POSITION_REPORTS_ENABLED', false),
     'loan_drafts_enabled' => (bool) env('VENUE_INVENTORY_LOAN_DRAFTS_ENABLED', false),
     // Only independently approved, evidence-backed source dispatch. OFF in production.
     'loan_dispatch_enabled' => (bool) env('VENUE_INVENTORY_LOAN_DISPATCH_ENABLED', false),

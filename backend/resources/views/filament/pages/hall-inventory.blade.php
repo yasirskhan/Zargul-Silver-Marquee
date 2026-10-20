@@ -54,6 +54,64 @@
         </section>
 
 
+        @if(config('inventory_controls.position_reports_enabled'))
+            <section class="space-y-3 rounded-xl border p-4" aria-label="Posted inventory book balances">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <h2 class="text-lg font-semibold">Hall stock balances and minimum-stock warnings</h2>
+                    <button type="button" wire:click="reloadPositionReport"
+                        class="rounded-lg border px-3 py-2 text-sm">Refresh book balances</button>
+                </div>
+                <p class="text-xs text-gray-600 dark:text-gray-300">
+                    These are posted BOOK balances, not a fresh verified physical count or a financial valuation.
+                    A catalog item without matching immutable movement history is not confirmed stock.
+                    Minimum warnings use owned usable units only. Borrowed stock is never treated as owned.
+                    Up to 100 active items are shown for the selected hall.
+                </p>
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[950px] text-left text-sm">
+                        <thead class="bg-gray-100 text-gray-900"><tr>
+                            <th scope="col" class="p-2">Item</th>
+                            <th scope="col" class="p-2">Owned usable</th>
+                            <th scope="col" class="p-2">Owned on loan</th>
+                            <th scope="col" class="p-2">Owned damaged</th>
+                            <th scope="col" class="p-2">Borrowed usable</th>
+                            <th scope="col" class="p-2">Borrowed transit</th>
+                            <th scope="col" class="p-2">Borrowed damaged</th>
+                            <th scope="col" class="p-2">Minimum owned</th>
+                            <th scope="col" class="p-2">Book status</th>
+                        </tr></thead>
+                        <tbody>
+                            @forelse($positionReport as $balance)
+                                <tr class="border-t" wire:key="position-book-{{ $balance['itemId'] }}">
+                                    <td class="p-2">{{ $balance['name'] }} ({{ $balance['unit'] }})</td>
+                                    <td class="p-2">{{ $balance['ownedUsable'] ?? 'Not posted' }}</td>
+                                    <td class="p-2">{{ $balance['ownedOnLoan'] ?? 'Not posted' }}</td>
+                                    <td class="p-2">{{ $balance['ownedDamaged'] ?? 'Not posted' }}</td>
+                                    <td class="p-2">{{ $balance['borrowedUsable'] ?? 'Not posted' }}</td>
+                                    <td class="p-2">{{ $balance['borrowedTransit'] ?? 'Not posted' }}</td>
+                                    <td class="p-2">{{ $balance['borrowedDamaged'] ?? 'Not posted' }}</td>
+                                    <td class="p-2">{{ $balance['minimum'] }}</td>
+                                    <td class="p-2">
+                                        @if($balance['status']==='BELOW_MINIMUM')
+                                            <span class="font-semibold text-amber-700">LOW OWNED STOCK / REPLENISHMENT REVIEW</span>
+                                        @elseif($balance['status']==='NO_POSTED_MOVEMENT')
+                                            No posted movement
+                                        @elseif($balance['status']==='RECONCILIATION_REQUIRED')
+                                            BOOK INTEGRITY REVIEW REQUIRED
+                                        @else
+                                            Posted book balance
+                                        @endif
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="9" class="p-3">No active catalog items for this hall.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        @endif
+
         @if(config('inventory_controls.purchase_receipts_enabled'))
             <section class="space-y-3 rounded-xl border p-4" aria-label="Purchased stock request and receipt history">
                 <h2 class="text-lg font-semibold">Purchased stock: receiving requested</h2>

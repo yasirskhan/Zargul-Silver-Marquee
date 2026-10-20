@@ -40,6 +40,8 @@ final class HallInventory extends Page
     #[Locked]
     public array $catalog = [];
     #[Locked]
+    public array $positionReport = [];
+    #[Locked]
     public string $createRequestId = '';
     #[Locked]
     public string $countRequestId = '';
@@ -694,10 +696,21 @@ final class HallInventory extends Page
                 'id' => $item->id, 'name' => $item->name, 'category' => $item->category,
                 'unit' => $item->unit, 'minimumQuantity' => (int) $item->minimum_quantity,
             ])->all();
+        $this->positionReport = [];
+        if(config('inventory_controls.position_reports_enabled'))
+            $this->reloadPositionReport();
         $this->reloadStocktakeHistory();
         $this->reloadLoanHistory();
         $this->reloadOpeningHistory();
         $this->reloadPurchaseHistory();
+    }
+
+    public function reloadPositionReport():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.position_reports_enabled'),403);
+        $this->positionReport=app(\\App\\Services\\HallInventoryPositionReport::class)
+            ->recent($actor,$this->companyId,$this->hallId);
     }
 
     public function createItem(): void

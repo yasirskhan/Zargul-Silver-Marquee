@@ -14,7 +14,7 @@ final class HallInventoryReleaseDefaultsTest extends TestCase
     {
         $defaults=require base_path('config/inventory_controls.php');
         $expected=[
-            'catalog_enabled','stocktakes_enabled','loan_drafts_enabled',
+            'catalog_enabled','stocktakes_enabled','position_reports_enabled','loan_drafts_enabled',
             'loan_dispatch_enabled','loan_receipt_enabled','loan_returns_enabled',
             'loan_return_acceptance_enabled','loan_incidents_enabled',
             'loan_incident_reviews_enabled','loan_clean_closure_enabled',
