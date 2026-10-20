@@ -106,8 +106,8 @@ final class HallInventoryFinancialWaiverService {
                 ->outstanding($actor,$companyId,$hallId,$obligation->loan_id);
             $money=$balance[$obligationId]??null;
             if(!$money)throw new ConflictHttpException('Original collectible obligation balance not found.');
-            $waivers=$this->reservation($companyId,$obligationId);
-            $available=(int)$money['unreservedMinor']-$waivers['approved']-$waivers['pending'];
+            // outstanding() already subtracts posted and pending waivers exactly once.
+            $available=(int)$money['unreservedMinor'];
             if($amountMinor>$available)
                 throw new ConflictHttpException('Unverified or already reserved debt cannot be waived twice.');
             DB::table('hall_inventory_financial_waiver_proposals')->insert([
@@ -158,8 +158,8 @@ final class HallInventoryFinancialWaiverService {
                     ->outstanding($actor,$companyId,$hallId,$proposal->loan_id);
                 $money=$balance[$proposal->obligation_id]??null;
                 if(!$money)throw new ConflictHttpException('Financial source balance disappeared.');
-                $reserved=$this->reservation($companyId,$proposal->obligation_id,$proposalId);
-                $available=(int)$money['unreservedMinor']-$reserved['approved']-$reserved['pending'];
+                // Add back only this immutable pending reservation during final review.
+                $available=(int)$money['unreservedMinor']+(int)$proposal->amount_minor;
                 if((int)$proposal->amount_minor>$available)
                     throw new ConflictHttpException('Concurrent collections or other waivers consumed this balance.');
             }

@@ -666,6 +666,51 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
             $this->fail('Second independent write-off decision posted duplicate inventory.');
         } catch (ConflictHttpException) {}
         $this->assertSame(2,DB::table('hall_inventory_nonclean_writeoff_decisions')->count());
+        $waiver=app(\App\Services\HallInventoryFinancialWaiverService::class);
+        $this->be($owner);
+        try {
+            $waiver->propose($owner,$company->id,$hall->id,$obligationId,
+                (string)Str::uuid(),5000,'Default disabled financial waiver test');
+            $this->fail('Default-disabled financial forgiveness accepted.');
+        } catch (ConflictHttpException) {}
+        config()->set('inventory_controls.loan_financial_waivers_enabled',true);
+        $cashJournalCount=DB::table('finance_journals')->count();
+        Livewire::test(HallInventory::class)->set('hallId',$hall->id)
+            ->call('startFinancialClaims',$loan)->assertHasNoErrors()
+            ->assertSee('Independent contractual settlement and partial forgiveness')
+            ->set('financialWaiverObligationId',$obligationId)
+            ->set('financialWaiverAmountMinor','5000')
+            ->set('financialWaiverReason','Owner proposed documented goodwill reduction of original debt')
+            ->call('submitFinancialWaiver')->assertHasNoErrors();
+        $waiverProposal=DB::table('hall_inventory_financial_waiver_proposals')
+            ->where('company_id',$company->id)->where('obligation_id',$obligationId)->first();
+        $this->assertNotNull($waiverProposal);
+        $this->assertSame(5000,$recoveries->outstanding($owner,$company->id,$hall->id,$loan)
+            [$obligationId]['waiverPendingMinor']);
+        try {
+            $waiver->decide($owner,$company->id,$hall->id,$waiverProposal->id,
+                (string)Str::uuid(),'approved','Own proposal cannot be self approved');
+            $this->fail('Financial owner self-waiver approved.');
+        } catch (AuthorizationException) {}
+        $this->be($independent);
+        Livewire::test(HallInventory::class)->set('hallId',$hall->id)
+            ->call('startFinancialClaims',$loan)->assertHasNoErrors()
+            ->set('financialWaiverDecisionProposalId',$waiverProposal->id)
+            ->set('financialWaiverDecision','approved')
+            ->set('financialWaiverDecisionReason','Separate owner verifies documented partial contractual forgiveness')
+            ->call('decideFinancialWaiver')->assertHasNoErrors();
+        $reconciled=$recoveries->outstanding($independent,$company->id,$hall->id,$loan)
+            [$obligationId];
+        $this->assertSame(5000,$reconciled['waivedMinor']);
+        $this->assertSame(20000,$reconciled['remainingMinor']);
+        $this->assertSame(0,$reconciled['waiverPendingMinor']);
+        $this->assertSame($cashJournalCount,DB::table('finance_journals')->count());
+        try {
+            $waiver->decide($independent,$company->id,$hall->id,$waiverProposal->id,
+                (string)Str::uuid(),'approved','Unauthorized contradictory double approval');
+            $this->fail('Second financial waiver decision accepted.');
+        } catch (ConflictHttpException) {}
+        $this->assertSame(1,DB::table('hall_inventory_financial_waiver_decisions')->count());
         $this->assertSame(0,DB::table('hall_inventory_external_out_clean_closures')->count());
         $this->assertSame(1,DB::table('hall_inventory_financial_recovery_reversals')->count());
         $this->assertSame(0,DB::table('hall_inventory_external_out_clean_closures')->count());

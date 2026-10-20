@@ -1018,9 +1018,53 @@
                                 @endforeach
                                 <p>Incident reports: {{ $noncleanReconciliation['incidentReports'] }}; awaiting independent incident review: {{ $noncleanReconciliation['unreviewedIncidents'] }}. Any outstanding incident requires authorized individual disposition before final closure.</p>
                                 @foreach($noncleanReconciliation['obligations'] as $id=>$amount)
-                                    <p wire:key="nonclean-money-{{ $id }}">Independently authorized obligation {{ $id }}: {{ $amount['currency'] }} {{ $amount['amountMinor'] }} minor units; independently verified net collected {{ $amount['paidMinor'] }}, unverified pending {{ $amount['pendingMinor'] }}, outstanding {{ $amount['remainingMinor'] }}.</p>
+                                    <p wire:key="nonclean-money-{{ $id }}">Independently authorized obligation {{ $id }}: {{ $amount['currency'] }} {{ $amount['amountMinor'] }} minor units; independently verified net collected {{ $amount['paidMinor'] }}, unverified pending {{ $amount['pendingMinor'] }}, outstanding {{ $amount['remainingMinor'] }}, approved forgiveness {{ $amount['waivedMinor'] }}, pending forgiveness {{ $amount['waiverPendingMinor'] }}.</p>
                                 @endforeach
-                                <p>Physical and financial summaries are informational only, not authority to post stock, recognize a receivable, waive a dispute or close this loan.</p>
+                                <p>Physical and financial summaries are informational only; separate independently authorized workflows control physical losses and contractual forgiveness.</p>
+                                @if(config('inventory_controls.loan_financial_waivers_enabled'))
+                                    <h4 class="font-semibold">Independent contractual settlement and partial forgiveness</h4>
+                                    <p>Forgiveness reduces the outstanding approved obligation only after a second owner authorizes it. It is not a received payment, bank journal, physical write-off or loan closure.</p>
+                                    <label>Existing independently approved obligation
+                                        <select wire:model="financialWaiverObligationId" class="w-full rounded-lg border p-2 text-gray-900">
+                                            <option value="">Choose authorized money obligation</option>
+                                            @foreach($financialRecoveryBalances as $id=>$balance)
+                                                <option value="{{ $id }}">{{ $balance['currency'] }} {{ $balance['unreservedMinor'] }} unreserved minor units ({{ $id }})</option>
+                                            @endforeach
+                                        </select>
+                                    </label>
+                                    <label>Partial amount in currency minor units
+                                        <input wire:model="financialWaiverAmountMinor" type="number" min="1" class="w-full rounded-lg border p-2 text-gray-900">
+                                    </label>
+                                    <label>Documented contractual forgiveness reason
+                                        <textarea wire:model="financialWaiverReason" class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                                    </label>
+                                    <button type="button" wire:click="submitFinancialWaiver" class="rounded-lg border p-2">Propose independent obligation forgiveness</button>
+                                    @foreach($financialWaiverHistory as $waiver)
+                                        <article wire:key="fin-waiver-{{ $waiver['id'] }}" class="rounded-lg border p-2 text-sm">
+                                            <p>{{ $waiver['currency'] }} {{ $waiver['amountMinor'] }} minor units; {{ $waiver['decision'] ?? 'AWAITING independent approval' }}. {{ $waiver['id'] }}</p>
+                                        </article>
+                                    @endforeach
+                                    <label>Pending proposed contractual forgiveness
+                                        <select wire:model="financialWaiverDecisionProposalId" class="w-full rounded-lg border p-2 text-gray-900">
+                                            <option value="">Choose pending request</option>
+                                            @foreach($financialWaiverHistory as $waiver)
+                                                @if($waiver['decision'] === null)
+                                                    <option value="{{ $waiver['id'] }}">{{ $waiver['currency'] }} {{ $waiver['amountMinor'] }} ({{ $waiver['id'] }})</option>
+                                                @endif
+                                            @endforeach
+                                        </select>
+                                    </label>
+                                    <label>Independent waiver decision
+                                        <select wire:model="financialWaiverDecision" class="w-full rounded-lg border p-2 text-gray-900">
+                                            <option value="rejected">Reject</option>
+                                            <option value="approved">Approve contractual forgiveness</option>
+                                        </select>
+                                    </label>
+                                    <label>Independent finance review reason
+                                        <textarea wire:model="financialWaiverDecisionReason" class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                                    </label>
+                                    <button type="button" wire:click="decideFinancialWaiver" class="rounded-lg border p-2">Record independent financial waiver decision</button>
+                                @endif
                                 @if(config('inventory_controls.loan_nonclean_writeoffs_enabled'))
                                     <h4 class="font-semibold">Independent abnormal physical write-off approval</h4>
                                     <p>Write-off permanently removes confirmed lost or damaged owned units from book custody. It never cancels partner debt, confirms payment, or closes a loan. A different owner must authorize it.</p>

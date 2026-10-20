@@ -331,6 +331,18 @@ final class HallInventory extends Page
     #[Locked]
     public array $financialRecoveryBalances = [];
     #[Locked]
+    public array $financialWaiverHistory = [];
+    #[Locked]
+    public string $financialWaiverProposalId = '';
+    #[Locked]
+    public string $financialWaiverDecisionId = '';
+    public string $financialWaiverObligationId = '';
+    public string $financialWaiverAmountMinor = '';
+    public string $financialWaiverReason = '';
+    public string $financialWaiverDecisionProposalId = '';
+    public string $financialWaiverDecision = 'rejected';
+    public string $financialWaiverDecisionReason = '';
+    #[Locked]
     public array $noncleanReconciliation = [];
     #[Locked]
     public array $noncleanWriteoffHistory = [];
@@ -2240,6 +2252,13 @@ final class HallInventory extends Page
         $this->noncleanWriteoffReason='';
         $this->noncleanWriteoffDecisionProposalId='';
         $this->noncleanWriteoffDecisionReason='';
+        $this->financialWaiverProposalId=(string)Str::uuid();
+        $this->financialWaiverDecisionId=(string)Str::uuid();
+        $this->financialWaiverObligationId='';
+        $this->financialWaiverAmountMinor='';
+        $this->financialWaiverReason='';
+        $this->financialWaiverDecisionProposalId='';
+        $this->financialWaiverDecisionReason='';
         $this->financialRecoveryRequestId=(string)Str::uuid();
         $this->financialRecoveryReviewId=(string)Str::uuid();
         $this->financialRecoveryReversalId=(string)Str::uuid();
@@ -2298,8 +2317,13 @@ final class HallInventory extends Page
         }
         $this->financialClaimHistory=app(\App\Services\HallInventoryFinancialClaimService::class)
             ->history($actor,$this->companyId,$this->hallId,$this->financialClaimLoanId);
+        $this->financialWaiverHistory=[];
         $this->financialRecoveryHistory=[];
         $this->financialRecoveryBalances=[];
+        if(config('inventory_controls.loan_financial_waivers_enabled')) {
+            $this->financialWaiverHistory=app(\App\Services\HallInventoryFinancialWaiverService::class)
+                ->history($actor,$this->companyId,$this->hallId,$this->financialClaimLoanId);
+        }
         if(config('inventory_controls.loan_recoveries_enabled') &&
             config('inventory_controls.loan_authorized_obligations_enabled') &&
             config('inventory_controls.loan_partner_responses_enabled')) {
@@ -2604,6 +2628,46 @@ final class HallInventory extends Page
         $this->reloadFinancialClaims($actor);
     }
 
+
+    public function submitFinancialWaiver():void {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canManageFinancialClaims() &&
+            config('inventory_controls.loan_financial_waivers_enabled') &&
+            $this->financialClaimLoanId!=='',403);
+        $this->validate([
+            'financialWaiverObligationId'=>'required|uuid',
+            'financialWaiverAmountMinor'=>['required','regex:/\A[1-9][0-9]{0,11}\z/D'],
+            'financialWaiverReason'=>'required|string|min:10|max:500'
+        ]);
+        app(\App\Services\HallInventoryFinancialWaiverService::class)->propose(
+            $actor,$this->companyId,$this->hallId,$this->financialWaiverObligationId,
+            $this->financialWaiverProposalId,(int)$this->financialWaiverAmountMinor,
+            $this->financialWaiverReason);
+        $this->financialWaiverProposalId=(string)Str::uuid();
+        $this->financialWaiverObligationId='';
+        $this->financialWaiverAmountMinor='';
+        $this->financialWaiverReason='';
+        $this->reloadFinancialClaims($actor);
+    }
+    public function decideFinancialWaiver():void {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canManageFinancialClaims() &&
+            config('inventory_controls.loan_financial_waivers_enabled') &&
+            $this->financialClaimLoanId!=='',403);
+        $this->validate([
+            'financialWaiverDecisionProposalId'=>'required|uuid',
+            'financialWaiverDecision'=>'required|in:approved,rejected',
+            'financialWaiverDecisionReason'=>'required|string|min:10|max:500'
+        ]);
+        app(\App\Services\HallInventoryFinancialWaiverService::class)->decide(
+            $actor,$this->companyId,$this->hallId,$this->financialWaiverDecisionProposalId,
+            $this->financialWaiverDecisionId,$this->financialWaiverDecision,
+            $this->financialWaiverDecisionReason);
+        $this->financialWaiverDecisionId=(string)Str::uuid();
+        $this->financialWaiverDecisionProposalId='';
+        $this->financialWaiverDecisionReason='';
+        $this->reloadFinancialClaims($actor);
+    }
 
     public function submitFinancialRecovery():void
     {

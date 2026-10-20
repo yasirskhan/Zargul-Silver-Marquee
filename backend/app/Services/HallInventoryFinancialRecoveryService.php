@@ -400,16 +400,25 @@ final class HallInventoryFinancialRecoveryService
             ->where('o.company_id',$companyId)->where('o.source_hall_id',$hallId)
             ->where('o.loan_id',$loanId)->where('d.decision','authorized')
             ->get(['o.id','o.amount_minor','o.currency']);
+        $waivers=config('inventory_controls.loan_financial_waivers_enabled')
+            ?app(HallInventoryFinancialWaiverService::class)->totals($companyId,$hallId,$loanId)
+            :[];
         $amounts=[];
         foreach($agreements as $agreement){
             $id=(string)$agreement->id;
             $paid=(int)($totals[$id]->paid_minor??0);
             $pending=(int)($totals[$id]->pending_minor??0);
             $amount=(int)$agreement->amount_minor;
+            $waived=(int)($waivers[$id]['approved']??0);
+            $waiverPending=(int)($waivers[$id]['pending']??0);
+            if($paid+$waived>$amount)
+                throw new ConflictHttpException('Approved financial forgiveness and cash recovery exceed original obligation.');
             $amounts[$id]=['amountMinor'=>$amount,
                 'currency'=>(string)$agreement->currency,'paidMinor'=>$paid,
-                'pendingMinor'=>$pending,'remainingMinor'=>max(0,$amount-$paid),
-                'unreservedMinor'=>max(0,$amount-$paid-$pending)];
+                'pendingMinor'=>$pending,'waivedMinor'=>$waived,
+                'waiverPendingMinor'=>$waiverPending,
+                'remainingMinor'=>max(0,$amount-$paid-$waived),
+                'unreservedMinor'=>max(0,$amount-$paid-$pending-$waived-$waiverPending)];
         }
         return $amounts;
     }

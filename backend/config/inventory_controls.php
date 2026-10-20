@@ -34,6 +34,8 @@ return [
     // Evidence-recorded, independent-bank/cash-verified partial recoveries with
     // balanced cash-basis journals and immutable reversals only. OFF until finance.
     'loan_recoveries_enabled' => (bool) env('VENUE_INVENTORY_LOAN_RECOVERIES_ENABLED', false),
+    // Independently approved partial contractual debt forgiveness, NOT payment or cash journal; OFF.
+    'loan_financial_waivers_enabled' => (bool) env('VENUE_INVENTORY_LOAN_FINANCIAL_WAIVERS_ENABLED', false),
     // Read-only external-owned abnormal custody and verified money reconciliation.
     // Never authorizes write-off, financial waiver or non-clean closure. OFF.
     'loan_nonclean_reconciliation_enabled' => (bool) env('VENUE_INVENTORY_NONCLEAN_RECONCILIATION_ENABLED', false),
