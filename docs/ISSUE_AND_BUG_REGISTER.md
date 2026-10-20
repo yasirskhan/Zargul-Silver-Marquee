@@ -266,3 +266,5 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 ## INV-FIN-20261020-028 — Missing independently authorized documented loss obligation
 - Candidate after partner documentary response: separate manual partner-identity check reference and original approved claim/currency/amount binding; only independently reviewed acceptance or counteroffer may be proposed. Separate owner authorization rejects self approval, conflicting replay and simultaneous authorizations by unique PostgreSQL partial index. Readable owner proposal/decision queue and real regression flow. A merely disputed document cannot become a debt. No accounting receivable, collections, reversal, write-off, loan closure, or production activation yet.
 - Status: PREPARED DETACHED pending exact six-job CI on preceding documentary source and new candidate.
+
+- Verification closeout for header order repair: `5df565fdb681a3fda0fd432091e4d6fd29ee5570`, GitHub Actions 39488870650, six required jobs SUCCESS. Partner document evidence and independent integrity review now VERIFIED; later obligation approval and collection work remain unverified.

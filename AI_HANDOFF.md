@@ -536,3 +536,7 @@ Verify live branch/CI → reconcile current handoff + specific requirement/featu
 
 ## PHASE 12 MANUALLY ATTESTED LOSS OBLIGATION — PREPARED DETACHED (2026-10-20)
 - Prepared on top of counterparty private-document source `f92372fb043d3d15a23a7bec85f360483b516656`, whose six-job CI is pending. DO NOT move live branch to candidate until predecessor is fully verified. Adds separately gated (OFF) two-stage manually authenticated partner agreement proposal plus independent owner/admin decision with composite source claim/document/currency/loan/hall FKs, SQL one-authorized-agreement-per-claim constraint, per-loan history and Livewire forms. A partner document's text alone is never sufficient. No recognized receivable, invoice, cash recovery, reversal, journal, physical write-off or non-clean closure. Requires own six-job exact-SHA hosted CI and operator acceptance.
+
+
+## 2026-10-20 PUBLICATION CHECKPOINT — MANUAL LOSS OBLIGATION
+- Parent `5df565fdb681a3fda0fd432091e4d6fd29ee5570` verified GitHub Actions `39488870650` SUCCESS, all six required jobs. Root-cause cache-header-order regression fixed; 634+ backend tests pass at parent. The next manual verified loss agreement/independent obligation service, SQL constraints, Livewire UI and regression fixture is now a candidate to publish with exact-head CAS. Its own hosted CI is PENDING and cannot be called verified until exact SHA all six jobs pass. Production inventory and finance controls remain OFF.
