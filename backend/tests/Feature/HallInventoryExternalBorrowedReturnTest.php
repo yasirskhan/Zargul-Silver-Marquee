@@ -137,6 +137,7 @@ final class HallInventoryExternalBorrowedReturnTest extends TestCase
         }catch(AuthorizationException){}
         $this->be($owner);
         Livewire::test(HallInventory::class)
+            ->set('hallId',$hall->id)
             ->assertSee('Independently verify partner receipt')
             ->call('startExternalReturnConfirmation',$batch)->assertHasNoErrors()
             ->set('externalConfirmCounts.'.$requested[0]['itemId'],'1')
@@ -148,6 +149,7 @@ final class HallInventoryExternalBorrowedReturnTest extends TestCase
         $this->assertSame(3,(int)DB::table('hall_inventory_positions')->sum('borrowed_transit'));
         $this->be($owner);
         Livewire::test(HallInventory::class)
+            ->set('hallId',$hall->id)
             ->call('startExternalReturnConfirmation',$batch)->assertHasNoErrors()
             ->set('externalConfirmCounts.'.$requested[0]['itemId'],'2')
             ->set('externalConfirmCounts.'.$requested[1]['itemId'],'1')
