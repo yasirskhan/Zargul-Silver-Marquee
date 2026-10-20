@@ -131,6 +131,44 @@ final class HallInventoryStocktakeVariancePreviewTest extends TestCase
         $this->assertTrue($second[0]['requiresReview']);
         $this->assertSame(0,DB::table('finance_journals')->count());
 
+        // Review attestation is independent from count submission, immutable,
+        // and explicitly must not post stock, an expense or a write-off.
+        $owner=User::create(['name'=>'Independent Variance Reviewer',
+            'email'=>'variance-review-owner@example.test','password'=>'test-only']);
+        $owner->markEmailAsVerified();
+        CompanyMembership::create(['company_id'=>$company->id,
+            'user_id'=>$owner->id,'role'=>'owner']);
+        $reviewService=app(\App\Services\HallInventoryVarianceReviewService::class);
+        $ackId=(string)Str::uuid();
+        try {
+            $reviewService->acknowledge($manager,$company->id,$hall->id,
+                $stocktake,$ackId,'Physical discrepancy needs investigation');
+            $this->fail('Count author self-reviewed the count.');
+        } catch(AuthorizationException) {}
+        $this->be($owner);
+        $this->assertSame($ackId,$reviewService->acknowledge(
+            $owner,$company->id,$hall->id,$stocktake,$ackId,
+            'Physical discrepancy needs investigation'));
+        $this->assertSame($ackId,$reviewService->acknowledge(
+            $owner,$company->id,$hall->id,$stocktake,$ackId,
+            'Physical discrepancy needs investigation'));
+        try {
+            $reviewService->acknowledge($owner,$company->id,$hall->id,
+                $stocktake,$ackId,'Different findings require new review');
+            $this->fail('Conflicting variance attestation replayed.');
+        } catch(ConflictHttpException) {}
+        $this->assertSame(1,DB::table('hall_inventory_variance_review_acknowledgments')->count());
+        $this->assertSame(1,DB::table('audit_events')
+            ->where('action','hall_inventory.stocktake_variance_review_acknowledged')->count());
+        $this->assertSame(0,DB::table('finance_journals')->count());
+        try {
+            DB::transaction(function()use($ackId):void {
+                DB::table('hall_inventory_variance_review_acknowledgments')
+                    ->where('id',$ackId)->update(['review_reason'=>'tampered']);
+            });
+            $this->fail('Immutable independent variance review altered.');
+        } catch(QueryException) {}
+        $this->be($manager);
         try {
             DB::transaction(function()use($snapshot):void {
                 DB::table('hall_inventory_stocktake_book_snapshots')
