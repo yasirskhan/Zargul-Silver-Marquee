@@ -822,7 +822,13 @@
                                                 class="rounded-lg border px-3 py-2 text-sm">Independently approve outside lending stock dispatch</button>
                                         @endif
                                     @elseif($loan['externalOutApproved'])
-                                        <p>Outside lending approved. Hall-owned goods are ON LOAN to the partner, not sold or financially settled. Physical return and independent reconciliation are pending.</p>
+                                        <p>Outside lending approved. Hall-owned goods are ON LOAN to the partner, not sold or financially settled. Independently reviewed partner returns are separately listed below.</p>
+                                        @if(config('inventory_controls.external_out_return_enabled') &&
+                                            !$this->canApproveExternalOutDispatch() &&
+                                            $loan['createdBy']!==(int)auth()->id())
+                                            <button type="button" wire:click="startExternalOutReturn('{{ $loan['id'] }}')"
+                                                class="rounded-lg border px-3 py-2 text-sm">Record partial owned-stock return from outside partner</button>
+                                        @endif
                                     @endif
                                     @error('externalOutFile') <p role="alert">{{ $message }}</p> @enderror
                                 @endif
@@ -976,6 +982,93 @@
                 @endif
                 @if($lastExternalOutReference)
                     <p role="status">Outside lending custody reference {{ $lastExternalOutReference }}. Only independent approval can move owned goods; no money posted.</p>
+                @endif
+                @if(config('inventory_controls.external_out_return_enabled') &&
+                    config('inventory_controls.external_out_dispatch_enabled'))
+                    <section class="rounded-xl border p-4 space-y-3" aria-label="External owned stock physical return history">
+                        <h3 class="font-semibold">Outside partner returns of hall-owned stock</h3>
+                        <p>Signed actual partner handovers require independent owner/admin condition counts. Unreviewed or unresolved units stay ON LOAN. No monetary liability or settlement is created here.</p>
+                        @foreach($externalOutReturnHistory as $outsideReceipt)
+                            <article wire:key="ext-owned-return-{{ $outsideReceipt['receiptId'] }}"
+                                class="rounded-lg border p-3 text-sm space-y-2">
+                                <p>Loan {{ $outsideReceipt['loanId'] }}; physical return {{ $outsideReceipt['receiptId'] }}
+                                    — {{ $outsideReceipt['reviewed'] ? 'INDEPENDENT PHYSICAL CONDITION REVIEWED' : 'INDEPENDENT REVIEW PENDING' }}</p>
+                                <ul class="list-inside list-disc">
+                                    @foreach($outsideReceipt['lines'] as $line)
+                                        <li>Item {{ $line['itemId'] }}: {{ $line['quantity'] }} units physically returned</li>
+                                    @endforeach
+                                </ul>
+                                @if($outsideReceipt['reviewed'])
+                                    <ul class="list-inside list-disc">
+                                        @foreach($outsideReceipt['conditions'] as $line)
+                                            <li>Item {{ $line['itemId'] }}: good {{ $line['good'] }},
+                                                damaged {{ $line['damaged'] }},
+                                                unresolved {{ $line['unresolved'] }} — unresolved stays ON LOAN</li>
+                                        @endforeach
+                                    </ul>
+                                @elseif($this->canApproveExternalOutDispatch() &&
+                                    $outsideReceipt['receivedBy']!==(int)auth()->id())
+                                    <button type="button" wire:click="startExternalOutReturnReview('{{ $outsideReceipt['receiptId'] }}')"
+                                        class="rounded-lg border px-3 py-2 text-sm">Independently assess outside partner physical return</button>
+                                @endif
+                            </article>
+                        @endforeach
+                    </section>
+                @endif
+                @if(config('inventory_controls.external_out_return_enabled') && $externalOutReturnLoanId !== '')
+                    <section class="rounded-xl border p-4 space-y-3" aria-label="Record outside owned stock return">
+                        <h3 class="font-semibold">Witness actual partial outside partner return</h3>
+                        <p>Loan {{ $externalOutReturnLoanId }}. Only items physically returned now; leave others blank. Partner-signed evidence is mandatory.</p>
+                        @foreach($loanHistory as $outLoan)
+                            @if($outLoan['id']===$externalOutReturnLoanId)
+                                @foreach($outLoan['lines'] as $line)
+                                    <label wire:key="ext-owned-partial-{{ $line['itemId'] }}" class="block text-sm">
+                                        {{ $line['name'] }} (original {{ $line['quantity'] }})
+                                        <input type="number" min="1" max="{{ $line['quantity'] }}" step="1"
+                                            wire:model="externalOutReturnQuantities.{{ $line['itemId'] }}"
+                                            class="w-full rounded-lg border p-2 text-gray-900" placeholder="Blank when not physically returned">
+                                    </label>
+                                @endforeach
+                            @endif
+                        @endforeach
+                        @error('externalOutReturnQuantities') <p role="alert">{{ $message }}</p> @enderror
+                        <label class="block text-sm">Partner-signed physical return PDF/photo, maximum 5 MB
+                            <input type="file" wire:model="externalOutReturnFile" accept=".jpg,.jpeg,.png,.pdf"
+                                class="w-full rounded-lg border p-2"></label>
+                        @error('externalOutReturnFile') <p role="alert">{{ $message }}</p> @enderror
+                        <button type="button" wire:click="submitExternalOutReturn"
+                            class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">Record witnessed partner return only</button>
+                    </section>
+                @endif
+                @if(config('inventory_controls.external_out_return_enabled') && $externalOutReviewReceiptId !== '')
+                    <section class="rounded-xl border p-4 space-y-3" aria-label="Independent outside partner return condition review">
+                        <h3 class="font-semibold">Independent owner inspection — outside partner return</h3>
+                        <p>Receipt {{ $externalOutReviewReceiptId }}. Enter separate physically good, damaged and unresolved counts; their sum MUST exactly equal each witnessed return line.</p>
+                        @foreach($externalOutReturnHistory as $outsideReceipt)
+                            @if($outsideReceipt['receiptId']===$externalOutReviewReceiptId)
+                                @foreach($outsideReceipt['lines'] as $line)
+                                    <fieldset wire:key="ext-owned-review-{{ $line['itemId'] }}" class="rounded-lg border p-3 space-y-1">
+                                        <legend class="font-medium">Item {{ $line['itemId'] }}; actual received {{ $line['quantity'] }}</legend>
+                                        <label class="block text-sm">Good
+                                            <input type="number" min="0" step="1" wire:model="externalOutReviewGood.{{ $line['itemId'] }}"
+                                                class="w-full rounded-lg border p-2 text-gray-900"></label>
+                                        <label class="block text-sm">Damaged
+                                            <input type="number" min="0" step="1" wire:model="externalOutReviewDamaged.{{ $line['itemId'] }}"
+                                                class="w-full rounded-lg border p-2 text-gray-900"></label>
+                                        <label class="block text-sm">Unresolved
+                                            <input type="number" min="0" step="1" wire:model="externalOutReviewUnresolved.{{ $line['itemId'] }}"
+                                                class="w-full rounded-lg border p-2 text-gray-900"></label>
+                                    </fieldset>
+                                @endforeach
+                            @endif
+                        @endforeach
+                        @error('externalOutReviewGood') <p role="alert">{{ $message }}</p> @enderror
+                        <button type="button" wire:click="submitExternalOutReturnReview"
+                            class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">Independently record partner-return condition</button>
+                    </section>
+                @endif
+                @if($lastExternalOutReturnReference)
+                    <p role="status">Outside partner return evidence/review {{ $lastExternalOutReturnReference }}. No financial entry, debt or loan closure posted.</p>
                 @endif
                 @if(config('inventory_controls.external_borrowed_intake_enabled') && $externalIntakeLoanId !== '')
                     <section class="space-y-3 rounded-xl border p-4" aria-label="Witnessed external borrowing arrival">

@@ -233,3 +233,7 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 
 ## INV-EXT-OUT-20261020-022 — Outside lending draft had no physical dispatch workflow
 - Prior behavior: external_out draft only; no real signed dispatch and owned book movement despite inventory physically leaving hall. Adds default-OFF independently witnessed multi-item counterparty handover, immutable exact draft provenance constraints and separate owner/admin signed-proof approval. Two-actor self-dealing and short count block stock; financial posting never occurs. Await six-job exact-SHA hosted CI; release controls OFF. Partner returns, incidents, settlement and non-clean closure remain unfinished.
+
+
+## INV-EXT-OUT-20261020-023 — Outside partner return and damaged condition workflow missing
+- After verified external_out dispatch CI 39455907097, hall-owned assets had no complete signed partial partner return or independent owner condition-review workflow. New default-OFF implementation records witnessed multiple batch custody receipts and separately verified good/damaged/unresolved conditions, maintaining per-loan receipt ceiling and immutable SQL link to original loan/dispatch. Unresolved stays owned_on_loan and is NOT monetized; damaged remains hall-owned. CI pending; all six exact jobs required. Financial obligations/disputes/nonclean closure and commercial operator acceptance remain pending.

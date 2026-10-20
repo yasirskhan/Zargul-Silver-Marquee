@@ -130,3 +130,7 @@ production toggles merely because development CI passes.
 
 ## Phase 12 external_out partner lending owned-stock dispatch candidate (CI PENDING)
 Default-OFF outside lending from hall-owned inventory with manager draft separate witnessed partner signed handover and independent owner/admin original-exact quantity approval. Stock shifts owned_usable to owned_on_loan only; no borrowed or financial posting. Hall/loan/item SQL provenance and immutable movement/evidence; role-scoped Livewire controls and PostgreSQL checks. Return, condition assessment, financial liability, disputed/nonclean closure and production activation are NOT completed.
+
+
+## Phase 12 external_out partial physical return / condition verification (separate candidate)
+Three distinct duties across draft, outside dispatch and return review: partner-signed partial receipt witnessed by assigned staff, independent owner good/damaged/unresolved physical condition approval. Only good and damaged quantities may move original OWNED-on-loan back to OWNED physical buckets; unresolved remains on loan and is not implicitly written off. Exact per-loan cumulative returns cannot exceed immutable original dispatch. Company/hall/item binding in PostgreSQL, signed files hashed, multi-batch retry-safe. No financial obligation/settlement, disputes or completion PDF yet; feature OFF and exact six-job CI/pilot pending.

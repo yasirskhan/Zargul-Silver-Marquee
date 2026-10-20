@@ -28,6 +28,8 @@ return [
     'loan_clean_closure_enabled' => (bool) env('VENUE_INVENTORY_LOAN_CLEAN_CLOSURE_ENABLED', false),
     // Hall-owned goods lent outside: independent signed handover and owner approval. OFF.
     'external_out_dispatch_enabled' => (bool) env('VENUE_INVENTORY_EXTERNAL_OUT_DISPATCH_ENABLED', false),
+    // Outside partner physical partial returns and independent condition review. OFF.
+    'external_out_return_enabled' => (bool) env('VENUE_INVENTORY_EXTERNAL_OUT_RETURN_ENABLED', false),
     // External partner-to-hall intake requires a different physical counter and approver.
     'external_borrowed_intake_enabled' => (bool) env('VENUE_INVENTORY_EXTERNAL_BORROWED_INTAKE_ENABLED', false),
     // Witnessed partial partner returns and independently verified partner receipt; OFF.

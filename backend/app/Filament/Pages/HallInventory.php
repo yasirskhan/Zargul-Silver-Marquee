@@ -156,6 +156,23 @@ final class HallInventory extends Page
     public $externalOutFile = null;
     #[Locked]
     public ?string $lastExternalOutReference = null;
+    #[Locked]
+    public array $externalOutReturnHistory = [];
+    #[Locked]
+    public string $externalOutReturnLoanId = '';
+    #[Locked]
+    public string $externalOutReturnRequestId = '';
+    public array $externalOutReturnQuantities = [];
+    public $externalOutReturnFile = null;
+    #[Locked]
+    public string $externalOutReviewReceiptId = '';
+    #[Locked]
+    public string $externalOutReviewRequestId = '';
+    public array $externalOutReviewGood = [];
+    public array $externalOutReviewDamaged = [];
+    public array $externalOutReviewUnresolved = [];
+    #[Locked]
+    public ?string $lastExternalOutReturnReference = null;
 
     #[Locked]
     public array $externalCleanReceipts = [];
@@ -450,6 +467,17 @@ final class HallInventory extends Page
         $this->externalOutCounts = [];
         $this->externalOutFile = null;
         $this->lastExternalOutReference = null;
+        $this->externalOutReturnHistory = [];
+        $this->externalOutReturnLoanId = '';
+        $this->externalOutReturnRequestId = (string)Str::uuid();
+        $this->externalOutReturnQuantities = [];
+        $this->externalOutReturnFile = null;
+        $this->externalOutReviewReceiptId = '';
+        $this->externalOutReviewRequestId = (string)Str::uuid();
+        $this->externalOutReviewGood = [];
+        $this->externalOutReviewDamaged = [];
+        $this->externalOutReviewUnresolved = [];
+        $this->lastExternalOutReturnReference = null;
         $this->externalCleanReceipts = [];
         $this->externalCleanClosureRequestId = (string)Str::uuid();
         $this->lastExternalCleanReceipt = null;
@@ -757,6 +785,11 @@ final class HallInventory extends Page
         }
         $this->loanHistory = app(\App\Services\HallInventoryLoanDraftReview::class)
             ->recent($actor, $this->companyId, $this->hallId);
+        $this->externalOutReturnHistory = [];
+        if(config('inventory_controls.external_out_return_enabled') &&
+            config('inventory_controls.external_out_dispatch_enabled'))
+            $this->externalOutReturnHistory=app(\App\Services\HallInventoryExternalOutReturnService::class)
+                ->recent($actor,$this->companyId,$this->hallId);
         $this->externalReturnHistory = [];
         if(config('inventory_controls.external_borrowed_return_enabled') &&
             config('inventory_controls.external_borrowed_intake_enabled'))
@@ -1187,6 +1220,129 @@ final class HallInventory extends Page
         }catch(InvalidArgumentException|ConflictHttpException $e){
             throw ValidationException::withMessages(['externalOutFile'=>$e->getMessage()]);
         }
+        $this->reloadLoanHistory();
+    }
+
+
+    public function startExternalOutReturn(string $loanId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_out_return_enabled') &&
+            config('inventory_controls.external_out_dispatch_enabled'),403);
+        $loan=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($l):bool=>$l['id']===$loanId &&
+                $l['direction']==='external_out' &&
+                $l['lendingHallId']===$this->hallId &&
+                $l['externalOutApproved'] &&
+                $l['createdBy']!==(int)$actor->getKey());
+        abort_unless($loan!==null && !$this->canApproveExternalOutDispatch(),403);
+        $this->externalOutReturnLoanId=$loanId;
+        $this->externalOutReturnRequestId=(string)Str::uuid();
+        $this->externalOutReturnQuantities=[];
+        $this->externalOutReturnFile=null;
+        $this->lastExternalOutReturnReference=null;
+    }
+
+    public function submitExternalOutReturn():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_out_return_enabled') &&
+            config('inventory_controls.external_out_dispatch_enabled'),403);
+        $this->validate(['externalOutReturnFile'=>'required|file|max:5120|mimes:jpg,jpeg,png,pdf']);
+        $loan=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($l):bool=>$l['id']===$this->externalOutReturnLoanId &&
+                $l['direction']==='external_out' &&
+                $l['lendingHallId']===$this->hallId && $l['externalOutApproved']);
+        abort_unless($loan!==null && !$this->canApproveExternalOutDispatch(),403);
+        $qty=[];
+        foreach($loan['lines'] as $line){
+            $raw=$this->externalOutReturnQuantities[$line['itemId']]??'';
+            if($raw==='')continue;
+            if(!is_string($raw)||!preg_match('/^[1-9][0-9]*$/',$raw)||
+                (float)$raw>100000000)
+                throw ValidationException::withMessages([
+                    'externalOutReturnQuantities'=>'Enter positive whole physically returned quantities or leave blank.']);
+            $qty[$line['itemId']]=(int)$raw;
+        }
+        if(!$qty)throw ValidationException::withMessages([
+            'externalOutReturnQuantities'=>'Select at least one physically returned outside-loan item.']);
+        try {
+            $this->lastExternalOutReturnReference=app(
+                \App\Services\HallInventoryExternalOutReturnService::class
+            )->receive($actor,$this->companyId,$this->hallId,
+                $this->externalOutReturnLoanId,$this->externalOutReturnRequestId,
+                $qty,$this->externalOutReturnFile);
+        }catch(InvalidArgumentException|ConflictHttpException $e){
+            throw ValidationException::withMessages(['externalOutReturnFile'=>$e->getMessage()]);
+        }
+        $this->externalOutReturnLoanId='';
+        $this->externalOutReturnRequestId=(string)Str::uuid();
+        $this->externalOutReturnQuantities=[];
+        $this->externalOutReturnFile=null;
+        $this->reloadLoanHistory();
+    }
+
+    public function startExternalOutReturnReview(string $receiptId):void
+    {
+        $this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_out_return_enabled') &&
+            $this->canApproveExternalOutDispatch(),403);
+        $receipt=collect($this->externalOutReturnHistory)
+            ->first(fn($x):bool=>$x['receiptId']===$receiptId &&
+                !$x['reviewed'] && $x['receivedBy']!==(int)auth()->id());
+        abort_unless($receipt!==null,403);
+        $this->externalOutReviewReceiptId=$receiptId;
+        $this->externalOutReviewRequestId=(string)Str::uuid();
+        $this->externalOutReviewGood=[];
+        $this->externalOutReviewDamaged=[];
+        $this->externalOutReviewUnresolved=[];
+        foreach($receipt['lines'] as $line) {
+            $this->externalOutReviewGood[$line['itemId']]='';
+            $this->externalOutReviewDamaged[$line['itemId']]='';
+            $this->externalOutReviewUnresolved[$line['itemId']]='';
+        }
+    }
+
+    public function submitExternalOutReturnReview():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_out_return_enabled') &&
+            $this->canApproveExternalOutDispatch(),403);
+        $receipt=collect(app(\App\Services\HallInventoryExternalOutReturnService::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($x):bool=>$x['receiptId']===$this->externalOutReviewReceiptId &&
+                !$x['reviewed'] && $x['receivedBy']!==(int)$actor->getKey());
+        abort_unless($receipt!==null,403);
+        $counts=[];
+        foreach($receipt['lines'] as $line) {
+            $q=[];
+            foreach(['good'=>'externalOutReviewGood',
+                     'damaged'=>'externalOutReviewDamaged',
+                     'unresolved'=>'externalOutReviewUnresolved'] as $type=>$field) {
+                $raw=$this->{$field}[$line['itemId']]??null;
+                if(!is_string($raw)||!preg_match('/^(0|[1-9][0-9]*)$/',$raw)||
+                    (float)$raw>100000000)
+                    throw ValidationException::withMessages([
+                        'externalOutReviewGood'=>'Independently enter good, damaged, and unresolved as whole counts including zero.']);
+                $q[$type]=(int)$raw;
+            }
+            $counts[$line['itemId']]=$q;
+        }
+        try {
+            $this->lastExternalOutReturnReference=app(
+                \App\Services\HallInventoryExternalOutReturnService::class
+            )->review($actor,$this->companyId,$this->hallId,
+                $this->externalOutReviewReceiptId,$this->externalOutReviewRequestId,$counts);
+        }catch(InvalidArgumentException|ConflictHttpException $e){
+            throw ValidationException::withMessages(['externalOutReviewGood'=>$e->getMessage()]);
+        }
+        $this->externalOutReviewReceiptId='';
+        $this->externalOutReviewRequestId=(string)Str::uuid();
+        $this->externalOutReviewGood=[];
+        $this->externalOutReviewDamaged=[];
+        $this->externalOutReviewUnresolved=[];
         $this->reloadLoanHistory();
     }
 
