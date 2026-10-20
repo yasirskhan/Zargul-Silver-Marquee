@@ -133,6 +133,35 @@ final class HallInventoryExternalOutCleanClosureTest extends TestCase {
         }catch(ConflictHttpException){}
         $this->assertSame(0,DB::table('hall_inventory_external_out_clean_closures')->count());
         $file->put($storedReturn->evidence_storage_path,$original);
+        // Final numbered certificates must reject forged duplicate batch rows,
+        // whether SQL immutability blocks the mutation or reconciliation does.
+        $originalLine=(array)DB::table('hall_inventory_external_out_return_lines')
+            ->where('receipt_id',$two)->where('item_id',$items[0]['itemId'])->first();
+        $this->assertNotEmpty($originalLine);
+        try {
+            DB::transaction(function () use ($originalLine,$closure,$owner,$company,$loan):void {
+                $duplicate=$originalLine;
+                $duplicate['id']=(string)Str::uuid();
+                DB::table('hall_inventory_external_out_return_lines')->insert($duplicate);
+                $closure->close($owner,$company->id,$loan,(string)Str::uuid());
+                $this->fail('Duplicated physical batch row minted numbered PDF.');
+            });
+        } catch (QueryException|ConflictHttpException) {}
+        $reviewLine=DB::table('hall_inventory_external_out_return_review_lines')
+            ->where('receipt_id',$two)->where('item_id',$items[0]['itemId'])->first();
+        $this->assertNotNull($reviewLine);
+        $firstMovement=DB::table('hall_inventory_external_out_return_review_lines')
+            ->where('receipt_id',$one)->where('item_id',$items[0]['itemId'])
+            ->value('good_movement_id');
+        try {
+            DB::transaction(function () use ($reviewLine,$firstMovement,$closure,$owner,$company,$loan):void {
+                DB::table('hall_inventory_external_out_return_review_lines')
+                    ->where('id',$reviewLine->id)->update(['good_movement_id'=>$firstMovement]);
+                $closure->close($owner,$company->id,$loan,(string)Str::uuid());
+                $this->fail('Reused movement minted external owned clean PDF.');
+            });
+        } catch (QueryException|ConflictHttpException) {}
+        $this->assertSame(0,DB::table('hall_inventory_external_out_clean_closures')->count());
         $this->be($witness);
         try{
             $closure->close($witness,$company->id,$loan,(string)Str::uuid());
