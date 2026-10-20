@@ -74,6 +74,9 @@ final class HallInventoryLoanDraftReview
             ->leftJoin('hall_inventory_external_out_dispatches as od',function($j):void {
                 $j->on('od.company_id','=','d.company_id')->on('od.loan_id','=','d.id');
             })
+            ->leftJoin('hall_inventory_external_out_clean_closures as oc',function($j):void {
+                $j->on('oc.company_id','=','d.company_id')->on('oc.loan_id','=','d.id');
+            })
             ->leftJoin('hall_inventory_external_in_receipts as er',function($j):void {
                 $j->on('er.company_id','=','d.company_id')->on('er.loan_id','=','d.id');
             })
@@ -117,6 +120,7 @@ final class HallInventoryLoanDraftReview
                 'lr.id as receipt_id','lr.created_at as received_at',
                 'er.id as external_receipt_id','ea.id as external_acceptance_id',
                 'oh.id as external_out_handover_id','od.id as external_out_dispatch_id',
+                'oc.id as external_out_closure_id',
                 'ec.id as external_clean_closure_id',
                 'rb.return_batch_count','rb.acknowledged_batch_count',
                 'p.name as external_partner_name',
@@ -128,6 +132,25 @@ final class HallInventoryLoanDraftReview
             ->where('company_id',$companyId)
             ->whereIn('loan_id',$drafts->pluck('id')->all())
             ->get(['loan_id','item_id','counted_quantity'])->groupBy('loan_id');
+        $externalOutReceived=DB::table('hall_inventory_external_out_return_receipts as b')
+            ->join('hall_inventory_external_out_return_lines as l',function($j):void {
+                $j->on('l.company_id','=','b.company_id')->on('l.receipt_id','=','b.id');
+            })
+            ->where('b.company_id',$companyId)
+            ->whereIn('b.loan_id',$drafts->pluck('id')->all())
+            ->select(['b.loan_id','l.item_id'])->selectRaw('SUM(l.quantity) AS count')
+            ->groupBy('b.loan_id','l.item_id')->get()->groupBy('loan_id');
+        $externalOutReviewed=DB::table('hall_inventory_external_out_return_reviews as a')
+            ->join('hall_inventory_external_out_return_review_lines as l',function($j):void {
+                $j->on('l.company_id','=','a.company_id')->on('l.review_id','=','a.id');
+            })
+            ->where('a.company_id',$companyId)
+            ->whereIn('a.loan_id',$drafts->pluck('id')->all())
+            ->select(['a.loan_id','l.item_id'])
+            ->selectRaw('SUM(l.good_quantity) AS good_count')
+            ->selectRaw('SUM(l.damaged_quantity) AS damaged_count')
+            ->selectRaw('SUM(l.unresolved_quantity) AS unresolved_count')
+            ->groupBy('a.loan_id','l.item_id')->get()->groupBy('loan_id');
         $physicalCounts=DB::table('hall_inventory_external_in_receipt_lines')
             ->where('company_id',$companyId)
             ->whereIn('loan_id',$drafts->pluck('id')->all())
@@ -205,7 +228,8 @@ final class HallInventoryLoanDraftReview
             ->groupBy('b.loan_id','l.item_id')->get()->groupBy('loan_id');
 
         return $drafts->map(static function ($draft) use ($lines,$hallId,$received,$returns,
-            $physicalCounts,$externalOutCounts,$externalAccepted,$externalSent,$externalConfirmed):array {
+            $physicalCounts,$externalOutCounts,$externalOutReceived,$externalOutReviewed,
+            $externalAccepted,$externalSent,$externalConfirmed):array {
             $receiptCount=(int)($received->get($draft->id)??0);
             $draftLines=$lines->get($draft->id)??collect();
             $actualCounts=($physicalCounts->get($draft->id)??collect())
@@ -229,6 +253,37 @@ final class HallInventoryLoanDraftReview
                 if(!array_key_exists((string)$requested->item_id,$outCounts)||
                     $outCounts[(string)$requested->item_id] !== (int)$requested->requested_quantity)
                     $outMatches=false;
+            }
+            $outRecon=null;
+            if($draft->direction==='external_out' && $draft->external_out_dispatch_id!==null){
+                $got=($externalOutReceived->get($draft->id)??collect())->keyBy('item_id');
+                $assessed=($externalOutReviewed->get($draft->id)??collect())->keyBy('item_id');
+                $orig=0;$receivedCount=0;$good=0;$bad=0;$unresolved=0;
+                $integrity=$got->count()>$draftLines->count() ||
+                    $assessed->count()>$draftLines->count() || $draftLines->isEmpty();
+                foreach($draftLines as $line){
+                    $id=(string)$line->item_id;$qty=(int)$line->requested_quantity;
+                    $received=(int)($got->get($id)?->count??0);
+                    $ok=(int)($assessed->get($id)?->good_count??0);
+                    $damaged=(int)($assessed->get($id)?->damaged_count??0);
+                    $unknown=(int)($assessed->get($id)?->unresolved_count??0);
+                    if($received>$qty||$ok+$damaged+$unknown>$received)$integrity=true;
+                    $orig+=$qty;$receivedCount+=$received;$good+=$ok;
+                    $bad+=$damaged;$unresolved+=$unknown;
+                }
+                $outRecon=[
+                    'original'=>$orig,'physicallyReceived'=>$receivedCount,
+                    'verifiedGood'=>$good,'verifiedDamaged'=>$bad,
+                    'verifiedUnresolved'=>$unresolved,
+                    'reviewPending'=>max(0,$receivedCount-$good-$bad-$unresolved),
+                    'notYetReturned'=>max(0,$orig-$receivedCount),
+                    'stillOnLoan'=>max(0,$orig-$good-$bad),
+                    'integrityWarning'=>$integrity,
+                    'allFullyReturnedClean'=>!$integrity && $orig>0 && $orig===$good &&
+                        $receivedCount===$orig && $bad===0 && $unresolved===0,
+                    'loanClosed'=>$draft->external_out_closure_id!==null,
+                    'financiallySettled'=>false,
+                ];
             }
             $externalReconciliation=null;
             if($draft->direction==='external_in' && $draft->external_acceptance_id!==null) {
@@ -291,6 +346,8 @@ final class HallInventoryLoanDraftReview
                 'direction'=>(string)$draft->direction,
                 'createdBy'=>(int)$draft->created_by,
                 'externalOutHandoverRecorded'=>$draft->external_out_handover_id!==null,
+                'externalOutReturnReconciliation'=>$outRecon,
+                'externalOutClosed'=>$draft->external_out_closure_id!==null,
                 'externalOutApproved'=>$draft->external_out_dispatch_id!==null,
                 'externalOutCounts'=>$draft->direction==='external_out' ? $outCounts : [],
                 'externalOutCountMatchesDraft'=>$outMatches,
@@ -316,8 +373,11 @@ final class HallInventoryLoanDraftReview
                         ? ($externalReconciliation===null ||
                             $externalReconciliation['stillOutstanding']>0 ||
                             $externalReconciliation['integrityWarning'])
-                        : ($draft->receipt_id === null || $reconciliation === null ||
-                            $reconciliation['stillUnsettled']>0 || $reconciliation['integrityWarning'])),
+                        : ($draft->direction==='external_out'
+                            ? ($outRecon===null || $outRecon['stillOnLoan']>0 ||
+                                $outRecon['integrityWarning'])
+                            : ($draft->receipt_id === null || $reconciliation === null ||
+                                $reconciliation['stillUnsettled']>0 || $reconciliation['integrityWarning']))),
                 'purpose'=>(string)$draft->purpose,
                 'createdAt'=>(string)$draft->created_at,
                 'status'=>$draft->direction==='external_in' ?
@@ -332,7 +392,13 @@ final class HallInventoryLoanDraftReview
                         : ($draft->external_receipt_id!==null ? 'external_physical_receipt_pending_review' : 'draft_only')) :
                     ($draft->direction==='external_out'
                         ? ($draft->external_out_dispatch_id!==null
-                            ? 'external_out_partner_custody_outstanding'
+                            ? ($draft->external_out_closure_id!==null
+                                ? 'external_out_clean_closed'
+                                : (($outRecon['allFullyReturnedClean']??false)
+                                    ? 'external_out_physically_returned_clean_closure_pending'
+                                    : (($outRecon['physicallyReceived']??0)>0
+                                        ? 'external_out_partial_return_review'
+                                        : 'external_out_partner_custody_outstanding')))
                             : ($draft->external_out_handover_id!==null
                                 ? 'external_out_handover_pending_approval' : 'draft_only'))
                         : ($draft->closure_id !== null ? 'clean_loan_closed' : ($draft->receipt_id !== null

@@ -157,6 +157,12 @@ final class HallInventory extends Page
     #[Locked]
     public ?string $lastExternalOutReference = null;
     #[Locked]
+    public array $externalOutCleanReceipts = [];
+    #[Locked]
+    public string $externalOutCleanRequestId = '';
+    #[Locked]
+    public ?array $lastExternalOutCleanReceipt = null;
+    #[Locked]
     public array $externalOutReturnHistory = [];
     #[Locked]
     public string $externalOutReturnLoanId = '';
@@ -467,6 +473,9 @@ final class HallInventory extends Page
         $this->externalOutCounts = [];
         $this->externalOutFile = null;
         $this->lastExternalOutReference = null;
+        $this->externalOutCleanReceipts = [];
+        $this->externalOutCleanRequestId = (string)Str::uuid();
+        $this->lastExternalOutCleanReceipt = null;
         $this->externalOutReturnHistory = [];
         $this->externalOutReturnLoanId = '';
         $this->externalOutReturnRequestId = (string)Str::uuid();
@@ -785,6 +794,21 @@ final class HallInventory extends Page
         }
         $this->loanHistory = app(\App\Services\HallInventoryLoanDraftReview::class)
             ->recent($actor, $this->companyId, $this->hallId);
+        $this->externalOutCleanReceipts=[];
+        if(config('inventory_controls.external_out_clean_closure_enabled')) {
+            $selectedHall=Hall::query()->where('company_id',$this->companyId)
+                ->where('id',$this->hallId)->where('is_active',true)->first();
+            if($selectedHall && app(TenantAccess::class)->canConfigureHall($actor,$selectedHall)){
+                $closureService=app(\App\Services\HallInventoryExternalOutCleanClosureService::class);
+                foreach($this->loanHistory as $loan){
+                    if($loan['direction']==='external_out' &&
+                        $loan['lendingHallId']===$this->hallId){
+                        $row=$closureService->summaryForLoan($actor,$this->companyId,$loan['id']);
+                        if($row!==null)$this->externalOutCleanReceipts[$loan['id']]=$row;
+                    }
+                }
+            }
+        }
         $this->externalOutReturnHistory = [];
         if(config('inventory_controls.external_out_return_enabled') &&
             config('inventory_controls.external_out_dispatch_enabled'))
@@ -1537,6 +1561,69 @@ final class HallInventory extends Page
         $this->reloadLoanHistory();
     }
 
+
+
+    public function canCloseExternalOutClean():bool
+    {
+        if(!config('inventory_controls.external_out_clean_closure_enabled'))return false;
+        $actor=auth()->user();
+        $hall=Hall::query()->where('company_id',$this->companyId)
+            ->where('id',$this->hallId)->where('is_active',true)->first();
+        return $actor instanceof User && $hall!==null &&
+            app(TenantAccess::class)->canConfigureHall($actor,$hall);
+    }
+    public function closeExternalOutCleanLoan(string $loanId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canCloseExternalOutClean(),403);
+        $loan=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($l):bool=>$l['id']===$loanId &&
+                $l['direction']==='external_out' &&
+                $l['lendingHallId']===$this->hallId &&
+                !$l['externalOutClosed'] &&
+                ($l['externalOutReturnReconciliation']['allFullyReturnedClean']??false) &&
+                $l['createdBy']!==(int)$actor->getKey());
+        abort_unless($loan!==null,403);
+        try {
+            $this->lastExternalOutCleanReceipt=app(
+                \App\Services\HallInventoryExternalOutCleanClosureService::class
+            )->close($actor,$this->companyId,$loanId,$this->externalOutCleanRequestId);
+        }catch(InvalidArgumentException|ConflictHttpException $e){
+            throw ValidationException::withMessages(['externalOutCleanClosure'=>$e->getMessage()]);
+        }
+        $this->externalOutCleanRequestId=(string)Str::uuid();
+        $this->reloadLoanHistory();
+    }
+    public function downloadExternalOutCleanLoanPdf(string $loanId):\Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canCloseExternalOutClean(),403);
+        $loan=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($l):bool=>$l['id']===$loanId &&
+                $l['direction']==='external_out' &&
+                $l['lendingHallId']===$this->hallId);
+        abort_unless($loan!==null,403);
+        $bytes=app(\App\Services\HallInventoryExternalOutCleanClosureService::class)
+            ->receiptPdf($actor,$this->companyId,$loanId);
+        DB::table('audit_events')->insert([
+            'id'=>(string)Str::uuid(),'company_id'=>$this->companyId,
+            'actor_id'=>$actor->getKey(),
+            'action'=>'hall_inventory.external_out_clean_receipt_pdf_downloaded',
+            'entity_type'=>'hall_inventory_loan_draft','entity_id'=>$loanId,
+            'before_values'=>json_encode([],JSON_THROW_ON_ERROR),
+            'after_values'=>json_encode(['read'=>'hash_verified_eol_pdf','stockMoved'=>false],JSON_THROW_ON_ERROR),
+            'context'=>json_encode(['hallId'=>$this->hallId,
+                'receiptOnly'=>true,'financialPosting'=>false],JSON_THROW_ON_ERROR)
+        ]);
+        return response()->streamDownload(
+            static function()use($bytes):void{echo $bytes;},
+            'venue-inventory-external-out-clean-'.substr($loanId,0,8).'.pdf',
+            ['Content-Type'=>'application/pdf','X-Content-Type-Options'=>'nosniff',
+             'Cache-Control'=>'private, no-store']
+        );
+    }
 
     public function canCloseCleanExternalBorrowing():bool
     {

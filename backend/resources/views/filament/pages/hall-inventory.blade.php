@@ -686,6 +686,9 @@
                                         'source_dispatched_receipt_pending' => 'SOURCE DISPATCHED / DESTINATION RECEIPT PENDING',
                                         'external_out_handover_pending_approval' => 'OUTSIDE LENDING HANDOVER / INDEPENDENT REVIEW PENDING',
                                         'external_out_partner_custody_outstanding' => 'HALL-OWNED STOCK LENT OUT / PARTNER RETURN PENDING',
+                                        'external_out_partial_return_review' => 'OUTSIDE OWNED PARTIAL RETURNS / RECONCILIATION PENDING',
+                                        'external_out_physically_returned_clean_closure_pending' => 'OUTSIDE OWNED PHYSICAL RETURN VERIFIED / FORMAL CLOSURE PENDING',
+                                        'external_out_clean_closed' => 'CLOSED / OUTSIDE OWNED CLEAN RETURN VERIFIED',
                                         'external_physical_receipt_pending_review' => 'EXTERNAL PHYSICAL RECEIPT / INDEPENDENT REVIEW PENDING',
                                         'external_borrowed_received_return_pending' => 'EXTERNAL BORROWED STOCK RECEIVED / RETURN PENDING',
                                         'external_partial_return_or_partner_ack_pending' => 'EXTERNAL PARTIAL RETURN / PARTNER RECEIPT PENDING',
@@ -722,6 +725,24 @@
                                         @endif</p>
                                     @if($loan['returnReconciliation']['integrityWarning'])
                                         <p role="alert">Inventory return evidence mismatch; reconciliation is blocked.</p>
+                                    @endif
+                                @endif
+                                @if(($loan['externalOutReturnReconciliation'] ?? null)!==null)
+                                    <p>Outside owned loan custody: original {{ $loan['externalOutReturnReconciliation']['original'] }},
+                                        physically returned {{ $loan['externalOutReturnReconciliation']['physicallyReceived'] }},
+                                        independently good {{ $loan['externalOutReturnReconciliation']['verifiedGood'] }},
+                                        damaged {{ $loan['externalOutReturnReconciliation']['verifiedDamaged'] }},
+                                        unresolved {{ $loan['externalOutReturnReconciliation']['verifiedUnresolved'] }}.
+                                        Return review pending {{ $loan['externalOutReturnReconciliation']['reviewPending'] }},
+                                        not physically returned {{ $loan['externalOutReturnReconciliation']['notYetReturned'] }},
+                                        outstanding owned-on-loan {{ $loan['externalOutReturnReconciliation']['stillOnLoan'] }}.
+                                        @if($loan['externalOutReturnReconciliation']['loanClosed'])
+                                            Numbered clean return custody is CLOSED; no financial settlement was posted.
+                                        @else
+                                            Loan closure and financial settlement are NOT recorded.
+                                        @endif</p>
+                                    @if($loan['externalOutReturnReconciliation']['integrityWarning'])
+                                        <p role="alert">Outside-owned per-loan physical count lineage mismatch; do not approve clean closure.</p>
                                     @endif
                                 @endif
                                 @if(($loan['externalReturnReconciliation'] ?? null) !== null)
@@ -833,6 +854,21 @@
                                             <button type="button" wire:click="startExternalOutReturn('{{ $loan['id'] }}')"
                                                 class="rounded-lg border px-3 py-2 text-sm">Record partial owned-stock return from outside partner</button>
                                         @endif
+                                    @endif
+                                    @if(config('inventory_controls.external_out_clean_closure_enabled') &&
+                                        $this->canCloseExternalOutClean())
+                                        @if(isset($externalOutCleanReceipts[$loan['id']]))
+                                            <p class="font-medium">Immutable outside-owned clean physical return EOL-{{ $externalOutCleanReceipts[$loan['id']]['receiptNumber'] }}. No money posted.</p>
+                                            <button type="button" wire:click="downloadExternalOutCleanLoanPdf('{{ $loan['id'] }}')"
+                                                class="rounded-lg border px-3 py-2 text-sm">Download numbered EOL outside-owned clean return PDF</button>
+                                        @elseif(!$loan['externalOutClosed'] &&
+                                            $loan['createdBy']!==(int)auth()->id() &&
+                                            ($loan['externalOutReturnReconciliation']['allFullyReturnedClean']??false))
+                                            <p class="text-xs">Final owner review independently checks every original signed handover and partner return, full-good condition, absent incidents and separate actors. Financial obligations are not assessed.</p>
+                                            <button type="button" wire:click="closeExternalOutCleanLoan('{{ $loan['id'] }}')"
+                                                class="rounded-lg border px-3 py-2 text-sm">Finalize outside-owned clean physical loan</button>
+                                        @endif
+                                        @error('externalOutCleanClosure') <p role="alert">{{ $message }}</p> @enderror
                                     @endif
                                     @error('externalOutFile') <p role="alert">{{ $message }}</p> @enderror
                                 @endif

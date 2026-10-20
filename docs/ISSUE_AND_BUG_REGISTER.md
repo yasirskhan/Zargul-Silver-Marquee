@@ -241,3 +241,7 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 
 ## INV-EXT-OUT-20261020-024 — Damage/missing/dispute reporting previously internal-only
 - Previous source refused all external_out loan incidents despite physical outside partner returns. Candidate extends the same immutable evidence/decision contract with strict original lending-hall approved external dispatch and per-item witnessed condition/outstanding caps; source-owner reporter and independent different reviewer. Does not assess money, move stock, settle debt or finalize loans. Exact six CI jobs and pilot required. Release flags OFF.
+
+
+## INV-EXT-OUT-20261020-025 — Outside owned loan falsely remained physically outstanding after clean returns
+- Candidate reconciles per-loan original external_out physical owned custody from immutable handover, partial physical receipts and independently reviewed good/damaged/unresolved lines instead of global hall inventory totals. Avoids false overdue when every unit is returned good; adds owner-only immutable EOL number/hash-pinned PDF closeout gated OFF. Rejects missing or altered physical partner documents, open incidents and outstanding custody. NO financial settlement, six-job CI pending.

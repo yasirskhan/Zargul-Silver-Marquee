@@ -138,3 +138,7 @@ Three distinct duties across draft, outside dispatch and return review: partner-
 
 ## Phase 12 external_out owner incidents and independent review (candidate)
 Reuse immutable incident/independent decision lifecycle for separately approved outside-owned loan custody with direction-aware release gates. Damage alleged only within owner independently inspected physical damaged amounts; missing/dispute only against outstanding unaccounted source dispatch. No automatic invoices, financial liabilities or write-offs. Authorized owner/admin reports, distinct reviewer independently substantiates or denies; PG/Livewire tests and hosted CI pending, OFF.
+
+
+## Phase 12 external_out all-clean returned owned loan closure (candidate, CI pending)
+Single company-scoped serial-numbered EOL-series PDF certificate, only after independently recorded FULL GOOD exact original item return. Every signed physical evidence document must pass hash checks; rejects missing/damaged/disputed/unreviewed amounts, creator or return physical witness self-closure, foreign hall and repeated receipt. A certificate is not a debt settlement or inventory loss write-off. EOL feature gate remains OFF until hosted CI six jobs and operator acceptance.
