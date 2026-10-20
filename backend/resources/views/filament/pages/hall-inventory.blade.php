@@ -479,8 +479,12 @@
                                 </tbody>
                             </table>
                         </div>
+                        @if(collect($stocktakeVariance)->contains(fn($row) => $row['reviewAcknowledged']))
+                            <p class="text-sm">An independent reviewer acknowledged this physical variance. Investigation and any separately approved correction remain outstanding. No stock or finance posting was made.</p>
+                        @endif
                         @if($this->canIndependentlyReviewSelectedVariance() &&
-                            collect($stocktakeVariance)->contains(fn($row) => $row['requiresReview']))
+                            collect($stocktakeVariance)->contains(fn($row) => $row['requiresReview']) &&
+                            !collect($stocktakeVariance)->contains(fn($row) => $row['reviewAcknowledged']))
                             <div class="space-y-2 rounded-lg border p-3">
                                 <p class="text-sm">Independent variance review is an audit acknowledgment only. It does not approve stock write-offs, resolve discrepancies or settle money.</p>
                                 <label class="block space-y-1">

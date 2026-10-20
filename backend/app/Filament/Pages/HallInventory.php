@@ -737,6 +737,8 @@ final class HallInventory extends Page
             throw ValidationException::withMessages(['varianceReviewReason'=>$e->getMessage()]);
         }
         $this->varianceReviewReason='';
+        $this->stocktakeVariance=app(\App\Services\HallInventoryStocktakeVariancePreview::class)
+            ->forStocktake($actor,$this->companyId,$this->hallId,$this->varianceStocktakeId);
     }
 
     public function reloadCatalog(): void

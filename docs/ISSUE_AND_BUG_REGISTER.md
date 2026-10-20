@@ -167,3 +167,10 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - BUG-20261019-010 corrected parseable default-OFF inventory release controls at `b7234c27`; [CI 39366602667](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39366602667) passed all six.
 - BUG-20261020-011 corrected Livewire class namespace syntax at `ab38325a`; [CI 39367373687](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39367373687) passed all six. The original Composer-step failure was source syntax, not external dependency network failure.
 - Inventory report CSV and complete journal-chain verification PASSED six-job [CI 39368066878](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39368066878) at exact `30878317`; production switches OFF.
+
+
+## BUG-20261020-012 — Variance acknowledgment UI lacks durable reviewed state
+- First detected: source `e4fbf0d6824468fc7673a779d6a642dceb184c89`, [CI 39371679196](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39371679196) laravel-postgres failed at HallInventoryStocktakeVariancePreviewTest.php:167. Five other jobs passed.
+- Issue: the page's transient success label was absent from rendered Livewire output after review. A read-only persisted status indicator is needed so review survives reopening and duplicate form actions are hidden.
+- Recovery: join immutable acknowledgment scoped by company/hall/stocktake into variance preview; reflect durable reviewed status and update page upon review; require PostgreSQL and Livewire checks for persisted visibility, no second review form, and unchanged inventory/finance.
+- Status: FIX PUBLISHED — CI PENDING. Never mark feature verified until exact six-job green.

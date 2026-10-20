@@ -45,12 +45,18 @@ final class HallInventoryStocktakeVariancePreview
             })
             ->leftJoin('hall_inventory_stocktake_book_snapshots as s',
                 's.stocktake_line_id','=','l.id')
+            ->leftJoin('hall_inventory_variance_review_acknowledgments as a',function($j):void {
+                $j->on('a.company_id','=','l.company_id')
+                    ->on('a.hall_id','=','l.hall_id')
+                    ->on('a.stocktake_id','=','l.stocktake_id');
+            })
             ->where('l.company_id',$companyId)->where('l.hall_id',$hallId)
             ->where('l.stocktake_id',$stocktakeId)
             ->orderBy('i.name')->orderBy('l.ownership')->orderBy('l.item_id')
             ->get(['l.id','l.item_id','i.name','i.unit','l.ownership',
                 'l.usable_count','l.damaged_count','s.book_revision','s.book_usable',
-                's.book_damaged','s.away_count','s.book_state'])
+                's.book_damaged','s.away_count','s.book_state',
+                'a.id as variance_review_id','a.created_at as variance_reviewed_at'])
             ->map(static function($row):array {
                 $trusted=$row->book_state==='POSTED_BOOK_SNAPSHOT';
                 $usable=$trusted?(int)$row->book_usable:null;
@@ -71,6 +77,9 @@ final class HallInventoryStocktakeVariancePreview
                     'requiresReview'=>!$trusted || (int)$row->usable_count!==$usable ||
                         (int)$row->damaged_count!==$damaged,
                     'adjustmentPosted'=>false,'financialPosting'=>false,
+                    'reviewAcknowledged'=>$row->variance_review_id!==null,
+                    'reviewAcknowledgedAt'=>$row->variance_reviewed_at===null
+                        ?null:(string)$row->variance_reviewed_at,
                 ];
             })->all();
     }

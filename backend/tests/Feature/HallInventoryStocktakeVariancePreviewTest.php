@@ -164,8 +164,16 @@ final class HallInventoryStocktakeVariancePreviewTest extends TestCase
             ->call('viewStocktakeVariance',$secondTake)->assertHasNoErrors()
             ->set('varianceReviewReason','Separate physical count variance reviewed')
             ->call('acknowledgeStocktakeVariance')->assertHasNoErrors()
-            ->assertSee('Independent review recorded:');
+            ->assertSee('An independent reviewer acknowledged this physical variance.');
         $this->assertSame(2,DB::table('hall_inventory_variance_review_acknowledgments')->count());
+        $history=app(HallInventoryStocktakeVariancePreview::class)
+            ->forStocktake($owner,$company->id,$hall->id,$secondTake);
+        $this->assertTrue($history[0]['reviewAcknowledged']);
+        $this->assertNotNull($history[0]['reviewAcknowledgedAt']);
+        Livewire::test(HallInventory::class)
+            ->call('viewStocktakeVariance',$secondTake)->assertHasNoErrors()
+            ->assertSee('An independent reviewer acknowledged this physical variance.')
+            ->assertDontSee('Record independent variance review');
         $this->assertSame(0,DB::table('finance_journals')->count());
         try {
             DB::transaction(function()use($ackId):void {
