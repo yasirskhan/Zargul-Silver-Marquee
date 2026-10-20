@@ -96,9 +96,16 @@ final class HallInventoryVarianceReclassificationTest extends TestCase {
         $this->assertSame(1,DB::table('hall_inventory_variance_reclassifications')->count());
         $this->assertSame(2,DB::table('hall_inventory_movement_events')->count());
         $this->assertSame(0,DB::table('finance_journals')->count());
-        try{DB::table('hall_inventory_variance_reclassifications')
-            ->where('stocktake_line_id',$line->id)->update(['quantity'=>20]);
-            $this->fail('Decision mutation allowed.');}catch(QueryException){}
+        try {
+            // PostgreSQL aborts a transaction after an expected trigger
+            // rejection. Roll back only this SAVEPOINT so subsequent
+            // assertions still exercise a usable test transaction.
+            DB::transaction(function()use($line):void {
+                DB::table('hall_inventory_variance_reclassifications')
+                    ->where('stocktake_line_id',$line->id)->update(['quantity'=>20]);
+            });
+            $this->fail('Decision mutation allowed.');
+        } catch(QueryException) {}
         $this->assertSame(1,DB::table('audit_events')
             ->where('action','hall_inventory.stocktake_condition_reclassified')->count());
         $this->be($counter);

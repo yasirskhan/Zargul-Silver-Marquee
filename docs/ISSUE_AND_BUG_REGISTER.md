@@ -174,3 +174,10 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Issue: the page's transient success label was absent from rendered Livewire output after review. A read-only persisted status indicator is needed so review survives reopening and duplicate form actions are hidden.
 - Recovery: join immutable acknowledgment scoped by company/hall/stocktake into variance preview; reflect durable reviewed status and update page upon review; require PostgreSQL and Livewire checks for persisted visibility, no second review form, and unchanged inventory/finance.
 - Status: FIX PUBLISHED — CI PENDING. Never mark feature verified until exact six-job green.
+
+
+## BUG-20261020-013 — Expected immutable update aborts entire PostgreSQL test fixture
+- Source `f12ba9a766dcbe5d828d18f9b1f623d2b7e74171`, hosted CI 39377437941: laravel-postgres failed `HallInventoryVarianceReclassificationTest.php:103` with SQLSTATE 25P02 after deliberately rejected immutable UPDATE. Five other jobs succeeded.
+- Root cause: the new negative test caught the expected QueryException without a nested DB transaction/savepoint. PostgreSQL left the surrounding test transaction aborted, so a subsequent safe audit SELECT failed.
+- Repair: wrap ONLY the deliberate invalid UPDATE in DB::transaction so Laravel rolls back its savepoint, retaining the trigger, full assertion and subsequent finance/stock checks. No service, migration or production flag weakening.
+- Status: REPAIR PUBLISHED, NEW EXACT-SHA ALL SIX CI PENDING.
