@@ -684,6 +684,8 @@
                                         'partial_return_in_transit_source_ack_pending' => 'PARTIAL RETURN SENT / SOURCE ACK PENDING',
                                         'destination_received_return_pending' => 'DESTINATION RECEIVED / RETURNS PENDING',
                                         'source_dispatched_receipt_pending' => 'SOURCE DISPATCHED / DESTINATION RECEIPT PENDING',
+                                        'external_out_handover_pending_approval' => 'OUTSIDE LENDING HANDOVER / INDEPENDENT REVIEW PENDING',
+                                        'external_out_partner_custody_outstanding' => 'HALL-OWNED STOCK LENT OUT / PARTNER RETURN PENDING',
                                         'external_physical_receipt_pending_review' => 'EXTERNAL PHYSICAL RECEIPT / INDEPENDENT REVIEW PENDING',
                                         'external_borrowed_received_return_pending' => 'EXTERNAL BORROWED STOCK RECEIVED / RETURN PENDING',
                                         'external_partial_return_or_partner_ack_pending' => 'EXTERNAL PARTIAL RETURN / PARTNER RECEIPT PENDING',
@@ -798,6 +800,31 @@
                                             class="rounded-lg border px-3 py-2 text-sm">Finalize externally borrowed clean loan</button>
                                     @endif
                                     @error('externalCleanClosure') <p role="alert">{{ $message }}</p> @enderror
+                                @endif
+                                @if(config('inventory_controls.external_out_dispatch_enabled') &&
+                                    $loan['direction']==='external_out' &&
+                                    $loan['lendingHallId']===$hallId)
+                                    @if(!$loan['externalOutHandoverRecorded'] &&
+                                        $loan['createdBy']!==(int)auth()->id())
+                                        <button type="button" wire:click="startExternalOutHandover('{{ $loan['id'] }}')"
+                                            class="rounded-lg border px-3 py-2 text-sm">Witness outside partner physical handover</button>
+                                    @elseif($loan['externalOutHandoverRecorded'] && !$loan['externalOutApproved'])
+                                        <p>Witnessed outside handover:
+                                            @foreach($loan['lines'] as $outLine)
+                                                {{ $outLine['name'] }} counted {{ $loan['externalOutCounts'][$outLine['itemId']] ?? 'MISSING' }} / requested {{ $outLine['quantity'] }}.
+                                            @endforeach
+                                        </p>
+                                        @if(!$loan['externalOutCountMatchesDraft'])
+                                            <p role="alert">Outside physical counts do not match original loan; no owned stock may leave the book.</p>
+                                        @elseif($this->canApproveExternalOutDispatch() &&
+                                            $loan['createdBy']!==(int)auth()->id())
+                                            <button type="button" wire:click="approveExternalOutDispatch('{{ $loan['id'] }}')"
+                                                class="rounded-lg border px-3 py-2 text-sm">Independently approve outside lending stock dispatch</button>
+                                        @endif
+                                    @elseif($loan['externalOutApproved'])
+                                        <p>Outside lending approved. Hall-owned goods are ON LOAN to the partner, not sold or financially settled. Physical return and independent reconciliation are pending.</p>
+                                    @endif
+                                    @error('externalOutFile') <p role="alert">{{ $message }}</p> @enderror
                                 @endif
                                 @if(config('inventory_controls.loan_dispatch_enabled') &&
                                     $loan['direction']==='internal' &&
@@ -921,6 +948,34 @@
                             <p>No incident reports recorded.</p>
                         @endforelse
                     </section>
+                @endif
+                @if(config('inventory_controls.external_out_dispatch_enabled') && $externalOutLoanId !== '')
+                    <section class="rounded-xl border p-4 space-y-3" aria-label="Witness outside lending physical handover">
+                        <h3 class="font-semibold">Outside lending physical handover — independent witness</h3>
+                        <p>Loan {{ $externalOutLoanId }}. Enter physical counts; a different owner/admin must approve before owned stock is posted ON LOAN. No finance or closure is posted.</p>
+                        @foreach($loanHistory as $outLoan)
+                            @if($outLoan['id']===$externalOutLoanId)
+                                @foreach($outLoan['lines'] as $outLine)
+                                    <label wire:key="ext-out-qty-{{ $outLine['itemId'] }}" class="block text-sm">
+                                        {{ $outLine['name'] }} (requested {{ $outLine['quantity'] }} {{ $outLine['unit'] }})
+                                        <input type="number" min="0" max="100000000" step="1" required
+                                            wire:model="externalOutCounts.{{ $outLine['itemId'] }}"
+                                            class="w-full rounded-lg border p-2 text-gray-900">
+                                    </label>
+                                @endforeach
+                            @endif
+                        @endforeach
+                        @error('externalOutCounts') <p role="alert">{{ $message }}</p> @enderror
+                        <label class="block text-sm">Outside partner signed physical handover, PDF/photo up to 5 MB
+                            <input type="file" wire:model="externalOutFile" accept=".jpg,.jpeg,.png,.pdf"
+                                class="w-full rounded-lg border p-2"></label>
+                        @error('externalOutFile') <p role="alert">{{ $message }}</p> @enderror
+                        <button type="button" wire:click="submitExternalOutHandover"
+                            class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">Submit witnessed outside lending handover</button>
+                    </section>
+                @endif
+                @if($lastExternalOutReference)
+                    <p role="status">Outside lending custody reference {{ $lastExternalOutReference }}. Only independent approval can move owned goods; no money posted.</p>
                 @endif
                 @if(config('inventory_controls.external_borrowed_intake_enabled') && $externalIntakeLoanId !== '')
                     <section class="space-y-3 rounded-xl border p-4" aria-label="Witnessed external borrowing arrival">

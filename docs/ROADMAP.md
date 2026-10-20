@@ -126,3 +126,7 @@ production toggles merely because development CI passes.
 - Numbered immutable partner clean-return PDF, complete per-item original intake / witnessed partial batch / partner-signed receipt matching, multi-actor separation and role-specific owner confirmation + download. Explicitly no financial payment/penalty/claim assignment. Default OFF independent release flag; requires six CI successes on exact SHA. Disputed/damaged/missing financial resolution, nonclean closure, external_out and launch review still pending.
 
 - VERIFIED: external_in borrowed intake at ab146a61 CI 39433026329; external partial return partner physical batch approval at ab75cd0f CI 39448663572; per-item/loan custody reconciliation 00f7efbc CI 39450008056 — all six jobs green each. Production OFF. External borrowed clean numbered return PDF is the NEXT separately gated candidate.
+
+
+## Phase 12 external_out partner lending owned-stock dispatch candidate (CI PENDING)
+Default-OFF outside lending from hall-owned inventory with manager draft separate witnessed partner signed handover and independent owner/admin original-exact quantity approval. Stock shifts owned_usable to owned_on_loan only; no borrowed or financial posting. Hall/loan/item SQL provenance and immutable movement/evidence; role-scoped Livewire controls and PostgreSQL checks. Return, condition assessment, financial liability, disputed/nonclean closure and production activation are NOT completed.

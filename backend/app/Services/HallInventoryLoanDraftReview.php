@@ -68,6 +68,12 @@ final class HallInventoryLoanDraftReview
                 $join->on('lr.company_id','=','d.company_id')
                     ->on('lr.loan_id','=','d.id');
             })
+            ->leftJoin('hall_inventory_external_out_handovers as oh',function($j):void {
+                $j->on('oh.company_id','=','d.company_id')->on('oh.loan_id','=','d.id');
+            })
+            ->leftJoin('hall_inventory_external_out_dispatches as od',function($j):void {
+                $j->on('od.company_id','=','d.company_id')->on('od.loan_id','=','d.id');
+            })
             ->leftJoin('hall_inventory_external_in_receipts as er',function($j):void {
                 $j->on('er.company_id','=','d.company_id')->on('er.loan_id','=','d.id');
             })
@@ -110,6 +116,7 @@ final class HallInventoryLoanDraftReview
                 'lc.id as closure_id',
                 'lr.id as receipt_id','lr.created_at as received_at',
                 'er.id as external_receipt_id','ea.id as external_acceptance_id',
+                'oh.id as external_out_handover_id','od.id as external_out_dispatch_id',
                 'ec.id as external_clean_closure_id',
                 'rb.return_batch_count','rb.acknowledged_batch_count',
                 'p.name as external_partner_name',
@@ -117,6 +124,10 @@ final class HallInventoryLoanDraftReview
             ]);
         if($drafts->isEmpty())return [];
 
+        $externalOutCounts=DB::table('hall_inventory_external_out_handover_lines')
+            ->where('company_id',$companyId)
+            ->whereIn('loan_id',$drafts->pluck('id')->all())
+            ->get(['loan_id','item_id','counted_quantity'])->groupBy('loan_id');
         $physicalCounts=DB::table('hall_inventory_external_in_receipt_lines')
             ->where('company_id',$companyId)
             ->whereIn('loan_id',$drafts->pluck('id')->all())
@@ -194,7 +205,7 @@ final class HallInventoryLoanDraftReview
             ->groupBy('b.loan_id','l.item_id')->get()->groupBy('loan_id');
 
         return $drafts->map(static function ($draft) use ($lines,$hallId,$received,$returns,
-            $physicalCounts,$externalAccepted,$externalSent,$externalConfirmed):array {
+            $physicalCounts,$externalOutCounts,$externalAccepted,$externalSent,$externalConfirmed):array {
             $receiptCount=(int)($received->get($draft->id)??0);
             $draftLines=$lines->get($draft->id)??collect();
             $actualCounts=($physicalCounts->get($draft->id)??collect())
@@ -207,6 +218,17 @@ final class HallInventoryLoanDraftReview
                 if(!array_key_exists((string)$requested->item_id,$actualCounts) ||
                     $actualCounts[(string)$requested->item_id]!== (int)$requested->requested_quantity)
                     $matches=false;
+            }
+            $outCounts=($externalOutCounts->get($draft->id)??collect())
+                ->pluck('counted_quantity','item_id')
+                ->map(static fn($n):int=>(int)$n)->all();
+            $outMatches=$draft->direction==='external_out' &&
+                $draft->external_out_handover_id!==null &&
+                count($outCounts)===$draftLines->count();
+            foreach($draftLines as $requested){
+                if(!array_key_exists((string)$requested->item_id,$outCounts)||
+                    $outCounts[(string)$requested->item_id] !== (int)$requested->requested_quantity)
+                    $outMatches=false;
             }
             $externalReconciliation=null;
             if($draft->direction==='external_in' && $draft->external_acceptance_id!==null) {
@@ -268,6 +290,10 @@ final class HallInventoryLoanDraftReview
                 'id'=>(string)$draft->id,
                 'direction'=>(string)$draft->direction,
                 'createdBy'=>(int)$draft->created_by,
+                'externalOutHandoverRecorded'=>$draft->external_out_handover_id!==null,
+                'externalOutApproved'=>$draft->external_out_dispatch_id!==null,
+                'externalOutCounts'=>$draft->direction==='external_out' ? $outCounts : [],
+                'externalOutCountMatchesDraft'=>$outMatches,
                 'externalReceiptRecorded'=>$draft->external_receipt_id!==null,
                 'externalReceiptAccepted'=>$draft->external_acceptance_id!==null,
                 'externalCountByItem'=>$draft->direction==='external_in' ? $actualCounts : [],
@@ -283,6 +309,7 @@ final class HallInventoryLoanDraftReview
                 // Informational only: a past due date has no charging or closure effect.
                 // Unshipped drafts are never labeled overdue physical custody.
                 'overdueWithOutstandingCustody'=>($draft->dispatch_id !== null ||
+                    $draft->external_out_dispatch_id!==null ||
                     $draft->external_acceptance_id!==null)
                     && (string)$draft->expected_return_date < now()->toDateString()
                     && ($draft->direction==='external_in'
@@ -303,17 +330,23 @@ final class HallInventoryLoanDraftReview
                                 ? 'external_partial_return_or_partner_ack_pending'
                                 : 'external_borrowed_received_return_pending')))
                         : ($draft->external_receipt_id!==null ? 'external_physical_receipt_pending_review' : 'draft_only')) :
-                    ($draft->closure_id !== null ? 'clean_loan_closed' : ($draft->receipt_id !== null
+                    ($draft->direction==='external_out'
+                        ? ($draft->external_out_dispatch_id!==null
+                            ? 'external_out_partner_custody_outstanding'
+                            : ($draft->external_out_handover_id!==null
+                                ? 'external_out_handover_pending_approval' : 'draft_only'))
+                        : ($draft->closure_id !== null ? 'clean_loan_closed' : ($draft->receipt_id !== null
                     ? ((int)($draft->return_batch_count??0)>0
                         ? ((int)($draft->acknowledged_batch_count??0) < (int)$draft->return_batch_count
                             ? 'partial_return_in_transit_source_ack_pending'
                             : 'return_acknowledged_outstanding_reconciliation_required')
                         : 'destination_received_return_pending')
                     : ($draft->dispatch_id !== null
-                        ? 'source_dispatched_receipt_pending' : 'draft_only'))),
+                        ? 'source_dispatched_receipt_pending' : 'draft_only')))),
                 'viewRole'=>(in_array($draft->direction,['internal','external_in'],true) &&
                     $draft->borrowing_hall_id=== $hallId) ? 'receiving' : 'originating',
-                'stockMoved'=>$draft->dispatch_id !== null || $draft->external_acceptance_id!==null,
+                'stockMoved'=>$draft->dispatch_id !== null ||
+                    $draft->external_acceptance_id!==null || $draft->external_out_dispatch_id!==null,
                 'sourceDispatchRecorded'=>$draft->dispatch_id !== null,
                 'destinationReceiptConfirmed'=>$draft->receipt_id !== null || $draft->external_acceptance_id!==null,
                 'receivedAt'=>$draft->received_at !== null

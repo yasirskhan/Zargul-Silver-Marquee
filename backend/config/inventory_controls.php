@@ -26,6 +26,8 @@ return [
     'loan_incident_reviews_enabled' => (bool) env('VENUE_INVENTORY_LOAN_INCIDENT_REVIEWS_ENABLED', false),
     // Entirely clean internal loans only; independently reconciled numbered PDF.
     'loan_clean_closure_enabled' => (bool) env('VENUE_INVENTORY_LOAN_CLEAN_CLOSURE_ENABLED', false),
+    // Hall-owned goods lent outside: independent signed handover and owner approval. OFF.
+    'external_out_dispatch_enabled' => (bool) env('VENUE_INVENTORY_EXTERNAL_OUT_DISPATCH_ENABLED', false),
     // External partner-to-hall intake requires a different physical counter and approver.
     'external_borrowed_intake_enabled' => (bool) env('VENUE_INVENTORY_EXTERNAL_BORROWED_INTAKE_ENABLED', false),
     // Witnessed partial partner returns and independently verified partner receipt; OFF.

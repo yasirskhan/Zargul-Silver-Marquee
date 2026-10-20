@@ -149,6 +149,15 @@ final class HallInventory extends Page
     public ?string $lastExternalIntakeReference = null;
 
     #[Locked]
+    public string $externalOutLoanId = '';
+    #[Locked]
+    public string $externalOutRequestId = '';
+    public array $externalOutCounts = [];
+    public $externalOutFile = null;
+    #[Locked]
+    public ?string $lastExternalOutReference = null;
+
+    #[Locked]
     public array $externalCleanReceipts = [];
     #[Locked]
     public string $externalCleanClosureRequestId = '';
@@ -436,6 +445,11 @@ final class HallInventory extends Page
         $this->returnAcceptanceFile = null;
         $this->lastReturnAcceptanceId = null;
 
+        $this->externalOutLoanId = '';
+        $this->externalOutRequestId = (string)Str::uuid();
+        $this->externalOutCounts = [];
+        $this->externalOutFile = null;
+        $this->lastExternalOutReference = null;
         $this->externalCleanReceipts = [];
         $this->externalCleanClosureRequestId = (string)Str::uuid();
         $this->lastExternalCleanReceipt = null;
@@ -1084,6 +1098,96 @@ final class HallInventory extends Page
             ->where('id',$this->hallId)->where('is_active',true)->first();
         return $actor instanceof User && $hall!==null &&
             app(TenantAccess::class)->canConfigureHall($actor,$hall);
+    }
+
+
+    public function canApproveExternalOutDispatch():bool
+    {
+        if(!config('inventory_controls.external_out_dispatch_enabled'))return false;
+        $actor=auth()->user();
+        $hall=Hall::query()->where('company_id',$this->companyId)
+            ->where('id',$this->hallId)->where('is_active',true)->first();
+        return $actor instanceof User && $hall!==null &&
+            app(TenantAccess::class)->canConfigureHall($actor,$hall);
+    }
+
+    public function startExternalOutHandover(string $loanId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_out_dispatch_enabled'),403);
+        $loan=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($l):bool=>$l['id']===$loanId &&
+                $l['direction']==='external_out' &&
+                $l['lendingHallId']===$this->hallId &&
+                !$l['externalOutHandoverRecorded'] &&
+                $l['createdBy']!==(int)$actor->getKey());
+        abort_unless($loan!==null,403);
+        $this->externalOutLoanId=$loanId;
+        $this->externalOutRequestId=(string)Str::uuid();
+        $this->externalOutCounts=array_fill_keys(
+            array_map(static fn(array $l):string=>$l['itemId'],$loan['lines']),'');
+        $this->externalOutFile=null;
+        $this->lastExternalOutReference=null;
+    }
+
+    public function submitExternalOutHandover():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_out_dispatch_enabled'),403);
+        $this->validate(['externalOutFile'=>'required|file|max:5120|mimes:jpg,jpeg,png,pdf']);
+        $loan=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($l):bool=>$l['id']===$this->externalOutLoanId &&
+                $l['direction']==='external_out' &&
+                $l['lendingHallId']===$this->hallId &&
+                !$l['externalOutHandoverRecorded']);
+        abort_unless($loan!==null,403);
+        $counts=[];
+        foreach($loan['lines'] as $line) {
+            $raw=$this->externalOutCounts[$line['itemId']]??null;
+            if(!is_string($raw)||!preg_match('/^(0|[1-9][0-9]*)$/',$raw)||
+                (float)$raw>100000000)
+                throw ValidationException::withMessages([
+                    'externalOutCounts'=>'Enter each actual witnessed physical handover quantity, including zero.']);
+            $counts[$line['itemId']]=(int)$raw;
+        }
+        try {
+            $this->lastExternalOutReference=app(
+                \App\Services\HallInventoryExternalOutDispatchService::class
+            )->record($actor,$this->companyId,$this->hallId,
+                $this->externalOutLoanId,$this->externalOutRequestId,
+                $this->externalOutFile,$counts);
+        }catch(InvalidArgumentException|ConflictHttpException $e){
+            throw ValidationException::withMessages(['externalOutFile'=>$e->getMessage()]);
+        }
+        $this->externalOutLoanId='';
+        $this->externalOutRequestId=(string)Str::uuid();
+        $this->externalOutFile=null;
+        $this->externalOutCounts=[];
+        $this->reloadLoanHistory();
+    }
+
+    public function approveExternalOutDispatch(string $loanId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canApproveExternalOutDispatch(),403);
+        $loan=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($l):bool=>$l['id']===$loanId &&
+                $l['direction']==='external_out' &&
+                $l['lendingHallId']===$this->hallId &&
+                $l['externalOutHandoverRecorded'] &&
+                !$l['externalOutApproved']);
+        abort_unless($loan!==null,403);
+        try {
+            $this->lastExternalOutReference=app(
+                \App\Services\HallInventoryExternalOutDispatchService::class
+            )->approve($actor,$this->companyId,$this->hallId,$loanId,(string)Str::uuid());
+        }catch(InvalidArgumentException|ConflictHttpException $e){
+            throw ValidationException::withMessages(['externalOutFile'=>$e->getMessage()]);
+        }
+        $this->reloadLoanHistory();
     }
 
     public function startExternalBorrowedReceipt(string $loanId):void

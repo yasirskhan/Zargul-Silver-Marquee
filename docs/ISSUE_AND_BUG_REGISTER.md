@@ -229,3 +229,7 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 
 ## VERIFIED 2026-10-20: BUG-019/020 external borrowed return and per-loan custody display
 - External partial partner dispatch and independent count CI 39448663572 at ab75cd0f: all six SUCCESS, preserving five successes from earlier failed selector-only CI and repairing the two-hall owner UI regression. Per-loan item aggregate and accurate outstanding/in-transit/confirmed states CI 39450008056 at 00f7efbc: all six SUCCESS. Closure candidate still separate/CI PENDING. Default production controls all OFF.
+
+
+## INV-EXT-OUT-20261020-022 — Outside lending draft had no physical dispatch workflow
+- Prior behavior: external_out draft only; no real signed dispatch and owned book movement despite inventory physically leaving hall. Adds default-OFF independently witnessed multi-item counterparty handover, immutable exact draft provenance constraints and separate owner/admin signed-proof approval. Two-actor self-dealing and short count block stock; financial posting never occurs. Await six-job exact-SHA hosted CI; release controls OFF. Partner returns, incidents, settlement and non-clean closure remain unfinished.
