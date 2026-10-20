@@ -45,6 +45,16 @@ final class HallInventoryStocktakeVariancePreview
             })
             ->leftJoin('hall_inventory_stocktake_book_snapshots as s',
                 's.stocktake_line_id','=','l.id')
+            ->leftJoin('hall_inventory_variance_reclassifications as d',function($j):void {
+                $j->on('d.company_id','=','l.company_id')
+                    ->on('d.hall_id','=','l.hall_id')
+                    ->on('d.stocktake_line_id','=','l.id');
+            })
+            ->leftJoin('hall_inventory_positions as p',function($j):void {
+                $j->on('p.company_id','=','l.company_id')
+                    ->on('p.hall_id','=','l.hall_id')
+                    ->on('p.item_id','=','l.item_id');
+            })
             ->leftJoin('hall_inventory_variance_review_acknowledgments as a',function($j):void {
                 $j->on('a.company_id','=','l.company_id')
                     ->on('a.hall_id','=','l.hall_id')
@@ -56,13 +66,15 @@ final class HallInventoryStocktakeVariancePreview
             ->get(['l.id','l.item_id','i.name','i.unit','l.ownership',
                 'l.usable_count','l.damaged_count','s.book_revision','s.book_usable',
                 's.book_damaged','s.away_count','s.book_state',
-                'a.id as variance_review_id','a.created_at as variance_reviewed_at'])
+                'a.id as variance_review_id','a.created_at as variance_reviewed_at',
+                'd.id as reclassification_id','d.movement_id as reclassification_movement_id',
+                'p.revision as current_position_revision'])
             ->map(static function($row):array {
                 $trusted=$row->book_state==='POSTED_BOOK_SNAPSHOT';
                 $usable=$trusted?(int)$row->book_usable:null;
                 $damaged=$trusted?(int)$row->book_damaged:null;
                 return [
-                    'itemId'=>(string)$row->item_id,
+                    'itemId'=>(string)$row->item_id,'lineId'=>(string)$row->id,
                     'name'=>(string)$row->name,'unit'=>(string)$row->unit,
                     'ownership'=>(string)$row->ownership,
                     'countedUsable'=>(int)$row->usable_count,
@@ -76,7 +88,15 @@ final class HallInventoryStocktakeVariancePreview
                         (string)$row->book_state,
                     'requiresReview'=>!$trusted || (int)$row->usable_count!==$usable ||
                         (int)$row->damaged_count!==$damaged,
-                    'adjustmentPosted'=>false,'financialPosting'=>false,
+                    'adjustmentPosted'=>$row->reclassification_id!==null,'financialPosting'=>false,
+                    'reclassificationMovementId'=>$row->reclassification_movement_id,
+                    'reclassificationEligible'=>config('inventory_controls.variance_reclassification_enabled') &&
+                        $row->variance_review_id!==null && $row->reclassification_id===null &&
+                        $row->ownership==='owned' && $trusted &&
+                        $row->current_position_revision!==null &&
+                        (int)$row->current_position_revision===(int)$row->book_revision &&
+                        (int)$row->usable_count+(int)$row->damaged_count===$usable+$damaged &&
+                        (int)$row->usable_count!==$usable,
                     'reviewAcknowledged'=>$row->variance_review_id!==null,
                     'reviewAcknowledgedAt'=>$row->variance_reviewed_at===null
                         ?null:(string)$row->variance_reviewed_at,

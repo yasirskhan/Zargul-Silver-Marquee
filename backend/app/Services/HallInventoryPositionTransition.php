@@ -28,6 +28,8 @@ final class HallInventoryPositionTransition
         'send_borrowed_back' => ['borrowedUsable', 'borrowedTransit'],
         'confirm_borrowed_return' => ['borrowedTransit', null],
         'damage_borrowed' => ['borrowedUsable', 'borrowedDamaged'],
+        'reclassify_owned_damage' => ['ownedUsable', 'ownedDamaged'],
+        'restore_owned_usable' => ['ownedDamaged', 'ownedUsable'],
     ];
 
     /** @param array<string,int> $position

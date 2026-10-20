@@ -54,6 +54,9 @@ final class HallInventory extends Page
     #[Locked]
     public string $varianceStocktakeId = '';
     public string $varianceReviewReason = '';
+    public string $varianceAdjudicationReason = '';
+    #[Locked]
+    public ?string $lastVarianceReclassificationReference = null;
     #[Locked]
     public string $varianceReviewRequestId = '';
     #[Locked]
@@ -345,6 +348,8 @@ final class HallInventory extends Page
         $this->countRows = [];
         $this->stocktakeVariance = [];
         $this->varianceStocktakeId = '';
+        $this->varianceAdjudicationReason = '';
+        $this->lastVarianceReclassificationReference = null;
         $this->lastCountReference = null;
         $this->loanRows = [];
         $this->loanDirection = 'internal';
@@ -706,6 +711,8 @@ final class HallInventory extends Page
         $this->varianceReviewRequestId=(string)Str::uuid();
         $this->varianceReviewReason='';
         $this->lastVarianceReviewReference=null;
+        $this->varianceAdjudicationReason='';
+        $this->lastVarianceReclassificationReference=null;
     }
 
     public function canIndependentlyReviewSelectedVariance():bool
@@ -741,11 +748,33 @@ final class HallInventory extends Page
             ->forStocktake($actor,$this->companyId,$this->hallId,$this->varianceStocktakeId);
     }
 
+
+    public function reclassifyStocktakeDamage(string $lineId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.variance_reclassification_enabled') &&
+            config('inventory_controls.stocktake_variance_enabled') &&
+            config('inventory_controls.position_reports_enabled'),403);
+        try {
+            $this->lastVarianceReclassificationReference=app(
+                \App\Services\HallInventoryVarianceReclassificationService::class
+            )->reconcile($actor,$this->companyId,$this->hallId,$this->varianceStocktakeId,
+                $lineId,$this->varianceAdjudicationReason);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['varianceAdjudicationReason'=>$e->getMessage()]);
+        }
+        $this->varianceAdjudicationReason='';
+        $this->stocktakeVariance=app(\App\Services\HallInventoryStocktakeVariancePreview::class)
+            ->forStocktake($actor,$this->companyId,$this->hallId,$this->varianceStocktakeId);
+    }
+
     public function reloadCatalog(): void
     {
         $this->stocktakeVariance = [];
         $this->varianceStocktakeId = '';
         $this->varianceReviewReason = '';
+        $this->varianceAdjudicationReason = '';
+        $this->lastVarianceReclassificationReference = null;
         $this->lastVarianceReviewReference = null;
         $this->varianceReviewRequestId = '';
         $this->catalog = [];

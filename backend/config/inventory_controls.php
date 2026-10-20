@@ -9,6 +9,8 @@ return [
     'position_reports_enabled' => (bool) env('VENUE_INVENTORY_POSITION_REPORTS_ENABLED', false),
     // Immutable count-time book snapshot and read-only variance; default OFF.
     'stocktake_variance_enabled' => (bool) env('VENUE_INVENTORY_STOCKTAKE_VARIANCE_ENABLED', false),
+    // Review-bound, same-total OWNED condition movements only, OFF until pilot.
+    'variance_reclassification_enabled' => (bool) env('VENUE_INVENTORY_VARIANCE_RECLASSIFICATION_ENABLED', false),
     'loan_drafts_enabled' => (bool) env('VENUE_INVENTORY_LOAN_DRAFTS_ENABLED', false),
     // Only independently approved, evidence-backed source dispatch. OFF in production.
     'loan_dispatch_enabled' => (bool) env('VENUE_INVENTORY_LOAN_DISPATCH_ENABLED', false),

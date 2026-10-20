@@ -473,7 +473,11 @@
                                         <td class="p-2">{{ $line['countedDamaged'] }}</td>
                                         <td class="p-2">{{ $line['bookDamaged'] ?? 'No valid baseline' }}</td>
                                         <td class="p-2">{{ $line['damagedVariance'] ?? 'Not available' }}</td>
-                                        <td class="p-2">{{ $line['requiresReview'] ? 'REVIEW REQUIRED' : 'MATCHED BOOK SNAPSHOT' }}</td>
+                                        <td class="p-2">{{ $line['adjustmentPosted'] ? 'OWNED CONDITION RECLASSIFIED' : ($line['requiresReview'] ? 'REVIEW REQUIRED' : 'MATCHED BOOK SNAPSHOT') }}</td>
+                                        @if($line['reclassificationEligible'])
+                                            <td class="p-2"><button type="button" wire:click="reclassifyStocktakeDamage('{{ $line['lineId'] }}')"
+                                                class="rounded-lg border px-2 py-1">Reclassify owned condition</button></td>
+                                        @endif
                                     </tr>
                                 @endforeach
                                 </tbody>
@@ -496,6 +500,20 @@
                                 <button type="button" wire:click="acknowledgeStocktakeVariance"
                                     class="rounded-lg border px-3 py-2 text-sm">Record independent variance review</button>
                             </div>
+                        @endif
+                        @if(config('inventory_controls.variance_reclassification_enabled') &&
+                            collect($stocktakeVariance)->contains(fn($row) => $row['reclassificationEligible']))
+                            <div class="space-y-2 rounded-lg border p-3">
+                                <p class="text-sm">Only independently reviewed, same-total owned condition correction can post. Missing stock, gains, loans and money require separate authorization.</p>
+                                <label class="block space-y-1"><span class="text-sm">Reason for independently reviewed condition correction</span>
+                                    <textarea wire:model="varianceAdjudicationReason" maxlength="500"
+                                        class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                                </label>
+                                @error('varianceAdjudicationReason') <p role="alert">{{ $message }}</p> @enderror
+                            </div>
+                        @endif
+                        @if($lastVarianceReclassificationReference)
+                            <p role="status">Owned condition correction recorded: {{ $lastVarianceReclassificationReference }}. Total owned unchanged. No financial journal posted.</p>
                         @endif
                         @if($lastVarianceReviewReference)
                             <p role="status">Independent review recorded: {{ $lastVarianceReviewReference }}. Stock and finance unchanged.</p>
