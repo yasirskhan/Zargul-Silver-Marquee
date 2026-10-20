@@ -459,6 +459,45 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
         $this->assertSame(4,DB::table('finance_journal_lines')->count());
         $this->assertSame(0,$recoveries->outstanding($owner,$company->id,$hall->id,$loan)
             [$obligationId]['paidMinor']);
+        $correctionId=(string)DB::table('hall_inventory_financial_recovery_reversals')
+            ->where('company_id',$company->id)->where('receipt_id',$receiptId)->value('id');
+        $this->assertTrue(Str::isUuid($correctionId));
+        $this->assertSame($correctionId,$recoveries->reverse($owner,$company->id,
+            $receiptId,$correctionId,
+            'Evidence was posted to an incorrect cash reconciliation batch and must be corrected'));
+        try {
+            $recoveries->reverse($owner,$company->id,$receiptId,(string)Str::uuid(),
+                'Unauthorized conflicting reversal key cannot alter earlier journal');
+            $this->fail('Double reversal of the original posted recovery succeeded.');
+        }catch(ConflictHttpException){}
+        try {
+            $recoveries->record($owner,$company->id,$obligationId,(string)Str::uuid(),
+                'bank',11000,'WIRE-RECOVERY-ONE-INV123',$payfile());
+            $this->fail('Bank payment reference was reused after journal reversal.');
+        }catch(ConflictHttpException){}
+        try {
+            DB::transaction(fn()=>DB::table('hall_inventory_financial_recovery_receipts')
+                ->where('id',$receiptId)->update(['amount_minor'=>1]));
+            $this->fail('Original recovery amount was silently modified.');
+        }catch(\Illuminate\Database\QueryException){}
+        $this->assertSame(12000,(int)DB::table('hall_inventory_financial_recovery_receipts')
+            ->where('id',$receiptId)->value('amount_minor'));
+        // Cash with separate physical proof remains only pending and is rejected
+        // by a different owner; neither act manufactures another finance journal.
+        $cashReceipt=(string)Str::uuid();
+        $this->assertSame($cashReceipt,$recoveries->record($owner,$company->id,
+            $obligationId,$cashReceipt,'cash',8000,null,$payfile()));
+        $this->be($reviewer);
+        $this->assertSame(8000,$recoveries->outstanding($reviewer,$company->id,$hall->id,$loan)
+            [$obligationId]['pendingMinor']);
+        $cashReview=(string)Str::uuid();
+        $this->assertSame($cashReview,$recoveries->verify($reviewer,$company->id,
+            $cashReceipt,$cashReview,'rejected','witnessed_cash_count',
+            'Actual independent physical cash count INVTEST123',
+            'Independently confirmed supplied cash documentation was not actual cash'));
+        $this->assertSame(0,$recoveries->outstanding($reviewer,$company->id,$hall->id,$loan)
+            [$obligationId]['pendingMinor']);
+        $this->assertSame(2,DB::table('finance_journals')->count());
         $this->assertSame(0,DB::table('hall_inventory_internal_loan_closures')->count());
         $p=DB::table('hall_inventory_positions')->where('company_id',$company->id)
             ->where('hall_id',$hall->id)->where('item_id',$item)->first();
