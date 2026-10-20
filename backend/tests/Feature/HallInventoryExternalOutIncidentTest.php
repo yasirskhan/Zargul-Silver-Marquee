@@ -641,8 +641,33 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
         $after=DB::table('hall_inventory_positions')->where('item_id',$item)->first();
         $this->assertSame(0,(int)$after->owned_damaged);
         $this->assertSame(3,(int)$after->owned_on_loan);
+        // A previously documented missing loss also requires its own independent
+        // incident decision and third-owner physical custody retirement.
+        $this->be($reviewer);
+        $decision->decide($reviewer,$company->id,$missing,(string)Str::uuid(),
+            'substantiated','Independent physical count confirms three missing units');
+        $this->be($owner);
+        $missingProposalId=(string)Str::uuid();
+        $writeoffs->propose($owner,$company->id,$hall->id,$missing,
+            $missingProposalId,3,'Partner did not return three substantiated missing owned tables');
+        $this->be($independent);
+        $writeoffs->decide($independent,$company->id,$hall->id,$missingProposalId,
+            (string)Str::uuid(),'approved','Third owner confirms missing owned stock disposal with evidence');
+        $afterMissing=DB::table('hall_inventory_positions')->where('item_id',$item)->first();
+        $this->assertSame(0,(int)$afterMissing->owned_on_loan);
+        $lossSummary=$reconciliation->report($independent,$company->id,$hall->id,$loan);
+        $this->assertSame(3,$lossSummary['items'][0]['writtenOffMissing']);
+        $this->assertSame(1,$lossSummary['items'][0]['writtenOffDamaged']);
+        $this->assertSame(3,$lossSummary['items'][0]['unreturned']);
+        $this->assertSame(0,$lossSummary['items'][0]['onLoan']);
+        try {
+            $writeoffs->decide($independent,$company->id,$hall->id,$missingProposalId,
+                (string)Str::uuid(),'approved','Contradictory duplicate final disposition attempt');
+            $this->fail('Second independent write-off decision posted duplicate inventory.');
+        } catch (ConflictHttpException) {}
+        $this->assertSame(2,DB::table('hall_inventory_nonclean_writeoff_decisions')->count());
         $this->assertSame(0,DB::table('hall_inventory_external_out_clean_closures')->count());
-        $this->assertSame(0,DB::table('hall_inventory_financial_recovery_reversals')->count());
+        $this->assertSame(1,DB::table('hall_inventory_financial_recovery_reversals')->count());
         $this->assertSame(0,DB::table('hall_inventory_external_out_clean_closures')->count());
     }
 }
