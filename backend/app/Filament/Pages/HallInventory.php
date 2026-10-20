@@ -174,6 +174,15 @@ final class HallInventory extends Page
     public string $incidentReason = '';
     #[Locked]
     public ?string $lastIncidentId = null;
+    #[Locked]
+    public string $incidentDecisionId = '';
+    public string $incidentDecisionReportId = '';
+    public string $incidentDecision = 'requires_more_evidence';
+    public string $incidentDecisionReason = '';
+    #[Locked]
+    public array $incidentReviews = [];
+    #[Locked]
+    public ?string $lastIncidentDecisionId = null;
 
     #[Locked]
     public string $loanInlineRequestId = '';
@@ -338,6 +347,12 @@ final class HallInventory extends Page
         $this->incidentQuantity = '';
         $this->incidentReason = '';
         $this->lastIncidentId = null;
+        $this->incidentDecisionId = (string) Str::uuid();
+        $this->incidentDecisionReportId = '';
+        $this->incidentDecision = 'requires_more_evidence';
+        $this->incidentDecisionReason = '';
+        $this->incidentReviews = [];
+        $this->lastIncidentDecisionId = null;
         $this->returnLoanId = '';
         $this->returnBatchId = (string) Str::uuid();
         $this->returnEligibleLines = [];
@@ -1053,6 +1068,11 @@ final class HallInventory extends Page
         $this->incidentReason='';
         $this->incidentHistory=app(\App\Services\HallInventoryLoanIncidentService::class)
             ->history($actor,$this->companyId,$this->hallId,$loanId);
+        $this->incidentReviews=[];
+        if(config('inventory_controls.loan_incident_reviews_enabled')) {
+            $this->incidentReviews=app(\App\Services\HallInventoryLoanIncidentDecisionService::class)
+                ->reviews($actor,$this->companyId,$this->hallId,$loanId);
+        }
     }
 
     public function submitLoanIncident(): void
@@ -1082,6 +1102,34 @@ final class HallInventory extends Page
         $this->incidentHistory=app(\App\Services\HallInventoryLoanIncidentService::class)
             ->history($actor,$this->companyId,$this->hallId,$this->incidentLoanId);
         $this->reloadLoanHistory();
+    }
+
+    public function submitLoanIncidentReview():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.loan_incident_reviews_enabled') &&
+            $this->incidentLoanId !== '',403);
+        $this->validate([
+            'incidentDecisionReportId'=>'required|uuid',
+            'incidentDecision'=>'required|in:substantiated,unsubstantiated,requires_more_evidence',
+            'incidentDecisionReason'=>'required|string|min:10|max:500',
+        ]);
+        $reports=app(\App\Services\HallInventoryLoanIncidentDecisionService::class)
+            ->reviews($actor,$this->companyId,$this->hallId,$this->incidentLoanId);
+        abort_unless(collect($reports)->contains(fn($row):bool=>
+            $row['reportId']===$this->incidentDecisionReportId && $row['decision']===null),403);
+        try {
+            $this->lastIncidentDecisionId=app(\App\Services\HallInventoryLoanIncidentDecisionService::class)
+                ->decide($actor,$this->companyId,$this->incidentDecisionReportId,
+                    $this->incidentDecisionId,$this->incidentDecision,$this->incidentDecisionReason);
+        } catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['incidentDecisionReason'=>$e->getMessage()]);
+        }
+        $this->incidentDecisionId=(string)Str::uuid();
+        $this->incidentDecisionReportId='';
+        $this->incidentDecisionReason='';
+        $this->incidentReviews=app(\App\Services\HallInventoryLoanIncidentDecisionService::class)
+            ->reviews($actor,$this->companyId,$this->hallId,$this->incidentLoanId);
     }
 
     public function submitCount(): void

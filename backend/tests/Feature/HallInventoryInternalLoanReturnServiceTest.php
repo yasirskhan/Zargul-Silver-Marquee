@@ -268,6 +268,40 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         $history=$incidentSvc->history($owner,$company->id,$src->id,$loan);
         $this->assertCount(1,$history);
         $this->assertSame('damage',$history[0]['kind']);
+        $reviewSvc=app(\App\Services\HallInventoryLoanIncidentDecisionService::class);
+        $reviewId=(string)Str::uuid();
+        try {
+            $reviewSvc->decide($owner,$company->id,$incidentId,$reviewId,
+                'substantiated','Independent photographed physical damage.');
+            $this->fail('Incident review ignored release gate.');
+        }catch(ConflictHttpException){}
+        config()->set('inventory_controls.loan_incident_reviews_enabled',true);
+        try {
+            $reviewSvc->decide($owner,$company->id,$incidentId,$reviewId,
+                'substantiated','Independent photographed physical damage.');
+            $this->fail('Reporter self-approved incident.');
+        }catch(AuthorizationException){}
+        $this->be($dispatcher);
+        $this->assertSame($reviewId,$reviewSvc->decide($dispatcher,$company->id,
+            $incidentId,$reviewId,'substantiated','Independent photographed physical damage.'));
+        $this->assertSame($reviewId,$reviewSvc->decide($dispatcher,$company->id,
+            $incidentId,$reviewId,'substantiated','Independent photographed physical damage.'));
+        try {
+            $reviewSvc->decide($dispatcher,$company->id,$incidentId,(string)Str::uuid(),
+                'unsubstantiated','Conflicting second review should be rejected.');
+            $this->fail('Second review replaced immutable decision.');
+        }catch(ConflictHttpException){}
+        $reviewRows=$reviewSvc->reviews($dispatcher,$company->id,$src->id,$loan);
+        $this->assertCount(1,$reviewRows);
+        $this->assertSame('substantiated',$reviewRows[0]['decision']);
+        $this->assertFalse($reviewRows[0]['monetaryObligationSettled']);
+        $this->assertFalse($reviewRows[0]['loanClosed']);
+        $this->be($receiver);
+        try {
+            $reviewSvc->reviews($receiver,$company->id,$src->id,$loan);
+            $this->fail('Borrowing hall manager read source private review.');
+        }catch(AuthorizationException){}
+        $this->be($owner);
         $this->assertFalse($history[0]['financiallyResolved']);
         $this->assertSame(0,DB::table('finance_journals')->count());
         $this->travelTo(\Illuminate\Support\Carbon::parse('2028-01-02 12:00:00'));

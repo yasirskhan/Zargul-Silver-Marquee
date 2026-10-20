@@ -16,6 +16,8 @@ return [
     'loan_return_acceptance_enabled' => (bool) env('VENUE_INVENTORY_LOAN_RETURN_ACCEPTANCE_ENABLED', false),
     // Immutable staff incident reporting only. Financial settlement remains separately gated.
     'loan_incidents_enabled' => (bool) env('VENUE_INVENTORY_LOAN_INCIDENTS_ENABLED', false),
+    // Independent evidence assessment only; does not assign financial liability.
+    'loan_incident_reviews_enabled' => (bool) env('VENUE_INVENTORY_LOAN_INCIDENT_REVIEWS_ENABLED', false),
     // Independently reviewed opening count posting; OFF until physical
     // witness acceptance, authorization, concurrency and pilot signoff.
     'purchase_receipts_enabled' => (bool) env('VENUE_INVENTORY_PURCHASE_RECEIPTS_ENABLED', false),

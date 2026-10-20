@@ -612,6 +612,36 @@
                         @error('incidentReason') <p role="alert">{{ $message }}</p> @enderror
                         <button type="button" wire:click="submitLoanIncident" class="rounded-lg border px-3 py-2">Record immutable incident</button>
                         @if($lastIncidentId)<p>Recorded incident: {{ $lastIncidentId }}. Financial resolution remains pending.</p>@endif
+                        @if(config('inventory_controls.loan_incident_reviews_enabled'))
+                            <h4 class="font-semibold">Independent incident evidence review</h4>
+                            <p>Only a different authorized owner/admin may review a report. Review does not authorize any charge, debt write-off, or loan closure.</p>
+                            <label class="block">Unreviewed incident
+                                <select wire:model="incidentDecisionReportId" class="w-full rounded-lg border p-2 text-gray-900">
+                                    <option value="">Select an incident</option>
+                                    @foreach($incidentReviews as $review)
+                                        @if($review['decision'] === null)
+                                            <option value="{{ $review['reportId'] }}">{{ $review['kind'] }}: {{ $review['quantity'] }} ({{ $review['reportId'] }})</option>
+                                        @endif
+                                    @endforeach
+                                </select>
+                            </label>
+                            <label class="block">Evidence assessment
+                                <select wire:model="incidentDecision" class="w-full rounded-lg border p-2 text-gray-900">
+                                    <option value="requires_more_evidence">More evidence required</option>
+                                    <option value="substantiated">Evidence supports report</option>
+                                    <option value="unsubstantiated">Evidence does not support report</option>
+                                </select>
+                            </label>
+                            <label class="block">Review explanation
+                                <textarea wire:model="incidentDecisionReason" class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                            </label>
+                            @error('incidentDecisionReason') <p role="alert">{{ $message }}</p> @enderror
+                            <button type="button" wire:click="submitLoanIncidentReview" class="rounded-lg border px-3 py-2">Record independent decision</button>
+                            @if($lastIncidentDecisionId)<p>Immutable review saved: {{ $lastIncidentDecisionId }}.</p>@endif
+                            @foreach($incidentReviews as $review)
+                                <p wire:key="loan-incident-review-{{ $review['reportId'] }}">Report {{ $review['reportId'] }}: {{ $review['decision'] ?? 'awaiting independent review' }}. Financial obligations and custody remain unsettled.</p>
+                            @endforeach
+                        @endif
                         <h4 class="font-semibold">Existing reports</h4>
                         @forelse($incidentHistory as $incident)
                             <p wire:key="incident-{{ $incident['id'] }}">{{ $incident['kind'] }}: {{ $incident['quantity'] }} units, {{ $incident['reason'] }} (report {{ $incident['id'] }})</p>
