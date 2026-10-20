@@ -143,3 +143,10 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Risk: operational misreading of unreturned borrowed stock, return-in-transit, accepted damaged and unresolved physical amounts as a completed loan. Keep controls OFF and never infer financial settlement.
 - Prepared change: sum ONLY exact loan and company-scoped independent physical receipt and return evidence; expose total received, shipped, good, damaged, source acknowledgement pending, unresolved and not-yet-shipped counts; flag integrity mismatches; no stock or money writes. Test actual one-loan two-batch good/damaged/unresolved scenario.
 - Status: FEATURE PREPARATION, NOT A VERIFIED BUG FIX. Existing production loan release remains OFF.
+
+## BUG-20261019-010 — Literal escaped newlines comment out production inventory controls
+- Affected: Phase 12 purchased evidence upload/posting and opening-stock release flags.
+- Discovery: literal backslash-n bytes inside PHP `//` comment lines in `backend/config/inventory_controls.php` made subsequent configuration entries part of the comment until a real newline. Tests calling `config()->set(...,true)` masked the absence of parsed keys.
+- Impact: HIGH availability/correctness for operator-approved future switches; no evidence that production posting was activated. Existing production controls remain OFF.
+- Repair: replace escaped markers with real line breaks; regression verifies all fourteen approved keys are parsed booleans in both PHP array and Laravel configuration.
+- Status: FIX PUBLISHED — CI PENDING. Require all six hosted jobs green on exact SHA before VERIFIED.

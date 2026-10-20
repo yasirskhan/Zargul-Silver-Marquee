@@ -23,6 +23,10 @@ return [
     // Independently reviewed opening count posting; OFF until physical
     // witness acceptance, authorization, concurrency and pilot signoff.
     'purchase_receipts_enabled' => (bool) env('VENUE_INVENTORY_PURCHASE_RECEIPTS_ENABLED', false),
-    // Authenticated private evidence bytes; independent from receipt claim and stock posting.\n    'purchase_evidence_upload_enabled' => (bool) env('VENUE_INVENTORY_PURCHASE_EVIDENCE_UPLOAD_ENABLED', false),\n    // Only after independent review, both stored evidence files and CAS movement. OFF by default.\n    'purchase_stock_posting_enabled' => (bool) env('VENUE_INVENTORY_PURCHASE_STOCK_POSTING_ENABLED', false),\n    'opening_stock_posting_enabled' =>
+    // Authenticated private evidence bytes; independent from receipt claim and stock posting.
+    'purchase_evidence_upload_enabled' => (bool) env('VENUE_INVENTORY_PURCHASE_EVIDENCE_UPLOAD_ENABLED', false),
+    // Only after independent review, both stored evidence files and CAS movement. OFF by default.
+    'purchase_stock_posting_enabled' => (bool) env('VENUE_INVENTORY_PURCHASE_STOCK_POSTING_ENABLED', false),
+    'opening_stock_posting_enabled' =>
         (bool) env('VENUE_INVENTORY_OPENING_POSTING_ENABLED', false),
 ];
