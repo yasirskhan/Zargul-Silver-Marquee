@@ -696,7 +696,11 @@
                                 @endphp
                                 <p class="font-medium">{{ $loan['purpose'] }} — {{ ($loan['viewRole'] ?? 'originating') === 'receiving' ? 'INCOMING REQUEST' : 'OUTGOING REQUEST' }} — {{ $loanStatus }}</p>
                                 <p>Reference: {{ $loan['id'] }}. Return expected: {{ $loan['expectedReturnDate'] }}.</p>
-                                @if(config('inventory_controls.loan_incidents_enabled') && $loan['direction'] === 'internal' && $loan['lendingHallId'] === $hallId && $loan['destinationReceiptConfirmed'])
+                                @if(config('inventory_controls.loan_incidents_enabled') && $loan['lendingHallId'] === $hallId &&
+                                    (($loan['direction'] === 'internal' && $loan['destinationReceiptConfirmed']) ||
+                                     ($loan['direction'] === 'external_out' &&
+                                        config('inventory_controls.external_out_return_enabled') &&
+                                        $loan['externalOutApproved'])))
                                     <button type="button" wire:click="startLoanIncident('{{ $loan['id'] }}')" class="rounded-lg border px-3 py-2 text-sm">Review damage, missing or disputed items</button>
                                 @endif
                                 @if($loan['overdueWithOutstandingCustody'] ?? false)

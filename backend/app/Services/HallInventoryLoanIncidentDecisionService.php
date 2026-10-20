@@ -39,6 +39,14 @@ final class HallInventoryLoanIncidentDecisionService
                 ->where('company_id',$companyId)->where('id',$reportId)
                 ->lockForUpdate()->first();
             if(!$report)throw new ConflictHttpException('Incident report was not found.');
+            $loan=DB::table('hall_inventory_loan_drafts')
+                ->where('company_id',$companyId)->where('id',$report->loan_id)->first();
+            if(!$loan||!in_array($loan->direction,['internal','external_out'],true))
+                throw new ConflictHttpException('A valid original loan is required for review.');
+            if($loan->direction==='external_out' &&
+                (!config('inventory_controls.external_out_dispatch_enabled') ||
+                 !config('inventory_controls.external_out_return_enabled')))
+                throw new ConflictHttpException('Outside owned incident reviews are not released.');
             $hall=Hall::query()->where('company_id',$companyId)
                 ->where('id',$report->source_hall_id)->where('is_active',true)->first();
             if(!$hall||!Auth::check()||(int)Auth::id()!==(int)$actor->getKey()||

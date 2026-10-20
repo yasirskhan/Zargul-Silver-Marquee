@@ -41,9 +41,16 @@ final class HallInventoryLoanIncidentService
             $loan=DB::table('hall_inventory_loan_drafts')
                 ->where('company_id',$companyId)->where('id',$loanId)
                 ->lockForUpdate()->first();
-            if(!$loan || $loan->direction!=='internal' || !$loan->lending_hall_id)
-                throw new ConflictHttpException('An internal originating loan is required.');
-            if(DB::table('hall_inventory_internal_loan_closures')
+            if(!$loan || !in_array($loan->direction,['internal','external_out'],true) ||
+                !$loan->lending_hall_id)
+                throw new ConflictHttpException('An originating physically approved loan is required.');
+            $external=$loan->direction==='external_out';
+            if($external && (!config('inventory_controls.external_out_dispatch_enabled') ||
+                !config('inventory_controls.external_out_return_enabled')))
+                throw new ConflictHttpException('External owned loan incidents are not released.');
+            if(!$external && !config('inventory_controls.loan_return_acceptance_enabled'))
+                throw new ConflictHttpException('Internal incident reporting requires released return acceptance.');
+            if(!$external && DB::table('hall_inventory_internal_loan_closures')
                 ->where('company_id',$companyId)->where('loan_id',$loanId)->exists())
                 throw new ConflictHttpException('Immutable clean loan closure prevents new incident reports.');
             $hall=Hall::query()->where('company_id',$companyId)
@@ -63,10 +70,35 @@ final class HallInventoryLoanIncidentService
             $line=DB::table('hall_inventory_loan_draft_lines')
                 ->where('company_id',$companyId)->where('loan_id',$loanId)
                 ->where('item_id',$sourceItemId)->first();
-            $receipt=DB::table('hall_inventory_internal_loan_receipts')
-                ->where('company_id',$companyId)->where('loan_id',$loanId)->first();
-            if(!$line || !$receipt)
-                throw new ConflictHttpException('Only independently received loan lines may be investigated.');
+            if(!$line)throw new ConflictHttpException('The claimed item is not on the original loan.');
+            if($external){
+                $original=DB::table('hall_inventory_external_out_dispatch_lines as l')
+                    ->join('hall_inventory_external_out_dispatches as d',function($j):void{
+                        $j->on('d.company_id','=','l.company_id')->on('d.id','=','l.dispatch_id');
+                    })
+                    ->where('d.company_id',$companyId)->where('d.loan_id',$loanId)
+                    ->where('d.hall_id',$hall->id)->where('l.item_id',$sourceItemId)
+                    ->first(['l.quantity']);
+                if(!$original)throw new ConflictHttpException('Outside-owned loan was not independently dispatched.');
+                $physical=DB::table('hall_inventory_external_out_return_review_lines as l')
+                    ->join('hall_inventory_external_out_return_reviews as a',function($j):void {
+                        $j->on('a.company_id','=','l.company_id')->on('a.id','=','l.review_id');
+                    })
+                    ->where('a.company_id',$companyId)->where('a.loan_id',$loanId)
+                    ->where('a.hall_id',$hall->id)->where('l.item_id',$sourceItemId)
+                    ->selectRaw('COALESCE(SUM(l.good_quantity),0) as good')
+                    ->selectRaw('COALESCE(SUM(l.damaged_quantity),0) as damaged')
+                    ->first();
+                $good=(int)($physical->good??0);
+                $damaged=(int)($physical->damaged??0);
+                $qty=(int)$original->quantity;
+                $maximum=$kind==='damage'?$damaged:$qty-$good-$damaged;
+                if($maximum<1||$quantity>$maximum)
+                    throw new ConflictHttpException('External incident exceeds evidenced damaged or unresolved on-loan quantity.');
+            }else{
+                $receipt=DB::table('hall_inventory_internal_loan_receipts')
+                    ->where('company_id',$companyId)->where('loan_id',$loanId)->first();
+                if(!$receipt)throw new ConflictHttpException('Only independently received loan lines may be investigated.');
 
             $physical=DB::table('hall_inventory_internal_loan_return_acceptance_lines as al')
                 ->join('hall_inventory_internal_loan_return_acceptances as a',
@@ -91,6 +123,7 @@ final class HallInventoryLoanIncidentService
             $maximum=$kind==='damage' ? $damaged : $received-$good-$damaged;
             if($maximum<1 || $quantity>$maximum)
                 throw new ConflictHttpException('Incident exceeds physically evidenced affected quantity.');
+            }
             // Separate reports may describe the same event; they are not
             // additive financial claims, stock write-offs, or settlements.
             DB::table('hall_inventory_loan_incident_reports')->insert([
@@ -102,7 +135,8 @@ final class HallInventoryLoanIncidentService
             DB::table('audit_events')->insert([
                 'id'=>(string)Str::uuid(),'company_id'=>$companyId,
                 'actor_id'=>$actor->getKey(),
-                'action'=>'hall_inventory.internal_loan_incident_reported',
+                'action'=>$external?'hall_inventory.external_owned_loan_incident_reported':
+                    'hall_inventory.internal_loan_incident_reported',
                 'entity_type'=>'hall_inventory_loan_incident_report',
                 'entity_id'=>$requestId,
                 'before_values'=>json_encode([],JSON_THROW_ON_ERROR),
@@ -124,6 +158,16 @@ final class HallInventoryLoanIncidentService
         if(!$hall||!Auth::check()||(int)Auth::id()!==(int)$actor->getKey()||
             !$this->access->canConfigureHall($actor,$hall))
             throw new AuthorizationException('Incident history is restricted to the originating owner/admin.');
+        $loan=DB::table('hall_inventory_loan_drafts')
+            ->where('company_id',$companyId)->where('id',$loanId)->first();
+        if(!$loan||$loan->lending_hall_id!==$hallId)
+            throw new AuthorizationException('Incident loan scope mismatch.');
+        if($loan->direction==='internal' && !config('inventory_controls.loan_return_acceptance_enabled'))
+            throw new ConflictHttpException('Internal loan incident history is not released.');
+        if($loan->direction==='external_out' &&
+            (!config('inventory_controls.external_out_dispatch_enabled') ||
+             !config('inventory_controls.external_out_return_enabled')))
+            throw new ConflictHttpException('Outside owned incidents are not released.');
         return DB::table('hall_inventory_loan_incident_reports')
             ->where('company_id',$companyId)->where('source_hall_id',$hallId)
             ->where('loan_id',$loanId)->orderByDesc('created_at')->orderByDesc('id')
@@ -139,8 +183,7 @@ final class HallInventoryLoanIncidentService
 
     private function gated():void
     {
-        if(!config('inventory_controls.loan_incidents_enabled') ||
-            !config('inventory_controls.loan_return_acceptance_enabled'))
+        if(!config('inventory_controls.loan_incidents_enabled'))
             throw new ConflictHttpException('Private loan incident evidence is disabled.');
     }
 }

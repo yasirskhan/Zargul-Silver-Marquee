@@ -134,3 +134,7 @@ Default-OFF outside lending from hall-owned inventory with manager draft separat
 
 ## Phase 12 external_out partial physical return / condition verification (separate candidate)
 Three distinct duties across draft, outside dispatch and return review: partner-signed partial receipt witnessed by assigned staff, independent owner good/damaged/unresolved physical condition approval. Only good and damaged quantities may move original OWNED-on-loan back to OWNED physical buckets; unresolved remains on loan and is not implicitly written off. Exact per-loan cumulative returns cannot exceed immutable original dispatch. Company/hall/item binding in PostgreSQL, signed files hashed, multi-batch retry-safe. No financial obligation/settlement, disputes or completion PDF yet; feature OFF and exact six-job CI/pilot pending.
+
+
+## Phase 12 external_out owner incidents and independent review (candidate)
+Reuse immutable incident/independent decision lifecycle for separately approved outside-owned loan custody with direction-aware release gates. Damage alleged only within owner independently inspected physical damaged amounts; missing/dispute only against outstanding unaccounted source dispatch. No automatic invoices, financial liabilities or write-offs. Authorized owner/admin reports, distinct reviewer independently substantiates or denies; PG/Livewire tests and hosted CI pending, OFF.

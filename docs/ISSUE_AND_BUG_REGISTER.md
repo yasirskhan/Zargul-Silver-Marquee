@@ -237,3 +237,7 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 
 ## INV-EXT-OUT-20261020-023 — Outside partner return and damaged condition workflow missing
 - After verified external_out dispatch CI 39455907097, hall-owned assets had no complete signed partial partner return or independent owner condition-review workflow. New default-OFF implementation records witnessed multiple batch custody receipts and separately verified good/damaged/unresolved conditions, maintaining per-loan receipt ceiling and immutable SQL link to original loan/dispatch. Unresolved stays owned_on_loan and is NOT monetized; damaged remains hall-owned. CI pending; all six exact jobs required. Financial obligations/disputes/nonclean closure and commercial operator acceptance remain pending.
+
+
+## INV-EXT-OUT-20261020-024 — Damage/missing/dispute reporting previously internal-only
+- Previous source refused all external_out loan incidents despite physical outside partner returns. Candidate extends the same immutable evidence/decision contract with strict original lending-hall approved external dispatch and per-item witnessed condition/outstanding caps; source-owner reporter and independent different reviewer. Does not assess money, move stock, settle debt or finalize loans. Exact six CI jobs and pilot required. Release flags OFF.

@@ -1892,9 +1892,11 @@ final class HallInventory extends Page
         $loan=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
             ->recent($actor,$this->companyId,$this->hallId))
             ->first(fn($row):bool=>$row['id']===$loanId &&
-                $row['direction']==='internal' &&
                 $row['lendingHallId']===$this->hallId &&
-                $row['destinationReceiptConfirmed']);
+                (($row['direction']==='internal' && $row['destinationReceiptConfirmed']) ||
+                 ($row['direction']==='external_out' &&
+                  config('inventory_controls.external_out_return_enabled') &&
+                  $row['externalOutApproved'])));
         abort_unless($loan!==null,403);
         $this->incidentLoanId=$loanId;
         $this->incidentRequestId=(string) Str::uuid();
