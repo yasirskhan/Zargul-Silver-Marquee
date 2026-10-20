@@ -713,6 +713,29 @@ final class HallInventory extends Page
             ->recent($actor,$this->companyId,$this->hallId);
     }
 
+    public function downloadPositionReportCsv():\Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.position_reports_enabled'),403);
+        $csv=app(\App\Services\HallInventoryPositionReport::class)
+            ->csv($actor,$this->companyId,$this->hallId);
+        DB::table('audit_events')->insert([
+            'id'=>(string)Str::uuid(),'company_id'=>$this->companyId,
+            'actor_id'=>$actor->getKey(),
+            'action'=>'hall_inventory.book_report_csv_exported',
+            'entity_type'=>'hall_inventory_hall','entity_id'=>$this->hallId,
+            'before_values'=>json_encode([],JSON_THROW_ON_ERROR),
+            'after_values'=>json_encode(['format'=>'csv','reportOnly'=>true],JSON_THROW_ON_ERROR),
+            'context'=>json_encode(['scope'=>'selected_hall','financialPosting'=>false],JSON_THROW_ON_ERROR),
+        ]);
+        return response()->streamDownload(
+            static function()use($csv):void {echo $csv;},
+            'hall-inventory-book-'.substr($this->hallId,0,8).'.csv',
+            ['Content-Type'=>'text/csv; charset=UTF-8',
+             'X-Content-Type-Options'=>'nosniff','Cache-Control'=>'private, no-store']
+        );
+    }
+
     public function createItem(): void
     {
         $actor = $this->authorizeSelection();

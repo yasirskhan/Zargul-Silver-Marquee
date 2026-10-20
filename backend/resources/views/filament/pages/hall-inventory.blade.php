@@ -58,8 +58,12 @@
             <section class="space-y-3 rounded-xl border p-4" aria-label="Posted inventory book balances">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <h2 class="text-lg font-semibold">Hall stock balances and minimum-stock warnings</h2>
-                    <button type="button" wire:click="reloadPositionReport"
-                        class="rounded-lg border px-3 py-2 text-sm">Refresh book balances</button>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" wire:click="reloadPositionReport"
+                            class="rounded-lg border px-3 py-2 text-sm">Refresh book balances</button>
+                        <button type="button" wire:click="downloadPositionReportCsv"
+                            class="rounded-lg border px-3 py-2 text-sm">Download hall book CSV</button>
+                    </div>
                 </div>
                 <p class="text-xs text-gray-600 dark:text-gray-300">
                     These are posted BOOK balances, not a fresh verified physical count or a financial valuation.

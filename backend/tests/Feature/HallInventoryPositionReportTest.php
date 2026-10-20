@@ -41,12 +41,39 @@ final class HallInventoryPositionReportTest extends TestCase
             'Book report chairs','Furniture','piece',15,'Approved hall stock report');
         $catalog->create($manager,$company->id,$hall->id,$unposted,
             'Catalog only linen','Linen','piece',12,'Not yet purchased');
+        $unsafe=(string)Str::uuid();
+        $catalog->create($manager,$company->id,$hall->id,$unsafe,
+            '=SUM(1+1)','Supplies','piece',0,'Legacy imported catalog name');
+        $inconsistent=(string)Str::uuid();
+        $catalog->create($manager,$company->id,$hall->id,$inconsistent,
+            'Suspect movement snapshot','Supplies','piece',3,'Reconciliation test fixture');
         $position=(string)Str::uuid();
         DB::table('hall_inventory_positions')->insert([
             'id'=>$position,'company_id'=>$company->id,'hall_id'=>$hall->id,
             'item_id'=>$item,'owned_usable'=>10,'owned_on_loan'=>3,
             'owned_damaged'=>2,'borrowed_usable'=>4,'revision'=>1,
             'created_at'=>now(),'updated_at'=>now()
+        ]);
+        // Privileged legacy corruption simulation: nonzero revision without
+        // matching immutable movement MUST NOT masquerade as verified book stock.
+        DB::table('hall_inventory_positions')->insert([
+            'id'=>(string)Str::uuid(),'company_id'=>$company->id,
+            'hall_id'=>$hall->id,'item_id'=>$inconsistent,
+            'owned_usable'=>99,'revision'=>3,'created_at'=>now(),'updated_at'=>now()
+        ]);
+        // Latest revision alone is insufficient: 2 earlier events are absent.
+        DB::table('hall_inventory_movement_events')->insert([
+            'id'=>(string)Str::uuid(),'company_id'=>$company->id,'hall_id'=>$hall->id,
+            'item_id'=>$inconsistent,
+            'position_id'=>(string)DB::table('hall_inventory_positions')
+                ->where('item_id',$inconsistent)->value('id'),
+            'event_kind'=>'acquire_owned','quantity'=>99,
+            'revision_before'=>2,'revision_after'=>3,
+            'request_fingerprint'=>hash('sha256','incomplete ledger fixture'),
+            'reason'=>'Synthetic incomplete journal chain',
+            'before_values'=>json_encode(['ownedUsable'=>0],JSON_THROW_ON_ERROR),
+            'after_values'=>json_encode(['ownedUsable'=>99],JSON_THROW_ON_ERROR),
+            'actor_id'=>$manager->id,
         ]);
         $zeros=['ownedUsable'=>0,'ownedOnLoan'=>0,'ownedDamaged'=>0,
             'borrowedUsable'=>0,'borrowedTransit'=>0,'borrowedDamaged'=>0];
@@ -67,7 +94,20 @@ final class HallInventoryPositionReportTest extends TestCase
         }catch(ConflictHttpException){}
         config()->set('inventory_controls.position_reports_enabled',true);
         $rows=$service->recent($manager,$company->id,$hall->id);
-        $this->assertCount(2,$rows);
+        $this->assertCount(4,$rows);
+        $csv=$service->csv($manager,$company->id,$hall->id);
+        $this->assertStringContainsString('Owned usable', $csv);
+        $this->assertStringContainsString('Book report chairs', $csv);
+        $this->assertStringContainsString('BELOW_MINIMUM', $csv);
+        $this->assertStringContainsString("'=SUM(1+1)",$csv);
+        $this->assertStringNotContainsString('finance_journals',$csv);
+        Livewire::test(HallInventory::class)
+            ->call('downloadPositionReportCsv')
+            ->assertFileDownloaded('hall-inventory-book-'.substr($hall->id,0,8).'.csv');
+        $this->assertSame(1,DB::table('audit_events')
+            ->where('action','hall_inventory.book_report_csv_exported')
+            ->where('company_id',$company->id)
+            ->where('entity_id',$hall->id)->count());
         $books=collect($rows)->firstWhere('itemId',$item);
         $this->assertSame(10,$books['ownedUsable']);
         $this->assertSame(3,$books['ownedOnLoan']);
@@ -75,6 +115,10 @@ final class HallInventoryPositionReportTest extends TestCase
         $this->assertSame(2,$books['ownedDamaged']);
         $this->assertSame('BELOW_MINIMUM',$books['status']);
         $this->assertTrue($books['needsReplenishment']);
+        $suspect=collect($rows)->firstWhere('itemId',$inconsistent);
+        $this->assertSame('RECONCILIATION_REQUIRED',$suspect['status']);
+        $this->assertNull($suspect['ownedUsable']);
+        $this->assertFalse($suspect['needsReplenishment']);
         $empty=collect($rows)->firstWhere('itemId',$unposted);
         $this->assertSame('NO_POSTED_MOVEMENT',$empty['status']);
         $this->assertNull($empty['ownedUsable']);
@@ -84,7 +128,7 @@ final class HallInventoryPositionReportTest extends TestCase
             ->assertSee('LOW OWNED STOCK / REPLENISHMENT REVIEW')
             ->assertSee('Catalog only linen')
             ->assertSee('No posted movement');
-        $this->assertSame(1,DB::table('hall_inventory_movement_events')->count());
+        $this->assertSame(2,DB::table('hall_inventory_movement_events')->count());
         $this->assertSame(0,DB::table('finance_journals')->count());
         try{$service->recent($manager,$company->id,$other->id);
             $this->fail('Unassigned hall accessed.');

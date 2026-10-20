@@ -40,6 +40,8 @@ final class HallInventoryPositionReport
             ->where('company_id',$companyId)->where('hall_id',$hallId)
             ->select('company_id','hall_id','item_id')
             ->selectRaw('MAX(revision_after) AS latest_revision')
+            ->selectRaw('MIN(revision_before) AS first_revision')
+            ->selectRaw('COUNT(*) AS movement_count')
             ->groupBy('company_id','hall_id','item_id');
 
         return DB::table('hall_inventory_items as i')
@@ -60,12 +62,14 @@ final class HallInventoryPositionReport
                 'p.id as position_id','p.revision','p.owned_usable',
                 'p.owned_on_loan','p.owned_damaged','p.borrowed_usable',
                 'p.borrowed_transit','p.borrowed_damaged',
-                'm.latest_revision'])
+                'm.latest_revision','m.first_revision','m.movement_count'])
             ->map(static function($r):array {
                 $hasPosition=$r->position_id!==null;
                 $posted=$hasPosition&&(int)$r->revision>0&&
                     $r->latest_revision!==null&&
-                    (int)$r->latest_revision===(int)$r->revision;
+                    (int)$r->latest_revision===(int)$r->revision&&
+                    (int)$r->first_revision===0&&
+                    (int)$r->movement_count===(int)$r->revision;
                 $status=!$hasPosition || ((int)$r->revision===0 && $r->latest_revision===null)
                     ? 'NO_POSTED_MOVEMENT'
                     : (!$posted?'RECONCILIATION_REQUIRED':
@@ -87,5 +91,42 @@ final class HallInventoryPositionReport
                     'isPhysicalCount'=>false,'isFinancialValuation'=>false,
                 ];
             })->all();
+    }
+
+    /**
+     * Stable, bounded, hall-scoped CSV export of the SAME approved read model.
+     * Defend spreadsheet programs from formulas in legacy catalog text fields.
+     */
+    public function csv(User $actor,string $companyId,string $hallId):string
+    {
+        $rows=$this->recent($actor,$companyId,$hallId);
+        $stream=fopen('php://temp','w+');
+        if($stream===false)throw new \RuntimeException('Inventory report buffer unavailable.');
+        try {
+            fputcsv($stream,[
+                'Item ID','Item','Category','Unit','Owned usable','Owned on loan',
+                'Owned damaged','Borrowed usable','Borrowed transit','Borrowed damaged',
+                'Minimum owned usable','Book status','Position revision'
+            ]);
+            foreach($rows as $row) {
+                $escape=static fn(string $v):string=>
+                    preg_match('/\A[\x00-\x20]*[=+@-]/',$v)===1 ? "'".$v : $v;
+                $n=static fn($v):string=>$v===null?'UNPOSTED':(string)$v;
+                fputcsv($stream,[
+                    $escape($row['itemId']),$escape($row['name']),
+                    $escape($row['category']),$escape($row['unit']),
+                    $n($row['ownedUsable']),$n($row['ownedOnLoan']),
+                    $n($row['ownedDamaged']),$n($row['borrowedUsable']),
+                    $n($row['borrowedTransit']),$n($row['borrowedDamaged']),
+                    (string)$row['minimum'],$row['status'],$n($row['positionRevision'])
+                ]);
+            }
+            rewind($stream);
+            $content=stream_get_contents($stream);
+            if(!is_string($content))throw new \RuntimeException('Inventory report unreadable.');
+            return $content;
+        } finally {
+            fclose($stream);
+        }
     }
 }
