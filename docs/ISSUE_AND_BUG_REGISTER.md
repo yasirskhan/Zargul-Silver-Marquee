@@ -157,3 +157,13 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Impact: HIGH availability on this unreleased branch. No evidence of production activation, stock movement or financial posting. All release flags remain OFF.
 - Repair: single valid fully qualified PHP class namespace separator. Existing targeted Livewire report regression and full exact-SHA six-job CI must run; original failed run remains a diagnostic record.
 - Status: REPAIR PUBLISHED, CI PENDING.
+
+## QA-20261020-CLEAN-RECEIPT-READ-AUDIT — Private numbered receipt download lacked read audit
+- Phase 12 clean internal loan closeout already verifies actor source-hall authorization and pinned immutable PDF SHA256. But the owner/administrator's private Livewire download action did not record the successful document read or prohibit caching explicitly.
+- Prepared repair: audited `hall_inventory.clean_loan_receipt_downloaded` event only after the private PDF integrity verifier succeeds, `private, no-store` and `nosniff` download headers; real Filament/Livewire download test checks authorized file response and exactly one scoped audit entry. Do not expose tenant data, disable authentication, or write financial/stock records.
+- Status: PREPARED / CI PENDING. Publish only after verified previous source and confirm all six hosted jobs on final exact SHA.
+
+## Verified remediation closeout — configuration and report PHP syntax
+- BUG-20261019-010 corrected parseable default-OFF inventory release controls at `b7234c27`; [CI 39366602667](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39366602667) passed all six.
+- BUG-20261020-011 corrected Livewire class namespace syntax at `ab38325a`; [CI 39367373687](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39367373687) passed all six. The original Composer-step failure was source syntax, not external dependency network failure.
+- Inventory report CSV and complete journal-chain verification PASSED six-job [CI 39368066878](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39368066878) at exact `30878317`; production switches OFF.

@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Pages\HallInventory;
+use Filament\Facades\Filament;
+use Livewire\Livewire;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\Hall;
@@ -114,6 +117,18 @@ class HallInventoryCleanLoanClosureTest extends TestCase
         $pdf=$closure->receiptPdf($owner,$company->id,$loan);
         $this->assertStringStartsWith('%PDF-1.4',$pdf);
         $this->assertStringContainsString('Receipt number: 1',$pdf);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Livewire::test(HallInventory::class)
+            ->set('hallId',$dst->id)
+            ->call('downloadCleanLoanReceipt',$loan)->assertForbidden();
+        Livewire::test(HallInventory::class)
+            ->set('hallId',$src->id)
+            ->call('downloadCleanLoanReceipt',$loan)
+            ->assertFileDownloaded('venue-inventory-clean-loan-'.substr($loan,0,8).'.pdf');
+        $this->assertSame(1,DB::table('audit_events')
+            ->where('action','hall_inventory.clean_loan_receipt_download_requested')
+            ->where('company_id',$company->id)
+            ->where('entity_id',$loan)->count());
         config()->set('inventory_controls.loan_incidents_enabled',true);
         try {
             app(\App\Services\HallInventoryLoanIncidentService::class)

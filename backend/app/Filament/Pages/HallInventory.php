@@ -1210,12 +1210,28 @@ final class HallInventory extends Page
     public function downloadCleanLoanReceipt(string $loanId):\Symfony\Component\HttpFoundation\StreamedResponse
     {
         $actor=$this->authorizeSelection();
+        abort_unless(DB::table('hall_inventory_loan_drafts')
+            ->where('company_id',$this->companyId)->where('id',$loanId)
+            ->where('lending_hall_id',$this->hallId)->where('direction','internal')
+            ->exists(),403);
         $bytes=app(\App\Services\HallInventoryCleanLoanClosureService::class)
             ->receiptPdf($actor,$this->companyId,$loanId);
+        // Audit only after authorization and the pinned private PDF hash pass.
+        // An unsuccessful/tampered read must not be recorded as a request.
+        DB::table('audit_events')->insert([
+            'id'=>(string)Str::uuid(),'company_id'=>$this->companyId,
+            'actor_id'=>$actor->getKey(),
+            'action'=>'hall_inventory.clean_loan_receipt_download_requested',
+            'entity_type'=>'hall_inventory_loan_draft','entity_id'=>$loanId,
+            'before_values'=>json_encode([],JSON_THROW_ON_ERROR),
+            'after_values'=>json_encode(['read'=>'verified_pdf','stockMoved'=>false],JSON_THROW_ON_ERROR),
+            'context'=>json_encode(['hallId'=>$this->hallId,'receiptOnly'=>true],JSON_THROW_ON_ERROR),
+        ]);
         return response()->streamDownload(
             static function()use($bytes):void {echo $bytes;},
             'venue-inventory-clean-loan-'.substr($loanId,0,8).'.pdf',
-            ['Content-Type'=>'application/pdf','X-Content-Type-Options'=>'nosniff']
+            ['Content-Type'=>'application/pdf','X-Content-Type-Options'=>'nosniff',
+             'Cache-Control'=>'private, no-store']
         );
     }
 
