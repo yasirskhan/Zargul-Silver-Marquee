@@ -140,6 +140,15 @@ final class HallInventory extends Page
     public array $loanRows = [];
 
     #[Locked]
+    public string $externalIntakeLoanId = '';
+    #[Locked]
+    public string $externalIntakeRequestId = '';
+    public $externalIntakeFile = null;
+    public array $externalIntakeCounts = [];
+    #[Locked]
+    public ?string $lastExternalIntakeReference = null;
+
+    #[Locked]
     public string $loanDispatchLoanId = '';
     #[Locked]
     public string $loanDispatchRequestId = '';
@@ -403,6 +412,11 @@ final class HallInventory extends Page
         $this->returnAcceptanceFile = null;
         $this->lastReturnAcceptanceId = null;
 
+        $this->externalIntakeLoanId = '';
+        $this->externalIntakeRequestId = (string)Str::uuid();
+        $this->externalIntakeFile = null;
+        $this->externalIntakeCounts = [];
+        $this->lastExternalIntakeReference = null;
         $this->loanDispatchLoanId = '';
         $this->loanDispatchRequestId = (string) Str::uuid();
         $this->loanDispatchLines = [];
@@ -1004,6 +1018,94 @@ final class HallInventory extends Page
             ->where('id',$this->hallId)->where('is_active',true)->first();
         return $actor instanceof User && $hall!==null &&
             app(TenantAccess::class)->canConfigureHall($actor,$hall);
+    }
+
+    public function canIndependentlyAcceptExternalBorrowing():bool
+    {
+        if(!config('inventory_controls.external_borrowed_intake_enabled'))return false;
+        $actor=auth()->user();
+        $hall=Hall::query()->where('company_id',$this->companyId)
+            ->where('id',$this->hallId)->where('is_active',true)->first();
+        return $actor instanceof User && $hall!==null &&
+            app(TenantAccess::class)->canConfigureHall($actor,$hall);
+    }
+
+    public function startExternalBorrowedReceipt(string $loanId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_borrowed_intake_enabled') &&
+            config('inventory_controls.loan_drafts_enabled'),403);
+        $loan=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($l):bool=>$l['id']===$loanId && $l['direction']==='external_in' &&
+                $l['borrowingHallId']===$this->hallId &&
+                !$l['externalReceiptRecorded'] && !$l['externalReceiptAccepted'] &&
+                $l['createdBy']!==(int)$actor->getKey());
+        abort_unless($loan!==null,403);
+        $this->externalIntakeLoanId=$loanId;
+        $this->externalIntakeRequestId=(string)Str::uuid();
+        $this->externalIntakeFile=null;
+        $this->externalIntakeCounts=array_fill_keys(
+            array_map(static fn(array $l):string=>$l['itemId'],$loan['lines']), '');
+        $this->lastExternalIntakeReference=null;
+    }
+
+    public function submitExternalBorrowedReceipt():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_borrowed_intake_enabled') &&
+            config('inventory_controls.loan_drafts_enabled'),403);
+        $this->validate(['externalIntakeFile'=>'required|file|max:5120|mimes:jpg,jpeg,png,pdf']);
+        $loan=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($l):bool=>$l['id']===$this->externalIntakeLoanId &&
+                $l['direction']==='external_in' && $l['borrowingHallId']===$this->hallId);
+        abort_unless($loan!==null,403);
+        $counts=[];
+        foreach($loan['lines'] as $line) {
+            $raw=$this->externalIntakeCounts[$line['itemId']]??null;
+            if(!is_string($raw) || !preg_match('/^(0|[1-9][0-9]*)$/',$raw) ||
+                (float)$raw>100000000 || (float)$raw<0)
+                throw ValidationException::withMessages([
+                    'externalIntakeCounts'=>'Enter each actual physically counted quantity, including zero.']);
+            $counts[$line['itemId']]=(int)$raw;
+        }
+        try {
+            $this->lastExternalIntakeReference=app(
+                \App\Services\HallInventoryExternalBorrowedIntakeService::class
+            )->record($actor,$this->companyId,$this->hallId,
+                $this->externalIntakeLoanId,$this->externalIntakeRequestId,
+                $this->externalIntakeFile,$counts);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['externalIntakeFile'=>$e->getMessage()]);
+        }
+        $this->externalIntakeLoanId='';
+        $this->externalIntakeRequestId=(string)Str::uuid();
+        $this->externalIntakeFile=null;
+        $this->externalIntakeCounts=[];
+        $this->reloadLoanHistory();
+    }
+
+    public function approveExternalBorrowedReceipt(string $loanId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_borrowed_intake_enabled') &&
+            config('inventory_controls.loan_drafts_enabled'),403);
+        $loan=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($l):bool=>$l['id']===$loanId &&
+                $l['direction']==='external_in' &&
+                $l['borrowingHallId']===$this->hallId &&
+                $l['externalReceiptRecorded'] && !$l['externalReceiptAccepted']);
+        abort_unless($loan!==null && $this->canIndependentlyAcceptExternalBorrowing(),403);
+        try {
+            $this->lastExternalIntakeReference=app(
+                \App\Services\HallInventoryExternalBorrowedIntakeService::class
+            )->accept($actor,$this->companyId,$this->hallId,$loanId,(string)Str::uuid());
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['externalIntakeFile'=>$e->getMessage()]);
+        }
+        $this->reloadLoanHistory();
     }
 
     public function startInternalDispatch(string $loanId):void

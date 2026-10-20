@@ -197,3 +197,12 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 
 ## BUG-20261020-017 — Two incorrect negative regression assertions, legitimate stronger denials
 - CI 39425980820 @ 7d55c6d0, 5/6 PASS, laravel-postgres 627 pass/2 fail/3 risky. Failure 1: revoked user gets Filament route-level 404 not Livewire action 403. Failure 2: immutable forged variance provenance is rejected by SQL BEFORE INSERT guard P0001, not later FK name. Correct tests to assert route NotFound and recognized SQL guard-or-FK rejection respectively, retaining all negative security checks. Product code unchanged; six-job CI pending.
+
+
+## INV-EXT-20261020-015 — External loan drafts previously lacked physical receipt and approved borrowed-book arrival
+- Before candidate: external_in could be drafted with encrypted partner identity, but not physically counted or book posted by independent actors. Status misleadingly always remained DRAFT.
+- Candidate repair: default-OFF real witness receipt with bounded signed evidence/hash, independent owner acceptance, exact per-item borrowed_usable CAS movement with immutable SQL parent binding/audit; distinct actor checks and Livewire/PG tests. Never increases owned inventory or silently settles money. Await exact six-job CI verification. External-out and external returns remain open.
+
+
+## VERIFIED closeout — Phase 12 CI migration replay and negative assertions
+- BUG-20261020-016 and BUG-20261020-017 verified resolved at exact `80102c503cc92fba618a08d12370bc151d0398cf`, CI 39427134021 all six jobs SUCCESS. CREATE OR REPLACE keeps provenance function strict and migration replayable. Negative tests preserve route-level revoked staff denial and SQL cross-count provenance rejection. Owner source-dispatch and clean PDF UI verified; external borrowed intake still CI pending.

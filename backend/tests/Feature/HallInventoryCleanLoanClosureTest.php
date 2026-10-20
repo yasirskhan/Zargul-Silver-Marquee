@@ -111,7 +111,9 @@ class HallInventoryCleanLoanClosureTest extends TestCase
             ->assertSee('Finalize independently reconciled clean loan')
             ->call('closeCleanInternalLoan',$loan)->assertHasNoErrors()
             ->assertSee('CLOSED / INDEPENDENT CLEAN RETURN VERIFIED')
-            ->assertSee('Download numbered clean-return PDF');
+            ->assertSee('Download numbered clean-return PDF')
+            ->assertSee('Independently verified clean loan is CLOSED')
+            ->assertDontSee('Loan completion and financial settlement are NOT recorded.');
         $closureId=(string)DB::table('hall_inventory_internal_loan_closures')
             ->where('loan_id',$loan)->value('id');
         $saved=$closure->close($owner,$company->id,$loan,$closureId);

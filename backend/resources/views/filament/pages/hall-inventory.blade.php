@@ -677,13 +677,25 @@
                     <div class="space-y-3">
                         @forelse($loanHistory as $loan)
                             <article wire:key="inventory-loan-summary-{{ $loan['id'] }}" class="space-y-2 rounded-lg border p-3 text-sm">
-                                <p class="font-medium">{{ $loan['purpose'] }} — {{ ($loan['viewRole'] ?? 'originating') === 'receiving' ? 'INCOMING REQUEST' : 'OUTGOING REQUEST' }} — {{ ($loan['status'] ?? 'draft_only') === 'clean_loan_closed' ? 'CLOSED / INDEPENDENT CLEAN RETURN VERIFIED' : (($loan['status'] ?? 'draft_only') === 'return_acknowledged_outstanding_reconciliation_required' ? 'RETURN ACKNOWLEDGED / OUTSTANDING RECONCILIATION REQUIRED' : (($loan['status'] ?? 'draft_only') === 'partial_return_in_transit_source_ack_pending' ? 'PARTIAL RETURN SENT / SOURCE ACK PENDING' : (($loan['status'] ?? 'draft_only') === 'destination_received_return_pending' ? 'DESTINATION RECEIVED / RETURNS PENDING' : (($loan['status'] ?? 'draft_only') === 'source_dispatched_receipt_pending' ? 'SOURCE DISPATCHED / DESTINATION RECEIPT PENDING' : 'DRAFT / NOT DISPATCHED')))) }}</p>
+                                @php
+                                    $loanStatus = match($loan['status'] ?? 'draft_only') {
+                                        'clean_loan_closed' => 'CLOSED / INDEPENDENT CLEAN RETURN VERIFIED',
+                                        'return_acknowledged_outstanding_reconciliation_required' => 'RETURN ACKNOWLEDGED / OUTSTANDING RECONCILIATION REQUIRED',
+                                        'partial_return_in_transit_source_ack_pending' => 'PARTIAL RETURN SENT / SOURCE ACK PENDING',
+                                        'destination_received_return_pending' => 'DESTINATION RECEIVED / RETURNS PENDING',
+                                        'source_dispatched_receipt_pending' => 'SOURCE DISPATCHED / DESTINATION RECEIPT PENDING',
+                                        'external_physical_receipt_pending_review' => 'EXTERNAL PHYSICAL RECEIPT / INDEPENDENT REVIEW PENDING',
+                                        'external_borrowed_received_return_pending' => 'EXTERNAL BORROWED STOCK RECEIVED / RETURN PENDING',
+                                        default => 'DRAFT / NOT DISPATCHED'
+                                    };
+                                @endphp
+                                <p class="font-medium">{{ $loan['purpose'] }} — {{ ($loan['viewRole'] ?? 'originating') === 'receiving' ? 'INCOMING REQUEST' : 'OUTGOING REQUEST' }} — {{ $loanStatus }}</p>
                                 <p>Reference: {{ $loan['id'] }}. Return expected: {{ $loan['expectedReturnDate'] }}.</p>
                                 @if(config('inventory_controls.loan_incidents_enabled') && $loan['direction'] === 'internal' && $loan['lendingHallId'] === $hallId && $loan['destinationReceiptConfirmed'])
                                     <button type="button" wire:click="startLoanIncident('{{ $loan['id'] }}')" class="rounded-lg border px-3 py-2 text-sm">Review damage, missing or disputed items</button>
                                 @endif
                                 @if($loan['overdueWithOutstandingCustody'] ?? false)
-                                    <p role="status" class="font-semibold text-amber-700 dark:text-amber-300">OVERDUE: dispatched inventory remains outstanding. Physical reconciliation required; no fee or loss has been assessed.</p>
+                                    <p role="status" class="font-semibold text-amber-700 dark:text-amber-300">OVERDUE: dispatched or externally borrowed inventory remains outstanding. Physical reconciliation required; no fee or loss has been assessed.</p>
                                 @endif
                                 @if(($loan['returnReconciliation'] ?? null) !== null)
                                     <p>Physical custody: received {{ $loan['returnReconciliation']['receivedQuantity'] }},
@@ -694,7 +706,11 @@
                                         damaged {{ $loan['returnReconciliation']['sourceAcknowledgedDamaged'] }},
                                         unresolved {{ $loan['returnReconciliation']['sourceUnresolved'] }}.
                                         Total not yet settled {{ $loan['returnReconciliation']['stillUnsettled'] }}.
-                                        Loan completion and financial settlement are NOT recorded.</p>
+                                        @if($loan['returnReconciliation']['loanCompleted'])
+                                            Independently verified clean loan is CLOSED. This did not post a financial journal.
+                                        @else
+                                            Loan completion and financial settlement are NOT recorded.
+                                        @endif</p>
                                     @if($loan['returnReconciliation']['integrityWarning'])
                                         <p role="alert">Inventory return evidence mismatch; reconciliation is blocked.</p>
                                     @endif
@@ -706,6 +722,35 @@
                                         <li>{{ $line['name'] }} — {{ $line['quantity'] }} {{ $line['unit'] }}</li>
                                     @endforeach
                                 </ul>
+                                @if(config('inventory_controls.external_borrowed_intake_enabled') &&
+                                    $loan['direction']==='external_in' &&
+                                    $loan['borrowingHallId']===$hallId)
+                                    @if($loan['externalReceiptRecorded'])
+                                        <p class="font-medium">Independently witnessed external physical counts</p>
+                                        <ul class="list-inside list-disc text-sm">
+                                            @foreach($loan['lines'] as $outsideLine)
+                                                <li>{{ $outsideLine['name'] }}: physically counted
+                                                    {{ $loan['externalCountByItem'][$outsideLine['itemId']] ?? 'MISSING EVIDENCE' }}
+                                                    versus requested {{ $outsideLine['quantity'] }} {{ $outsideLine['unit'] }}</li>
+                                            @endforeach
+                                        </ul>
+                                        @if(!$loan['externalCountMatchesDraft'])
+                                            <p role="alert">Physical count differs from requested items. Discrepancy investigation required; no borrowed stock can be posted.</p>
+                                        @endif
+                                    @endif
+                                    @if(!$loan['externalReceiptRecorded'] && $loan['createdBy']!==(int)auth()->id())
+                                        <button type="button" wire:click="startExternalBorrowedReceipt('{{ $loan['id'] }}')"
+                                            class="rounded-lg border px-3 py-2 text-sm">Record witnessed external borrowed delivery</button>
+                                    @elseif($loan['externalReceiptRecorded'] && !$loan['externalReceiptAccepted'] &&
+                                        $loan['externalCountMatchesDraft'] &&
+                                        $this->canIndependentlyAcceptExternalBorrowing())
+                                        <button type="button" wire:click="approveExternalBorrowedReceipt('{{ $loan['id'] }}')"
+                                            class="rounded-lg border px-3 py-2 text-sm">Independently accept externally borrowed stock</button>
+                                    @elseif($loan['externalReceiptAccepted'])
+                                        <p class="text-sm">External inventory accepted as BORROWED, not owned. No money posted or loan completed. Physical return is still due.</p>
+                                    @endif
+                                    @error('externalIntakeFile') <p role="alert">{{ $message }}</p> @enderror
+                                @endif
                                 @if(config('inventory_controls.loan_dispatch_enabled') &&
                                     $loan['direction']==='internal' &&
                                     $loan['lendingHallId']===$hallId &&
@@ -828,6 +873,39 @@
                             <p>No incident reports recorded.</p>
                         @endforelse
                     </section>
+                @endif
+                @if(config('inventory_controls.external_borrowed_intake_enabled') && $externalIntakeLoanId !== '')
+                    <section class="space-y-3 rounded-xl border p-4" aria-label="Witnessed external borrowing arrival">
+                        <h3 class="font-semibold">Witnessed external borrowing, signed partner handover</h3>
+                        <p class="text-sm">Recording only captures independently counted physical evidence. A different current owner/admin must accept before BORROWED inventory enters the book. No owned stock or money is posted.</p>
+                        <p class="text-xs">External borrowing {{ $externalIntakeLoanId }}</p>
+                        <div class="space-y-2">
+                            <p>Enter what was physically received for EACH item. A difference is preserved for investigation; owner approval cannot credit an unmatched count.</p>
+                            @foreach($loanHistory as $externalLoan)
+                                @if($externalLoan['id']===$externalIntakeLoanId)
+                                    @foreach($externalLoan['lines'] as $externalLine)
+                                        <label wire:key="external-intake-count-{{ $externalLine['itemId'] }}" class="flex items-center justify-between gap-3 text-sm">
+                                            <span>{{ $externalLine['name'] }} (requested {{ $externalLine['quantity'] }} {{ $externalLine['unit'] }})</span>
+                                            <input type="number" min="0" max="100000000" step="1" required
+                                                wire:model="externalIntakeCounts.{{ $externalLine['itemId'] }}"
+                                                class="w-28 rounded-lg border p-2 text-gray-900">
+                                        </label>
+                                    @endforeach
+                                @endif
+                            @endforeach
+                        </div>
+                        @error('externalIntakeCounts') <p role="alert">{{ $message }}</p> @enderror
+                        <label class="block space-y-1"><span class="text-sm">Signed outside partner handover (PDF or photo, up to 5 MB)</span>
+                            <input type="file" wire:model="externalIntakeFile" accept=".jpg,.jpeg,.png,.pdf" class="w-full rounded-lg border p-2"></label>
+                        @error('externalIntakeFile') <p role="alert">{{ $message }}</p> @enderror
+                        <button type="button" wire:click="submitExternalBorrowedReceipt"
+                            class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">
+                            Submit witnessed outside delivery for independent review
+                        </button>
+                    </section>
+                @endif
+                @if($lastExternalIntakeReference)
+                    <p role="status">External physical evidence/approval reference: {{ $lastExternalIntakeReference }}. This does not create owned inventory or financial entries.</p>
                 @endif
                 @if(config('inventory_controls.loan_dispatch_enabled') && $loanDispatchLoanId !== '')
                     <section class="space-y-3 rounded-xl border p-4" aria-label="Independent internal source dispatch">

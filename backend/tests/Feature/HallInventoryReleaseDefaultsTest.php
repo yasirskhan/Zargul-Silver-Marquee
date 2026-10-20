@@ -17,7 +17,7 @@ final class HallInventoryReleaseDefaultsTest extends TestCase
             'catalog_enabled','stocktakes_enabled','position_reports_enabled','stocktake_variance_enabled','variance_reclassification_enabled','loan_drafts_enabled',
             'loan_dispatch_enabled','loan_receipt_enabled','loan_returns_enabled',
             'loan_return_acceptance_enabled','loan_incidents_enabled',
-            'loan_incident_reviews_enabled','loan_clean_closure_enabled',
+            'loan_incident_reviews_enabled','loan_clean_closure_enabled','external_borrowed_intake_enabled',
             'purchase_receipts_enabled','purchase_evidence_upload_enabled',
             'purchase_stock_posting_enabled','opening_stock_posting_enabled',
         ];
