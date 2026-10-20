@@ -160,6 +160,12 @@ final class HallInventoryStocktakeVariancePreviewTest extends TestCase
         $this->assertSame(1,DB::table('hall_inventory_variance_review_acknowledgments')->count());
         $this->assertSame(1,DB::table('audit_events')
             ->where('action','hall_inventory.stocktake_variance_review_acknowledged')->count());
+        Livewire::test(HallInventory::class)
+            ->call('viewStocktakeVariance',$secondTake)->assertHasNoErrors()
+            ->set('varianceReviewReason','Separate physical count variance reviewed')
+            ->call('acknowledgeStocktakeVariance')->assertHasNoErrors()
+            ->assertSee('Independent review recorded:');
+        $this->assertSame(2,DB::table('hall_inventory_variance_review_acknowledgments')->count());
         $this->assertSame(0,DB::table('finance_journals')->count());
         try {
             DB::transaction(function()use($ackId):void {

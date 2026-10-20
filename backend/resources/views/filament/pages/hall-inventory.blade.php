@@ -479,6 +479,23 @@
                                 </tbody>
                             </table>
                         </div>
+                        @if($this->canIndependentlyReviewSelectedVariance() &&
+                            collect($stocktakeVariance)->contains(fn($row) => $row['requiresReview']))
+                            <div class="space-y-2 rounded-lg border p-3">
+                                <p class="text-sm">Independent variance review is an audit acknowledgment only. It does not approve stock write-offs, resolve discrepancies or settle money.</p>
+                                <label class="block space-y-1">
+                                    <span class="text-sm">Reason for reviewing physical discrepancy</span>
+                                    <textarea wire:model="varianceReviewReason" maxlength="500"
+                                        class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                                </label>
+                                @error('varianceReviewReason') <p role="alert">{{ $message }}</p> @enderror
+                                <button type="button" wire:click="acknowledgeStocktakeVariance"
+                                    class="rounded-lg border px-3 py-2 text-sm">Record independent variance review</button>
+                            </div>
+                        @endif
+                        @if($lastVarianceReviewReference)
+                            <p role="status">Independent review recorded: {{ $lastVarianceReviewReference }}. Stock and finance unchanged.</p>
+                        @endif
                     </section>
                 @endif
             </section>

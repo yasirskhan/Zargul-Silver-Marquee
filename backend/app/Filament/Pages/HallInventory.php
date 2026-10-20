@@ -53,6 +53,11 @@ final class HallInventory extends Page
     public array $stocktakeVariance = [];
     #[Locked]
     public string $varianceStocktakeId = '';
+    public string $varianceReviewReason = '';
+    #[Locked]
+    public string $varianceReviewRequestId = '';
+    #[Locked]
+    public ?string $lastVarianceReviewReference = null;
 
     public string $itemName = '';
     public string $itemCategory = 'Crockery';
@@ -698,12 +703,49 @@ final class HallInventory extends Page
         $this->stocktakeVariance=app(\App\Services\HallInventoryStocktakeVariancePreview::class)
             ->forStocktake($actor,$this->companyId,$this->hallId,$stocktakeId);
         $this->varianceStocktakeId=$stocktakeId;
+        $this->varianceReviewRequestId=(string)Str::uuid();
+        $this->varianceReviewReason='';
+        $this->lastVarianceReviewReference=null;
+    }
+
+    public function canIndependentlyReviewSelectedVariance():bool
+    {
+        if(!config('inventory_controls.stocktake_variance_enabled') ||
+            $this->varianceStocktakeId==='')return false;
+        $actor=auth()->user();
+        $hall=Hall::query()->where('company_id',$this->companyId)
+            ->where('id',$this->hallId)->where('is_active',true)->first();
+        return $actor instanceof \App\Models\User && $hall!==null &&
+            app(TenantAccess::class)->canConfigureHall($actor,$hall);
+    }
+
+    public function acknowledgeStocktakeVariance():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.stocktake_variance_enabled') &&
+            config('inventory_controls.position_reports_enabled'),403);
+        $hall=Hall::query()->where('company_id',$this->companyId)
+            ->where('id',$this->hallId)->where('is_active',true)->first();
+        abort_unless($hall && app(TenantAccess::class)->canConfigureHall($actor,$hall),403);
+        try {
+            $this->lastVarianceReviewReference=app(
+                \App\Services\HallInventoryVarianceReviewService::class
+            )->acknowledge($actor,$this->companyId,$this->hallId,
+                $this->varianceStocktakeId,$this->varianceReviewRequestId,
+                $this->varianceReviewReason);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['varianceReviewReason'=>$e->getMessage()]);
+        }
+        $this->varianceReviewReason='';
     }
 
     public function reloadCatalog(): void
     {
         $this->stocktakeVariance = [];
         $this->varianceStocktakeId = '';
+        $this->varianceReviewReason = '';
+        $this->lastVarianceReviewReference = null;
+        $this->varianceReviewRequestId = '';
         $this->catalog = [];
         $this->authorizeSelection();
         $this->catalog = DB::table('hall_inventory_items')
