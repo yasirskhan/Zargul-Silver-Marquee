@@ -120,5 +120,31 @@ final class HallInventoryVarianceReclassificationTest extends TestCase {
         try{$svc->reconcile($owner,$co->id,$hall->id,$missingTake,$missingLine->id,$reason);
             $this->fail('Missing stock was secretly written off.');}catch(ConflictHttpException){}
         $this->assertSame(0,DB::table('finance_journals')->count());
+        // Direct SQL cannot splice another valid stocktake's acknowledgment
+        // onto an unrelated valid line, even within the SAME company/hall.
+        $initialAcknowledgment=DB::table('hall_inventory_variance_review_acknowledgments')
+            ->where('stocktake_id',$take)->value('id');
+        $firstMovement=DB::table('hall_inventory_movement_events')
+            ->where('event_kind','opening_owned')->value('id');
+        try {
+            DB::transaction(function()use($co,$hall,$missingTake,$missingLine,
+                $initialAcknowledgment,$position,$firstMovement,$owner):void {
+                DB::table('hall_inventory_variance_reclassifications')->insert([
+                    'id'=>(string)Str::uuid(),'company_id'=>$co->id,
+                    'hall_id'=>$hall->id,'stocktake_id'=>$missingTake,
+                    'stocktake_line_id'=>$missingLine->id,
+                    'acknowledgment_id'=>$initialAcknowledgment,
+                    'position_id'=>$position,'movement_id'=>$firstMovement,
+                    'event_kind'=>'reclassify_owned_damage','quantity'=>1,
+                    'book_revision'=>2,'request_fingerprint'=>hash('sha256','forged cross-review'),
+                    'reason'=>'Attempt to bind unrelated but valid review',
+                    'adjudicated_by'=>$owner->id
+                ]);
+            });
+            $this->fail('Cross-stocktake acknowledgment binding was accepted.');
+        }catch(QueryException $e) {
+            $this->assertStringContainsString('stocktake_reclass_ack_scope_fk',$e->getMessage());
+        }
+        $this->assertSame(1,DB::table('hall_inventory_variance_reclassifications')->count());
     }
 }

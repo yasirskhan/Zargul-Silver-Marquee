@@ -140,6 +140,16 @@ final class HallInventory extends Page
     public array $loanRows = [];
 
     #[Locked]
+    public string $loanDispatchLoanId = '';
+    #[Locked]
+    public string $loanDispatchRequestId = '';
+    #[Locked]
+    public array $loanDispatchLines = [];
+    public $loanDispatchFile = null;
+    #[Locked]
+    public ?string $lastLoanDispatchReference = null;
+
+    #[Locked]
     public string $loanReceiptLoanId = '';
     #[Locked]
     public string $loanReceiptRequestId = '';
@@ -392,6 +402,12 @@ final class HallInventory extends Page
         $this->returnConditionDamaged = [];
         $this->returnAcceptanceFile = null;
         $this->lastReturnAcceptanceId = null;
+
+        $this->loanDispatchLoanId = '';
+        $this->loanDispatchRequestId = (string) Str::uuid();
+        $this->loanDispatchLines = [];
+        $this->loanDispatchFile = null;
+        $this->lastLoanDispatchReference = null;
 
         $this->loanReceiptLoanId = '';
         $this->loanReceiptRequestId = (string) Str::uuid();
@@ -976,6 +992,85 @@ final class HallInventory extends Page
         $this->reloadLoanHistory();
     }
 
+    /**
+     * Independently witnessed source handover. A saved draft never moves stock.
+     * This UI remains OFF until the existing source dispatch release gate.
+     */
+    public function canManageSourceInventoryDispatch():bool
+    {
+        if(!config('inventory_controls.loan_dispatch_enabled'))return false;
+        $actor=auth()->user();
+        $hall=Hall::query()->where('company_id',$this->companyId)
+            ->where('id',$this->hallId)->where('is_active',true)->first();
+        return $actor instanceof User && $hall!==null &&
+            app(TenantAccess::class)->canConfigureHall($actor,$hall);
+    }
+
+    public function startInternalDispatch(string $loanId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.loan_drafts_enabled') &&
+            config('inventory_controls.loan_dispatch_enabled'),403);
+        $hall=Hall::query()->where('company_id',$this->companyId)
+            ->where('id',$this->hallId)->where('is_active',true)->first();
+        abort_unless($hall && app(TenantAccess::class)->canConfigureHall($actor,$hall),403);
+        $loan=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($row):bool => $row['id']===$loanId &&
+                $row['direction']==='internal' &&
+                $row['lendingHallId']===$this->hallId &&
+                ($row['status']??'')==='draft_only');
+        abort_unless($loan!==null,403);
+        $this->loanDispatchLoanId=$loanId;
+        $this->loanDispatchRequestId=(string)Str::uuid();
+        $this->loanDispatchLines=$loan['lines'];
+        $this->loanDispatchFile=null;
+        $this->lastLoanDispatchReference=null;
+    }
+
+    public function submitInternalDispatch():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.loan_drafts_enabled') &&
+            config('inventory_controls.loan_dispatch_enabled'),403);
+        $hall=Hall::query()->where('company_id',$this->companyId)
+            ->where('id',$this->hallId)->where('is_active',true)->first();
+        abort_unless($hall && app(TenantAccess::class)->canConfigureHall($actor,$hall),403);
+        $loan=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($row):bool => $row['id']===$this->loanDispatchLoanId &&
+                $row['direction']==='internal' &&
+                $row['lendingHallId']===$this->hallId &&
+                ($row['status']??'')==='draft_only');
+        abort_unless($loan!==null,403);
+        $this->validate(['loanDispatchFile'=>'required|file|max:5120|mimes:jpg,jpeg,png,pdf']);
+        $revisions=[];
+        foreach($loan['lines'] as $line) {
+            $position=DB::table('hall_inventory_positions')
+                ->where('company_id',$this->companyId)
+                ->where('hall_id',$this->hallId)
+                ->where('item_id',$line['itemId'])
+                ->first(['revision','owned_usable']);
+            if(!$position || (int)$position->owned_usable<(int)$line['quantity'])
+                throw ValidationException::withMessages([
+                    'loanDispatchFile'=>'Physical owned stock is insufficient for the full loan.']);
+            $revisions[$line['itemId']]=(int)$position->revision;
+        }
+        try {
+            $this->lastLoanDispatchReference=app(
+                \App\Services\HallInventoryInternalLoanDispatchService::class
+            )->dispatch($actor,$this->companyId,$this->loanDispatchLoanId,
+                $this->loanDispatchRequestId,$revisions,$this->loanDispatchFile);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['loanDispatchFile'=>$e->getMessage()]);
+        }
+        $this->loanDispatchLoanId='';
+        $this->loanDispatchRequestId=(string)Str::uuid();
+        $this->loanDispatchLines=[];
+        $this->loanDispatchFile=null;
+        $this->reloadLoanHistory();
+    }
+
     public function startLoanReceipt(string $loanId): void
     {
         $actor=$this->authorizeSelection();
@@ -1277,6 +1372,16 @@ final class HallInventory extends Page
         $this->incidentDecisionReason='';
         $this->incidentReviews=app(\App\Services\HallInventoryLoanIncidentDecisionService::class)
             ->reviews($actor,$this->companyId,$this->hallId,$this->incidentLoanId);
+    }
+
+    public function canManageSourceCleanClosure():bool
+    {
+        if(!config('inventory_controls.loan_clean_closure_enabled'))return false;
+        $actor=auth()->user();
+        $hall=Hall::query()->where('company_id',$this->companyId)
+            ->where('id',$this->hallId)->where('is_active',true)->first();
+        return $actor instanceof User && $hall!==null &&
+            app(TenantAccess::class)->canConfigureHall($actor,$hall);
     }
 
     public function closeCleanInternalLoan(string $loanId):void

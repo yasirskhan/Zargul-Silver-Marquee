@@ -413,3 +413,18 @@ Verify live branch/CI → reconcile current handoff + specific requirement/featu
 
 ## PHASE 12 CONDITION-RECLASS CI FIX — 2026-10-20
 - New owned-condition source `f12ba9a766dcbe5d828d18f9b1f623d2b7e74171`, [CI 39377437941](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39377437941) failed laravel-postgres (other five jobs passed). Full suite: 627 passed, one failed, three risky. New test deliberately UPDATEs the immutable adjudication row; PostgreSQL correctly rejects it, but the fixture omitted a rollback/savepoint around the expected QueryException, aborting its own outer test transaction. Fix encloses the expected UPDATE in DB::transaction() to roll back only that deliberate invalid statement; immutability assertion remains, service unchanged. Require new exact six-job CI success before marking INV-015-CONDITION VERIFIED or publishing the scoped-FK successor. All release flags remain OFF.
+
+
+## PHASE 12 PREPARED NEXT VERTICAL — INTERNAL SOURCE DISPATCH UI
+- Existing source dispatch backend already records immutable multi-line owned_usable -> owned_on_loan with separate destination acceptance, but the operator could not start it from the HallInventory panel. New default-OFF UI adds source owner/admin-only witnessed handover for each internal draft, fresh role and hall checks, bounded private evidence file, authoritative server-side current revisions, idempotent locked dispatch UUID, real status/history refresh; source manager and unrelated hall cannot dispatch. New Livewire PG regression covers physical stock conservation and independence.
+- Preserve independent source/receiving actors, no borrowed receipt or finance posting at source. Does not complete Phase 12 alone and requires its own exact-SHA CI after the predecessor is green.
+
+
+## PHASE 12 SCOPE-BINDING HARDENING (2026-10-20)
+- Companion PostgreSQL migration for condition reclassifications: composite company/hall/count line and independent acknowledgment FKs, scoped book position/movement references and INSERT-only provenance guard verifying same item, event, movement revision and quantity. Negative SQL test uses TWO real same-hall stocktakes and attempts to bind one valid review to the other counted line; rejected at database level. Production release flags remain OFF. Success still requires new six-job exact-SHA CI.
+
+- In the same prepared Phase 12 owner interface batch: add discoverable clean-loan closure and immutable numbered PDF receipt download controls for the existing strict server-verified clean closure service. Only current source owner/admin sees them; borrower, incident, outstanding, damaged and unaccepted quantities are not depicted as clean. The existing full three-actor PostgreSQL closure test now performs the actual final close via Livewire, then verifies immutable PDF download, audited access, revoked role and tamper rejection. Still default-OFF pending exact CI.
+
+
+## VERIFIED PARENT INVENTORY CONDITION RECLASSIFICATION
+- The PostgreSQL expected-negative-update/savepoint repair commit `fe251f107d1486c711d3250fc426464170e0b99c` is **VERIFIED**, GitHub hosted Actions run [39378225973](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39378225973), exact HEAD, **six of six** required jobs SUCCESS (prototype-checks, laravel-postgres, central-postgres, editor-browser-e2e, licensing-postgres, authenticated-panel-e2e). The ownership-conserving owned usable/damaged condition workflow is verified at this checkpoint. Do not confuse next candidate SQL lineage hardening, source dispatch owner UI or clean PDF owner UI with the verified parent; each successor requires its own hosted CI. All inventory production switches remain OFF.

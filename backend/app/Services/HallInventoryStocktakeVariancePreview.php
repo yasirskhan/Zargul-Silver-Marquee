@@ -67,9 +67,10 @@ final class HallInventoryStocktakeVariancePreview
                 'l.usable_count','l.damaged_count','s.book_revision','s.book_usable',
                 's.book_damaged','s.away_count','s.book_state',
                 'a.id as variance_review_id','a.created_at as variance_reviewed_at',
+                'a.reviewed_by as variance_reviewed_by',
                 'd.id as reclassification_id','d.movement_id as reclassification_movement_id',
                 'p.revision as current_position_revision'])
-            ->map(static function($row):array {
+            ->map(static function($row)use($actor):array {
                 $trusted=$row->book_state==='POSTED_BOOK_SNAPSHOT';
                 $usable=$trusted?(int)$row->book_usable:null;
                 $damaged=$trusted?(int)$row->book_damaged:null;
@@ -91,7 +92,9 @@ final class HallInventoryStocktakeVariancePreview
                     'adjustmentPosted'=>$row->reclassification_id!==null,'financialPosting'=>false,
                     'reclassificationMovementId'=>$row->reclassification_movement_id,
                     'reclassificationEligible'=>config('inventory_controls.variance_reclassification_enabled') &&
-                        $row->variance_review_id!==null && $row->reclassification_id===null &&
+                        $row->variance_review_id!==null &&
+                        $row->variance_reviewed_by!==null &&
+                        (int)$row->variance_reviewed_by===(int)$actor->getKey() && $row->reclassification_id===null &&
                         $row->ownership==='owned' && $trusted &&
                         $row->current_position_revision!==null &&
                         (int)$row->current_position_revision===(int)$row->book_revision &&

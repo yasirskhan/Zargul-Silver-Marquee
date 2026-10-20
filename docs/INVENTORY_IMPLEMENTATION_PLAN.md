@@ -66,3 +66,7 @@ Use separate feature flag; no real inventory or customer data until acceptance. 
 - Separate transaction-captured source book snapshot for each owned/borrowed physical count line. Values are original as-of-count evidence and do not change when future receipts, dispatches or returns move the current position. No historical stocktake with absent snapshot may infer a variance from today's inventory.
 - Only positions whose complete immutable journal revision chain matches the position are numeric baseline candidates. Distinguish `NO_POSTED_BOOK` and `INTEGRITY_REVIEW_REQUIRED`; do not post variance, loan completion, financial liability or payment. Tenant/hall authorization checked on server for each preview, with explicit default OFF gate.
 - PostgreSQL and Livewire tests must pass all six hosted jobs on the exact SHA; owner/admin liability or stock adjustment approval is a DIFFERENT unfinished feature.
+
+
+### In-progress independent source physical dispatch panel (October 20, 2026)
+- Previously backend-only internal source dispatch gains a controlled owner/admin-only HallInventory UI. Source draft creator remains prohibited by service; no dispatch for external loans. Owner attaches physical handover evidence, server determines per-item source revision, service locks hall and source positions, journals owned usable -> owned on loan atomically; receiving hall still separately confirms receipt. Tenant isolation and no finance writes validated in Livewire/PostgreSQL regression. Keep `VENUE_INVENTORY_LOAN_DISPATCH_ENABLED=false` in production until approved.

@@ -181,3 +181,11 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Root cause: the new negative test caught the expected QueryException without a nested DB transaction/savepoint. PostgreSQL left the surrounding test transaction aborted, so a subsequent safe audit SELECT failed.
 - Repair: wrap ONLY the deliberate invalid UPDATE in DB::transaction so Laravel rolls back its savepoint, retaining the trigger, full assertion and subsequent finance/stock checks. No service, migration or production flag weakening.
 - Status: REPAIR PUBLISHED, NEW EXACT-SHA ALL SIX CI PENDING.
+
+
+## INV-UX-20261020-014 — Backend internal handover and clean PDF closeout unavailable from operator page
+- Problem observed at `fe251f107d1486c711d3250fc426464170e0b99c`: internal source dispatch service writes audited physical movements and clean closeout service stores numbered, verified PDFs, but neither operator action was reachable in the HallInventory Blade page. Destination receiving and partial return controls were already implemented; source workflow remained inaccessible without lower-level service invocation.
+- Candidate fix (PREPARED, CI NOT VERIFIED): add source-owner/admin-only handover action with 5 MB physical evidence and revision-locked service call; show clean final approval only after independently acknowledged full-good returns; provide private owner-only PDF download, preserving original service authorization and tamper checks. Existing clean closure full PostgreSQL test executes Livewire action; new multi-line source dispatch Livewire test verifies roles, stock and financial isolation.
+- Release switches stay OFF. Close this issue only after exact-SHA six-job CI.
+
+- BUG-20261020-013 RESOLVED / VERIFIED: exact commit `fe251f107d1486c711d3250fc426464170e0b99c`, CI run `39378225973`, six required jobs SUCCESS. The immutable trigger remains enforced; only the test fixture savepoint was corrected.

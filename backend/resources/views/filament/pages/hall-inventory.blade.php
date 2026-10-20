@@ -462,7 +462,7 @@
                                 <thead><tr><th class="p-2">Item / ownership</th><th class="p-2">Counted usable</th>
                                     <th class="p-2">Book usable at count</th><th class="p-2">Usable variance</th>
                                     <th class="p-2">Counted damaged</th><th class="p-2">Book damaged</th>
-                                    <th class="p-2">Damaged variance</th><th class="p-2">Review state</th></tr></thead>
+                                    <th class="p-2">Damaged variance</th><th class="p-2">Review state</th><th class="p-2">Condition action</th></tr></thead>
                                 <tbody>
                                 @foreach($stocktakeVariance as $line)
                                     <tr class="border-t" wire:key="variance-preview-{{ $line['itemId'] }}-{{ $line['ownership'] }}">
@@ -474,17 +474,29 @@
                                         <td class="p-2">{{ $line['bookDamaged'] ?? 'No valid baseline' }}</td>
                                         <td class="p-2">{{ $line['damagedVariance'] ?? 'Not available' }}</td>
                                         <td class="p-2">{{ $line['adjustmentPosted'] ? 'OWNED CONDITION RECLASSIFIED' : ($line['requiresReview'] ? 'REVIEW REQUIRED' : 'MATCHED BOOK SNAPSHOT') }}</td>
-                                        @if($line['reclassificationEligible'])
-                                            <td class="p-2"><button type="button" wire:click="reclassifyStocktakeDamage('{{ $line['lineId'] }}')"
-                                                class="rounded-lg border px-2 py-1">Reclassify owned condition</button></td>
-                                        @endif
+                                        <td class="p-2">
+                                            @if($line['reclassificationEligible'] && $this->canIndependentlyReviewSelectedVariance())
+                                                <button type="button" wire:click="reclassifyStocktakeDamage('{{ $line['lineId'] }}')"
+                                                    class="rounded-lg border px-2 py-1">Reclassify owned condition</button>
+                                            @elseif($line['adjustmentPosted'])
+                                                Reclassification recorded
+                                            @else
+                                                Not eligible
+                                            @endif
+                                        </td>
                                     </tr>
                                 @endforeach
                                 </tbody>
                             </table>
                         </div>
                         @if(collect($stocktakeVariance)->contains(fn($row) => $row['reviewAcknowledged']))
-                            <p class="text-sm">An independent reviewer acknowledged this physical variance. Investigation and any separately approved correction remain outstanding. No stock or finance posting was made.</p>
+                            <p class="text-sm">An independent reviewer recorded the discrepancy.
+                                @if(collect($stocktakeVariance)->contains(fn($row) => $row['adjustmentPosted']))
+                                    A separately approved owned usable/damaged condition correction was posted, conserving total owned units. Other discrepancies may remain unresolved. No financial journal was posted.
+                                @else
+                                    Investigation and any separately approved correction remain outstanding. No stock or finance posting was made.
+                                @endif
+                            </p>
                         @endif
                         @if($this->canIndependentlyReviewSelectedVariance() &&
                             collect($stocktakeVariance)->contains(fn($row) => $row['requiresReview']) &&
@@ -527,9 +539,9 @@
             <section class="space-y-4 rounded-xl border p-4" aria-label="Multi-item internal or external borrowing request">
                 <h2 class="text-lg font-semibold">Borrow / lend multiple inventory items</h2>
                 <p class="text-sm text-gray-600 dark:text-gray-300">
-                    Draft request only. Nothing is dispatched, transferred or returned here.
-                    Actual handover, independent confirmation, partial returns and final
-                    receipt are separate controlled steps.
+                    Saving the request does not move inventory. Physical source dispatch,
+                    independent receiving, partial returns and final acknowledgment
+                    are separate controlled steps available after the draft.
                 </p>
                 <div class="grid gap-3 md:grid-cols-2">
                     <label class="block space-y-1"><span class="text-sm">Borrowing transaction type</span>
@@ -694,6 +706,38 @@
                                         <li>{{ $line['name'] }} — {{ $line['quantity'] }} {{ $line['unit'] }}</li>
                                     @endforeach
                                 </ul>
+                                @if(config('inventory_controls.loan_dispatch_enabled') &&
+                                    $loan['direction']==='internal' &&
+                                    $loan['lendingHallId']===$hallId &&
+                                    ($loan['status']??'')==='draft_only' &&
+                                    $this->canManageSourceInventoryDispatch())
+                                    <button type="button" wire:click="startInternalDispatch('{{ $loan['id'] }}')"
+                                        class="rounded-lg border px-3 py-2 text-sm">Prepare witnessed source dispatch</button>
+                                @endif
+                                @if(config('inventory_controls.loan_clean_closure_enabled') &&
+                                    $loan['direction']==='internal' &&
+                                    $loan['lendingHallId']===$hallId &&
+                                    $this->canManageSourceCleanClosure())
+                                    @if(isset($cleanLoanReceipts[$loan['id']]))
+                                        <p class="font-medium">Immutable clean-return receipt number {{ $cleanLoanReceipts[$loan['id']]['receiptNumber'] }}. No money posted.</p>
+                                        <button type="button" wire:click="downloadCleanLoanReceipt('{{ $loan['id'] }}')"
+                                            class="rounded-lg border px-3 py-2 text-sm">Download numbered clean-return PDF</button>
+                                    @elseif($loan['destinationReceiptConfirmed'] &&
+                                        ($loan['returnReconciliation'] ?? null) !== null &&
+                                        !$loan['returnReconciliation']['integrityWarning'] &&
+                                        $loan['returnReconciliation']['receivedQuantity']>0 &&
+                                        $loan['returnReconciliation']['sourceAcknowledgedGood']===$loan['returnReconciliation']['receivedQuantity'] &&
+                                        $loan['returnReconciliation']['sourceAcknowledgedDamaged']===0 &&
+                                        $loan['returnReconciliation']['sourceUnresolved']===0 &&
+                                        $loan['returnReconciliation']['sourceAcknowledgmentPending']===0 &&
+                                        $loan['returnReconciliation']['notYetShipped']===0 &&
+                                        $loan['returnReconciliation']['stillUnsettled']===0)
+                                        <p class="text-xs">Final source approval will independently check all physical evidence, roles and open incidents. A clean receipt cannot settle damages or money.</p>
+                                        <button type="button" wire:click="closeCleanInternalLoan('{{ $loan['id'] }}')"
+                                            class="rounded-lg border px-3 py-2 text-sm">Finalize independently reconciled clean loan</button>
+                                    @endif
+                                    @error('cleanLoanClosure') <p role="alert">{{ $message }}</p> @enderror
+                                @endif
                                 @if(config('inventory_controls.loan_returns_enabled') &&
                                     ($loan['viewRole'] ?? '') === 'receiving' &&
                                     in_array(($loan['status'] ?? ''),[
@@ -784,6 +828,28 @@
                             <p>No incident reports recorded.</p>
                         @endforelse
                     </section>
+                @endif
+                @if(config('inventory_controls.loan_dispatch_enabled') && $loanDispatchLoanId !== '')
+                    <section class="space-y-3 rounded-xl border p-4" aria-label="Independent internal source dispatch">
+                        <h3 class="font-semibold">Independently witnessed source dispatch</h3>
+                        <p class="text-sm">Check each source item and quantity. Actual owned stock leaves the lending hall only when independent owner/admin review and the physical evidence are accepted. Destination receiving is separate.</p>
+                        <p class="text-xs">Loan {{ $loanDispatchLoanId }}</p>
+                        <ul class="list-inside list-disc text-sm">
+                            @foreach($loanDispatchLines as $line)
+                                <li wire:key="dispatch-line-{{ $line['itemId'] }}">{{ $line['name'] }}: {{ $line['quantity'] }} {{ $line['unit'] }}</li>
+                            @endforeach
+                        </ul>
+                        <label class="block space-y-1"><span class="text-sm">Signed handover document or physical dispatch photo (5 MB maximum)</span>
+                            <input type="file" wire:model="loanDispatchFile" accept=".jpg,.jpeg,.png,.pdf" class="w-full rounded-lg border p-3">
+                        </label>
+                        @error('loanDispatchFile') <p role="alert">{{ $message }}</p> @enderror
+                        <button type="button" wire:click="submitInternalDispatch" class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">
+                            Confirm actual source physical dispatch
+                        </button>
+                    </section>
+                @endif
+                @if($lastLoanDispatchReference)
+                    <p role="status">Independently witnessed physical dispatch recorded: {{ $lastLoanDispatchReference }}. Await receiving-hall physical acknowledgment, no completed loan or payment.</p>
                 @endif
                 @if(config('inventory_controls.loan_receipt_enabled') &&
                     config('inventory_controls.loan_dispatch_enabled') && $loanReceiptLoanId !== '')

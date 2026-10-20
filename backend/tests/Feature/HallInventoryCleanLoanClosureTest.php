@@ -105,6 +105,15 @@ class HallInventoryCleanLoanClosureTest extends TestCase
             $this->fail('Source dispatcher performed final closeout.');
         }catch(AuthorizationException){}
         $this->be($owner);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Livewire::test(HallInventory::class)
+            ->set('hallId',$src->id)
+            ->assertSee('Finalize independently reconciled clean loan')
+            ->call('closeCleanInternalLoan',$loan)->assertHasNoErrors()
+            ->assertSee('CLOSED / INDEPENDENT CLEAN RETURN VERIFIED')
+            ->assertSee('Download numbered clean-return PDF');
+        $closureId=(string)DB::table('hall_inventory_internal_loan_closures')
+            ->where('loan_id',$loan)->value('id');
         $saved=$closure->close($owner,$company->id,$loan,$closureId);
         $this->assertSame(1,$saved['receiptNumber']);
         $this->assertFalse($saved['financialPosting']);
