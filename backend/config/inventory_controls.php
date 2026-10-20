@@ -31,6 +31,9 @@ return [
     // Manual partner identity attestation and separately approved collectible obligation;
     // never a journaled receivable or payment. Default OFF.
     'loan_authorized_obligations_enabled' => (bool) env('VENUE_INVENTORY_LOAN_AUTHORIZED_OBLIGATIONS_ENABLED', false),
+    // Evidence-recorded, independent-bank/cash-verified partial recoveries with
+    // balanced cash-basis journals and immutable reversals only. OFF until finance.
+    'loan_recoveries_enabled' => (bool) env('VENUE_INVENTORY_LOAN_RECOVERIES_ENABLED', false),
     // Entirely clean internal loans only; independently reconciled numbered PDF.
     'loan_clean_closure_enabled' => (bool) env('VENUE_INVENTORY_LOAN_CLEAN_CLOSURE_ENABLED', false),
     // Hall-owned goods lent outside: independent signed handover and owner approval. OFF.

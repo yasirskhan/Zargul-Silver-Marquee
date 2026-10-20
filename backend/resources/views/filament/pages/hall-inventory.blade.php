@@ -1235,6 +1235,121 @@
                                 <p role="status">Agreement decision {{ $lastFinancialObligationReference }} recorded. No receivable journal or cash collection was posted.</p>
                             @endif
                         @endif
+                        @if(config('inventory_controls.loan_recoveries_enabled') &&
+                            config('inventory_controls.loan_authorized_obligations_enabled'))
+                            <h4 class="font-semibold">Separately verified partial and full loss recoveries</h4>
+                            <p class="text-sm">Payment evidence is not money until independently verified. This section records CASH-BASIS recovery journals only after an authorized financial agreement, a second current owner and the separate finance posting release flag. It does not automatically create an invoice, accrual receivable, damage write-off, dispute waiver or final loan closure.</p>
+                            @foreach($financialRecoveryBalances as $obligationId=>$balance)
+                                <p wire:key="recovery-balance-{{ $obligationId }}">Obligation {{ $obligationId }} ({{ $balance['currency'] }}):
+                                    authorized {{ $balance['amountMinor'] }}, independently verified net recovered {{ $balance['paidMinor'] }},
+                                    pending verification {{ $balance['pendingMinor'] }}, outstanding {{ $balance['remainingMinor'] }} minor units.
+                                </p>
+                            @endforeach
+                            @if(count($financialRecoveryBalances)>0)
+                                <label class="block text-sm">Authorized obligation for payment evidence
+                                    <select wire:model="financialRecoveryObligationId" class="w-full rounded-lg border p-2 text-gray-900">
+                                        <option value="">Select authorized agreement</option>
+                                        @foreach($financialRecoveryBalances as $obligationId=>$balance)
+                                            @if($balance['unreservedMinor']>0)
+                                                <option value="{{ $obligationId }}">{{ $balance['currency'] }} {{ $balance['unreservedMinor'] }} unreserved ({{ $obligationId }})</option>
+                                            @endif
+                                        @endforeach
+                                    </select>
+                                </label>
+                                <label class="block text-sm">Actually evidenced payment, integer minor units
+                                    <input type="number" min="1" step="1" wire:model="financialRecoveryAmountMinor" class="w-full rounded-lg border p-2 text-gray-900">
+                                </label>
+                                <label class="block text-sm">Documented payment method
+                                    <select wire:model="financialRecoveryMethod" class="w-full rounded-lg border p-2 text-gray-900">
+                                        <option value="bank">Bank transfer, not verified until bank statement checked</option>
+                                        <option value="cash">Physically witnessed cash, not verified until independent cash count</option>
+                                    </select>
+                                </label>
+                                <label class="block text-sm">Bank transaction reference (only for bank, unique within company)
+                                    <input wire:model="financialRecoveryBankReference" maxlength="120" class="w-full rounded-lg border p-2 text-gray-900">
+                                </label>
+                                <label class="block text-sm">Signed original payment evidence, private PDF/photo up to 5 MB
+                                    <input type="file" wire:model="financialRecoveryFile" accept=".pdf,.png,.jpg,.jpeg" class="w-full rounded-lg border p-2">
+                                </label>
+                                @error('financialRecoveryFile') <p role="alert">{{ $message }}</p> @enderror
+                                @error('financialRecoveryBankReference') <p role="alert">{{ $message }}</p> @enderror
+                                @error('financialRecoveryAmountMinor') <p role="alert">{{ $message }}</p> @enderror
+                                <button type="button" wire:click="submitFinancialRecovery" class="rounded-lg border px-3 py-2 text-sm">Record unverified payment evidence for independent review</button>
+                            @endif
+                            <h4 class="font-semibold">Recovery history, journals and corrections</h4>
+                            @forelse($financialRecoveryHistory as $payment)
+                                <article wire:key="fin-recovery-{{ $payment['id'] }}" class="rounded-lg border p-3 text-sm">
+                                    <p>Evidence {{ $payment['id'] }}: {{ $payment['currency'] }} {{ $payment['amountMinor'] }} via {{ $payment['method'] }}.</p>
+                                    <p>Status: {{ $payment['decision'] ?? 'AWAITING INDEPENDENT PAYMENT VERIFICATION' }}.
+                                       Journal: {{ $payment['journalId'] ?? 'NONE' }}.
+                                       Reversal: {{ $payment['reversalId'] ?? 'NONE' }}.</p>
+                                </article>
+                            @empty
+                                <p>No partner payment evidence recorded for this loan.</p>
+                            @endforelse
+                            @if(collect($financialRecoveryHistory)->contains(fn($p)=>
+                                $p['decision']===null && $p['recordedBy']!==(int)auth()->id()))
+                                <h5 class="font-semibold">Second owner independently verifies payment proof</h5>
+                                <label class="block text-sm">Pending payment from a different actor
+                                    <select wire:model="financialRecoveryReceiptId" class="w-full rounded-lg border p-2 text-gray-900">
+                                        <option value="">Choose pending payment</option>
+                                        @foreach($financialRecoveryHistory as $payment)
+                                            @if($payment['decision']===null && $payment['recordedBy']!==(int)auth()->id())
+                                                <option value="{{ $payment['id'] }}">{{ $payment['currency'] }} {{ $payment['amountMinor'] }} ({{ $payment['id'] }})</option>
+                                            @endif
+                                        @endforeach
+                                    </select>
+                                </label>
+                                <label class="block text-sm">Independent outcome
+                                    <select wire:model="financialRecoveryDecision" class="w-full rounded-lg border p-2 text-gray-900">
+                                        <option value="rejected">Reject unsubstantiated payment</option>
+                                        @if(config('finance_controls.posting_enabled'))
+                                            <option value="confirmed">Confirm verified actual receipt and post balanced journal</option>
+                                        @endif
+                                    </select>
+                                </label>
+                                <label class="block text-sm">Independent verification method
+                                    <select wire:model="financialRecoveryVerificationMethod" class="w-full rounded-lg border p-2 text-gray-900">
+                                        <option value="verified_bank_statement">Matched actual bank statement</option>
+                                        <option value="witnessed_cash_count">Separately witnessed cash count</option>
+                                    </select>
+                                </label>
+                                <label class="block text-sm">Bank statement or separate witness/cash count reference
+                                    <input wire:model="financialRecoveryVerificationReference" maxlength="160" class="w-full rounded-lg border p-2 text-gray-900">
+                                </label>
+                                <label class="block text-sm">Verification decision reasoning
+                                    <textarea wire:model="financialRecoveryReviewReason" class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                                </label>
+                                @error('financialRecoveryReviewReason') <p role="alert">{{ $message }}</p> @enderror
+                                <button type="button" wire:click="submitFinancialRecoveryReview" class="rounded-lg border px-3 py-2 text-sm">Save immutable independent payment verification</button>
+                            @endif
+                            @if(config('finance_controls.posting_enabled') &&
+                                collect($financialRecoveryHistory)->contains(fn($p)=>
+                                    $p['decision']==='confirmed' && $p['reversalId']===null &&
+                                    $p['reviewedBy']!==(int)auth()->id()))
+                                <h5 class="font-semibold">Correct erroneous posted recovery by balanced reversal</h5>
+                                <label class="block text-sm">Verified posted receipt requiring correction
+                                    <select wire:model="financialRecoveryReversalReceiptId" class="w-full rounded-lg border p-2 text-gray-900">
+                                        <option value="">Select posted receipt</option>
+                                        @foreach($financialRecoveryHistory as $payment)
+                                            @if($payment['decision']==='confirmed' && $payment['reversalId']===null &&
+                                                $payment['reviewedBy']!==(int)auth()->id())
+                                                <option value="{{ $payment['id'] }}">{{ $payment['currency'] }} {{ $payment['amountMinor'] }} ({{ $payment['id'] }})</option>
+                                            @endif
+                                        @endforeach
+                                    </select>
+                                </label>
+                                <label class="block text-sm">Why the original receipt was recorded in error, 15 to 500 characters
+                                    <textarea wire:model="financialRecoveryReversalReason" class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                                </label>
+                                @error('financialRecoveryReversalReason') <p role="alert">{{ $message }}</p> @enderror
+                                <button type="button" wire:click="reverseFinancialRecovery" class="rounded-lg border px-3 py-2 text-sm">Post exact balanced reversal, preserve original journal</button>
+                            @endif
+                            @if($lastFinancialRecoveryReference)
+                                <p role="status">Payment, review or financial correction {{ $lastFinancialRecoveryReference }} saved. Finance and custody histories remain independent. No final loan closure.</p>
+                            @endif
+                        @endif
+
 
 
                     </section>

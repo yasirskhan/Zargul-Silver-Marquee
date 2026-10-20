@@ -268,3 +268,8 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Status: PREPARED DETACHED pending exact six-job CI on preceding documentary source and new candidate.
 
 - Verification closeout for header order repair: `5df565fdb681a3fda0fd432091e4d6fd29ee5570`, GitHub Actions 39488870650, six required jobs SUCCESS. Partner document evidence and independent integrity review now VERIFIED; later obligation approval and collection work remain unverified.
+
+
+## INV-FIN-20261020-030 — Evidence-only claims without verified cash recovery, partial balances or corrections
+- Prepared candidate implements default-OFF owner-recorded private bank/cash evidence (never counted as received before independent owner verification), caps combined pending/posted amounts under company transaction lock and exact obligation, blocks bank reference replay across existing venue-invoice deposit subledger, posts two-line balanced cash-basis inventory recovery journal only with finance release and independently verified proof, permits another owner to post immutable linked reversal, presents full evidence/verification/reversal status and remaining balance in Hall Inventory Livewire UI. Does NOT create accrual receivable, a customer invoice, liability waiver, physical writeoff or non-clean closure.
+- Status: DETACHED candidate, not tested/verified on hosted CI. Production release OFF. New full six-job exact SHA CI required after predecessor success.

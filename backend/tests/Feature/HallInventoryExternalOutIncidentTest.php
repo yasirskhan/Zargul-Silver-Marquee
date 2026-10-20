@@ -376,6 +376,71 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
         $this->assertFalse($agreementHistory[0]['receivableJournalPosted']);
         $this->assertSame(0,$agreementHistory[0]['paidMinor']);
         $this->assertSame(0,DB::table('finance_journals')->count());
+        // Verified money remains separate from the previously approved
+        // obligation. Pending documentation does not affect the finance ledger.
+        config()->set('inventory_controls.loan_recoveries_enabled',true);
+        $recoveries=app(\App\Services\HallInventoryFinancialRecoveryService::class);
+        $this->be($owner);
+        $payfile=static fn()=>UploadedFile::fake()->createWithContent(
+            'verified-bank-evidence.pdf',"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF");
+        Livewire::test(HallInventory::class)->set('hallId',$hall->id)
+            ->call('startFinancialClaims',$loan)->assertHasNoErrors()
+            ->assertSee('Separately verified partial and full loss recoveries')
+            ->set('financialRecoveryObligationId',$obligationId)
+            ->set('financialRecoveryMethod','bank')
+            ->set('financialRecoveryAmountMinor','12000')
+            ->set('financialRecoveryBankReference','WIRE-RECOVERY-ONE-INV123')
+            ->set('financialRecoveryFile',$payfile())
+            ->call('submitFinancialRecovery')->assertHasNoErrors()
+            ->assertSee('AWAITING INDEPENDENT PAYMENT VERIFICATION');
+        $receiptId=(string)DB::table('hall_inventory_financial_recovery_receipts')
+            ->where('company_id',$company->id)->where('obligation_id',$obligationId)->value('id');
+        $this->assertTrue(Str::isUuid($receiptId));
+        $this->assertSame(0,DB::table('finance_journals')->count());
+        $this->assertSame(12000,$recoveries->outstanding($owner,$company->id,$hall->id,$loan)
+            [$obligationId]['pendingMinor']);
+        try{
+            $recoveries->record($owner,$company->id,$obligationId,(string)Str::uuid(),
+                'bank',15000,'WIRE-RECOVERY-TWO-INV456',$payfile());
+            $this->fail('Overpayment reservation exceeded remaining monetary obligation.');
+        }catch(ConflictHttpException){}
+        try{
+            $recoveries->verify($owner,$company->id,$receiptId,(string)Str::uuid(),
+                'confirmed','verified_bank_statement','Approved statement INVTEST123',
+                'The same payment reporter is forbidden from financial posting');
+            $this->fail('Payment reporter independently confirmed their own payment.');
+        }catch(AuthorizationException){}
+        config()->set('finance_controls.posting_enabled',true);
+        $this->be($reviewer);
+        Livewire::test(HallInventory::class)->set('hallId',$wrong->id)
+            ->call('startFinancialClaims',$loan)->assertForbidden();
+        Livewire::test(HallInventory::class)->set('hallId',$hall->id)
+            ->call('startFinancialClaims',$loan)->assertHasNoErrors()
+            ->set('financialRecoveryReceiptId',$receiptId)
+            ->set('financialRecoveryDecision','confirmed')
+            ->set('financialRecoveryVerificationMethod','verified_bank_statement')
+            ->set('financialRecoveryVerificationReference','Real bank statement verified INVTEST123')
+            ->set('financialRecoveryReviewReason','Independently reconciled deposited partner funds against private bank records')
+            ->call('submitFinancialRecoveryReview')->assertHasNoErrors()
+            ->assertSee('Status: confirmed');
+        $this->assertSame(1,DB::table('finance_journals')
+            ->where('company_id',$company->id)->where('entry_type','inventory_recovery')->count());
+        $this->assertSame(2,DB::table('finance_journal_lines')->count());
+        $this->assertSame(13000,$recoveries->outstanding($reviewer,$company->id,$hall->id,$loan)
+            [$obligationId]['remainingMinor']);
+        $this->be($owner);
+        Livewire::test(HallInventory::class)->set('hallId',$hall->id)
+            ->call('startFinancialClaims',$loan)->assertHasNoErrors()
+            ->set('financialRecoveryReversalReceiptId',$receiptId)
+            ->set('financialRecoveryReversalReason','Evidence was posted to an incorrect cash reconciliation batch and must be corrected')
+            ->call('reverseFinancialRecovery')->assertHasNoErrors()
+            ->assertSee('Reversal:');
+        $this->assertSame(2,DB::table('finance_journals')->count());
+        $this->assertSame(1,DB::table('finance_journals')
+            ->where('entry_type','reversal')->count());
+        $this->assertSame(4,DB::table('finance_journal_lines')->count());
+        $this->assertSame(0,$recoveries->outstanding($owner,$company->id,$hall->id,$loan)
+            [$obligationId]['paidMinor']);
         $this->assertSame(0,DB::table('hall_inventory_internal_loan_closures')->count());
         $p=DB::table('hall_inventory_positions')->where('company_id',$company->id)
             ->where('hall_id',$hall->id)->where('item_id',$item)->first();

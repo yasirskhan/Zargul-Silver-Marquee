@@ -540,3 +540,7 @@ Verify live branch/CI → reconcile current handoff + specific requirement/featu
 
 ## 2026-10-20 PUBLICATION CHECKPOINT — MANUAL LOSS OBLIGATION
 - Parent `5df565fdb681a3fda0fd432091e4d6fd29ee5570` verified GitHub Actions `39488870650` SUCCESS, all six required jobs. Root-cause cache-header-order regression fixed; 634+ backend tests pass at parent. The next manual verified loss agreement/independent obligation service, SQL constraints, Livewire UI and regression fixture is now a candidate to publish with exact-head CAS. Its own hosted CI is PENDING and cannot be called verified until exact SHA all six jobs pass. Production inventory and finance controls remain OFF.
+
+
+## PHASE 12 PARTIAL LOSS PAYMENT RECOVERIES AND REVERSALS — PREPARED DETACHED
+- Candidate on top of manual agreement approval; do not publish before independently verified prior commits. Adds private money evidence, preverification reservation caps, own and venue-invoice bank-reference double-use guard, independent owner bank-statement/cash verification with finance release flag and balanced two-line cash-basis recovery journal, immutable correction via exactly linked reversal journal, live per-loan outstanding/pending/net balances and complete owner Livewire screens with regression test. Flags VENUE_INVENTORY_LOAN_RECOVERIES_ENABLED=false, VENUE_FINANCE_POSTING_ENABLED=false by default. Not a journaled accrual receivable, invoice, write-off, or final closure. Exact-SHA full six CI required. No production flags enabled.

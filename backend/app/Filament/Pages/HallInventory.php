@@ -327,6 +327,31 @@ final class HallInventory extends Page
     public ?string $lastFinancialObligationReference = null;
 
     #[Locked]
+    public array $financialRecoveryHistory = [];
+    #[Locked]
+    public array $financialRecoveryBalances = [];
+    #[Locked]
+    public string $financialRecoveryRequestId = '';
+    public string $financialRecoveryObligationId = '';
+    public string $financialRecoveryAmountMinor = '';
+    public string $financialRecoveryMethod = 'bank';
+    public string $financialRecoveryBankReference = '';
+    public $financialRecoveryFile = null;
+    #[Locked]
+    public string $financialRecoveryReviewId = '';
+    public string $financialRecoveryReceiptId = '';
+    public string $financialRecoveryDecision = 'rejected';
+    public string $financialRecoveryVerificationMethod = 'verified_bank_statement';
+    public string $financialRecoveryVerificationReference = '';
+    public string $financialRecoveryReviewReason = '';
+    #[Locked]
+    public string $financialRecoveryReversalId = '';
+    public string $financialRecoveryReversalReceiptId = '';
+    public string $financialRecoveryReversalReason = '';
+    #[Locked]
+    public ?string $lastFinancialRecoveryReference = null;
+
+    #[Locked]
     public array $cleanLoanReceipts = [];
     #[Locked]
     public ?string $lastCleanLoanReceipt = null;
@@ -505,6 +530,24 @@ final class HallInventory extends Page
         $this->incidentReviews = [];
         $this->lastIncidentDecisionId = null;
         $this->financialClaimLoanId = '';
+        $this->financialRecoveryHistory = [];
+        $this->financialRecoveryBalances = [];
+        $this->financialRecoveryRequestId = (string)Str::uuid();
+        $this->financialRecoveryObligationId = '';
+        $this->financialRecoveryAmountMinor = '';
+        $this->financialRecoveryMethod = 'bank';
+        $this->financialRecoveryBankReference = '';
+        $this->financialRecoveryFile = null;
+        $this->financialRecoveryReviewId = (string)Str::uuid();
+        $this->financialRecoveryReceiptId = '';
+        $this->financialRecoveryDecision = 'rejected';
+        $this->financialRecoveryVerificationMethod = 'verified_bank_statement';
+        $this->financialRecoveryVerificationReference = '';
+        $this->financialRecoveryReviewReason = '';
+        $this->financialRecoveryReversalId = (string)Str::uuid();
+        $this->financialRecoveryReversalReceiptId = '';
+        $this->financialRecoveryReversalReason = '';
+        $this->lastFinancialRecoveryReference = null;
         $this->financialObligationHistory = [];
         $this->financialObligationRequestId = (string)Str::uuid();
         $this->financialObligationEvidenceId = '';
@@ -2173,6 +2216,18 @@ final class HallInventory extends Page
                 $row['externalOutApproved']);
         abort_unless($loan!==null,403);
         $this->financialClaimLoanId=$loanId;
+        $this->financialRecoveryRequestId=(string)Str::uuid();
+        $this->financialRecoveryReviewId=(string)Str::uuid();
+        $this->financialRecoveryReversalId=(string)Str::uuid();
+        $this->financialRecoveryObligationId='';
+        $this->financialRecoveryAmountMinor='';
+        $this->financialRecoveryBankReference='';
+        $this->financialRecoveryReceiptId='';
+        $this->financialRecoveryFile=null;
+        $this->financialRecoveryVerificationReference='';
+        $this->financialRecoveryReviewReason='';
+        $this->financialRecoveryReversalReceiptId='';
+        $this->financialRecoveryReversalReason='';
         $this->financialObligationRequestId=(string)Str::uuid();
         $this->financialObligationDecisionId=(string)Str::uuid();
         $this->financialObligationEvidenceId='';
@@ -2204,6 +2259,17 @@ final class HallInventory extends Page
             $this->financialClaimLoanId!=='',403);
         $this->financialClaimHistory=app(\App\Services\HallInventoryFinancialClaimService::class)
             ->history($actor,$this->companyId,$this->hallId,$this->financialClaimLoanId);
+        $this->financialRecoveryHistory=[];
+        $this->financialRecoveryBalances=[];
+        if(config('inventory_controls.loan_recoveries_enabled') &&
+            config('inventory_controls.loan_authorized_obligations_enabled') &&
+            config('inventory_controls.loan_partner_responses_enabled')) {
+            $recoveries=app(\App\Services\HallInventoryFinancialRecoveryService::class);
+            $this->financialRecoveryHistory=$recoveries->history(
+                $actor,$this->companyId,$this->hallId,$this->financialClaimLoanId);
+            $this->financialRecoveryBalances=$recoveries->outstanding(
+                $actor,$this->companyId,$this->hallId,$this->financialClaimLoanId);
+        }
         $this->financialObligationHistory=[];
         if(config('inventory_controls.loan_authorized_obligations_enabled') &&
             config('inventory_controls.loan_partner_responses_enabled')) {
@@ -2456,6 +2522,107 @@ final class HallInventory extends Page
         $this->financialObligationDecisionId=(string)Str::uuid();
         $this->financialObligationDecisionProposalId='';
         $this->financialObligationDecisionReason='';
+        $this->reloadFinancialClaims($actor);
+    }
+
+
+    public function submitFinancialRecovery():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canManageFinancialClaims() &&
+            config('inventory_controls.loan_recoveries_enabled') &&
+            $this->financialClaimLoanId!=='',403);
+        $this->validate([
+            'financialRecoveryObligationId'=>'required|uuid',
+            'financialRecoveryAmountMinor'=>['required','regex:/\A[1-9][0-9]{0,11}\z/D'],
+            'financialRecoveryMethod'=>'required|in:cash,bank',
+            'financialRecoveryFile'=>'required|file|max:5120|mimes:jpg,jpeg,png,pdf',
+        ]);
+        $this->reloadFinancialClaims($actor);
+        abort_unless(collect($this->financialObligationHistory)->contains(
+            fn($o):bool=>$o['id']===$this->financialRecoveryObligationId &&
+                $o['decision']==='authorized'),403);
+        $ref=$this->financialRecoveryMethod==='bank'?trim($this->financialRecoveryBankReference):null;
+        if($this->financialRecoveryMethod==='cash'&&$this->financialRecoveryBankReference!=='')
+            throw ValidationException::withMessages([
+                'financialRecoveryBankReference'=>'Cash evidence cannot be assigned a bank reference.'
+            ]);
+        try {
+            $this->lastFinancialRecoveryReference=app(\App\Services\HallInventoryFinancialRecoveryService::class)
+                ->record($actor,$this->companyId,$this->financialRecoveryObligationId,
+                    $this->financialRecoveryRequestId,$this->financialRecoveryMethod,
+                    (int)$this->financialRecoveryAmountMinor,$ref,$this->financialRecoveryFile);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['financialRecoveryFile'=>$e->getMessage()]);
+        }
+        $this->financialRecoveryRequestId=(string)Str::uuid();
+        $this->financialRecoveryObligationId='';
+        $this->financialRecoveryAmountMinor='';
+        $this->financialRecoveryBankReference='';
+        $this->financialRecoveryFile=null;
+        $this->reloadFinancialClaims($actor);
+    }
+
+    public function submitFinancialRecoveryReview():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canManageFinancialClaims() &&
+            config('inventory_controls.loan_recoveries_enabled') &&
+            $this->financialClaimLoanId!=='',403);
+        $this->validate([
+            'financialRecoveryReceiptId'=>'required|uuid',
+            'financialRecoveryDecision'=>'required|in:confirmed,rejected',
+            'financialRecoveryVerificationMethod'=>'required|in:verified_bank_statement,witnessed_cash_count',
+            'financialRecoveryVerificationReference'=>'required|string|min:12|max:160',
+            'financialRecoveryReviewReason'=>'required|string|min:10|max:500',
+        ]);
+        $this->reloadFinancialClaims($actor);
+        abort_unless(collect($this->financialRecoveryHistory)->contains(
+            fn($row):bool=>$row['id']===$this->financialRecoveryReceiptId &&
+                $row['decision']===null &&
+                $row['recordedBy']!==(int)$actor->getKey()),403);
+        try {
+            $this->lastFinancialRecoveryReference=app(\App\Services\HallInventoryFinancialRecoveryService::class)
+                ->verify($actor,$this->companyId,$this->financialRecoveryReceiptId,
+                    $this->financialRecoveryReviewId,$this->financialRecoveryDecision,
+                    $this->financialRecoveryVerificationMethod,
+                    $this->financialRecoveryVerificationReference,
+                    $this->financialRecoveryReviewReason);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['financialRecoveryReviewReason'=>$e->getMessage()]);
+        }
+        $this->financialRecoveryReviewId=(string)Str::uuid();
+        $this->financialRecoveryReceiptId='';
+        $this->financialRecoveryVerificationReference='';
+        $this->financialRecoveryReviewReason='';
+        $this->reloadFinancialClaims($actor);
+    }
+
+    public function reverseFinancialRecovery():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canManageFinancialClaims() &&
+            config('inventory_controls.loan_recoveries_enabled') &&
+            $this->financialClaimLoanId!=='',403);
+        $this->validate([
+            'financialRecoveryReversalReceiptId'=>'required|uuid',
+            'financialRecoveryReversalReason'=>'required|string|min:15|max:500',
+        ]);
+        $this->reloadFinancialClaims($actor);
+        abort_unless(collect($this->financialRecoveryHistory)->contains(
+            fn($row):bool=>$row['id']===$this->financialRecoveryReversalReceiptId &&
+                $row['decision']==='confirmed' && $row['reversalId']===null &&
+                $row['reviewedBy']!==(int)$actor->getKey()),403);
+        try {
+            $this->lastFinancialRecoveryReference=app(\App\Services\HallInventoryFinancialRecoveryService::class)
+                ->reverse($actor,$this->companyId,$this->financialRecoveryReversalReceiptId,
+                    $this->financialRecoveryReversalId,$this->financialRecoveryReversalReason);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['financialRecoveryReversalReason'=>$e->getMessage()]);
+        }
+        $this->financialRecoveryReversalId=(string)Str::uuid();
+        $this->financialRecoveryReversalReceiptId='';
+        $this->financialRecoveryReversalReason='';
         $this->reloadFinancialClaims($actor);
     }
 
