@@ -13,6 +13,7 @@ use App\Services\HallInventoryExternalOutDispatchService;
 use App\Services\HallInventoryExternalOutReturnService;
 use App\Services\HallInventoryLoanIncidentService;
 use App\Services\HallInventoryLoanIncidentDecisionService;
+use App\Services\HallInventoryFinancialClaimService;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -143,6 +144,65 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
                 'unsubstantiated','Different conflicting unsubstantiated conclusion');
             $this->fail('Second conflicting independent review accepted.');
         }catch(ConflictHttpException){}
+        // Proposed loss amounts require independently substantiated physical evidence.
+        $claims=app(\App\Services\HallInventoryFinancialClaimService::class);
+        try{
+            $claims->propose($reviewer,$company->id,$report,(string)Str::uuid(),
+                'USD',25000,'Collection request without feature release permission');
+            $this->fail('Default-disabled monetary claim was accepted.');
+        }catch(ConflictHttpException){}
+        config()->set('inventory_controls.loan_financial_claims_enabled',true);
+        $this->be($owner);
+        try{
+            $claims->propose($owner,$company->id,$missing,(string)Str::uuid(),
+                'USD',15000,'Unsubstantiated missing item must not be chargeable');
+            $this->fail('Unreviewed incident created a monetary claim.');
+        }catch(ConflictHttpException){}
+        $claim=(string)Str::uuid();
+        $this->assertSame($claim,$claims->propose($owner,$company->id,$report,$claim,
+            'USD',25000,'Physical damaged table independently substantiated and quoted'));
+        $this->assertSame($claim,$claims->propose($owner,$company->id,$report,$claim,
+            'USD',25000,'Physical damaged table independently substantiated and quoted'));
+        try{
+            $claims->propose($owner,$company->id,$report,(string)Str::uuid(),
+                'USD',75000,'Duplicate financial assessment must not double charge');
+            $this->fail('Conflicting financial proposal accepted.');
+        }catch(ConflictHttpException){}
+        try{
+            $claims->decide($owner,$company->id,$claim,(string)Str::uuid(),
+                'approved_for_collection','Self-approval must never be allowed');
+            $this->fail('Incident reporter approved their own monetary claim.');
+        }catch(AuthorizationException){}
+        $this->be($reviewer);
+        $decisionId=(string)Str::uuid();
+        $reason='Independent price basis review approved for COLLECTION ONLY';
+        $this->assertSame($decisionId,$claims->decide($reviewer,$company->id,
+            $claim,$decisionId,'approved_for_collection',$reason));
+        $this->assertSame($decisionId,$claims->decide($reviewer,$company->id,
+            $claim,$decisionId,'approved_for_collection',$reason));
+        try{
+            $claims->decide($reviewer,$company->id,$claim,(string)Str::uuid(),
+                'disputed','Second contradictory claim decision cannot override first');
+            $this->fail('Prior immutable financial decision was overwritten.');
+        }catch(ConflictHttpException){}
+        $history=$claims->history($reviewer,$company->id,$hall->id,$loan);
+        $this->assertCount(1,$history);
+        $this->assertSame('approved_for_collection',$history[0]['decision']);
+        $this->assertSame(25000,$history[0]['amountMinor']);
+        $this->assertSame(0,$history[0]['paidMinor']);
+        $this->assertFalse($history[0]['journalPosted']);
+        try{
+            $claims->history($reviewer,$company->id,$wrong->id,$loan);
+            $this->fail('Cross-hall incident claim history was disclosed.');
+        }catch(AuthorizationException){}
+        try{
+            DB::transaction(fn()=>DB::table('hall_inventory_financial_claims')
+                ->where('id',$claim)->update(['amount_minor'=>1]));
+            $this->fail('Claim amount was silently edited.');
+        }catch(\Illuminate\Database\QueryException){}
+        $this->assertSame(25000,(int)DB::table('hall_inventory_financial_claims')
+            ->where('id',$claim)->value('amount_minor'));
+        $this->assertSame(1,DB::table('hall_inventory_financial_claim_decisions')->count());
         $this->assertSame(0,DB::table('finance_journals')->count());
         $this->assertSame(0,DB::table('hall_inventory_internal_loan_closures')->count());
         $p=DB::table('hall_inventory_positions')->where('company_id',$company->id)
