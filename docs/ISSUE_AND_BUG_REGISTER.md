@@ -275,3 +275,10 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Status: DETACHED candidate, not tested/verified on hosted CI. Production release OFF. New full six-job exact SHA CI required after predecessor success.
 
 - Exact CI closeout: `f07f144914f5ec00a5016d242655747264bad6da` / run 39490232685 SUCCESS all six jobs for independently authorized loss obligations. Payment recovery release still requires its own exact-SHA CI and all financial production switches remain OFF.
+
+
+## BUG-20261020-031 — Provisional claim Livewire regression assumed obsolete financial journal text
+- Exact failure: `4ad6ea837423ee09dcbec2368ec10dc9e85f1b94`, hosted CI `39491859440`: `laravel-postgres` FAILED in `HallInventoryExternalOutIncidentTest` at an obsolete `Financial journal posted: NO` UI assertion; the other five jobs passed. The physical incident, claim service and recovery page had not silently posted a journal by creating a claim.
+- Root cause: after the independent partial-recovery/journal interface was added, provisional claims were correctly described as a distinct nonposting stage with a separate later recovery ledger. The test still checked removed static wording, which would falsely imply the entire loan never had a verified recovery journal.
+- Repair: assert the exact truthful provisional claim sentence, `Provisional claim alone does not post money`, while retaining direct database `journalPosted === false` and `paidMinor === 0` tests for this uncollected claim, plus separate independently verified recovery/journal regressions. Never restore a loan-wide false negative. No finance or inventory release flags changed.
+- Status: REPAIR PUBLISHED, hosted six-job CI for new exact SHA PENDING. Do not mark VERIFIED until all six succeed.

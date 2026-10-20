@@ -550,3 +550,9 @@ Verify live branch/CI → reconcile current handoff + specific requirement/featu
 
 ## 2026-10-20 VERIFIED MANUAL DOCUMENTED OBLIGATION; RECOVERIES BATCH PUBLICATION
 - Manual outside loss obligation independent review checkpoint `f07f144914f5ec00a5016d242655747264bad6da`, GitHub Actions `39490232685` SUCCESS, exact six required jobs. Default-OFF collectible obligation service, SQL one-authorized-per-claim and owner UI are VERIFIED. The next independently verified partial cash/bank recovery, pending reservation caps, cross-ledger bank-reference guard, SHA256 document download, cash-basis balanced recovery/reversal finance ledger, and owner Livewire regressions are about to be PUBLISHED on a new exact CAS commit. Its six-job hosted CI remains PENDING, not verified. Do not imply accrued receivables, invoices, inventory writeoffs, non-clean final closure, or production activation.
+
+
+## 2026-10-20 PHASE 12 RECOVERY CI REPAIR
+- Verified live parent `4ad6ea837423ee09dcbec2368ec10dc9e85f1b94` failed GitHub Actions `39491859440` only in `laravel-postgres` with obsolete provisional claim UI assertion (634 passed, 1 failed, 3 risky); all five other jobs succeeded. Retain full tests.
+- Repaired `HallInventoryExternalOutIncidentTest.php` assertion to verify truthful claims-only nonposting UI without falsely indicating that independently verified later money recoveries cannot have a journal. Direct claim `journalPosted=false` and paid=0 database assertions remain. Production feature gates OFF. New hosted CI must pass at exact successor SHA before release or feature verification.
+- After six-job green, continue Phase 12 non-clean closure and write-off governance, preserving independent evidence/finance/physical approvals and immutable numbered final PDF; do not advance to Phase 13.

@@ -171,7 +171,7 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
             ->set('financialClaimReason','Physical damaged table independently substantiated and quoted')
             ->call('submitFinancialClaim')->assertHasNoErrors()
             ->assertSee('AWAITING INDEPENDENT REVIEW')
-            ->assertSee('Financial journal posted: NO');
+            ->assertSee('Provisional claim alone does not post money');
         $claim=(string)DB::table('hall_inventory_financial_claims')
             ->where('company_id',$company->id)->where('report_id',$report)->value('id');
         $this->assertTrue(Str::isUuid($claim));
