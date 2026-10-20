@@ -49,6 +49,10 @@ final class HallInventory extends Page
     public ?string $lastCountReference = null;
     #[Locked]
     public array $stocktakeHistory = [];
+    #[Locked]
+    public array $stocktakeVariance = [];
+    #[Locked]
+    public string $varianceStocktakeId = '';
 
     public string $itemName = '';
     public string $itemCategory = 'Crockery';
@@ -334,6 +338,8 @@ final class HallInventory extends Page
         $this->createReason = '';
         $this->auditReason = '';
         $this->countRows = [];
+        $this->stocktakeVariance = [];
+        $this->varianceStocktakeId = '';
         $this->lastCountReference = null;
         $this->loanRows = [];
         $this->loanDirection = 'internal';
@@ -684,8 +690,20 @@ final class HallInventory extends Page
         }
     }
 
+    public function viewStocktakeVariance(string $stocktakeId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.stocktake_variance_enabled') &&
+            config('inventory_controls.position_reports_enabled'),403);
+        $this->stocktakeVariance=app(\App\Services\HallInventoryStocktakeVariancePreview::class)
+            ->forStocktake($actor,$this->companyId,$this->hallId,$stocktakeId);
+        $this->varianceStocktakeId=$stocktakeId;
+    }
+
     public function reloadCatalog(): void
     {
+        $this->stocktakeVariance = [];
+        $this->varianceStocktakeId = '';
         $this->catalog = [];
         $this->authorizeSelection();
         $this->catalog = DB::table('hall_inventory_items')

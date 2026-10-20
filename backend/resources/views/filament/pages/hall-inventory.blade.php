@@ -442,11 +442,45 @@
                                     <li>{{ $line['name'] }} ({{ $line['ownership'] }}): {{ $line['usable'] }} usable, {{ $line['damaged'] }} damaged — {{ $line['unit'] }}</li>
                                 @endforeach
                             </ul>
+                            @if(config('inventory_controls.stocktake_variance_enabled') &&
+                                config('inventory_controls.position_reports_enabled'))
+                                <button type="button" wire:click="viewStocktakeVariance('{{ $record['id'] }}')"
+                                    class="rounded-lg border px-3 py-2 text-sm">Preview count-to-book variance</button>
+                            @endif
                         </article>
                     @empty
                         <p class="text-sm text-gray-600 dark:text-gray-300">No saved physical counts for this hall yet.</p>
                     @endforelse
                 </section>
+                @if(config('inventory_controls.stocktake_variance_enabled') && $varianceStocktakeId !== '')
+                    <section class="rounded-xl border p-4 space-y-2" aria-label="Immutable physical count variance preview">
+                        <h3 class="font-semibold">Physical versus recorded book snapshot</h3>
+                        <p class="text-xs">Count {{ $varianceStocktakeId }}. The book baseline was captured at count submission, not taken from today's balance.
+                            Missing or inconsistent historical baselines cannot produce a trusted variance. This preview neither posts stock nor settles money.</p>
+                        <div class="overflow-x-auto">
+                            <table class="w-full min-w-[760px] text-left text-sm">
+                                <thead><tr><th class="p-2">Item / ownership</th><th class="p-2">Counted usable</th>
+                                    <th class="p-2">Book usable at count</th><th class="p-2">Usable variance</th>
+                                    <th class="p-2">Counted damaged</th><th class="p-2">Book damaged</th>
+                                    <th class="p-2">Damaged variance</th><th class="p-2">Review state</th></tr></thead>
+                                <tbody>
+                                @foreach($stocktakeVariance as $line)
+                                    <tr class="border-t" wire:key="variance-preview-{{ $line['itemId'] }}-{{ $line['ownership'] }}">
+                                        <td class="p-2">{{ $line['name'] }} ({{ $line['ownership'] }}, {{ $line['unit'] }})</td>
+                                        <td class="p-2">{{ $line['countedUsable'] }}</td>
+                                        <td class="p-2">{{ $line['bookUsable'] ?? 'No valid baseline' }}</td>
+                                        <td class="p-2">{{ $line['usableVariance'] ?? 'Not available' }}</td>
+                                        <td class="p-2">{{ $line['countedDamaged'] }}</td>
+                                        <td class="p-2">{{ $line['bookDamaged'] ?? 'No valid baseline' }}</td>
+                                        <td class="p-2">{{ $line['damagedVariance'] ?? 'Not available' }}</td>
+                                        <td class="p-2">{{ $line['requiresReview'] ? 'REVIEW REQUIRED' : 'MATCHED BOOK SNAPSHOT' }}</td>
+                                    </tr>
+                                @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                @endif
             </section>
         @endif
 

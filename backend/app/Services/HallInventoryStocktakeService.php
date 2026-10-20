@@ -103,12 +103,41 @@ final class HallInventoryStocktakeService
                 'reason' => $reason, 'counted_by' => $actor->getKey(),
             ]);
             foreach ($rows as $line) {
+                $lineId=(string)Str::uuid();
                 DB::table('hall_inventory_stocktake_lines')->insert([
-                    'id' => (string) Str::uuid(), 'company_id' => $companyId,
+                    'id' => $lineId, 'company_id' => $companyId,
                     'hall_id' => $hallId, 'stocktake_id' => $requestId,
                     'item_id' => $line['itemId'], 'ownership' => $line['ownership'],
                     'usable_count' => $line['usableCount'],
                     'damaged_count' => $line['damagedCount'],
+                ]);
+                // Capture an immutable as-of-submission BOOK baseline while
+                // the hall/items are locked. A later stock movement must
+                // never silently change the variance of this old count.
+                $position=DB::table('hall_inventory_positions')
+                    ->where('company_id',$companyId)->where('hall_id',$hallId)
+                    ->where('item_id',$line['itemId'])->lockForUpdate()->first();
+                $ledger=DB::table('hall_inventory_movement_events')
+                    ->where('company_id',$companyId)->where('hall_id',$hallId)
+                    ->where('item_id',$line['itemId'])
+                    ->selectRaw('COUNT(*) AS total, MAX(revision_after) AS last_rev,
+                        MIN(revision_before) AS first_rev')->first();
+                $posted=$position!==null&&(int)$position->revision>0&&
+                    (int)($ledger->total??0)===(int)$position->revision&&
+                    (int)($ledger->first_rev??-1)===0&&
+                    (int)($ledger->last_rev??-1)===(int)$position->revision;
+                $neverPosted=$position===null ||
+                    ((int)$position->revision===0&&(int)($ledger->total??0)===0);
+                $state=$posted?'POSTED_BOOK_SNAPSHOT':
+                    ($neverPosted?'NO_POSTED_BOOK':'INTEGRITY_REVIEW_REQUIRED');
+                $owned=$line['ownership']==='owned';
+                DB::table('hall_inventory_stocktake_book_snapshots')->insert([
+                    'id'=>(string)Str::uuid(),'stocktake_line_id'=>$lineId,
+                    'book_revision'=>$posted?(int)$position->revision:null,
+                    'book_usable'=>$posted?(int)($owned?$position->owned_usable:$position->borrowed_usable):null,
+                    'book_damaged'=>$posted?(int)($owned?$position->owned_damaged:$position->borrowed_damaged):null,
+                    'away_count'=>$posted?(int)($owned?$position->owned_on_loan:$position->borrowed_transit):null,
+                    'book_state'=>$state
                 ]);
             }
             DB::table('audit_events')->insert([
