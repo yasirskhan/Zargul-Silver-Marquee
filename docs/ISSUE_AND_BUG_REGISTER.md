@@ -206,3 +206,7 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 
 ## VERIFIED closeout — Phase 12 CI migration replay and negative assertions
 - BUG-20261020-016 and BUG-20261020-017 verified resolved at exact `80102c503cc92fba618a08d12370bc151d0398cf`, CI 39427134021 all six jobs SUCCESS. CREATE OR REPLACE keeps provenance function strict and migration replayable. Negative tests preserve route-level revoked staff denial and SQL cross-count provenance rejection. Owner source-dispatch and clean PDF UI verified; external borrowed intake still CI pending.
+
+
+## BUG-20261020-018 — External receipt SQL trigger delimiter malformed
+- CI 39428306646 @ b38cc3e8 blocked migration in laravel-postgres and authenticated-panel-e2e (SQLSTATE 42601). Cause: function body delimiter singular `$` instead of `$$`. Repair both delimiter sites without dropping or weakening guard. All six jobs must pass on new exact SHA. Production release OFF.
