@@ -118,6 +118,24 @@ final class HallInventoryNoncleanReconciliationService
                     ($good>0&&!$a->good_movement_id)||
                     ($damaged>0&&!$a->damaged_movement_id))
                     throw new ConflictHttpException('Independently reviewed physical quantities or movements invalid.');
+                // A condition label alone cannot certify a posted book movement.
+                // Verify the exact original batch, actor, unit count and kind.
+                foreach([[$good,$a->good_movement_id,'return_owned_good'],
+                         [$damaged,$a->damaged_movement_id,'return_owned_damaged']]
+                         as [$number,$movementId,$kind]){
+                    if($number===0){
+                        if($movementId!==null)
+                            throw new ConflictHttpException('Zero accepted units carried a posted movement.');
+                        continue;
+                    }
+                    $movement=DB::table('hall_inventory_movement_events')
+                        ->where('company_id',$companyId)->where('hall_id',$hallId)
+                        ->where('item_id',$id)->where('id',$movementId)
+                        ->where('event_kind',$kind)->where('quantity',$number)
+                        ->where('actor_id',$review->reviewed_by)->first();
+                    if(!$movement||$movement->reason!=='Independently assessed outside owned return '.$receipt->id)
+                        throw new ConflictHttpException('Physical condition approval lacks exact immutable inventory movement.');
+                }
                 $items[$id]['good']+=$good;
                 $items[$id]['damaged']+=$damaged;
                 $items[$id]['unresolved']+=$unresolved;
@@ -147,6 +165,7 @@ final class HallInventoryNoncleanReconciliationService
                 ->outstanding($actor,$companyId,$hallId,$loanId);
         return ['items'=>array_values($items),'incidentReports'=>(int)$incidentReports,
             'unreviewedIncidents'=>(int)$unreviewed,'obligations'=>$balances,
+            'expectedReturnDate'=>(string)$loan->expected_return_date,
             'finalClosureAuthorized'=>false];
     }
 }

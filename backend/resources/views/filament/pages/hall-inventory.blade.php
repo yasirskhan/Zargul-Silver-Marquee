@@ -1011,6 +1011,7 @@
                         @if(config('inventory_controls.loan_nonclean_reconciliation_enabled') && count($noncleanReconciliation)>0)
                             <section aria-label="Read-only non-clean loan reconciliation" class="rounded-lg border p-3 space-y-2">
                                 <h4 class="font-semibold">Non-clean loan reconciliation (read-only)</h4>
+                                <p>Original expected partner return date: {{ $noncleanReconciliation['expectedReturnDate'] }}. Due-date disputes need separate hall-local assessment.</p>
                                 <p role="status">Final non-clean closure: BLOCKED. No write-off, custody disposal, financial waiver or numbered final certificate has been authorized by this view.</p>
                                 @foreach($noncleanReconciliation['items'] as $physical)
                                     <p wire:key="nonclean-{{ $physical['itemId'] }}">Item {{ $physical['itemId'] }}: dispatched {{ $physical['dispatched'] }}, good {{ $physical['good'] }}, damaged {{ $physical['damaged'] }}, unresolved {{ $physical['unresolved'] }}, pending independent review {{ $physical['pendingReview'] }}. Physically unreturned: {{ $physical['unreturned'] }}. On-loan custody outstanding: {{ $physical['onLoan'] }}.</p>
