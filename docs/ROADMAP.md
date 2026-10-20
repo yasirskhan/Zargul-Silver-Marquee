@@ -117,3 +117,6 @@ production toggles merely because development CI passes.
 ## Phase 12 external partner-return candidate (2026-10-20; CI PENDING)
 - Parent ab146a61bdfdea23bc963895de75798a6592af22 is VERIFIED (GitHub Actions 39433026329: six successes). Next independent vertical includes default-disabled witnessed multi-item partial return batches for accepted outside borrowed stock, per-loan original-quantity ceilings, individually hashed signed handovers, immutable stock movement into borrowed transit, and separate owner/admin-attested partner receipt evidence/counts before transit is reduced. Repeat batches idempotent. Cross-hall and same-actor authorization fail closed.
 - Not a return closure or payment: damaged/missing/disputed stock, partner-transit shortfalls, outside-lending outbound flows, financial obligations/recovery and final numbered non-clean closeout still need implementation, full tests and operator acceptance. Production gates remain OFF.
+
+
+- Phase 12 partner return reconciliation follow-on candidate: clear per-loan/per-item accepted, returned-to-partner, partner-confirmed, still-in-hall and pending-in-transit aggregates; full physical return has a distinct NOT FINANCIALLY SETTLED status and no false overdue flag. No financial or closing authority. Retain all inventory release gates OFF; separate exact SHA CI required.

@@ -163,7 +163,34 @@ final class HallInventoryLoanDraftReview
             ->selectRaw('SUM(CASE WHEN a.id IS NOT NULL AND al.id IS NULL THEN l.quantity ELSE 0 END) AS missing_review_lines')
             ->groupBy('b.loan_id')->get()->keyBy('loan_id');
 
-        return $drafts->map(static function ($draft) use ($lines,$hallId,$received,$returns,$physicalCounts):array {
+        // Per-loan, per-item conservation is based on immutable actual accepted
+        // external custody and exact witnessed batches, not shared hall totals.
+        $externalAccepted=DB::table('hall_inventory_external_in_acceptances as a')
+            ->join('hall_inventory_external_in_acceptance_lines as l',function($j):void {
+                $j->on('l.company_id','=','a.company_id')->on('l.acceptance_id','=','a.id');
+            })
+            ->where('a.company_id',$companyId)->whereIn('a.loan_id',$loanIds)
+            ->get(['a.loan_id','l.item_id','l.quantity'])->groupBy('loan_id');
+        $externalSent=DB::table('hall_inventory_external_in_return_batches as b')
+            ->join('hall_inventory_external_in_return_lines as l',function($j):void {
+                $j->on('l.company_id','=','b.company_id')->on('l.batch_id','=','b.id');
+            })
+            ->where('b.company_id',$companyId)->whereIn('b.loan_id',$loanIds)
+            ->select(['b.loan_id','l.item_id'])->selectRaw('SUM(l.quantity) AS quantity')
+            ->groupBy('b.loan_id','l.item_id')->get()->groupBy('loan_id');
+        $externalConfirmed=DB::table('hall_inventory_external_in_return_batches as b')
+            ->join('hall_inventory_external_in_return_confirmations as c',function($j):void {
+                $j->on('c.company_id','=','b.company_id')->on('c.batch_id','=','b.id');
+            })
+            ->join('hall_inventory_external_in_return_confirmation_lines as l',function($j):void {
+                $j->on('l.company_id','=','c.company_id')->on('l.confirmation_id','=','c.id');
+            })
+            ->where('b.company_id',$companyId)->whereIn('b.loan_id',$loanIds)
+            ->select(['b.loan_id','l.item_id'])->selectRaw('SUM(l.quantity) AS quantity')
+            ->groupBy('b.loan_id','l.item_id')->get()->groupBy('loan_id');
+
+        return $drafts->map(static function ($draft) use ($lines,$hallId,$received,$returns,
+            $physicalCounts,$externalAccepted,$externalSent,$externalConfirmed):array {
             $receiptCount=(int)($received->get($draft->id)??0);
             $draftLines=$lines->get($draft->id)??collect();
             $actualCounts=($physicalCounts->get($draft->id)??collect())
@@ -176,6 +203,38 @@ final class HallInventoryLoanDraftReview
                 if(!array_key_exists((string)$requested->item_id,$actualCounts) ||
                     $actualCounts[(string)$requested->item_id]!== (int)$requested->requested_quantity)
                     $matches=false;
+            }
+            $externalReconciliation=null;
+            if($draft->direction==='external_in' && $draft->external_acceptance_id!==null) {
+                $a=($externalAccepted->get($draft->id)??collect())->keyBy('item_id');
+                $sent=($externalSent->get($draft->id)??collect())->keyBy('item_id');
+                $ack=($externalConfirmed->get($draft->id)??collect())->keyBy('item_id');
+                $acceptedCount=0;$sentCount=0;$confirmedCount=0;
+                $integrity=$a->count()!==$draftLines->count()||
+                    $sent->count()>$a->count()||$ack->count()>$a->count();
+                foreach($draftLines as $original) {
+                    $id=(string)$original->item_id;
+                    $accepted=$a->get($id)?(int)$a[$id]->quantity:0;
+                    $shipped=$sent->get($id)?(int)$sent[$id]->quantity:0;
+                    $verified=$ack->get($id)?(int)$ack[$id]->quantity:0;
+                    if($accepted!==(int)$original->requested_quantity ||
+                        $verified>$shipped || $shipped>$accepted)
+                        $integrity=true;
+                    $acceptedCount+=$accepted;$sentCount+=$shipped;$confirmedCount+=$verified;
+                }
+                $externalReconciliation=[
+                    'acceptedQuantity'=>$acceptedCount,
+                    'shippedQuantity'=>$sentCount,
+                    'partnerConfirmedQuantity'=>$confirmedCount,
+                    'stillAtHall'=>max(0,$acceptedCount-$sentCount),
+                    'awaitingPartnerConfirmation'=>max(0,$sentCount-$confirmedCount),
+                    'stillOutstanding'=>max(0,$acceptedCount-$confirmedCount),
+                    'integrityWarning'=>$integrity,
+                    'allPhysicalReturnsConfirmed'=>!$integrity && $acceptedCount>0 &&
+                        $acceptedCount===$confirmedCount,
+                    'financiallySettled'=>false,
+                    'loanClosed'=>false,
+                ];
             }
             $stats=$returns->get($draft->id);
             $shipped=$stats?(int)$stats->shipped_quantity:0;
@@ -209,6 +268,7 @@ final class HallInventoryLoanDraftReview
                 'externalReceiptAccepted'=>$draft->external_acceptance_id!==null,
                 'externalCountByItem'=>$draft->direction==='external_in' ? $actualCounts : [],
                 'externalCountMatchesDraft'=>$matches,
+                'externalReturnReconciliation'=>$externalReconciliation,
                 'lendingHallId'=>$draft->lending_hall_id,
                 'borrowingHallId'=>$draft->borrowing_hall_id,
                 'externalPartnerName'=>$draft->external_partner_name,
@@ -220,14 +280,22 @@ final class HallInventoryLoanDraftReview
                 'overdueWithOutstandingCustody'=>($draft->dispatch_id !== null ||
                     $draft->external_acceptance_id!==null)
                     && (string)$draft->expected_return_date < now()->toDateString()
-                    && ($draft->direction==='external_in' || $draft->receipt_id === null ||
-                        $reconciliation === null || $reconciliation['stillUnsettled'] > 0 ||
-                        $reconciliation['integrityWarning']),
+                    && ($draft->direction==='external_in'
+                        ? ($externalReconciliation===null ||
+                            $externalReconciliation['stillOutstanding']>0 ||
+                            $externalReconciliation['integrityWarning'])
+                        : ($draft->receipt_id === null || $reconciliation === null ||
+                            $reconciliation['stillUnsettled']>0 || $reconciliation['integrityWarning'])),
                 'purpose'=>(string)$draft->purpose,
                 'createdAt'=>(string)$draft->created_at,
                 'status'=>$draft->direction==='external_in' ?
-                    ($draft->external_acceptance_id!==null ? 'external_borrowed_received_return_pending' :
-                        ($draft->external_receipt_id!==null ? 'external_physical_receipt_pending_review' : 'draft_only')) :
+                    ($draft->external_acceptance_id!==null
+                        ? (($externalReconciliation['allPhysicalReturnsConfirmed']??false)
+                            ? 'external_all_returns_physically_confirmed_finance_unsettled'
+                            : (($externalReconciliation['shippedQuantity']??0)>0
+                                ? 'external_partial_return_or_partner_ack_pending'
+                                : 'external_borrowed_received_return_pending'))
+                        : ($draft->external_receipt_id!==null ? 'external_physical_receipt_pending_review' : 'draft_only')) :
                     ($draft->closure_id !== null ? 'clean_loan_closed' : ($draft->receipt_id !== null
                     ? ((int)($draft->return_batch_count??0)>0
                         ? ((int)($draft->acknowledged_batch_count??0) < (int)$draft->return_batch_count

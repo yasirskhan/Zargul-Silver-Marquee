@@ -217,3 +217,7 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 ## BUG-20261020-019 — External borrowed returns were unavailable after independently accepted intake
 - Confirmed missing Phase 12 functional vertical: outside-sourced borrowed inventory could enter physical custody but never leave by auditable partial shipment/independent partner acknowledgement; outstanding assets stayed as perpetual borrowed_usable.
 - Candidate: feature-gated witnessed, immutable per-loan partial dispatch, linked send_borrowed_back movements, physical signed partner receipt with independent approval and exact counts, confirm_borrowed_return, cross-hall and same-actor negative tests, per-batch audit and no finance/owned posting. Any shortage remains transit and requires separate resolution. Requires new exact six-job CI SUCCESS; production return gate remains OFF.
+
+
+## BUG-20261020-020 — Externally borrowed items falsely remain labeled pending after full physical return
+- Existing immutable intake review showed the same return-pending status forever, even after physically witnessed and independently confirmed partial partner batches; overdue warning also stayed on full physical reconciliation. Prepared follow-on per-item aggregate plus clear not-closed state and Livewire tests. Gate remains OFF; requires exact hosted CI.

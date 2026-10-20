@@ -686,6 +686,8 @@
                                         'source_dispatched_receipt_pending' => 'SOURCE DISPATCHED / DESTINATION RECEIPT PENDING',
                                         'external_physical_receipt_pending_review' => 'EXTERNAL PHYSICAL RECEIPT / INDEPENDENT REVIEW PENDING',
                                         'external_borrowed_received_return_pending' => 'EXTERNAL BORROWED STOCK RECEIVED / RETURN PENDING',
+                                        'external_partial_return_or_partner_ack_pending' => 'EXTERNAL PARTIAL RETURN / PARTNER RECEIPT PENDING',
+                                        'external_all_returns_physically_confirmed_finance_unsettled' => 'EXTERNAL RETURN PHYSICALLY VERIFIED / FINANCE UNSETTLED',
                                         default => 'DRAFT / NOT DISPATCHED'
                                     };
                                 @endphp
@@ -713,6 +715,19 @@
                                         @endif</p>
                                     @if($loan['returnReconciliation']['integrityWarning'])
                                         <p role="alert">Inventory return evidence mismatch; reconciliation is blocked.</p>
+                                    @endif
+                                @endif
+                                @if(($loan['externalReturnReconciliation'] ?? null) !== null)
+                                    <p>External borrowed custody: accepted {{ $loan['externalReturnReconciliation']['acceptedQuantity'] }},
+                                        shipped to partner {{ $loan['externalReturnReconciliation']['shippedQuantity'] }},
+                                        independently partner-confirmed {{ $loan['externalReturnReconciliation']['partnerConfirmedQuantity'] }}.
+                                        Still in hall {{ $loan['externalReturnReconciliation']['stillAtHall'] }},
+                                        awaiting partner receipt {{ $loan['externalReturnReconciliation']['awaitingPartnerConfirmation'] }},
+                                        total outstanding {{ $loan['externalReturnReconciliation']['stillOutstanding'] }}.</p>
+                                    @if($loan['externalReturnReconciliation']['integrityWarning'])
+                                        <p role="alert">External return custody evidence mismatch. Do not close or settle this loan.</p>
+                                    @elseif($loan['externalReturnReconciliation']['allPhysicalReturnsConfirmed'])
+                                        <p>All borrowed physical quantities independently returned and partner receipt-verified. Formal loan closure, claims and financial settlement remain separate and unrecorded.</p>
                                     @endif
                                 @endif
                                 <p>Source: {{ $loan['lendingHallName'] ?? $loan['externalPartnerName'] ?? 'Not assigned' }}.
@@ -747,7 +762,8 @@
                                         <button type="button" wire:click="approveExternalBorrowedReceipt('{{ $loan['id'] }}')"
                                             class="rounded-lg border px-3 py-2 text-sm">Independently accept externally borrowed stock</button>
                                     @elseif($loan['externalReceiptAccepted'])
-                                        <p class="text-sm">External inventory accepted as BORROWED, not owned. No money posted or loan completed. Physical return is still due.</p>
+                                        <p class="text-sm">External inventory accepted as BORROWED, not owned. No money posted or loan completed.
+                                            {{ ($loan['externalReturnReconciliation']['allPhysicalReturnsConfirmed'] ?? false) ? 'Physical return verified; formal closure pending.' : 'Physical return is still due.' }}</p>
                                         @if(config('inventory_controls.external_borrowed_return_enabled') &&
                                             $loan['createdBy']!==(int)auth()->id())
                                             <button type="button" wire:click="startExternalBorrowedReturn('{{ $loan['id'] }}')"

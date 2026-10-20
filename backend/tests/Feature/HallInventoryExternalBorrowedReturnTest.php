@@ -167,6 +167,10 @@ final class HallInventoryExternalBorrowedReturnTest extends TestCase
             $this->fail('Duplicate partner acknowledgement was created.');
         }catch(ConflictHttpException){}
         $this->assertSame(0,(int)DB::table('hall_inventory_positions')->sum('borrowed_transit'));
+        Livewire::test(HallInventory::class)
+            ->set('hallId',$hall->id)
+            ->assertSee('EXTERNAL PARTIAL RETURN / PARTNER RECEIPT PENDING')
+            ->assertSee('total outstanding 7');
         $this->assertSame(2,DB::table('hall_inventory_external_in_return_confirmation_lines')->count());
         $this->assertSame(2,DB::table('hall_inventory_movement_events')
             ->where('event_kind','confirm_borrowed_return')->count());
@@ -212,5 +216,10 @@ final class HallInventoryExternalBorrowedReturnTest extends TestCase
         $this->assertSame(0,(int)DB::table('hall_inventory_positions')->sum('borrowed_transit'));
         $this->assertSame(0,(int)DB::table('hall_inventory_positions')->sum('owned_usable'));
         $this->assertSame(0,DB::table('finance_journals')->count());
+        Livewire::test(HallInventory::class)
+            ->set('hallId',$hall->id)
+            ->assertSee('EXTERNAL RETURN PHYSICALLY VERIFIED / FINANCE UNSETTLED')
+            ->assertSee('total outstanding 0')
+            ->assertSee('Formal loan closure, claims and financial settlement remain separate');
     }
 }
