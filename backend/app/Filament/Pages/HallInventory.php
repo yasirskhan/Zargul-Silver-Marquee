@@ -185,6 +185,11 @@ final class HallInventory extends Page
     public ?string $lastIncidentDecisionId = null;
 
     #[Locked]
+    public array $cleanLoanReceipts = [];
+    #[Locked]
+    public ?string $lastCleanLoanReceipt = null;
+
+    #[Locked]
     public string $loanInlineRequestId = '';
     public ?string $loanInlineRowKey = null;
     public string $loanInlineName = '';
@@ -353,6 +358,8 @@ final class HallInventory extends Page
         $this->incidentDecisionReason = '';
         $this->incidentReviews = [];
         $this->lastIncidentDecisionId = null;
+        $this->cleanLoanReceipts = [];
+        $this->lastCleanLoanReceipt = null;
         $this->returnLoanId = '';
         $this->returnBatchId = (string) Str::uuid();
         $this->returnEligibleLines = [];
@@ -651,6 +658,19 @@ final class HallInventory extends Page
         }
         $this->loanHistory = app(\App\Services\HallInventoryLoanDraftReview::class)
             ->recent($actor, $this->companyId, $this->hallId);
+        $this->cleanLoanReceipts=[];
+        if(config('inventory_controls.loan_clean_closure_enabled')) {
+            $hall=Hall::query()->where('company_id',$this->companyId)->where('id',$this->hallId)->first();
+            if($hall && app(TenantAccess::class)->canConfigureHall($actor,$hall)) {
+                $closure=app(\App\Services\HallInventoryCleanLoanClosureService::class);
+                foreach($this->loanHistory as $loan) {
+                    if($loan['direction']==='internal' && $loan['lendingHallId']===$this->hallId) {
+                        $entry=$closure->summaryForLoan($actor,$this->companyId,$loan['id']);
+                        if($entry!==null)$this->cleanLoanReceipts[$loan['id']]=$entry;
+                    }
+                }
+            }
+        }
         $this->returnSourceHistory=[];
         if(config('inventory_controls.loan_returns_enabled') &&
             config('inventory_controls.loan_return_acceptance_enabled')) {
@@ -1130,6 +1150,37 @@ final class HallInventory extends Page
         $this->incidentDecisionReason='';
         $this->incidentReviews=app(\App\Services\HallInventoryLoanIncidentDecisionService::class)
             ->reviews($actor,$this->companyId,$this->hallId,$this->incidentLoanId);
+    }
+
+    public function closeCleanInternalLoan(string $loanId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.loan_clean_closure_enabled'),403);
+        $loan=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($row):bool=>$row['id']===$loanId && $row['direction']==='internal'
+                && $row['lendingHallId']===$this->hallId && $row['destinationReceiptConfirmed']);
+        abort_unless($loan!==null,403);
+        try {
+            $summary=app(\App\Services\HallInventoryCleanLoanClosureService::class)
+                ->close($actor,$this->companyId,$loanId,(string)Str::uuid());
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['cleanLoanClosure'=>$e->getMessage()]);
+        }
+        $this->lastCleanLoanReceipt=(string)$summary['receiptNumber'];
+        $this->reloadLoanHistory();
+    }
+
+    public function downloadCleanLoanReceipt(string $loanId):\Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $actor=$this->authorizeSelection();
+        $bytes=app(\App\Services\HallInventoryCleanLoanClosureService::class)
+            ->receiptPdf($actor,$this->companyId,$loanId);
+        return response()->streamDownload(
+            static function()use($bytes):void {echo $bytes;},
+            'venue-inventory-clean-loan-'.substr($loanId,0,8).'.pdf',
+            ['Content-Type'=>'application/pdf','X-Content-Type-Options'=>'nosniff']
+        );
     }
 
     public function submitCount(): void

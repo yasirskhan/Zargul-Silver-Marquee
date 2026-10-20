@@ -61,6 +61,9 @@ final class HallInventoryLoanDraftReview
                     $join->on('rb.company_id','=','d.company_id')
                         ->on('rb.loan_id','=','d.id');
                 })
+            ->leftJoin('hall_inventory_internal_loan_closures as lc',function($join):void {
+                $join->on('lc.company_id','=','d.company_id')->on('lc.loan_id','=','d.id');
+            })
             ->leftJoin('hall_inventory_internal_loan_receipts as lr', function ($join):void {
                 $join->on('lr.company_id','=','d.company_id')
                     ->on('lr.loan_id','=','d.id');
@@ -95,6 +98,7 @@ final class HallInventoryLoanDraftReview
                 'd.id','d.direction','d.lending_hall_id','d.borrowing_hall_id',
                 'd.expected_return_date','d.purpose','d.created_at',
                 'ld.id as dispatch_id','ld.created_at as dispatched_at',
+                'lc.id as closure_id',
                 'lr.id as receipt_id','lr.created_at as received_at',
                 'rb.return_batch_count','rb.acknowledged_batch_count',
                 'p.name as external_partner_name',
@@ -169,7 +173,7 @@ final class HallInventoryLoanDraftReview
                     'integrityWarning'=>$shipped>$receiptCount ||
                         $good+$damaged+$unresolved+$pending+$missing!==$shipped ||
                         $missing>0,
-                    'loanCompleted'=>false,
+                    'loanCompleted'=>$draft->closure_id!==null,
                     'financiallySettled'=>false,
                 ] : null;
 
@@ -191,14 +195,14 @@ final class HallInventoryLoanDraftReview
                         || $reconciliation['integrityWarning']),
                 'purpose'=>(string)$draft->purpose,
                 'createdAt'=>(string)$draft->created_at,
-                'status'=>$draft->receipt_id !== null
+                'status'=>$draft->closure_id !== null ? 'clean_loan_closed' : ($draft->receipt_id !== null
                     ? ((int)($draft->return_batch_count??0)>0
                         ? ((int)($draft->acknowledged_batch_count??0) < (int)$draft->return_batch_count
                             ? 'partial_return_in_transit_source_ack_pending'
                             : 'return_acknowledged_outstanding_reconciliation_required')
                         : 'destination_received_return_pending')
                     : ($draft->dispatch_id !== null
-                        ? 'source_dispatched_receipt_pending' : 'draft_only'),
+                        ? 'source_dispatched_receipt_pending' : 'draft_only')),
                 'viewRole'=>($draft->direction==='internal' &&
                     $draft->borrowing_hall_id=== $hallId) ? 'receiving' : 'originating',
                 'stockMoved'=>$draft->dispatch_id !== null,

@@ -43,6 +43,9 @@ final class HallInventoryLoanIncidentService
                 ->lockForUpdate()->first();
             if(!$loan || $loan->direction!=='internal' || !$loan->lending_hall_id)
                 throw new ConflictHttpException('An internal originating loan is required.');
+            if(DB::table('hall_inventory_internal_loan_closures')
+                ->where('company_id',$companyId)->where('loan_id',$loanId)->exists())
+                throw new ConflictHttpException('Immutable clean loan closure prevents new incident reports.');
             $hall=Hall::query()->where('company_id',$companyId)
                 ->where('id',$loan->lending_hall_id)->where('is_active',true)->first();
             if(!$hall || !Auth::check() ||
