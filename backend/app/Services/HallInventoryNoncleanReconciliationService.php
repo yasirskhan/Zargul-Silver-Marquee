@@ -67,7 +67,8 @@ final class HallInventoryNoncleanReconciliationService
         $signed=DB::table('hall_inventory_external_out_handover_lines')
             ->where('company_id',$companyId)->where('hall_id',$hallId)
             ->where('handover_id',$handover->id)->get()->keyBy('item_id');
-        if($original->isEmpty()||$original->count()!==$signed->count())
+        if($original->isEmpty()||$original->count()!==$signed->count()||
+            $original->pluck('item_id')->unique()->count()!==$original->count())
             throw new ConflictHttpException('Original dispatch item provenance is incomplete.');
         $items=[];
         foreach($original as $line) {
@@ -82,6 +83,7 @@ final class HallInventoryNoncleanReconciliationService
         $receipts=DB::table('hall_inventory_external_out_return_receipts')
             ->where('company_id',$companyId)->where('loan_id',$loanId)
             ->where('hall_id',$hallId)->orderBy('id')->get();
+        $postedMovementIds=[];
         foreach($receipts as $receipt) {
             if($receipt->dispatch_id!==$dispatch->id)
                 throw new ConflictHttpException('Return receipt references another dispatch.');
@@ -98,7 +100,11 @@ final class HallInventoryNoncleanReconciliationService
                 ->where('company_id',$companyId)->where('review_id',$review->id)
                 ->where('receipt_id',$receipt->id)->where('hall_id',$hallId)
                 ->get()->keyBy('item_id'):collect();
-            if($received->isEmpty()||($review&&$received->count()!==$assessments->count()))
+            if($received->isEmpty()||
+                DB::table('hall_inventory_external_out_return_lines')->where('company_id',$companyId)
+                    ->where('receipt_id',$receipt->id)->where('hall_id',$hallId)
+                    ->where('loan_id',$loanId)->count()!==$received->count()||
+                ($review&&$received->count()!==$assessments->count()))
                 throw new ConflictHttpException('Outside return evidence and condition lines do not reconcile.');
             foreach($received as $itemId=>$line){
                 $id=(string)$itemId;$qty=(int)$line->quantity;
@@ -128,6 +134,9 @@ final class HallInventoryNoncleanReconciliationService
                             throw new ConflictHttpException('Zero accepted units carried a posted movement.');
                         continue;
                     }
+                    if(isset($postedMovementIds[(string)$movementId]))
+                        throw new ConflictHttpException('One inventory movement cannot settle multiple physical return lines.');
+                    $postedMovementIds[(string)$movementId]=true;
                     $movement=DB::table('hall_inventory_movement_events')
                         ->where('company_id',$companyId)->where('hall_id',$hallId)
                         ->where('item_id',$id)->where('id',$movementId)
