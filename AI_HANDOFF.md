@@ -465,3 +465,8 @@ Verify live branch/CI → reconcile current handoff + specific requirement/featu
 
 ## PHASE 12 EXTERNAL-IN LIVEWIRE TEST REPLAY ID REPAIR (2026-10-20)
 - CI 39429192646 on `26e1573a9825e447a3e652f54bfaae400c68d9f4`: 5 jobs PASS, laravel-postgres 629 passed, 3 risky, one FAIL. Test `HallInventoryExternalBorrowedIntakeTest` erroneously used the earlier pre-release negative-test UUID for replay after Livewire had independently generated its own immutable receipt ID. Real service intentionally rejects different receipt identifiers. Fix test to query the ACTUAL saved receipt ID by company+loan after the UI submit, preserving strong replay matching, same-company cross-item SQL guard, immutable evidence, and external borrowed-only amounts. New exact-SHA six-job CI required. No production flags enabled.
+
+
+## PHASE 12 EXTERNAL PARTNER RETURN CANDIDATE — CI PENDING (2026-10-20)
+- Parent ab146a61bdfdea23bc963895de75798a6592af22, CI 39433026329 SUCCESS all six required jobs: laravel-postgres, authenticated-panel-e2e, editor-browser-e2e, licensing-postgres, central-postgres, prototype-checks.
+- Preparing default-OFF VENUE_INVENTORY_EXTERNAL_BORROWED_RETURN_ENABLED: witnessed partial borrowed return batches; independent, exact partner-signed physical count verification; original loan attribution, immutable stock movement lineage, hall/actor scope, no owned stock or finance alteration. Neither a dispute settlement nor loan closure. Requires independent hosted 6-job CI verification before VERIFIED. Production inventory gates remain OFF.

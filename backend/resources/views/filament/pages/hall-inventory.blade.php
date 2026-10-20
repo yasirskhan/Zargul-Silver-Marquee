@@ -748,6 +748,11 @@
                                             class="rounded-lg border px-3 py-2 text-sm">Independently accept externally borrowed stock</button>
                                     @elseif($loan['externalReceiptAccepted'])
                                         <p class="text-sm">External inventory accepted as BORROWED, not owned. No money posted or loan completed. Physical return is still due.</p>
+                                        @if(config('inventory_controls.external_borrowed_return_enabled') &&
+                                            $loan['createdBy']!==(int)auth()->id())
+                                            <button type="button" wire:click="startExternalBorrowedReturn('{{ $loan['id'] }}')"
+                                                class="rounded-lg border px-3 py-2 text-sm">Prepare partial outside partner return</button>
+                                        @endif
                                     @endif
                                     @error('externalIntakeFile') <p role="alert">{{ $message }}</p> @enderror
                                 @endif
@@ -906,6 +911,83 @@
                 @endif
                 @if($lastExternalIntakeReference)
                     <p role="status">External physical evidence/approval reference: {{ $lastExternalIntakeReference }}. This does not create owned inventory or financial entries.</p>
+                @endif
+
+                @if(config('inventory_controls.external_borrowed_return_enabled') &&
+                    config('inventory_controls.external_borrowed_intake_enabled'))
+                    <section class="rounded-xl border p-4 space-y-3" aria-label="Outside borrowed return batches">
+                        <h3 class="font-semibold">External borrowed physical returns</h3>
+                        <p class="text-sm">Each shipment requires signed handover. Another owner/admin verifies the partner signed receipt and independently enters physically accepted quantities. Short or disputed counts remain in transit. No money or penalty is assumed.</p>
+                        @foreach($externalReturnHistory as $returnBatch)
+                            <article wire:key="external-return-{{ $returnBatch['batchId'] }}" class="rounded-lg border p-3 text-sm space-y-1">
+                                <p>Loan {{ $returnBatch['loanId'] }} / batch {{ $returnBatch['batchId'] }}
+                                    — {{ $returnBatch['confirmed'] ? 'PARTNER PHYSICAL RECEIPT CONFIRMED' : 'IN TRANSIT / PARTNER ACKNOWLEDGMENT PENDING' }}</p>
+                                <ul class="list-inside list-disc">
+                                    @foreach($returnBatch['lines'] as $line)
+                                        <li>{{ $line['itemId'] }} — {{ $line['quantity'] }} units shipped</li>
+                                    @endforeach
+                                </ul>
+                                @if(!$returnBatch['confirmed'] && $returnBatch['dispatchedBy']!==(int)auth()->id() &&
+                                    $this->canIndependentlyAcceptExternalBorrowing())
+                                    <button type="button" wire:click="startExternalReturnConfirmation('{{ $returnBatch['batchId'] }}')"
+                                        class="rounded-lg border px-3 py-2">Independently verify partner receipt</button>
+                                @endif
+                            </article>
+                        @endforeach
+                    </section>
+                @endif
+                @if(config('inventory_controls.external_borrowed_return_enabled') && $externalReturnLoanId !== '')
+                    <section class="rounded-xl border p-4 space-y-3" aria-label="Dispatch outside partner return">
+                        <h3 class="font-semibold">Physically send partial borrowed return</h3>
+                        <p>Loan {{ $externalReturnLoanId }}. Enter only units physically handed over. Leave non-returned items blank.</p>
+                        @foreach($loanHistory as $outsideLoan)
+                            @if($outsideLoan['id']===$externalReturnLoanId)
+                                @foreach($outsideLoan['lines'] as $line)
+                                    <label wire:key="ext-return-qty-{{ $line['itemId'] }}" class="block text-sm">
+                                        {{ $line['name'] }} (original borrowed {{ $line['quantity'] }} {{ $line['unit'] }})
+                                        <input type="number" min="1" max="{{ $line['quantity'] }}" step="1"
+                                            wire:model="externalReturnQuantities.{{ $line['itemId'] }}"
+                                            class="w-full rounded-lg border p-2 text-gray-900" placeholder="Leave blank if not returning">
+                                    </label>
+                                @endforeach
+                            @endif
+                        @endforeach
+                        <label class="block text-sm">Signed outside return handover (PDF/photo, up to 5 MB)
+                            <input type="file" wire:model="externalReturnFile" accept=".pdf,.jpg,.jpeg,.png"
+                                class="w-full rounded-lg border p-2"></label>
+                        @error('externalReturnFile') <p role="alert">{{ $message }}</p> @enderror
+                        @error('externalReturnQuantities') <p role="alert">{{ $message }}</p> @enderror
+                        <button type="button" wire:click="submitExternalBorrowedReturn"
+                            class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">Record witnessed outside return shipment</button>
+                    </section>
+                @endif
+                @if(config('inventory_controls.external_borrowed_return_enabled') && $externalConfirmBatchId !== '')
+                    <section class="rounded-xl border p-4 space-y-3" aria-label="Independent outside partner receipt verification">
+                        <h3 class="font-semibold">Independently confirm outside partner receipt</h3>
+                        <p>Batch {{ $externalConfirmBatchId }}. Enter partner-acknowledged counts item by item. Discrepancies MUST stay in transit.</p>
+                        @foreach($externalReturnHistory as $returnBatch)
+                            @if($returnBatch['batchId']===$externalConfirmBatchId)
+                                @foreach($returnBatch['lines'] as $line)
+                                    <label wire:key="ext-confirm-qty-{{ $line['itemId'] }}" class="block text-sm">
+                                        Item {{ $line['itemId'] }} (physically shipped {{ $line['quantity'] }})
+                                        <input type="number" min="0" max="{{ $line['quantity'] }}" step="1" required
+                                            wire:model="externalConfirmCounts.{{ $line['itemId'] }}"
+                                            class="w-full rounded-lg border p-2 text-gray-900">
+                                    </label>
+                                @endforeach
+                            @endif
+                        @endforeach
+                        <label class="block text-sm">Outside partner signed acknowledgment PDF/photo, up to 5 MB
+                            <input type="file" wire:model="externalConfirmFile" accept=".pdf,.jpg,.jpeg,.png"
+                                class="w-full rounded-lg border p-2"></label>
+                        @error('externalConfirmFile') <p role="alert">{{ $message }}</p> @enderror
+                        @error('externalConfirmCounts') <p role="alert">{{ $message }}</p> @enderror
+                        <button type="button" wire:click="submitExternalReturnConfirmation"
+                            class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">Confirm independently counted partner receipt</button>
+                    </section>
+                @endif
+                @if($lastExternalReturnReference)
+                    <p role="status">External return custody reference: {{ $lastExternalReturnReference }}. No financial entry or loan closure was posted.</p>
                 @endif
                 @if(config('inventory_controls.loan_dispatch_enabled') && $loanDispatchLoanId !== '')
                     <section class="space-y-3 rounded-xl border p-4" aria-label="Independent internal source dispatch">

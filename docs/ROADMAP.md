@@ -112,3 +112,8 @@ production toggles merely because development CI passes.
 - Phase 12 EXTERNAL_IN physical delivery candidate prepared: separate hall manager draft, different physical receiving signer, independent owner approval after signed partner document integrity re-check, exact item borrowed-only book movements with no finance. Still requires external outward, partial external returns, damage/dispute financial obligations and complete case closure. OFF until acceptance.
 
 - Parent `80102c503cc92fba618a08d12370bc151d0398cf` CI 39427134021 VERIFIED (all six). Internal source physical dispatch owner/admin page, strict SQL same-hall condition adjudication bindings and numbered clean-loan PDF owner controls verified. External borrowed intake successor separately CI pending. Production controls all OFF.
+
+
+## Phase 12 external partner-return candidate (2026-10-20; CI PENDING)
+- Parent ab146a61bdfdea23bc963895de75798a6592af22 is VERIFIED (GitHub Actions 39433026329: six successes). Next independent vertical includes default-disabled witnessed multi-item partial return batches for accepted outside borrowed stock, per-loan original-quantity ceilings, individually hashed signed handovers, immutable stock movement into borrowed transit, and separate owner/admin-attested partner receipt evidence/counts before transit is reduced. Repeat batches idempotent. Cross-hall and same-actor authorization fail closed.
+- Not a return closure or payment: damaged/missing/disputed stock, partner-transit shortfalls, outside-lending outbound flows, financial obligations/recovery and final numbered non-clean closeout still need implementation, full tests and operator acceptance. Production gates remain OFF.

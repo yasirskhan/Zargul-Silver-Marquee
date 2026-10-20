@@ -212,3 +212,8 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - CI 39428306646 @ b38cc3e8 blocked migration in laravel-postgres and authenticated-panel-e2e (SQLSTATE 42601). Cause: function body delimiter singular `$` instead of `$$`. Repair both delimiter sites without dropping or weakening guard. All six jobs must pass on new exact SHA. Production release OFF.
 
 - Follow-up BUG-20261020-018: prior purported fix was docs-only because JS replacement-text `$$` collapses to `$`. Corrected using replacement callback, verified old/new blob SHA mismatch and direct SQL source bytes; six-job CI still required.
+
+
+## BUG-20261020-019 — External borrowed returns were unavailable after independently accepted intake
+- Confirmed missing Phase 12 functional vertical: outside-sourced borrowed inventory could enter physical custody but never leave by auditable partial shipment/independent partner acknowledgement; outstanding assets stayed as perpetual borrowed_usable.
+- Candidate: feature-gated witnessed, immutable per-loan partial dispatch, linked send_borrowed_back movements, physical signed partner receipt with independent approval and exact counts, confirm_borrowed_return, cross-hall and same-actor negative tests, per-batch audit and no finance/owned posting. Any shortage remains transit and requires separate resolution. Requires new exact six-job CI SUCCESS; production return gate remains OFF.

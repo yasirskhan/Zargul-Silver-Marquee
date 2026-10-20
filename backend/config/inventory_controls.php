@@ -28,6 +28,8 @@ return [
     'loan_clean_closure_enabled' => (bool) env('VENUE_INVENTORY_LOAN_CLEAN_CLOSURE_ENABLED', false),
     // External partner-to-hall intake requires a different physical counter and approver.
     'external_borrowed_intake_enabled' => (bool) env('VENUE_INVENTORY_EXTERNAL_BORROWED_INTAKE_ENABLED', false),
+    // Witnessed partial partner returns and independently verified partner receipt; OFF.
+    'external_borrowed_return_enabled' => (bool) env('VENUE_INVENTORY_EXTERNAL_BORROWED_RETURN_ENABLED', false),
     // Independently reviewed opening count posting; OFF until physical
     // witness acceptance, authorization, concurrency and pilot signoff.
     'purchase_receipts_enabled' => (bool) env('VENUE_INVENTORY_PURCHASE_RECEIPTS_ENABLED', false),

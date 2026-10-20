@@ -149,6 +149,23 @@ final class HallInventory extends Page
     public ?string $lastExternalIntakeReference = null;
 
     #[Locked]
+    public array $externalReturnHistory = [];
+    #[Locked]
+    public string $externalReturnLoanId = '';
+    #[Locked]
+    public string $externalReturnBatchId = '';
+    public array $externalReturnQuantities = [];
+    public $externalReturnFile = null;
+    #[Locked]
+    public string $externalConfirmBatchId = '';
+    #[Locked]
+    public string $externalConfirmRequestId = '';
+    public array $externalConfirmCounts = [];
+    public $externalConfirmFile = null;
+    #[Locked]
+    public ?string $lastExternalReturnReference = null;
+
+    #[Locked]
     public string $loanDispatchLoanId = '';
     #[Locked]
     public string $loanDispatchRequestId = '';
@@ -412,6 +429,16 @@ final class HallInventory extends Page
         $this->returnAcceptanceFile = null;
         $this->lastReturnAcceptanceId = null;
 
+        $this->externalReturnHistory = [];
+        $this->externalReturnLoanId = '';
+        $this->externalReturnBatchId = (string)Str::uuid();
+        $this->externalReturnQuantities = [];
+        $this->externalReturnFile = null;
+        $this->externalConfirmBatchId = '';
+        $this->externalConfirmRequestId = (string)Str::uuid();
+        $this->externalConfirmCounts = [];
+        $this->externalConfirmFile = null;
+        $this->lastExternalReturnReference = null;
         $this->externalIntakeLoanId = '';
         $this->externalIntakeRequestId = (string)Str::uuid();
         $this->externalIntakeFile = null;
@@ -706,6 +733,11 @@ final class HallInventory extends Page
         }
         $this->loanHistory = app(\App\Services\HallInventoryLoanDraftReview::class)
             ->recent($actor, $this->companyId, $this->hallId);
+        $this->externalReturnHistory = [];
+        if(config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled'))
+            $this->externalReturnHistory = app(\App\Services\HallInventoryExternalBorrowedReturnService::class)
+                ->recent($actor,$this->companyId,$this->hallId);
         $this->cleanLoanReceipts=[];
         if(config('inventory_controls.loan_clean_closure_enabled')) {
             $hall=Hall::query()->where('company_id',$this->companyId)->where('id',$this->hallId)->first();
@@ -1105,6 +1137,118 @@ final class HallInventory extends Page
         }catch(InvalidArgumentException|ConflictHttpException $e) {
             throw ValidationException::withMessages(['externalIntakeFile'=>$e->getMessage()]);
         }
+        $this->reloadLoanHistory();
+    }
+
+
+    public function startExternalBorrowedReturn(string $loanId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled'),403);
+        $loan=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($l):bool=>$l['id']===$loanId && $l['direction']==='external_in' &&
+                $l['borrowingHallId']===$this->hallId && $l['externalReceiptAccepted'] &&
+                $l['createdBy']!==(int)$actor->getKey());
+        abort_unless($loan!==null,403);
+        $this->externalReturnLoanId=$loanId;
+        $this->externalReturnBatchId=(string)Str::uuid();
+        $this->externalReturnQuantities=array_fill_keys(
+            array_map(static fn(array $l):string=>$l['itemId'],$loan['lines']), '');
+        $this->externalReturnFile=null;
+        $this->lastExternalReturnReference=null;
+    }
+
+    public function submitExternalBorrowedReturn():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled'),403);
+        $this->validate(['externalReturnFile'=>'required|file|max:5120|mimes:jpg,jpeg,png,pdf']);
+        $loan=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($l):bool=>$l['id']===$this->externalReturnLoanId &&
+                $l['direction']==='external_in' && $l['borrowingHallId']===$this->hallId &&
+                $l['externalReceiptAccepted']);
+        abort_unless($loan!==null,403);
+        $quantities=[];
+        foreach($loan['lines'] as $line) {
+            $raw=$this->externalReturnQuantities[$line['itemId']]??'';
+            if($raw==='')continue;
+            if(!is_string($raw)||!preg_match('/\A[1-9][0-9]{0,8}\z/D',$raw)||
+                (int)$raw>100000000)
+                throw ValidationException::withMessages([
+                    'externalReturnQuantities'=>'Enter positive whole return quantities; leave other lines blank.'
+                ]);
+            $quantities[$line['itemId']]=(int)$raw;
+        }
+        if(!$quantities)
+            throw ValidationException::withMessages(['externalReturnQuantities'=>'Choose a physical return quantity.']);
+        try {
+            $this->lastExternalReturnReference=app(\App\Services\HallInventoryExternalBorrowedReturnService::class)
+                ->dispatch($actor,$this->companyId,$this->hallId,$loan['id'],
+                    $this->externalReturnBatchId,$quantities,$this->externalReturnFile);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['externalReturnQuantities'=>$e->getMessage()]);
+        }
+        $this->externalReturnLoanId='';
+        $this->externalReturnBatchId=(string)Str::uuid();
+        $this->externalReturnFile=null;
+        $this->externalReturnQuantities=[];
+        $this->reloadLoanHistory();
+    }
+
+    public function startExternalReturnConfirmation(string $batchId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled') &&
+            $this->canIndependentlyAcceptExternalBorrowing(),403);
+        $batch=collect(app(\App\Services\HallInventoryExternalBorrowedReturnService::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($b):bool=>$b['batchId']===$batchId && !$b['confirmed'] &&
+                $b['dispatchedBy']!==(int)$actor->getKey());
+        abort_unless($batch!==null,403);
+        $this->externalConfirmBatchId=$batchId;
+        $this->externalConfirmRequestId=(string)Str::uuid();
+        $this->externalConfirmCounts=array_fill_keys(
+            array_map(static fn(array $l):string=>$l['itemId'],$batch['lines']), '');
+        $this->externalConfirmFile=null;
+    }
+
+    public function submitExternalReturnConfirmation():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled') &&
+            $this->canIndependentlyAcceptExternalBorrowing(),403);
+        $this->validate(['externalConfirmFile'=>'required|file|max:5120|mimes:jpg,jpeg,png,pdf']);
+        $batch=collect(app(\App\Services\HallInventoryExternalBorrowedReturnService::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($b):bool=>$b['batchId']===$this->externalConfirmBatchId &&
+                !$b['confirmed'] && $b['dispatchedBy']!==(int)$actor->getKey());
+        abort_unless($batch!==null,403);
+        $counts=[];
+        foreach($batch['lines'] as $line) {
+            $raw=$this->externalConfirmCounts[$line['itemId']]??null;
+            if(!is_string($raw)||!preg_match('/\A(0|[1-9][0-9]{0,8})\z/D',$raw)||
+                (int)$raw>100000000)
+                throw ValidationException::withMessages([
+                    'externalConfirmCounts'=>'Independently enter every outside partner received quantity.']);
+            $counts[$line['itemId']]=(int)$raw;
+        }
+        try {
+            $this->lastExternalReturnReference=app(\App\Services\HallInventoryExternalBorrowedReturnService::class)
+                ->confirm($actor,$this->companyId,$this->hallId,$batch['batchId'],
+                    $this->externalConfirmRequestId,$counts,$this->externalConfirmFile);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['externalConfirmCounts'=>$e->getMessage()]);
+        }
+        $this->externalConfirmBatchId='';
+        $this->externalConfirmRequestId=(string)Str::uuid();
+        $this->externalConfirmCounts=[];
+        $this->externalConfirmFile=null;
         $this->reloadLoanHistory();
     }
 

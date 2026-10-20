@@ -103,3 +103,5 @@ INV-013-CLEAN-CLOSURE-UI,Independent source owner final clean loan closure and n
 INV-016-EXTERNAL-ARRIVAL,Three-actor signed outside borrowed physical intake and independently accepted custody,12,PREPARED pending exact six-job hosted CI,External_in only default-off signed private evidence immutable independent acceptance and per-item accept_borrowed movement not owned or financial custody; owner and assigned manager UI and PostgreSQL test
 
 INV-016-COUNT-EXTERNAL,Immutable independently entered external inward physical count lines,12,PREPARED/CI pending,Per-item independently entered counted quantities and signed evidence cannot be edited or replayed differently; shortages block owner acceptance and stock/finance posting; separate investigation not yet complete
+
+INV-016-EXTERNAL-RETURN,External partial return and independent partner-signed acknowledgment,12,CI PENDING,Multi-batch witnessed send-to-transit plus independent exact partner count; owned and financial balances unchanged; all release flags OFF; exact six-job hosted CI required
