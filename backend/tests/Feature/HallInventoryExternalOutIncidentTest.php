@@ -158,7 +158,23 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
                 'USD',15000,'Unsubstantiated missing item must not be chargeable');
             $this->fail('Unreviewed incident created a monetary claim.');
         }catch(ConflictHttpException){}
-        $claim=(string)Str::uuid();
+        // End-to-end owner-facing claim submission, not only the underlying service.
+        Livewire::test(HallInventory::class)->set('hallId',$wrong->id)
+            ->call('startFinancialClaims',$loan)->assertForbidden();
+        Livewire::test(HallInventory::class)->set('hallId',$hall->id)
+            ->assertSee('Review provisional damage/loss claims')
+            ->call('startFinancialClaims',$loan)->assertHasNoErrors()
+            ->assertSee('Outside lending provisional loss claims')
+            ->set('financialClaimReportId',$report)
+            ->set('financialClaimCurrency','USD')
+            ->set('financialClaimAmountMinor','25000')
+            ->set('financialClaimReason','Physical damaged table independently substantiated and quoted')
+            ->call('submitFinancialClaim')->assertHasNoErrors()
+            ->assertSee('AWAITING INDEPENDENT REVIEW')
+            ->assertSee('Financial journal posted: NO');
+        $claim=(string)DB::table('hall_inventory_financial_claims')
+            ->where('company_id',$company->id)->where('report_id',$report)->value('id');
+        $this->assertTrue(Str::isUuid($claim));
         $this->assertSame($claim,$claims->propose($owner,$company->id,$report,$claim,
             'USD',25000,'Physical damaged table independently substantiated and quoted'));
         $this->assertSame($claim,$claims->propose($owner,$company->id,$report,$claim,
@@ -174,8 +190,19 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
             $this->fail('Incident reporter approved their own monetary claim.');
         }catch(AuthorizationException){}
         $this->be($reviewer);
-        $decisionId=(string)Str::uuid();
         $reason='Independent price basis review approved for COLLECTION ONLY';
+        Livewire::test(HallInventory::class)->set('hallId',$hall->id)
+            ->call('startFinancialClaims',$loan)->assertHasNoErrors()
+            ->assertSee('Independent owner/admin claim assessment')
+            ->set('financialClaimDecisionClaimId',$claim)
+            ->set('financialClaimDecision','approved_for_collection')
+            ->set('financialClaimDecisionReason',$reason)
+            ->call('submitFinancialClaimDecision')->assertHasNoErrors()
+            ->assertSee('approved_for_collection')
+            ->assertDontSee('AWAITING INDEPENDENT REVIEW');
+        $decisionId=(string)DB::table('hall_inventory_financial_claim_decisions')
+            ->where('company_id',$company->id)->where('claim_id',$claim)->value('id');
+        $this->assertTrue(Str::isUuid($decisionId));
         $this->assertSame($decisionId,$claims->decide($reviewer,$company->id,
             $claim,$decisionId,'approved_for_collection',$reason));
         $this->assertSame($decisionId,$claims->decide($reviewer,$company->id,

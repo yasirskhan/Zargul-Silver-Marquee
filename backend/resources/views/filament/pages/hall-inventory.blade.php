@@ -706,6 +706,14 @@
                                         $loan['externalOutApproved'])))
                                     <button type="button" wire:click="startLoanIncident('{{ $loan['id'] }}')" class="rounded-lg border px-3 py-2 text-sm">Review damage, missing or disputed items</button>
                                 @endif
+                                @if(config('inventory_controls.loan_financial_claims_enabled') &&
+                                    $loan['direction']==='external_out' &&
+                                    $loan['lendingHallId']===$hallId &&
+                                    $loan['externalOutApproved'] &&
+                                    $this->canManageFinancialClaims())
+                                    <button type="button" wire:click="startFinancialClaims('{{ $loan['id'] }}')"
+                                        class="rounded-lg border px-3 py-2 text-sm">Review provisional damage/loss claims</button>
+                                @endif
                                 @if($loan['overdueWithOutstandingCustody'] ?? false)
                                     <p role="status" class="font-semibold text-amber-700 dark:text-amber-300">OVERDUE: dispatched or externally borrowed inventory remains outstanding. Physical reconciliation required; no fee or loss has been assessed.</p>
                                 @endif
@@ -993,6 +1001,76 @@
                         @empty
                             <p>No incident reports recorded.</p>
                         @endforelse
+                    </section>
+                @endif
+
+                @if(config('inventory_controls.loan_financial_claims_enabled') &&
+                    $financialClaimLoanId !== '' && $this->canManageFinancialClaims())
+                    <section class="space-y-3 rounded-xl border p-4" aria-label="Provisional outside-owned inventory financial claims">
+                        <h3 class="font-semibold">Outside lending provisional loss claims</h3>
+                        <p class="text-sm">Loan {{ $financialClaimLoanId }}. Record only evidence-backed proposed amounts in the currency's smallest units (for USD, cents). An internal collection approval is NOT a partner admission, invoice, receivable, payment, stock write-off or final settlement.</p>
+                        @if(count($financialClaimEligibleReports)>0)
+                            <h4 class="font-semibold">Propose an independently evidenced amount</h4>
+                            <label class="block text-sm">Substantiated unclaimed incident
+                                <select wire:model="financialClaimReportId" class="w-full rounded-lg border p-2 text-gray-900">
+                                    <option value="">Choose independently reviewed evidence</option>
+                                    @foreach($financialClaimEligibleReports as $report)
+                                        <option value="{{ $report['reportId'] }}">{{ $report['kind'] }}: {{ $report['quantity'] }} units ({{ $report['reportId'] }})</option>
+                                    @endforeach
+                                </select>
+                            </label>
+                            <label class="block text-sm">ISO currency
+                                <input wire:model="financialClaimCurrency" maxlength="3" class="w-full rounded-lg border p-2 text-gray-900">
+                            </label>
+                            <label class="block text-sm">Proposed amount in integer minor units
+                                <input wire:model="financialClaimAmountMinor" type="number" min="1" step="1" class="w-full rounded-lg border p-2 text-gray-900">
+                            </label>
+                            <label class="block text-sm">Item valuation and evidence explanation
+                                <textarea wire:model="financialClaimReason" class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                            </label>
+                            @error('financialClaimReason') <p role="alert">{{ $message }}</p> @enderror
+                            @error('financialClaimAmountMinor') <p role="alert">{{ $message }}</p> @enderror
+                            @error('financialClaimReportId') <p role="alert">{{ $message }}</p> @enderror
+                            @error('financialClaimCurrency') <p role="alert">{{ $message }}</p> @enderror
+                            <button type="button" wire:click="submitFinancialClaim" class="rounded-lg border px-3 py-2 text-sm">Submit provisional amount for independent owner review</button>
+                        @endif
+                        <h4 class="font-semibold">Claim history and independent review queue</h4>
+                        @forelse($financialClaimHistory as $claim)
+                            <article wire:key="provisional-claim-{{ $claim['id'] }}" class="rounded-lg border p-3 text-sm">
+                                <p>Claim {{ $claim['id'] }} linked to incident {{ $claim['reportId'] }}: {{ $claim['quantity'] }} units, {{ $claim['currency'] }} {{ $claim['amountMinor'] }} minor units.</p>
+                                <p>Assessment: {{ $claim['decision'] ?? 'AWAITING INDEPENDENT REVIEW' }}. Collection received: {{ $claim['paidMinor'] }}. Financial journal posted: NO.</p>
+                            </article>
+                        @empty
+                            <p>No financial claim has been proposed for this loan.</p>
+                        @endforelse
+                        @if(collect($financialClaimHistory)->contains(fn($c)=>$c['decision']===null && $c['proposedBy']!==(int)auth()->id()))
+                            <h4 class="font-semibold">Independent owner/admin claim assessment</h4>
+                            <label class="block text-sm">Pending claim from another owner
+                                <select wire:model="financialClaimDecisionClaimId" class="w-full rounded-lg border p-2 text-gray-900">
+                                    <option value="">Choose a pending claim</option>
+                                    @foreach($financialClaimHistory as $claim)
+                                        @if($claim['decision']===null && $claim['proposedBy']!==(int)auth()->id())
+                                            <option value="{{ $claim['id'] }}">{{ $claim['currency'] }} {{ $claim['amountMinor'] }} minor units ({{ $claim['id'] }})</option>
+                                        @endif
+                                    @endforeach
+                                </select>
+                            </label>
+                            <label class="block text-sm">Decision
+                                <select wire:model="financialClaimDecision" class="w-full rounded-lg border p-2 text-gray-900">
+                                    <option value="disputed">Disputed / more resolution required</option>
+                                    <option value="approved_for_collection">Approve collection attempt, NOT recognized debt</option>
+                                    <option value="rejected">Reject proposed amount</option>
+                                </select>
+                            </label>
+                            <label class="block text-sm">Independent reasoning
+                                <textarea wire:model="financialClaimDecisionReason" class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                            </label>
+                            @error('financialClaimDecisionReason') <p role="alert">{{ $message }}</p> @enderror
+                            <button type="button" wire:click="submitFinancialClaimDecision" class="rounded-lg border px-3 py-2 text-sm">Record immutable independent claim assessment</button>
+                        @endif
+                        @if($lastFinancialClaimReference)
+                            <p role="status">Financial claim/review {{ $lastFinancialClaimReference }} saved. No receivable, payment, financial journal, stock write-off or final closure recorded.</p>
+                        @endif
                     </section>
                 @endif
                 @if(config('inventory_controls.external_out_dispatch_enabled') && $externalOutLoanId !== '')

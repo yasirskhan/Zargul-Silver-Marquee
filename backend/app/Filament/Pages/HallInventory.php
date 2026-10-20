@@ -273,6 +273,26 @@ final class HallInventory extends Page
     #[Locked]
     public ?string $lastIncidentDecisionId = null;
 
+    // Provisional financial assessments only. Never represent payment or receivable posting.
+    #[Locked]
+    public string $financialClaimLoanId = '';
+    #[Locked]
+    public array $financialClaimHistory = [];
+    #[Locked]
+    public array $financialClaimEligibleReports = [];
+    #[Locked]
+    public string $financialClaimRequestId = '';
+    public string $financialClaimReportId = '';
+    public string $financialClaimCurrency = 'USD';
+    public string $financialClaimAmountMinor = '';
+    public string $financialClaimReason = '';
+    #[Locked]
+    public string $financialClaimDecisionId = '';
+    public string $financialClaimDecisionClaimId = '';
+    public string $financialClaimDecision = 'disputed';
+    public string $financialClaimDecisionReason = '';
+    #[Locked]
+    public ?string $lastFinancialClaimReference = null;
     #[Locked]
     public array $cleanLoanReceipts = [];
     #[Locked]
@@ -451,6 +471,19 @@ final class HallInventory extends Page
         $this->incidentDecisionReason = '';
         $this->incidentReviews = [];
         $this->lastIncidentDecisionId = null;
+        $this->financialClaimLoanId = '';
+        $this->financialClaimHistory = [];
+        $this->financialClaimEligibleReports = [];
+        $this->financialClaimRequestId = (string)Str::uuid();
+        $this->financialClaimReportId = '';
+        $this->financialClaimCurrency = 'USD';
+        $this->financialClaimAmountMinor = '';
+        $this->financialClaimReason = '';
+        $this->financialClaimDecisionId = (string)Str::uuid();
+        $this->financialClaimDecisionClaimId = '';
+        $this->financialClaimDecision = 'disputed';
+        $this->financialClaimDecisionReason = '';
+        $this->lastFinancialClaimReference = null;
         $this->cleanLoanReceipts = [];
         $this->lastCleanLoanReceipt = null;
         $this->returnLoanId = '';
@@ -2056,6 +2089,132 @@ final class HallInventory extends Page
         $this->incidentDecisionReason='';
         $this->incidentReviews=app(\App\Services\HallInventoryLoanIncidentDecisionService::class)
             ->reviews($actor,$this->companyId,$this->hallId,$this->incidentLoanId);
+    }
+
+
+    /**
+     * Owner/admin provisional claim desk. Every actionable lookup is scoped again
+     * on the server; public Livewire selections never grant financial authority.
+     */
+    public function canManageFinancialClaims():bool
+    {
+        return config('inventory_controls.loan_financial_claims_enabled') &&
+            config('inventory_controls.loan_incidents_enabled') &&
+            config('inventory_controls.loan_incident_reviews_enabled') &&
+            config('inventory_controls.external_out_return_enabled') &&
+            $this->canApproveExternalOutDispatch();
+    }
+
+    public function startFinancialClaims(string $loanId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canManageFinancialClaims() && Str::isUuid($loanId),403);
+        $loan=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($row):bool=>$row['id']===$loanId &&
+                $row['direction']==='external_out' &&
+                $row['lendingHallId']===$this->hallId &&
+                $row['externalOutApproved']);
+        abort_unless($loan!==null,403);
+        $this->financialClaimLoanId=$loanId;
+        $this->financialClaimReportId='';
+        $this->financialClaimReason='';
+        $this->financialClaimAmountMinor='';
+        $this->financialClaimDecisionClaimId='';
+        $this->financialClaimDecisionReason='';
+        $this->financialClaimRequestId=(string)Str::uuid();
+        $this->financialClaimDecisionId=(string)Str::uuid();
+        $this->reloadFinancialClaims($actor);
+    }
+
+    private function reloadFinancialClaims(User $actor):void
+    {
+        abort_unless($this->canManageFinancialClaims() &&
+            $this->financialClaimLoanId!=='',403);
+        $this->financialClaimHistory=app(\App\Services\HallInventoryFinancialClaimService::class)
+            ->history($actor,$this->companyId,$this->hallId,$this->financialClaimLoanId);
+        // A substantiated decision is evidence, not an authorization for money.
+        // Only reports not already claimed are selectable for a proposal.
+        $this->financialClaimEligibleReports=DB::table('hall_inventory_loan_incident_reports as r')
+            ->join('hall_inventory_loan_incident_decisions as d',function($j):void {
+                $j->on('d.company_id','=','r.company_id')
+                    ->on('d.report_id','=','r.id');
+            })
+            ->where('r.company_id',$this->companyId)
+            ->where('r.source_hall_id',$this->hallId)
+            ->where('r.loan_id',$this->financialClaimLoanId)
+            ->where('d.decision','substantiated')
+            ->whereNotExists(function($q):void {
+                $q->selectRaw('1')->from('hall_inventory_financial_claims as c')
+                    ->whereColumn('c.company_id','r.company_id')
+                    ->whereColumn('c.report_id','r.id');
+            })
+            ->orderBy('r.created_at')->limit(100)
+            ->get(['r.id','r.kind','r.quantity'])
+            ->map(static fn($row):array=>[
+                'reportId'=>(string)$row->id,
+                'kind'=>(string)$row->kind,
+                'quantity'=>(int)$row->quantity
+            ])->all();
+    }
+
+    public function submitFinancialClaim():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canManageFinancialClaims() &&
+            $this->financialClaimLoanId!=='',403);
+        $this->validate([
+            'financialClaimReportId'=>'required|uuid',
+            'financialClaimCurrency'=>['required','regex:/\A[A-Z]{3}\z/D'],
+            'financialClaimAmountMinor'=>['required','regex:/\A[1-9][0-9]{0,11}\z/D'],
+            'financialClaimReason'=>'required|string|min:10|max:500',
+        ]);
+        // Do not trust a stale or tampered client-side report selector.
+        $this->reloadFinancialClaims($actor);
+        abort_unless(collect($this->financialClaimEligibleReports)->contains(
+            fn($r):bool=>$r['reportId']===$this->financialClaimReportId),403);
+        try {
+            $this->lastFinancialClaimReference=app(\App\Services\HallInventoryFinancialClaimService::class)
+                ->propose($actor,$this->companyId,$this->financialClaimReportId,
+                    $this->financialClaimRequestId,$this->financialClaimCurrency,
+                    (int)$this->financialClaimAmountMinor,$this->financialClaimReason);
+        }catch(InvalidArgumentException|ConflictHttpException $e){
+            throw ValidationException::withMessages(['financialClaimReason'=>$e->getMessage()]);
+        }
+        $this->financialClaimRequestId=(string)Str::uuid();
+        $this->financialClaimReportId='';
+        $this->financialClaimAmountMinor='';
+        $this->financialClaimReason='';
+        $this->reloadFinancialClaims($actor);
+    }
+
+    public function submitFinancialClaimDecision():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canManageFinancialClaims() &&
+            $this->financialClaimLoanId!=='',403);
+        $this->validate([
+            'financialClaimDecisionClaimId'=>'required|uuid',
+            'financialClaimDecision'=>'required|in:approved_for_collection,rejected,disputed',
+            'financialClaimDecisionReason'=>'required|string|min:10|max:500',
+        ]);
+        $this->reloadFinancialClaims($actor);
+        abort_unless(collect($this->financialClaimHistory)->contains(
+            fn($row):bool=>$row['id']===$this->financialClaimDecisionClaimId &&
+                $row['decision']===null &&
+                $row['proposedBy']!==(int)$actor->getKey()),403);
+        try {
+            $this->lastFinancialClaimReference=app(\App\Services\HallInventoryFinancialClaimService::class)
+                ->decide($actor,$this->companyId,$this->financialClaimDecisionClaimId,
+                    $this->financialClaimDecisionId,$this->financialClaimDecision,
+                    $this->financialClaimDecisionReason);
+        }catch(InvalidArgumentException|ConflictHttpException $e){
+            throw ValidationException::withMessages(['financialClaimDecisionReason'=>$e->getMessage()]);
+        }
+        $this->financialClaimDecisionId=(string)Str::uuid();
+        $this->financialClaimDecisionClaimId='';
+        $this->financialClaimDecisionReason='';
+        $this->reloadFinancialClaims($actor);
     }
 
     public function canManageSourceCleanClosure():bool
