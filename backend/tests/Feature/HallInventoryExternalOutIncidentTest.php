@@ -248,6 +248,13 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
             ->where('company_id',$company->id)->where('claim_id',$claim)->value('id');
         $this->assertTrue(Str::isUuid($document));
         $partner=app(\App\Services\HallInventoryFinancialCounterpartyEvidenceService::class);
+        $this->assertSame($document,$partner->record($owner,$company->id,$claim,
+            $document,'document_says_disputes',null,$partnerPdf()));
+        try {
+            $partner->record($owner,$company->id,$claim,(string)Str::uuid(),
+                'document_says_disputes',null,$partnerPdf());
+            $this->fail('Duplicated identical partner correspondence with a new id.');
+        }catch(ConflictHttpException){}
         try {
             $partner->review($owner,$company->id,$document,(string)Str::uuid(),
                 'document_integrity_confirmed','Cannot independently review my submitted response');
@@ -277,6 +284,40 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
         $this->assertCount(1,$docHistory);
         $this->assertFalse($docHistory[0]['partnerIdentityVerified']);
         $this->assertSame(0,$docHistory[0]['paidMinor']);
+        try {
+            $partner->history($reviewer,$company->id,$wrong->id,$loan);
+            $this->fail('Other hall partner document history disclosed.');
+        }catch(AuthorizationException){}
+        try {
+            $partner->download($reviewer,$company->id,$wrong->id,$loan,$document);
+            $this->fail('Other hall partner evidence downloaded.');
+        }catch(AuthorizationException){}
+        $record=DB::table('hall_inventory_financial_counterparty_evidence')
+            ->where('id',$document)->first();
+        $original=Storage::disk('local')->get($record->evidence_path);
+        Storage::disk('local')->put($record->evidence_path,'tampered bytes');
+        try {
+            $partner->download($reviewer,$company->id,$hall->id,$loan,$document);
+            $this->fail('Tampered private partner correspondence downloaded.');
+        }catch(ConflictHttpException){}
+        Storage::disk('local')->put($record->evidence_path,$original);
+        $forged=(array)$record;
+        $forged['id']=(string)Str::uuid();
+        $forged['source_hall_id']=$wrong->id;
+        $forged['fingerprint']=hash('sha256','foreign-hall partner record');
+        try {
+            DB::transaction(fn()=>DB::table('hall_inventory_financial_counterparty_evidence')
+                ->insert($forged));
+            $this->fail('Database accepted forged partner evidence from another hall.');
+        }catch(\Illuminate\Database\QueryException){}
+        try {
+            DB::transaction(fn()=>DB::table('hall_inventory_financial_counterparty_evidence')
+                ->where('id',$document)->update(['position'=>'other_document']));
+            $this->fail('Immutable partner evidence was updated.');
+        }catch(\Illuminate\Database\QueryException){}
+        $this->assertSame('document_says_disputes',
+            DB::table('hall_inventory_financial_counterparty_evidence')
+                ->where('id',$document)->value('position'));
         $this->assertSame(0,DB::table('finance_journals')->count());
         $this->assertSame(0,DB::table('hall_inventory_internal_loan_closures')->count());
         $p=DB::table('hall_inventory_positions')->where('company_id',$company->id)
