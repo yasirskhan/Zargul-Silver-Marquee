@@ -780,6 +780,25 @@
                                     @endif
                                     @error('externalIntakeFile') <p role="alert">{{ $message }}</p> @enderror
                                 @endif
+                                @if(config('inventory_controls.external_borrowed_clean_closure_enabled') &&
+                                    $loan['direction']==='external_in' &&
+                                    $loan['borrowingHallId']===$hallId &&
+                                    $this->canCloseCleanExternalBorrowing())
+                                    @if(isset($externalCleanReceipts[$loan['id']]))
+                                        <p class="font-medium">External borrowed clean return receipt EX-{{ $externalCleanReceipts[$loan['id']]['receiptNumber'] }}. No financial journal posted.</p>
+                                        <button type="button" wire:click="downloadExternalCleanReceipt('{{ $loan['id'] }}')"
+                                            class="rounded-lg border px-3 py-2 text-sm">Download numbered external clean-return PDF</button>
+                                    @elseif($loan['externalReceiptAccepted'] &&
+                                        !$loan['externalCleanClosed'] &&
+                                        $loan['createdBy']!==(int)auth()->id() &&
+                                        ($loan['externalReturnReconciliation']['allPhysicalReturnsConfirmed'] ?? false) &&
+                                        !($loan['externalReturnReconciliation']['integrityWarning'] ?? true))
+                                        <p class="text-xs">Final owner approval rechecks original accepted quantities, partner-signed evidence, separate actors and open incidents. Money and claims remain unsettled.</p>
+                                        <button type="button" wire:click="closeCleanExternalBorrowing('{{ $loan['id'] }}')"
+                                            class="rounded-lg border px-3 py-2 text-sm">Finalize externally borrowed clean loan</button>
+                                    @endif
+                                    @error('externalCleanClosure') <p role="alert">{{ $message }}</p> @enderror
+                                @endif
                                 @if(config('inventory_controls.loan_dispatch_enabled') &&
                                     $loan['direction']==='internal' &&
                                     $loan['lendingHallId']===$hallId &&
