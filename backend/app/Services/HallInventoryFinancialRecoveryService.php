@@ -345,25 +345,40 @@ final class HallInventoryFinancialRecoveryService
 
     public function outstanding(User $actor,string $companyId,string $hallId,string $loanId):array
     {
-        $rows=$this->history($actor,$companyId,$hallId,$loanId);
+        // Re-authorize original hall/loan through the bounded, private read.
+        $this->history($actor,$companyId,$hallId,$loanId);
+        // Financial balances MUST include all history, not only the latest
+        // 200 visible evidence rows or the latest 100 obligation proposals.
+        $totals=DB::table('hall_inventory_financial_recovery_receipts as p')
+            ->leftJoin('hall_inventory_financial_recovery_reviews as r',function($q):void {
+                $q->on('r.company_id','=','p.company_id')->on('r.receipt_id','=','p.id');
+            })
+            ->leftJoin('hall_inventory_financial_recovery_reversals as v',function($q):void {
+                $q->on('v.company_id','=','p.company_id')->on('v.receipt_id','=','p.id');
+            })
+            ->where('p.company_id',$companyId)->where('p.source_hall_id',$hallId)
+            ->where('p.loan_id',$loanId)->groupBy('p.obligation_id')
+            ->select('p.obligation_id')
+            ->selectRaw('COALESCE(SUM(CASE WHEN r.id IS NULL THEN p.amount_minor ELSE 0 END),0) AS pending_minor')
+            ->selectRaw("COALESCE(SUM(CASE WHEN r.decision = 'confirmed' AND v.id IS NULL THEN p.amount_minor ELSE 0 END),0) AS paid_minor")
+            ->get()->keyBy('obligation_id');
+        $agreements=DB::table('hall_inventory_financial_obligations as o')
+            ->join('hall_inventory_financial_obligation_decisions as d',function($q):void {
+                $q->on('d.company_id','=','o.company_id')->on('d.obligation_id','=','o.id');
+            })
+            ->where('o.company_id',$companyId)->where('o.source_hall_id',$hallId)
+            ->where('o.loan_id',$loanId)->where('d.decision','authorized')
+            ->get(['o.id','o.amount_minor','o.currency']);
         $amounts=[];
-        foreach($rows as $row) {
-            $id=$row['obligationId'];
-            if(!isset($amounts[$id]))$amounts[$id]=['paidMinor'=>0,'pendingMinor'=>0];
-            if($row['decision']===null)$amounts[$id]['pendingMinor']+=$row['amountMinor'];
-            elseif($row['decision']==='confirmed' && $row['reversalId']===null)
-                $amounts[$id]['paidMinor']+=$row['amountMinor'];
-        }
-        $agreements=app(HallInventoryFinancialObligationService::class)
-            ->history($actor,$companyId,$hallId,$loanId);
         foreach($agreements as $agreement){
-            if($agreement['decision']!=='authorized')continue;
-            $id=$agreement['id'];$paid=$amounts[$id]['paidMinor']??0;
-            $pending=$amounts[$id]['pendingMinor']??0;
-            $amounts[$id]=['amountMinor'=>$agreement['amountMinor'],
-                'currency'=>$agreement['currency'],'paidMinor'=>$paid,
-                'pendingMinor'=>$pending,'remainingMinor'=>max(0,$agreement['amountMinor']-$paid),
-                'unreservedMinor'=>max(0,$agreement['amountMinor']-$paid-$pending)];
+            $id=(string)$agreement->id;
+            $paid=(int)($totals[$id]->paid_minor??0);
+            $pending=(int)($totals[$id]->pending_minor??0);
+            $amount=(int)$agreement->amount_minor;
+            $amounts[$id]=['amountMinor'=>$amount,
+                'currency'=>(string)$agreement->currency,'paidMinor'=>$paid,
+                'pendingMinor'=>$pending,'remainingMinor'=>max(0,$amount-$paid),
+                'unreservedMinor'=>max(0,$amount-$paid-$pending)];
         }
         return $amounts;
     }
