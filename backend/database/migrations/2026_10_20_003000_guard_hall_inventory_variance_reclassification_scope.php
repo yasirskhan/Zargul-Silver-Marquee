@@ -27,7 +27,7 @@ return new class extends Migration {
             FOREIGN KEY (company_id,hall_id,movement_id)
             REFERENCES hall_inventory_movement_events(company_id,hall_id,id)');
         DB::unprepared(<<<'SQL'
-CREATE FUNCTION venuedesk_guard_variance_reclassification() RETURNS trigger
+CREATE OR REPLACE FUNCTION venuedesk_guard_variance_reclassification() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
     IF NOT EXISTS (

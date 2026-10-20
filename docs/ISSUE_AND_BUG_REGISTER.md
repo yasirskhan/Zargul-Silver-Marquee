@@ -189,3 +189,7 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Release switches stay OFF. Close this issue only after exact-SHA six-job CI.
 
 - BUG-20261020-013 RESOLVED / VERIFIED: exact commit `fe251f107d1486c711d3250fc426464170e0b99c`, CI run `39378225973`, six required jobs SUCCESS. The immutable trigger remains enforced; only the test fixture savepoint was corrected.
+
+
+## BUG-20261020-016 — PG RefreshDatabase replay duplicate variance guard function
+- Failing CI `39379060119` @ `8d12a19b`, PostgreSQL SQLSTATE[42723], 611 failures caused by migration trying to CREATE already-present `venuedesk_guard_variance_reclassification` across test database rebuilds. Use CREATE OR REPLACE to keep the same guard enforced while allowing replay. No weakening foreign keys or dropping guard. FIX PUBLISHED, CI PENDING.

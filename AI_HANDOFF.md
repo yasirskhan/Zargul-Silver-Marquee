@@ -428,3 +428,7 @@ Verify live branch/CI → reconcile current handoff + specific requirement/featu
 
 ## VERIFIED PARENT INVENTORY CONDITION RECLASSIFICATION
 - The PostgreSQL expected-negative-update/savepoint repair commit `fe251f107d1486c711d3250fc426464170e0b99c` is **VERIFIED**, GitHub hosted Actions run [39378225973](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39378225973), exact HEAD, **six of six** required jobs SUCCESS (prototype-checks, laravel-postgres, central-postgres, editor-browser-e2e, licensing-postgres, authenticated-panel-e2e). The ownership-conserving owned usable/damaged condition workflow is verified at this checkpoint. Do not confuse next candidate SQL lineage hardening, source dispatch owner UI or clean PDF owner UI with the verified parent; each successor requires its own hosted CI. All inventory production switches remain OFF.
+
+
+## 2026-10-20 MIGRATION REPLAY RECOVERY (CI FAILED)
+- Hosted CI `39379060119` on `8d12a19ba382ba95361f75f9a4275e74e15bcc84`: five jobs PASS, laravel-postgres FAIL. Root cause PostgreSQL 42723 Duplicate function `venuedesk_guard_variance_reclassification` when Laravel RefreshDatabase repeatedly replays migration `2026_10_20_003000_guard_hall_inventory_variance_reclassification_scope.php`. Repair CREATE OR REPLACE for same immutable-scoping guard definition, retains all strict FK and authorization logic. New exact-SHA 6-job CI REQUIRED. Continue INV-016 external-in after verified.
