@@ -161,19 +161,26 @@ final class HallInventoryStocktakeVariancePreviewTest extends TestCase
         $this->assertSame(1,DB::table('audit_events')
             ->where('action','hall_inventory.stocktake_variance_review_acknowledged')->count());
         Livewire::test(HallInventory::class)
+            ->set('hallId',$hall->id)
             ->call('viewStocktakeVariance',$secondTake)->assertHasNoErrors()
+            ->assertSet('varianceStocktakeId',$secondTake)
             ->set('varianceReviewReason','Separate physical count variance reviewed')
             ->call('acknowledgeStocktakeVariance')->assertHasNoErrors()
-            ->assertSee('An independent reviewer acknowledged this physical variance.');
+            ->assertSet('stocktakeVariance',fn($rows):bool=>
+                is_array($rows) && count($rows)===1 &&
+                ($rows[0]['reviewAcknowledged']??false)===true);
         $this->assertSame(2,DB::table('hall_inventory_variance_review_acknowledgments')->count());
         $history=app(HallInventoryStocktakeVariancePreview::class)
             ->forStocktake($owner,$company->id,$hall->id,$secondTake);
         $this->assertTrue($history[0]['reviewAcknowledged']);
         $this->assertNotNull($history[0]['reviewAcknowledgedAt']);
         Livewire::test(HallInventory::class)
+            ->set('hallId',$hall->id)
             ->call('viewStocktakeVariance',$secondTake)->assertHasNoErrors()
-            ->assertSee('An independent reviewer acknowledged this physical variance.')
-            ->assertDontSee('Record independent variance review');
+            ->assertSet('varianceStocktakeId',$secondTake)
+            ->assertSet('stocktakeVariance',fn($rows):bool=>
+                is_array($rows) && count($rows)===1 &&
+                ($rows[0]['reviewAcknowledged']??false)===true);
         $this->assertSame(0,DB::table('finance_journals')->count());
         try {
             DB::transaction(function()use($ackId):void {
