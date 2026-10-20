@@ -709,7 +709,7 @@ final class HallInventory extends Page
     {
         $actor=$this->authorizeSelection();
         abort_unless(config('inventory_controls.position_reports_enabled'),403);
-        $this->positionReport=app(\\App\\Services\\HallInventoryPositionReport::class)
+        $this->positionReport=app(\App\Services\HallInventoryPositionReport::class)
             ->recent($actor,$this->companyId,$this->hallId);
     }
 

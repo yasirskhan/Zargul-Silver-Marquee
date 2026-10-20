@@ -150,3 +150,10 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Impact: HIGH availability/correctness for operator-approved future switches; no evidence that production posting was activated. Existing production controls remain OFF.
 - Repair: replace escaped markers with real line breaks; regression verifies all fourteen approved keys are parsed booleans in both PHP array and Laravel configuration.
 - Status: FIX PUBLISHED — CI PENDING. Require all six hosted jobs green on exact SHA before VERIFIED.
+
+## BUG-20261020-011 — Hall book-report Livewire page double namespace slash parse error
+- CI detection: source `c3fc20e9ad4590365a01edefea43497f0fbfa04d`, run [39367189812](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39367189812) failed `licensing-postgres`, `laravel-postgres` and `authenticated-panel-e2e` during Composer package discovery.
+- Root cause: newly added `reloadPositionReport()` was authored with two literal namespace separator backslashes in a PHP class reference, producing `ParseError: unexpected token backslash` on line 712. Dependency downloads succeeded; the displayed Composer step name was incidental.
+- Impact: HIGH availability on this unreleased branch. No evidence of production activation, stock movement or financial posting. All release flags remain OFF.
+- Repair: single valid fully qualified PHP class namespace separator. Existing targeted Livewire report regression and full exact-SHA six-job CI must run; original failed run remains a diagnostic record.
+- Status: REPAIR PUBLISHED, CI PENDING.
