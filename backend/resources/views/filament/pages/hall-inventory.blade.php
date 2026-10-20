@@ -688,6 +688,7 @@
                                         'external_borrowed_received_return_pending' => 'EXTERNAL BORROWED STOCK RECEIVED / RETURN PENDING',
                                         'external_partial_return_or_partner_ack_pending' => 'EXTERNAL PARTIAL RETURN / PARTNER RECEIPT PENDING',
                                         'external_all_returns_physically_confirmed_finance_unsettled' => 'EXTERNAL RETURN PHYSICALLY VERIFIED / FINANCE UNSETTLED',
+                                        'external_clean_loan_closed' => 'CLOSED / EXTERNAL CLEAN PARTNER RETURN VERIFIED',
                                         default => 'DRAFT / NOT DISPATCHED'
                                     };
                                 @endphp
@@ -727,7 +728,13 @@
                                     @if($loan['externalReturnReconciliation']['integrityWarning'])
                                         <p role="alert">External return custody evidence mismatch. Do not close or settle this loan.</p>
                                     @elseif($loan['externalReturnReconciliation']['allPhysicalReturnsConfirmed'])
-                                        <p>All borrowed physical quantities independently returned and partner receipt-verified. Formal loan closure, claims and financial settlement remain separate and unrecorded.</p>
+                                        <p>All borrowed physical quantities independently returned and partner receipt-verified.
+                                            @if($loan['externalReturnReconciliation']['loanClosed'])
+                                                Clean physical return closure is recorded; it does not create money, penalty or any financial settlement.
+                                            @else
+                                                Formal loan closure, claims and financial settlement remain separate and unrecorded.
+                                            @endif
+                                        </p>
                                     @endif
                                 @endif
                                 <p>Source: {{ $loan['lendingHallName'] ?? $loan['externalPartnerName'] ?? 'Not assigned' }}.
@@ -765,6 +772,7 @@
                                         <p class="text-sm">External inventory accepted as BORROWED, not owned. No money posted or loan completed.
                                             {{ ($loan['externalReturnReconciliation']['allPhysicalReturnsConfirmed'] ?? false) ? 'Physical return verified; formal closure pending.' : 'Physical return is still due.' }}</p>
                                         @if(config('inventory_controls.external_borrowed_return_enabled') &&
+                                            !$loan['externalCleanClosed'] &&
                                             $loan['createdBy']!==(int)auth()->id())
                                             <button type="button" wire:click="startExternalBorrowedReturn('{{ $loan['id'] }}')"
                                                 class="rounded-lg border px-3 py-2 text-sm">Prepare partial outside partner return</button>

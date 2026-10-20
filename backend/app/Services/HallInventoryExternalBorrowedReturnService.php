@@ -130,6 +130,9 @@ final class HallInventoryExternalBorrowedReturnService {
                     throw new ConflictHttpException('Physical return replay changes original quantities.');
                 return $batchId;
             }
+            if(DB::table('hall_inventory_external_in_clean_closures')
+                ->where('company_id',$companyId)->where('loan_id',$loanId)->exists())
+                throw new ConflictHttpException('This partner borrowed loan is already independently closed.');
             $accepted=DB::table('hall_inventory_external_in_acceptance_lines')
                 ->where('company_id',$companyId)->where('acceptance_id',$accept->id)
                 ->where('hall_id',$hallId)->whereIn('item_id',array_keys($quantities))

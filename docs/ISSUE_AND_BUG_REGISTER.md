@@ -221,3 +221,11 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 
 ## BUG-20261020-020 — Externally borrowed items falsely remain labeled pending after full physical return
 - Existing immutable intake review showed the same return-pending status forever, even after physically witnessed and independently confirmed partial partner batches; overdue warning also stayed on full physical reconciliation. Prepared follow-on per-item aggregate plus clear not-closed state and Livewire tests. Gate remains OFF; requires exact hosted CI.
+
+
+## BUG-20261020-021 — External borrowed loan lacked immutable final clean-return closure
+- Existing independently confirmed physical return did not authorize a final closeout or legally independent signed receipt. Candidate adds owner-only verified exact-return finalization, private number/hash-linked immutable EX-series PDF and independent download, blocks missing/tampered evidence or reopened/duplicate closeout. Explicitly no money postings or case settlement. Still needs own exact hosted green CI; release switch OFF.
+
+
+## VERIFIED 2026-10-20: BUG-019/020 external borrowed return and per-loan custody display
+- External partial partner dispatch and independent count CI 39448663572 at ab75cd0f: all six SUCCESS, preserving five successes from earlier failed selector-only CI and repairing the two-hall owner UI regression. Per-loan item aggregate and accurate outstanding/in-transit/confirmed states CI 39450008056 at 00f7efbc: all six SUCCESS. Closure candidate still separate/CI PENDING. Default production controls all OFF.

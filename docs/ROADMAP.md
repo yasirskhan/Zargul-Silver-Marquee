@@ -120,3 +120,9 @@ production toggles merely because development CI passes.
 
 
 - Phase 12 partner return reconciliation follow-on candidate: clear per-loan/per-item accepted, returned-to-partner, partner-confirmed, still-in-hall and pending-in-transit aggregates; full physical return has a distinct NOT FINANCIALLY SETTLED status and no false overdue flag. No financial or closing authority. Retain all inventory release gates OFF; separate exact SHA CI required.
+
+
+## Phase 12 external clean partner-return closure (candidate)
+- Numbered immutable partner clean-return PDF, complete per-item original intake / witnessed partial batch / partner-signed receipt matching, multi-actor separation and role-specific owner confirmation + download. Explicitly no financial payment/penalty/claim assignment. Default OFF independent release flag; requires six CI successes on exact SHA. Disputed/damaged/missing financial resolution, nonclean closure, external_out and launch review still pending.
+
+- VERIFIED: external_in borrowed intake at ab146a61 CI 39433026329; external partial return partner physical batch approval at ab75cd0f CI 39448663572; per-item/loan custody reconciliation 00f7efbc CI 39450008056 — all six jobs green each. Production OFF. External borrowed clean numbered return PDF is the NEXT separately gated candidate.

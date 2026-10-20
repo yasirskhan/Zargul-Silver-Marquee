@@ -74,6 +74,9 @@ final class HallInventoryLoanDraftReview
             ->leftJoin('hall_inventory_external_in_acceptances as ea',function($j):void {
                 $j->on('ea.company_id','=','d.company_id')->on('ea.loan_id','=','d.id');
             })
+            ->leftJoin('hall_inventory_external_in_clean_closures as ec',function($j):void {
+                $j->on('ec.company_id','=','d.company_id')->on('ec.loan_id','=','d.id');
+            })
             ->leftJoin('hall_inventory_external_partners as p', function ($join):void {
                 $join->on('p.id','=','d.external_partner_id')
                     ->on('p.company_id','=','d.company_id');
@@ -107,6 +110,7 @@ final class HallInventoryLoanDraftReview
                 'lc.id as closure_id',
                 'lr.id as receipt_id','lr.created_at as received_at',
                 'er.id as external_receipt_id','ea.id as external_acceptance_id',
+                'ec.id as external_clean_closure_id',
                 'rb.return_batch_count','rb.acknowledged_batch_count',
                 'p.name as external_partner_name',
                 'lh.name as lending_hall_name','bh.name as borrowing_hall_name',
@@ -233,7 +237,7 @@ final class HallInventoryLoanDraftReview
                     'allPhysicalReturnsConfirmed'=>!$integrity && $acceptedCount>0 &&
                         $acceptedCount===$confirmedCount,
                     'financiallySettled'=>false,
-                    'loanClosed'=>false,
+                    'loanClosed'=>$draft->external_clean_closure_id!==null,
                 ];
             }
             $stats=$returns->get($draft->id);
@@ -269,6 +273,7 @@ final class HallInventoryLoanDraftReview
                 'externalCountByItem'=>$draft->direction==='external_in' ? $actualCounts : [],
                 'externalCountMatchesDraft'=>$matches,
                 'externalReturnReconciliation'=>$externalReconciliation,
+                'externalCleanClosed'=>$draft->external_clean_closure_id!==null,
                 'lendingHallId'=>$draft->lending_hall_id,
                 'borrowingHallId'=>$draft->borrowing_hall_id,
                 'externalPartnerName'=>$draft->external_partner_name,
@@ -290,11 +295,13 @@ final class HallInventoryLoanDraftReview
                 'createdAt'=>(string)$draft->created_at,
                 'status'=>$draft->direction==='external_in' ?
                     ($draft->external_acceptance_id!==null
-                        ? (($externalReconciliation['allPhysicalReturnsConfirmed']??false)
-                            ? 'external_all_returns_physically_confirmed_finance_unsettled'
+                        ? ($draft->external_clean_closure_id!==null
+                            ? 'external_clean_loan_closed'
+                            : (($externalReconciliation['allPhysicalReturnsConfirmed']??false)
+                                ? 'external_all_returns_physically_confirmed_finance_unsettled'
                             : (($externalReconciliation['shippedQuantity']??0)>0
                                 ? 'external_partial_return_or_partner_ack_pending'
-                                : 'external_borrowed_received_return_pending'))
+                                : 'external_borrowed_received_return_pending')))
                         : ($draft->external_receipt_id!==null ? 'external_physical_receipt_pending_review' : 'draft_only')) :
                     ($draft->closure_id !== null ? 'clean_loan_closed' : ($draft->receipt_id !== null
                     ? ((int)($draft->return_batch_count??0)>0
