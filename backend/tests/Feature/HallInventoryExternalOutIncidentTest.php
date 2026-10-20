@@ -513,5 +513,57 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
         $this->assertSame(6,(int)$p->owned_usable);
         $this->assertSame(1,(int)$p->owned_damaged);
         $this->assertSame(2,DB::table('hall_inventory_loan_incident_reports')->count());
+        // Independently audited non-clean readiness is a private READ, never
+        // an implicit write-off, collection posting or final PDF certificate.
+        $reconciliation=app(\App\Services\HallInventoryNoncleanReconciliationService::class);
+        try {
+            $reconciliation->report($reviewer,$company->id,$hall->id,$loan);
+            $this->fail('Disabled non-clean reconciliation was exposed.');
+        }catch(ConflictHttpException){}
+        config()->set('inventory_controls.loan_nonclean_reconciliation_enabled',true);
+        $this->be($reviewer);
+        try {
+            $reconciliation->report($reviewer,$company->id,$wrong->id,$loan);
+            $this->fail('Other hall loan reconciliation was disclosed.');
+        }catch(AuthorizationException){}
+        $snapshot=$reconciliation->report($reviewer,$company->id,$hall->id,$loan);
+        $this->assertFalse($snapshot['finalClosureAuthorized']);
+        $this->assertCount(1,$snapshot['items']);
+        $physical=$snapshot['items'][0];
+        $this->assertSame($item,$physical['itemId']);
+        $this->assertSame(5,$physical['dispatched']);
+        $this->assertSame(1,$physical['good']);
+        $this->assertSame(1,$physical['damaged']);
+        $this->assertSame(0,$physical['unresolved']);
+        $this->assertSame(0,$physical['pendingReview']);
+        $this->assertSame(3,$physical['unreturned']);
+        $this->assertSame(3,$physical['onLoan']);
+        $this->assertSame(2,$snapshot['incidentReports']);
+        $this->assertSame(1,$snapshot['unreviewedIncidents']);
+        $this->assertSame(25000,$snapshot['obligations'][$obligationId]['amountMinor']);
+        $this->assertSame(0,$snapshot['obligations'][$obligationId]['paidMinor']);
+        // A manager, even assigned to this exact hall, must not see a
+        // private owner financial settlement and physical loss report.
+        $this->be($drafter);
+        try {
+            $reconciliation->report($drafter,$company->id,$hall->id,$loan);
+            $this->fail('Manager could read owner-only non-clean reconciliation.');
+        }catch(AuthorizationException){}
+        $this->be($reviewer);
+        $signedReturn=DB::table('hall_inventory_external_out_return_receipts')
+            ->where('company_id',$company->id)->where('loan_id',$loan)->first();
+        $signedReturnOriginal=Storage::disk('local')->get($signedReturn->evidence_storage_path);
+        Storage::disk('local')->put($signedReturn->evidence_storage_path,'tampered return custody');
+        try {
+            $reconciliation->report($reviewer,$company->id,$hall->id,$loan);
+            $this->fail('Tampered partner return proof counted toward non-clean custody.');
+        }catch(ConflictHttpException){}
+        Storage::disk('local')->put($signedReturn->evidence_storage_path,$signedReturnOriginal);
+        Livewire::test(HallInventory::class)->set('hallId',$hall->id)
+            ->call('startFinancialClaims',$loan)->assertHasNoErrors()
+            ->assertSee('Non-clean loan reconciliation (read-only)')
+            ->assertSee('Physically unreturned: 3')
+            ->assertSee('Final non-clean closure: BLOCKED');
+        $this->assertSame(0,DB::table('hall_inventory_external_out_clean_closures')->count());
     }
 }

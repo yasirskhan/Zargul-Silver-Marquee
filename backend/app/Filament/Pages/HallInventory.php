@@ -331,6 +331,8 @@ final class HallInventory extends Page
     #[Locked]
     public array $financialRecoveryBalances = [];
     #[Locked]
+    public array $noncleanReconciliation = [];
+    #[Locked]
     public string $financialRecoveryRequestId = '';
     public string $financialRecoveryObligationId = '';
     public string $financialRecoveryAmountMinor = '';
@@ -532,6 +534,7 @@ final class HallInventory extends Page
         $this->financialClaimLoanId = '';
         $this->financialRecoveryHistory = [];
         $this->financialRecoveryBalances = [];
+        $this->noncleanReconciliation = [];
         $this->financialRecoveryRequestId = (string)Str::uuid();
         $this->financialRecoveryObligationId = '';
         $this->financialRecoveryAmountMinor = '';
@@ -2257,6 +2260,11 @@ final class HallInventory extends Page
     {
         abort_unless($this->canManageFinancialClaims() &&
             $this->financialClaimLoanId!=='',403);
+        $this->noncleanReconciliation = [];
+        if(config('inventory_controls.loan_nonclean_reconciliation_enabled')) {
+            $this->noncleanReconciliation=app(\App\Services\HallInventoryNoncleanReconciliationService::class)
+                ->report($actor,$this->companyId,$this->hallId,$this->financialClaimLoanId);
+        }
         $this->financialClaimHistory=app(\App\Services\HallInventoryFinancialClaimService::class)
             ->history($actor,$this->companyId,$this->hallId,$this->financialClaimLoanId);
         $this->financialRecoveryHistory=[];
