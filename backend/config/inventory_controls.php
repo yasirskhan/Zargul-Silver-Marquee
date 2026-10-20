@@ -26,6 +26,8 @@ return [
     'loan_incident_reviews_enabled' => (bool) env('VENUE_INVENTORY_LOAN_INCIDENT_REVIEWS_ENABLED', false),
     // Substantiated incident claim proposal and separate collection review, no payment or journal.
     'loan_financial_claims_enabled' => (bool) env('VENUE_INVENTORY_LOAN_FINANCIAL_CLAIMS_ENABLED', false),
+    // Private owner-recorded partner correspondence and independent integrity review only.
+    'loan_partner_responses_enabled' => (bool) env('VENUE_INVENTORY_LOAN_PARTNER_RESPONSES_ENABLED', false),
     // Entirely clean internal loans only; independently reconciled numbered PDF.
     'loan_clean_closure_enabled' => (bool) env('VENUE_INVENTORY_LOAN_CLEAN_CLOSURE_ENABLED', false),
     // Hall-owned goods lent outside: independent signed handover and owner approval. OFF.

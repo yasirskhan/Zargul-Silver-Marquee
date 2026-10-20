@@ -1071,6 +1071,90 @@
                         @if($lastFinancialClaimReference)
                             <p role="status">Financial claim/review {{ $lastFinancialClaimReference }} saved. No receivable, payment, financial journal, stock write-off or final closure recorded.</p>
                         @endif
+                        @if(config('inventory_controls.loan_partner_responses_enabled'))
+                            <h4 class="font-semibold">Private outside partner correspondence and disputes</h4>
+                            <p class="text-sm">Only owner-recorded copies of partner documents are captured. The document is not authenticated by uploading it. Even a document describing acceptance or an offer is NOT a legally confirmed debt, a paid collection, or a posted accounting entry.</p>
+                            @if(collect($financialClaimHistory)->contains(fn($c)=>in_array($c['decision'],['approved_for_collection','disputed'],true)))
+                                <label class="block text-sm">Reviewed claim linked to correspondence
+                                    <select wire:model="financialPartnerClaimId" class="w-full rounded-lg border p-2 text-gray-900">
+                                        <option value="">Choose claim</option>
+                                        @foreach($financialClaimHistory as $claim)
+                                            @if(in_array($claim['decision'],['approved_for_collection','disputed'],true))
+                                                <option value="{{ $claim['id'] }}">{{ $claim['currency'] }} {{ $claim['amountMinor'] }} ({{ $claim['id'] }})</option>
+                                            @endif
+                                        @endforeach
+                                    </select>
+                                </label>
+                                <label class="block text-sm">What the submitted document appears to state
+                                    <select wire:model="financialPartnerPosition" class="w-full rounded-lg border p-2 text-gray-900">
+                                        <option value="document_says_disputes">Partner document disputes claim</option>
+                                        <option value="document_says_accepts">Document appears to accept proposed claim, authenticity NOT verified</option>
+                                        <option value="counteroffer">Counteroffer documented</option>
+                                        <option value="other_document">Other correspondence</option>
+                                    </select>
+                                </label>
+                                <label class="block text-sm">Counteroffer in minor units (only when Counteroffer selected)
+                                    <input wire:model="financialPartnerCounterofferMinor" type="number" min="1" step="1" class="w-full rounded-lg border p-2 text-gray-900">
+                                </label>
+                                <label class="block text-sm">Private signed correspondence PDF/photo, maximum 5 MB
+                                    <input type="file" wire:model="financialPartnerFile" accept=".pdf,.png,.jpeg,.jpg"
+                                        class="w-full rounded-lg border p-2">
+                                </label>
+                                @error('financialPartnerClaimId') <p role="alert">{{ $message }}</p> @enderror
+                                @error('financialPartnerFile') <p role="alert">{{ $message }}</p> @enderror
+                                @error('financialPartnerCounterofferMinor') <p role="alert">{{ $message }}</p> @enderror
+                                <button type="button" wire:click="submitFinancialPartnerEvidence"
+                                    class="rounded-lg border px-3 py-2 text-sm">Record private partner document without posting money</button>
+                            @endif
+                            <h4 class="font-semibold">Partner document custody and independent review</h4>
+                            @forelse($financialPartnerHistory as $document)
+                                <article wire:key="finance-partner-doc-{{ $document['id'] }}" class="rounded-lg border p-3 text-sm">
+                                    <p>Document {{ $document['id'] }}: {{ $document['position'] }} for claim {{ $document['claimId'] }}.
+                                        @if($document['counterofferMinor']!==null)
+                                            Counteroffer {{ $document['currency'] }} {{ $document['counterofferMinor'] }} minor units.
+                                        @endif
+                                    </p>
+                                    <p>Review: {{ $document['assessment'] ?? 'PENDING DOCUMENT REVIEW' }}.
+                                        Partner identity verified: NO. Paid: {{ $document['paidMinor'] }}. Journal posted: NO.</p>
+                                    <button type="button" wire:click="downloadFinancialPartnerDocument('{{ $document['id'] }}')"
+                                        class="rounded-lg border px-3 py-2 text-sm">Download hash-checked private correspondence</button>
+                                </article>
+                            @empty
+                                <p>No partner correspondence recorded for this loan.</p>
+                            @endforelse
+                            @if(collect($financialPartnerHistory)->contains(fn($d)=>$d['assessment']===null &&
+                                $d['recordedBy']!==(int)auth()->id() &&
+                                $d['proposedBy']!==(int)auth()->id()))
+                                <label class="block text-sm">Unreviewed document submitted by another owner
+                                    <select wire:model="financialPartnerReviewEvidenceId" class="w-full rounded-lg border p-2 text-gray-900">
+                                        <option value="">Choose document</option>
+                                        @foreach($financialPartnerHistory as $document)
+                                            @if($document['assessment']===null &&
+                                                $document['recordedBy']!==(int)auth()->id() &&
+                                                $document['proposedBy']!==(int)auth()->id())
+                                                <option value="{{ $document['id'] }}">{{ $document['position'] }} ({{ $document['id'] }})</option>
+                                            @endif
+                                        @endforeach
+                                    </select>
+                                </label>
+                                <label class="block text-sm">Independent documentary review
+                                    <select wire:model="financialPartnerAssessment" class="w-full rounded-lg border p-2 text-gray-900">
+                                        <option value="insufficient_partner_proof">Insufficient partner proof</option>
+                                        <option value="document_integrity_confirmed">Stored document matches upload; authenticity NOT proven</option>
+                                    </select>
+                                </label>
+                                <label class="block text-sm">Review explanation
+                                    <textarea wire:model="financialPartnerReviewReason" class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                                </label>
+                                @error('financialPartnerReviewReason') <p role="alert">{{ $message }}</p> @enderror
+                                <button type="button" wire:click="submitFinancialPartnerReview"
+                                    class="rounded-lg border px-3 py-2 text-sm">Save independent immutable documentary review</button>
+                            @endif
+                            @if($lastFinancialPartnerReference)
+                                <p role="status">Documentary record {{ $lastFinancialPartnerReference }} saved. No accepted debt, receipt, recovery, journal or physical write-off.</p>
+                            @endif
+                        @endif
+
                     </section>
                 @endif
                 @if(config('inventory_controls.external_out_dispatch_enabled') && $externalOutLoanId !== '')

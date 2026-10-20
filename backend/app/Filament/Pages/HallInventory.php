@@ -294,6 +294,22 @@ final class HallInventory extends Page
     #[Locked]
     public ?string $lastFinancialClaimReference = null;
     #[Locked]
+    public array $financialPartnerHistory = [];
+    #[Locked]
+    public string $financialPartnerRequestId = '';
+    public string $financialPartnerClaimId = '';
+    public string $financialPartnerPosition = 'document_says_disputes';
+    public string $financialPartnerCounterofferMinor = '';
+    public $financialPartnerFile = null;
+    #[Locked]
+    public string $financialPartnerReviewId = '';
+    public string $financialPartnerReviewEvidenceId = '';
+    public string $financialPartnerAssessment = 'insufficient_partner_proof';
+    public string $financialPartnerReviewReason = '';
+    #[Locked]
+    public ?string $lastFinancialPartnerReference = null;
+
+    #[Locked]
     public array $cleanLoanReceipts = [];
     #[Locked]
     public ?string $lastCleanLoanReceipt = null;
@@ -472,6 +488,17 @@ final class HallInventory extends Page
         $this->incidentReviews = [];
         $this->lastIncidentDecisionId = null;
         $this->financialClaimLoanId = '';
+        $this->financialPartnerHistory = [];
+        $this->financialPartnerRequestId = (string)Str::uuid();
+        $this->financialPartnerClaimId = '';
+        $this->financialPartnerPosition = 'document_says_disputes';
+        $this->financialPartnerCounterofferMinor = '';
+        $this->financialPartnerFile = null;
+        $this->financialPartnerReviewId = (string)Str::uuid();
+        $this->financialPartnerReviewEvidenceId = '';
+        $this->financialPartnerAssessment = 'insufficient_partner_proof';
+        $this->financialPartnerReviewReason = '';
+        $this->lastFinancialPartnerReference = null;
         $this->financialClaimHistory = [];
         $this->financialClaimEligibleReports = [];
         $this->financialClaimRequestId = (string)Str::uuid();
@@ -2117,6 +2144,13 @@ final class HallInventory extends Page
                 $row['externalOutApproved']);
         abort_unless($loan!==null,403);
         $this->financialClaimLoanId=$loanId;
+        $this->financialPartnerRequestId=(string)Str::uuid();
+        $this->financialPartnerReviewId=(string)Str::uuid();
+        $this->financialPartnerClaimId='';
+        $this->financialPartnerReviewEvidenceId='';
+        $this->financialPartnerFile=null;
+        $this->financialPartnerCounterofferMinor='';
+        $this->financialPartnerReviewReason='';
         $this->financialClaimReportId='';
         $this->financialClaimReason='';
         $this->financialClaimAmountMinor='';
@@ -2133,6 +2167,11 @@ final class HallInventory extends Page
             $this->financialClaimLoanId!=='',403);
         $this->financialClaimHistory=app(\App\Services\HallInventoryFinancialClaimService::class)
             ->history($actor,$this->companyId,$this->hallId,$this->financialClaimLoanId);
+        $this->financialPartnerHistory=[];
+        if(config('inventory_controls.loan_partner_responses_enabled')) {
+            $this->financialPartnerHistory=app(\App\Services\HallInventoryFinancialCounterpartyEvidenceService::class)
+                ->history($actor,$this->companyId,$this->hallId,$this->financialClaimLoanId);
+        }
         // A substantiated decision is evidence, not an authorization for money.
         // Only reports not already claimed are selectable for a proposal.
         $this->financialClaimEligibleReports=DB::table('hall_inventory_loan_incident_reports as r')
@@ -2215,6 +2254,91 @@ final class HallInventory extends Page
         $this->financialClaimDecisionClaimId='';
         $this->financialClaimDecisionReason='';
         $this->reloadFinancialClaims($actor);
+    }
+
+
+    /** Owner-recorded documentation is never automatically a recognized obligation. */
+    public function submitFinancialPartnerEvidence():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canManageFinancialClaims() &&
+            config('inventory_controls.loan_partner_responses_enabled') &&
+            $this->financialClaimLoanId!=='',403);
+        $this->validate([
+            'financialPartnerClaimId'=>'required|uuid',
+            'financialPartnerPosition'=>'required|in:document_says_accepts,document_says_disputes,counteroffer,other_document',
+            'financialPartnerFile'=>'required|file|max:5120|mimes:jpg,jpeg,png,pdf',
+        ]);
+        $this->reloadFinancialClaims($actor);
+        abort_unless(collect($this->financialClaimHistory)->contains(
+            fn($c):bool=>$c['id']===$this->financialPartnerClaimId &&
+                in_array($c['decision'],['approved_for_collection','disputed'],true)),403);
+        $offer=null;
+        if($this->financialPartnerPosition==='counteroffer'){
+            $this->validate([
+                'financialPartnerCounterofferMinor'=>['required','regex:/\A[1-9][0-9]{0,11}\z/D']
+            ]);
+            $offer=(int)$this->financialPartnerCounterofferMinor;
+        }elseif($this->financialPartnerCounterofferMinor!==''){
+            throw ValidationException::withMessages([
+                'financialPartnerCounterofferMinor'=>'Only a documentary counteroffer may include an offered monetary amount.'
+            ]);
+        }
+        try {
+            $this->lastFinancialPartnerReference=app(\App\Services\HallInventoryFinancialCounterpartyEvidenceService::class)
+                ->record($actor,$this->companyId,$this->financialPartnerClaimId,
+                    $this->financialPartnerRequestId,$this->financialPartnerPosition,
+                    $offer,$this->financialPartnerFile);
+        }catch(InvalidArgumentException|ConflictHttpException $e){
+            throw ValidationException::withMessages(['financialPartnerFile'=>$e->getMessage()]);
+        }
+        $this->financialPartnerRequestId=(string)Str::uuid();
+        $this->financialPartnerClaimId='';
+        $this->financialPartnerCounterofferMinor='';
+        $this->financialPartnerFile=null;
+        $this->reloadFinancialClaims($actor);
+    }
+
+    public function submitFinancialPartnerReview():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canManageFinancialClaims() &&
+            config('inventory_controls.loan_partner_responses_enabled') &&
+            $this->financialClaimLoanId!=='',403);
+        $this->validate([
+            'financialPartnerReviewEvidenceId'=>'required|uuid',
+            'financialPartnerAssessment'=>'required|in:document_integrity_confirmed,insufficient_partner_proof',
+            'financialPartnerReviewReason'=>'required|string|min:10|max:500',
+        ]);
+        $this->reloadFinancialClaims($actor);
+        abort_unless(collect($this->financialPartnerHistory)->contains(
+            fn($p):bool=>$p['id']===$this->financialPartnerReviewEvidenceId &&
+                $p['assessment']===null &&
+                $p['recordedBy']!==(int)$actor->getKey() &&
+                $p['proposedBy']!==(int)$actor->getKey()),403);
+        try {
+            $this->lastFinancialPartnerReference=app(\App\Services\HallInventoryFinancialCounterpartyEvidenceService::class)
+                ->review($actor,$this->companyId,$this->financialPartnerReviewEvidenceId,
+                    $this->financialPartnerReviewId,$this->financialPartnerAssessment,
+                    $this->financialPartnerReviewReason);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['financialPartnerReviewReason'=>$e->getMessage()]);
+        }
+        $this->financialPartnerReviewId=(string)Str::uuid();
+        $this->financialPartnerReviewEvidenceId='';
+        $this->financialPartnerReviewReason='';
+        $this->reloadFinancialClaims($actor);
+    }
+
+    public function downloadFinancialPartnerDocument(string $evidenceId):\Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canManageFinancialClaims() &&
+            config('inventory_controls.loan_partner_responses_enabled') &&
+            $this->financialClaimLoanId!=='' && Str::isUuid($evidenceId),403);
+        return app(\App\Services\HallInventoryFinancialCounterpartyEvidenceService::class)
+            ->download($actor,$this->companyId,$this->hallId,
+                $this->financialClaimLoanId,$evidenceId);
     }
 
     public function canManageSourceCleanClosure():bool

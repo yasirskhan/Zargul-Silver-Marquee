@@ -230,6 +230,53 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
         $this->assertSame(25000,(int)DB::table('hall_inventory_financial_claims')
             ->where('id',$claim)->value('amount_minor'));
         $this->assertSame(1,DB::table('hall_inventory_financial_claim_decisions')->count());
+        // Second independent documentary workflow: private custody, disputed
+        // partner response, separate review, and no automatic financial charge.
+        config()->set('inventory_controls.loan_partner_responses_enabled',true);
+        $this->be($owner);
+        $partnerPdf=static fn()=>UploadedFile::fake()->createWithContent(
+            'partner-response.pdf',"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF");
+        Livewire::test(HallInventory::class)->set('hallId',$hall->id)
+            ->call('startFinancialClaims',$loan)->assertHasNoErrors()
+            ->set('financialPartnerClaimId',$claim)
+            ->set('financialPartnerPosition','document_says_disputes')
+            ->set('financialPartnerFile',$partnerPdf())
+            ->call('submitFinancialPartnerEvidence')->assertHasNoErrors()
+            ->assertSee('PENDING DOCUMENT REVIEW')
+            ->assertSee('Journal posted: NO');
+        $document=(string)DB::table('hall_inventory_financial_counterparty_evidence')
+            ->where('company_id',$company->id)->where('claim_id',$claim)->value('id');
+        $this->assertTrue(Str::isUuid($document));
+        $partner=app(\App\Services\HallInventoryFinancialCounterpartyEvidenceService::class);
+        try {
+            $partner->review($owner,$company->id,$document,(string)Str::uuid(),
+                'document_integrity_confirmed','Cannot independently review my submitted response');
+            $this->fail('Partner evidence reporter reviewed their own submission.');
+        }catch(AuthorizationException){}
+        $this->be($reviewer);
+        Livewire::test(HallInventory::class)->set('hallId',$wrong->id)
+            ->call('startFinancialClaims',$loan)->assertForbidden();
+        Livewire::test(HallInventory::class)->set('hallId',$hall->id)
+            ->call('startFinancialClaims',$loan)->assertHasNoErrors()
+            ->assertSee('Partner document custody and independent review')
+            ->set('financialPartnerReviewEvidenceId',$document)
+            ->set('financialPartnerAssessment','document_integrity_confirmed')
+            ->set('financialPartnerReviewReason','Stored signed partner document matches submitted bytes but signer needs verification')
+            ->call('submitFinancialPartnerReview')->assertHasNoErrors()
+            ->assertSee('document_integrity_confirmed');
+        $reviewId=(string)DB::table('hall_inventory_financial_counterparty_reviews')
+            ->where('company_id',$company->id)->where('evidence_id',$document)->value('id');
+        $this->assertTrue(Str::isUuid($reviewId));
+        $this->assertSame($reviewId,$partner->review($reviewer,$company->id,$document,
+            $reviewId,'document_integrity_confirmed',
+            'Stored signed partner document matches submitted bytes but signer needs verification'));
+        $private=$partner->download($reviewer,$company->id,$hall->id,$loan,$document);
+        $this->assertSame('private, no-store',$private->headers->get('Cache-Control'));
+        $this->assertSame('nosniff',$private->headers->get('X-Content-Type-Options'));
+        $docHistory=$partner->history($reviewer,$company->id,$hall->id,$loan);
+        $this->assertCount(1,$docHistory);
+        $this->assertFalse($docHistory[0]['partnerIdentityVerified']);
+        $this->assertSame(0,$docHistory[0]['paidMinor']);
         $this->assertSame(0,DB::table('finance_journals')->count());
         $this->assertSame(0,DB::table('hall_inventory_internal_loan_closures')->count());
         $p=DB::table('hall_inventory_positions')->where('company_id',$company->id)
