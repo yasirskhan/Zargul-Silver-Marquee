@@ -96,6 +96,10 @@ final class HallInventoryExternalBorrowedIntakeTest extends TestCase
             ->assertSee('EXTERNAL PHYSICAL RECEIPT / INDEPENDENT REVIEW PENDING');
         $this->assertSame(1,DB::table('hall_inventory_external_in_receipts')->count());
         $this->assertSame(2,DB::table('hall_inventory_external_in_receipt_lines')->count());
+        // The Livewire form owns its own locked receipt id, distinct from the
+        // identifier used for the pre-release negative request above.
+        $receipt=(string)DB::table('hall_inventory_external_in_receipts')
+            ->where('company_id',$company->id)->where('loan_id',$loan)->value('id');
         // A valid hall item absent from the outside partner's original
         // immutable loan must not be attachable via direct PostgreSQL writes.
         $this->be($owner);

@@ -461,3 +461,7 @@ Verify live branch/CI → reconcile current handoff + specific requirement/featu
 
 ## 2026-10-20 EXTERNAL INBOUND SQL QUOTE FINAL CORRECTION
 - On CI 39428562572, migration remained unchanged despite documentation-only commit `273cd67f...` because JavaScript String.replace replacement string treats `$$` as escaped literal `$`. Repaired deterministically with a callback replacer so BOTH SQL dollar-quote delimiters in `venuedesk_guard_external_in_count` persist as actual `$$`, and verified new git blob SHA differs from original BEFORE publishing. Integrity guard and test retained. Repeat all 6 CI jobs on the new exact SHA.
+
+
+## PHASE 12 EXTERNAL-IN LIVEWIRE TEST REPLAY ID REPAIR (2026-10-20)
+- CI 39429192646 on `26e1573a9825e447a3e652f54bfaae400c68d9f4`: 5 jobs PASS, laravel-postgres 629 passed, 3 risky, one FAIL. Test `HallInventoryExternalBorrowedIntakeTest` erroneously used the earlier pre-release negative-test UUID for replay after Livewire had independently generated its own immutable receipt ID. Real service intentionally rejects different receipt identifiers. Fix test to query the ACTUAL saved receipt ID by company+loan after the UI submit, preserving strong replay matching, same-company cross-item SQL guard, immutable evidence, and external borrowed-only amounts. New exact-SHA six-job CI required. No production flags enabled.
