@@ -556,7 +556,7 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
                 $reconciliation->report($reviewer,$company->id,$hall->id,$loan);
                 $this->fail('Duplicate physical return line accepted.');
             });
-        } catch (\\Illuminate\\Database\\QueryException|ConflictHttpException) {}
+        } catch (\Illuminate\Database\QueryException|ConflictHttpException) {}
         // A movement may not be reused as proof of two differently classified
         // returned batches, even if a writer attempts to alter reviewed evidence.
         $reviewLine=DB::table('hall_inventory_external_out_return_review_lines')
@@ -570,7 +570,7 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
                 $reconciliation->report($reviewer,$company->id,$hall->id,$loan);
                 $this->fail('Reused inventory movement accepted for another condition.');
             });
-        } catch (\\Illuminate\\Database\\QueryException|ConflictHttpException) {}
+        } catch (\Illuminate\Database\QueryException|ConflictHttpException) {}
         $this->assertSame(1,$reconciliation->report($reviewer,$company->id,$hall->id,$loan)['items'][0]['good']);
         // A manager, even assigned to this exact hall, must not see a
         // private owner financial settlement and physical loss report.
