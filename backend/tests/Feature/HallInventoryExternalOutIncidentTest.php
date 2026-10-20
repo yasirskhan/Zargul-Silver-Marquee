@@ -404,13 +404,21 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
                 'bank',15000,'WIRE-RECOVERY-TWO-INV456',$payfile());
             $this->fail('Overpayment reservation exceeded remaining monetary obligation.');
         }catch(ConflictHttpException){}
+        // Distinguish the finance release gate from independent-actor
+        // authorization. The first call is rejected before any posting.
+        try{
+            $recoveries->verify($owner,$company->id,$receiptId,(string)Str::uuid(),
+                'confirmed','verified_bank_statement','Approved statement INVTEST123',
+                'Financial release is disabled, even for valid looking evidence');
+            $this->fail('Unreleased finance journal posting was accepted.');
+        }catch(ConflictHttpException){}
+        config()->set('finance_controls.posting_enabled',true);
         try{
             $recoveries->verify($owner,$company->id,$receiptId,(string)Str::uuid(),
                 'confirmed','verified_bank_statement','Approved statement INVTEST123',
                 'The same payment reporter is forbidden from financial posting');
             $this->fail('Payment reporter independently confirmed their own payment.');
         }catch(AuthorizationException){}
-        config()->set('finance_controls.posting_enabled',true);
         $this->be($reviewer);
         $download=$recoveries->download($reviewer,$company->id,$hall->id,$loan,$receiptId);
         $cacheDirectives=array_map('trim',explode(',',(string)$download->headers->get('Cache-Control')));

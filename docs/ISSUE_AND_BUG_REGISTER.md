@@ -282,3 +282,9 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Root cause: after the independent partial-recovery/journal interface was added, provisional claims were correctly described as a distinct nonposting stage with a separate later recovery ledger. The test still checked removed static wording, which would falsely imply the entire loan never had a verified recovery journal.
 - Repair: assert the exact truthful provisional claim sentence, `Provisional claim alone does not post money`, while retaining direct database `journalPosted === false` and `paidMinor === 0` tests for this uncollected claim, plus separate independently verified recovery/journal regressions. Never restore a loan-wide false negative. No finance or inventory release flags changed.
 - Status: REPAIR PUBLISHED, hosted six-job CI for new exact SHA PENDING. Do not mark VERIFIED until all six succeed.
+
+
+## BUG-20261020-032 — Payment self-approval test ran before separate finance journal release
+- Source `2130f21fa4aebe1f5cd09f08b52d914e3f858d3e`, hosted CI `39503830518`: five jobs passed; `laravel-postgres` FAILED because the existing real recovery workflow test attempted a confirmed payment while `finance_controls.posting_enabled=false`. The production `HallInventoryFinancialRecoveryService::gate(true)` correctly threw ConflictHttpException before self-approval authorization, whereas the fixture expected AuthorizationException.
+- Fix: test explicitly asserts finance-release-OFF rejects any posting, then enables ONLY the synthetic test config and asserts the original payment reporter is denied self-approval by authorization; the separate owner reviewer still verifies real evidence, journal balance, reversal, tenant privacy and idempotence. No production service, balance, permission or default finance/inventory gate weakened.
+- Status: REPAIR PUBLISHED, new exact-SHA six-job hosted CI pending.
