@@ -319,6 +319,62 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
         $this->assertSame('document_says_disputes',
             DB::table('hall_inventory_financial_counterparty_evidence')
                 ->where('id',$document)->value('position'));
+        // A disputed document must never be accepted as a collectible agreement.
+        config()->set('inventory_controls.loan_authorized_obligations_enabled',true);
+        $obligations=app(\App\Services\HallInventoryFinancialObligationService::class);
+        $this->be($owner);
+        try {
+            $obligations->propose($owner,$company->id,$claim,$document,(string)Str::uuid(),
+                25000,'verified_callback','Recorded signed partner reference ABC123',
+                'Attempted liability from expressly DISPUTED response');
+            $this->fail('Disputed response was accepted as verified agreement.');
+        }catch(ConflictHttpException){}
+        // Second, distinct received document claims acceptance. The claim remains
+        // wholly unposted until the real owner independently approves liability.
+        $acceptDoc=(string)Str::uuid();
+        $this->assertSame($acceptDoc,$partner->record($owner,$company->id,$claim,
+            $acceptDoc,'document_says_accepts',null,$partnerPdf()));
+        $this->be($reviewer);
+        $this->assertSame(1,DB::table('hall_inventory_financial_counterparty_reviews')->count());
+        $partner->review($reviewer,$company->id,$acceptDoc,(string)Str::uuid(),
+            'document_integrity_confirmed',
+            'Independently checked accepted partner signed document bytes only');
+        $this->be($owner);
+        Livewire::test(HallInventory::class)->set('hallId',$hall->id)
+            ->call('startFinancialClaims',$loan)->assertHasNoErrors()
+            ->assertSee('Manually attested collectible obligation approval')
+            ->set('financialObligationEvidenceId',$acceptDoc)
+            ->set('financialObligationAmountMinor','25000')
+            ->set('financialObligationIdentityMethod','verified_callback')
+            ->set('financialObligationIdentityReference','Approved partner contact callback ref INVTEST123')
+            ->set('financialObligationReason','Physical inventory damage payable only after independent owner attestation')
+            ->call('submitFinancialObligation')->assertHasNoErrors()
+            ->assertSee('PENDING INDEPENDENT OBLIGATION REVIEW');
+        $obligationId=(string)DB::table('hall_inventory_financial_obligations')
+            ->where('company_id',$company->id)->where('claim_id',$claim)->value('id');
+        $this->assertTrue(Str::isUuid($obligationId));
+        try {
+            $obligations->decide($owner,$company->id,$obligationId,(string)Str::uuid(),
+                'authorized','Unauthorized self approval must fail');
+            $this->fail('Financial obligation was self-approved.');
+        }catch(AuthorizationException){}
+        $this->be($reviewer);
+        Livewire::test(HallInventory::class)->set('hallId',$wrong->id)
+            ->call('startFinancialClaims',$loan)->assertForbidden();
+        Livewire::test(HallInventory::class)->set('hallId',$hall->id)
+            ->call('startFinancialClaims',$loan)->assertHasNoErrors()
+            ->set('financialObligationDecisionProposalId',$obligationId)
+            ->set('financialObligationDecision','authorized')
+            ->set('financialObligationDecisionReason','Independent owner authorized documented amount for collection not journal')
+            ->call('submitFinancialObligationDecision')->assertHasNoErrors()
+            ->assertSee('Decision: authorized');
+        $this->assertSame('authorized',
+            DB::table('hall_inventory_financial_obligation_decisions')
+                ->where('obligation_id',$obligationId)->value('decision'));
+        $agreementHistory=$obligations->history($reviewer,$company->id,$hall->id,$loan);
+        $this->assertCount(1,$agreementHistory);
+        $this->assertFalse($agreementHistory[0]['receivableJournalPosted']);
+        $this->assertSame(0,$agreementHistory[0]['paidMinor']);
         $this->assertSame(0,DB::table('finance_journals')->count());
         $this->assertSame(0,DB::table('hall_inventory_internal_loan_closures')->count());
         $p=DB::table('hall_inventory_positions')->where('company_id',$company->id)

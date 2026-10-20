@@ -261,3 +261,8 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 ## BUG-20261020-029 — Partner document private Cache-Control header order test mismatch
 - Hosted CI 39487452294 @ f92372fb: laravel-postgres 634 passed, 1 failed, 3 risky; five other required jobs success. At ExternalOutIncidentTest.php:281 the secure Symfony response returned `no-store, private`, not the asserted `private, no-store`. Both required directives were present. This is a brittle assertion, not a privacy regression.
 - Repair candidate independently asserts `private` and `no-store` cache directives regardless of order, and leaves production code, headers, access checks and all negative security tests unchanged. Exact-SHA six-job CI pending; production OFF.
+
+
+## INV-FIN-20261020-028 — Missing independently authorized documented loss obligation
+- Candidate after partner documentary response: separate manual partner-identity check reference and original approved claim/currency/amount binding; only independently reviewed acceptance or counteroffer may be proposed. Separate owner authorization rejects self approval, conflicting replay and simultaneous authorizations by unique PostgreSQL partial index. Readable owner proposal/decision queue and real regression flow. A merely disputed document cannot become a debt. No accounting receivable, collections, reversal, write-off, loan closure, or production activation yet.
+- Status: PREPARED DETACHED pending exact six-job CI on preceding documentary source and new candidate.

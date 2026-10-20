@@ -28,6 +28,9 @@ return [
     'loan_financial_claims_enabled' => (bool) env('VENUE_INVENTORY_LOAN_FINANCIAL_CLAIMS_ENABLED', false),
     // Private owner-recorded partner correspondence and independent integrity review only.
     'loan_partner_responses_enabled' => (bool) env('VENUE_INVENTORY_LOAN_PARTNER_RESPONSES_ENABLED', false),
+    // Manual partner identity attestation and separately approved collectible obligation;
+    // never a journaled receivable or payment. Default OFF.
+    'loan_authorized_obligations_enabled' => (bool) env('VENUE_INVENTORY_LOAN_AUTHORIZED_OBLIGATIONS_ENABLED', false),
     // Entirely clean internal loans only; independently reconciled numbered PDF.
     'loan_clean_closure_enabled' => (bool) env('VENUE_INVENTORY_LOAN_CLEAN_CLOSURE_ENABLED', false),
     // Hall-owned goods lent outside: independent signed handover and owner approval. OFF.

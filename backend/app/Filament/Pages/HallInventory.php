@@ -310,6 +310,23 @@ final class HallInventory extends Page
     public ?string $lastFinancialPartnerReference = null;
 
     #[Locked]
+    public array $financialObligationHistory = [];
+    #[Locked]
+    public string $financialObligationRequestId = '';
+    public string $financialObligationEvidenceId = '';
+    public string $financialObligationAmountMinor = '';
+    public string $financialObligationIdentityMethod = 'verified_callback';
+    public string $financialObligationIdentityReference = '';
+    public string $financialObligationReason = '';
+    #[Locked]
+    public string $financialObligationDecisionId = '';
+    public string $financialObligationDecisionProposalId = '';
+    public string $financialObligationDecision = 'disputed';
+    public string $financialObligationDecisionReason = '';
+    #[Locked]
+    public ?string $lastFinancialObligationReference = null;
+
+    #[Locked]
     public array $cleanLoanReceipts = [];
     #[Locked]
     public ?string $lastCleanLoanReceipt = null;
@@ -488,6 +505,18 @@ final class HallInventory extends Page
         $this->incidentReviews = [];
         $this->lastIncidentDecisionId = null;
         $this->financialClaimLoanId = '';
+        $this->financialObligationHistory = [];
+        $this->financialObligationRequestId = (string)Str::uuid();
+        $this->financialObligationEvidenceId = '';
+        $this->financialObligationAmountMinor = '';
+        $this->financialObligationIdentityMethod = 'verified_callback';
+        $this->financialObligationIdentityReference = '';
+        $this->financialObligationReason = '';
+        $this->financialObligationDecisionId = (string)Str::uuid();
+        $this->financialObligationDecisionProposalId = '';
+        $this->financialObligationDecision = 'disputed';
+        $this->financialObligationDecisionReason = '';
+        $this->lastFinancialObligationReference = null;
         $this->financialPartnerHistory = [];
         $this->financialPartnerRequestId = (string)Str::uuid();
         $this->financialPartnerClaimId = '';
@@ -2144,6 +2173,14 @@ final class HallInventory extends Page
                 $row['externalOutApproved']);
         abort_unless($loan!==null,403);
         $this->financialClaimLoanId=$loanId;
+        $this->financialObligationRequestId=(string)Str::uuid();
+        $this->financialObligationDecisionId=(string)Str::uuid();
+        $this->financialObligationEvidenceId='';
+        $this->financialObligationAmountMinor='';
+        $this->financialObligationIdentityReference='';
+        $this->financialObligationReason='';
+        $this->financialObligationDecisionProposalId='';
+        $this->financialObligationDecisionReason='';
         $this->financialPartnerRequestId=(string)Str::uuid();
         $this->financialPartnerReviewId=(string)Str::uuid();
         $this->financialPartnerClaimId='';
@@ -2167,6 +2204,12 @@ final class HallInventory extends Page
             $this->financialClaimLoanId!=='',403);
         $this->financialClaimHistory=app(\App\Services\HallInventoryFinancialClaimService::class)
             ->history($actor,$this->companyId,$this->hallId,$this->financialClaimLoanId);
+        $this->financialObligationHistory=[];
+        if(config('inventory_controls.loan_authorized_obligations_enabled') &&
+            config('inventory_controls.loan_partner_responses_enabled')) {
+            $this->financialObligationHistory=app(\App\Services\HallInventoryFinancialObligationService::class)
+                ->history($actor,$this->companyId,$this->hallId,$this->financialClaimLoanId);
+        }
         $this->financialPartnerHistory=[];
         if(config('inventory_controls.loan_partner_responses_enabled')) {
             $this->financialPartnerHistory=app(\App\Services\HallInventoryFinancialCounterpartyEvidenceService::class)
@@ -2339,6 +2382,81 @@ final class HallInventory extends Page
         return app(\App\Services\HallInventoryFinancialCounterpartyEvidenceService::class)
             ->download($actor,$this->companyId,$this->hallId,
                 $this->financialClaimLoanId,$evidenceId);
+    }
+
+
+    public function submitFinancialObligation():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canManageFinancialClaims() &&
+            config('inventory_controls.loan_authorized_obligations_enabled') &&
+            config('inventory_controls.loan_partner_responses_enabled') &&
+            $this->financialClaimLoanId!=='',403);
+        $this->validate([
+            'financialObligationEvidenceId'=>'required|uuid',
+            'financialObligationAmountMinor'=>['required','regex:/\A[1-9][0-9]{0,11}\z/D'],
+            'financialObligationIdentityMethod'=>'required|in:verified_callback,in_person_signed,trusted_contract_record',
+            'financialObligationIdentityReference'=>'required|string|min:12|max:200',
+            'financialObligationReason'=>'required|string|min:10|max:500',
+        ]);
+        $this->reloadFinancialClaims($actor);
+        $partnerDoc=collect($this->financialPartnerHistory)->first(fn($d):bool=>
+            $d['id']===$this->financialObligationEvidenceId &&
+            in_array($d['position'],['document_says_accepts','counteroffer'],true) &&
+            $d['assessment']==='document_integrity_confirmed');
+        abort_unless($partnerDoc!==null,403);
+        $claim=collect($this->financialClaimHistory)->first(fn($c):bool=>
+            $c['id']===$partnerDoc['claimId'] &&
+            $c['decision']==='approved_for_collection');
+        abort_unless($claim!==null,403);
+        try {
+            $this->lastFinancialObligationReference=app(\App\Services\HallInventoryFinancialObligationService::class)
+                ->propose($actor,$this->companyId,$claim['id'],
+                    $this->financialObligationEvidenceId,$this->financialObligationRequestId,
+                    (int)$this->financialObligationAmountMinor,
+                    $this->financialObligationIdentityMethod,
+                    $this->financialObligationIdentityReference,
+                    $this->financialObligationReason);
+        }catch(InvalidArgumentException|ConflictHttpException $e){
+            throw ValidationException::withMessages(['financialObligationReason'=>$e->getMessage()]);
+        }
+        $this->financialObligationRequestId=(string)Str::uuid();
+        $this->financialObligationEvidenceId='';
+        $this->financialObligationAmountMinor='';
+        $this->financialObligationIdentityReference='';
+        $this->financialObligationReason='';
+        $this->reloadFinancialClaims($actor);
+    }
+
+    public function submitFinancialObligationDecision():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canManageFinancialClaims() &&
+            config('inventory_controls.loan_authorized_obligations_enabled') &&
+            config('inventory_controls.loan_partner_responses_enabled') &&
+            $this->financialClaimLoanId!=='',403);
+        $this->validate([
+            'financialObligationDecisionProposalId'=>'required|uuid',
+            'financialObligationDecision'=>'required|in:authorized,rejected,disputed',
+            'financialObligationDecisionReason'=>'required|string|min:10|max:500',
+        ]);
+        $this->reloadFinancialClaims($actor);
+        abort_unless(collect($this->financialObligationHistory)->contains(
+            fn($row):bool=>$row['id']===$this->financialObligationDecisionProposalId &&
+                $row['decision']===null &&
+                $row['proposedBy']!==(int)$actor->getKey()),403);
+        try {
+            $this->lastFinancialObligationReference=app(\App\Services\HallInventoryFinancialObligationService::class)
+                ->decide($actor,$this->companyId,$this->financialObligationDecisionProposalId,
+                    $this->financialObligationDecisionId,$this->financialObligationDecision,
+                    $this->financialObligationDecisionReason);
+        }catch(InvalidArgumentException|ConflictHttpException $e){
+            throw ValidationException::withMessages(['financialObligationDecisionReason'=>$e->getMessage()]);
+        }
+        $this->financialObligationDecisionId=(string)Str::uuid();
+        $this->financialObligationDecisionProposalId='';
+        $this->financialObligationDecisionReason='';
+        $this->reloadFinancialClaims($actor);
     }
 
     public function canManageSourceCleanClosure():bool

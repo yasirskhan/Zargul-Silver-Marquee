@@ -1154,6 +1154,88 @@
                                 <p role="status">Documentary record {{ $lastFinancialPartnerReference }} saved. No accepted debt, receipt, recovery, journal or physical write-off.</p>
                             @endif
                         @endif
+                        @if(config('inventory_controls.loan_authorized_obligations_enabled') &&
+                            config('inventory_controls.loan_partner_responses_enabled'))
+                            <h4 class="font-semibold">Manually attested collectible obligation approval</h4>
+                            <p class="text-sm">Requires an independently reviewed partner acceptance or counteroffer document, a real separately verified contact or contract identity reference and a different owner's written decision. This does NOT post accounts receivable, record a payment, waive unresolved custody, or close the loan.</p>
+                            @if(collect($financialPartnerHistory)->contains(fn($d)=>
+                                in_array($d['position'],['document_says_accepts','counteroffer'],true) &&
+                                $d['assessment']==='document_integrity_confirmed'))
+                                <label class="block text-sm">Independently reviewed partner agreement document
+                                    <select wire:model="financialObligationEvidenceId" class="w-full rounded-lg border p-2 text-gray-900">
+                                        <option value="">Select agreement evidence</option>
+                                        @foreach($financialPartnerHistory as $document)
+                                            @if(in_array($document['position'],['document_says_accepts','counteroffer'],true) &&
+                                                $document['assessment']==='document_integrity_confirmed')
+                                                <option value="{{ $document['id'] }}">{{ $document['position'] }} / claim {{ $document['claimId'] }}</option>
+                                            @endif
+                                        @endforeach
+                                    </select>
+                                </label>
+                                <label class="block text-sm">Proposed collectible amount in currency minor units, never greater than agreed offer
+                                    <input type="number" min="1" step="1" wire:model="financialObligationAmountMinor" class="w-full rounded-lg border p-2 text-gray-900">
+                                </label>
+                                <label class="block text-sm">Actual partner identity verification method
+                                    <select wire:model="financialObligationIdentityMethod" class="w-full rounded-lg border p-2 text-gray-900">
+                                        <option value="verified_callback">Independently verified partner callback</option>
+                                        <option value="in_person_signed">In-person signer identity checked</option>
+                                        <option value="trusted_contract_record">Matched approved partner contract</option>
+                                    </select>
+                                </label>
+                                <label class="block text-sm">Auditable verification reference (12 to 200 characters, avoid private contacts)
+                                    <input wire:model="financialObligationIdentityReference" maxlength="200" class="w-full rounded-lg border p-2 text-gray-900">
+                                </label>
+                                <label class="block text-sm">Reason and proposed obligation basis
+                                    <textarea wire:model="financialObligationReason" class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                                </label>
+                                @error('financialObligationReason') <p role="alert">{{ $message }}</p> @enderror
+                                @error('financialObligationAmountMinor') <p role="alert">{{ $message }}</p> @enderror
+                                @error('financialObligationIdentityReference') <p role="alert">{{ $message }}</p> @enderror
+                                <button type="button" wire:click="submitFinancialObligation" class="rounded-lg border px-3 py-2 text-sm">Propose verified-document obligation for independent review</button>
+                            @endif
+                            <h4 class="font-semibold">Independent obligation decisions</h4>
+                            @forelse($financialObligationHistory as $obligation)
+                                <article wire:key="fin-obligation-{{ $obligation['id'] }}" class="rounded-lg border p-3 text-sm">
+                                    <p>Proposal {{ $obligation['id'] }}, claim {{ $obligation['claimId'] }},
+                                       {{ $obligation['currency'] }} {{ $obligation['amountMinor'] }} minor units.
+                                       Manual check: {{ $obligation['manualCheck'] }}.</p>
+                                    <p>Decision: {{ $obligation['decision'] ?? 'PENDING INDEPENDENT OBLIGATION REVIEW' }}.
+                                       Financial journal posted: NO. Collected: {{ $obligation['paidMinor'] }}.</p>
+                                </article>
+                            @empty
+                                <p>No attested financial obligation proposal for this loan.</p>
+                            @endforelse
+                            @if(collect($financialObligationHistory)->contains(fn($o)=>
+                                $o['decision']===null && $o['proposedBy']!==(int)auth()->id()))
+                                <label class="block text-sm">Pending obligation proposed by another owner
+                                    <select wire:model="financialObligationDecisionProposalId" class="w-full rounded-lg border p-2 text-gray-900">
+                                        <option value="">Choose proposal</option>
+                                        @foreach($financialObligationHistory as $obligation)
+                                            @if($obligation['decision']===null && $obligation['proposedBy']!==(int)auth()->id())
+                                                <option value="{{ $obligation['id'] }}">{{ $obligation['currency'] }} {{ $obligation['amountMinor'] }} ({{ $obligation['id'] }})</option>
+                                            @endif
+                                        @endforeach
+                                    </select>
+                                </label>
+                                <label class="block text-sm">Independent owner decision
+                                    <select wire:model="financialObligationDecision" class="w-full rounded-lg border p-2 text-gray-900">
+                                        <option value="disputed">Dispute or require more evidence</option>
+                                        <option value="authorized">Authorize collection obligation, not accounting</option>
+                                        <option value="rejected">Reject obligation</option>
+                                    </select>
+                                </label>
+                                <label class="block text-sm">Decision reason
+                                    <textarea wire:model="financialObligationDecisionReason" class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                                </label>
+                                @error('financialObligationDecisionReason') <p role="alert">{{ $message }}</p> @enderror
+                                <button type="button" wire:click="submitFinancialObligationDecision"
+                                    class="rounded-lg border px-3 py-2 text-sm">Record independent immutable obligation decision</button>
+                            @endif
+                            @if($lastFinancialObligationReference)
+                                <p role="status">Agreement decision {{ $lastFinancialObligationReference }} recorded. No receivable journal or cash collection was posted.</p>
+                            @endif
+                        @endif
+
 
                     </section>
                 @endif
