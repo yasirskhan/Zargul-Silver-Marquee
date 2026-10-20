@@ -250,9 +250,9 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 ## INV-FIN-20261020-026 — Provisional loss claim service lacked operator forms
 - At verified baseline `9130e6ed` the SQL/service claim assessment was available but Hall Inventory owners could not enter or independently assess a claim through the operator page.
 - Implemented candidate: hall-scoped owner/admin claim selection from independently substantiated incidents, explicit minor-unit currency entry, bounded amounts, persisted pending and reviewed history and different-actor review. Server-side selection is revalidated and service locks continue to prevent overlapping financial claims. No receivable, journal, payment, partner admission or non-clean closure.
-- Status: IMPLEMENTED, HOSTED CI PENDING on successor SHA. All production flags remain OFF.
+- Status: VERIFIED at 19dfc07d, hosted CI 39486099346 six jobs SUCCESS. All production flags remain OFF.
 
 
 ## INV-FIN-20261020-027 — No independent private counterparty documentary position or review
 - Follow-on candidate to provisional owner claim desk: append-only outside-partner correspondence with exact company/hall/loan/claim/currency SQL binding, private 5 MB PDF/photo SHA-256 evidence, owner-recorded claimed acceptance/dispute/counteroffer positions, independent owner integrity review and hash-checked no-store download. Duplicate replay and self-review blocked. Never infer signer identity, legal debt, settlement, payment or finance journal from recorded correspondence.
-- Status: PREPARED DETACHED; six-job hosted CI required after predecessor verification. All production controls remain OFF. Actual obligation/collection/nonclean closure pending.
+- Status: PUBLISHED CI PENDING after exact predecessor verification; six-job hosted CI required on successor. All production controls remain OFF. Actual obligation/collection/nonclean closure pending.

@@ -1,6 +1,6 @@
 # Phase 12 — independently reviewed external-owned loss claims
 
-Status: implementation candidate. Production release flag OFF, exact-SHA hosted CI required.
+Status: provisional claim backend and owner assessment UI VERIFIED at 19dfc07d, GitHub Actions 39486099346 (six jobs SUCCESS). Production release flag remains OFF; payment/receivable and collection remain unimplemented.
 
 A current original lending-hall owner/admin may propose a money amount in ISO three-letter currency and integer minor units only for an independently substantiated inventory incident on an actually approved outside-owned dispatch. A different authorized owner/admin must make the immutable collection assessment; the original incident reporter and claim proposer cannot approve their own proposed charge.
 
