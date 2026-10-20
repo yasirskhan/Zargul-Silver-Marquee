@@ -1038,7 +1038,7 @@
                         @forelse($financialClaimHistory as $claim)
                             <article wire:key="provisional-claim-{{ $claim['id'] }}" class="rounded-lg border p-3 text-sm">
                                 <p>Claim {{ $claim['id'] }} linked to incident {{ $claim['reportId'] }}: {{ $claim['quantity'] }} units, {{ $claim['currency'] }} {{ $claim['amountMinor'] }} minor units.</p>
-                                <p>Assessment: {{ $claim['decision'] ?? 'AWAITING INDEPENDENT REVIEW' }}. Collection received: {{ $claim['paidMinor'] }}. Financial journal posted: NO.</p>
+                                <p>Assessment: {{ $claim['decision'] ?? 'AWAITING INDEPENDENT REVIEW' }}. Provisional claim alone does not post money. See separate verified recovery journal below if enabled.</p>
                             </article>
                         @empty
                             <p>No financial claim has been proposed for this loan.</p>
@@ -1200,7 +1200,7 @@
                                        {{ $obligation['currency'] }} {{ $obligation['amountMinor'] }} minor units.
                                        Manual check: {{ $obligation['manualCheck'] }}.</p>
                                     <p>Decision: {{ $obligation['decision'] ?? 'PENDING INDEPENDENT OBLIGATION REVIEW' }}.
-                                       Financial journal posted: NO. Collected: {{ $obligation['paidMinor'] }}.</p>
+                                       This obligation approval does not post money. See verified recovery ledger below if enabled.</p>
                                 </article>
                             @empty
                                 <p>No attested financial obligation proposal for this loan.</p>
@@ -1283,6 +1283,8 @@
                                     <p>Status: {{ $payment['decision'] ?? 'AWAITING INDEPENDENT PAYMENT VERIFICATION' }}.
                                        Journal: {{ $payment['journalId'] ?? 'NONE' }}.
                                        Reversal: {{ $payment['reversalId'] ?? 'NONE' }}.</p>
+                                    <button type="button" wire:click="downloadFinancialRecoveryEvidence('{{ $payment['id'] }}')"
+                                        class="rounded-lg border px-3 py-2 text-sm">Download private hash-verified money evidence</button>
                                 </article>
                             @empty
                                 <p>No partner payment evidence recorded for this loan.</p>

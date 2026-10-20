@@ -412,6 +412,24 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
         }catch(AuthorizationException){}
         config()->set('finance_controls.posting_enabled',true);
         $this->be($reviewer);
+        $download=$recoveries->download($reviewer,$company->id,$hall->id,$loan,$receiptId);
+        $cacheDirectives=array_map('trim',explode(',',(string)$download->headers->get('Cache-Control')));
+        $this->assertContains('private',$cacheDirectives);
+        $this->assertContains('no-store',$cacheDirectives);
+        $this->assertSame('nosniff',$download->headers->get('X-Content-Type-Options'));
+        try {
+            $recoveries->download($reviewer,$company->id,$wrong->id,$loan,$receiptId);
+            $this->fail('Other hall private banking proof accessible.');
+        }catch(AuthorizationException){}
+        $moneyEvidence=DB::table('hall_inventory_financial_recovery_receipts')
+            ->where('id',$receiptId)->first();
+        $bankOriginal=Storage::disk('local')->get($moneyEvidence->evidence_path);
+        Storage::disk('local')->put($moneyEvidence->evidence_path,'tampered bank bytes');
+        try {
+            $recoveries->download($reviewer,$company->id,$hall->id,$loan,$receiptId);
+            $this->fail('Tampered private bank proof downloaded.');
+        }catch(ConflictHttpException){}
+        Storage::disk('local')->put($moneyEvidence->evidence_path,$bankOriginal);
         Livewire::test(HallInventory::class)->set('hallId',$wrong->id)
             ->call('startFinancialClaims',$loan)->assertForbidden();
         Livewire::test(HallInventory::class)->set('hallId',$hall->id)

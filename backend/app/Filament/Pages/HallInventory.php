@@ -2598,6 +2598,17 @@ final class HallInventory extends Page
         $this->reloadFinancialClaims($actor);
     }
 
+
+    public function downloadFinancialRecoveryEvidence(string $receiptId):\Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canManageFinancialClaims() &&
+            config('inventory_controls.loan_recoveries_enabled') &&
+            $this->financialClaimLoanId!=='' && Str::isUuid($receiptId),403);
+        return app(\App\Services\HallInventoryFinancialRecoveryService::class)
+            ->download($actor,$this->companyId,$this->hallId,$this->financialClaimLoanId,$receiptId);
+    }
+
     public function reverseFinancialRecovery():void
     {
         $actor=$this->authorizeSelection();

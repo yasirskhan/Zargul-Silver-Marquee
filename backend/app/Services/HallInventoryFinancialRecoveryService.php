@@ -343,6 +343,37 @@ final class HallInventoryFinancialRecoveryService
         return $rows;
     }
 
+
+    public function download(User $actor,string $companyId,string $hallId,
+        string $loanId,string $receiptId):\Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $this->gate(false);$this->ids($companyId,$hallId,$loanId,$receiptId);
+        $this->authorize($actor,$companyId,$hallId,false);
+        $loan=DB::table('hall_inventory_loan_drafts')
+            ->where('company_id',$companyId)->where('id',$loanId)
+            ->where('lending_hall_id',$hallId)->where('direction','external_out')->first();
+        if(!$loan)throw new AuthorizationException('Private recovery requires exact source lending hall.');
+        $receipt=DB::table('hall_inventory_financial_recovery_receipts')
+            ->where('company_id',$companyId)->where('source_hall_id',$hallId)
+            ->where('loan_id',$loanId)->where('id',$receiptId)->first();
+        if(!$receipt)throw new AuthorizationException('Other hall or loan payment evidence is private.');
+        $this->intact($receipt);
+        $bytes=Storage::disk('local')->get($receipt->evidence_path);
+        $extension=match($receipt->evidence_mime){
+            'application/pdf'=>'pdf','image/png'=>'png','image/jpeg'=>'jpg',
+            default=>throw new ConflictHttpException('Stored private recovery evidence type invalid.')
+        };
+        $this->audit($actor,$companyId,'payment_evidence_downloaded',
+            $receiptId,$loanId,['evidenceSha256'=>$receipt->evidence_sha256,
+                'bytesIntact'=>true,'paymentAutomaticallyVerified'=>false]);
+        return response()->streamDownload(static function()use($bytes):void {
+            echo $bytes;
+        },'inventory-recovery-evidence-'.$receiptId.'.'.$extension,[
+            'Content-Type'=>$receipt->evidence_mime,'Cache-Control'=>'private, no-store',
+            'Pragma'=>'no-cache','X-Content-Type-Options'=>'nosniff'
+        ]);
+    }
+
     public function outstanding(User $actor,string $companyId,string $hallId,string $loanId):array
     {
         // Re-authorize original hall/loan through the bounded, private read.
