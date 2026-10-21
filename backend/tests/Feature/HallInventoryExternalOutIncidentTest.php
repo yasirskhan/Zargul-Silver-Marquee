@@ -767,6 +767,16 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
             $finalClosure->close($reviewer,$company->id,$hall->id,$loan,(string)Str::uuid());
             $this->fail('Second final numbered PDF issued for same original loan.');
         }catch(ConflictHttpException){}
+        try {
+            $finalClosure->receiptPdf($reviewer,$company->id,$wrong->id,$loan);
+            $this->fail('Other hall downloaded private original numbered NCL certificate.');
+        }catch(AuthorizationException){}
+        $this->be($independent);
+        try {
+            $finalClosure->close($independent,$company->id,$hall->id,$loan,(string)Str::uuid());
+            $this->fail('Inventory write-off approver issued a second NCL receipt.');
+        }catch(ConflictHttpException|AuthorizationException){}
+        $this->be($reviewer);
         $pdf=$finalClosure->receiptPdf($reviewer,$company->id,$hall->id,$loan);
         $this->assertStringStartsWith('%PDF-1.4',$pdf);
         $this->assertStringContainsString('NCL-1',$pdf);
