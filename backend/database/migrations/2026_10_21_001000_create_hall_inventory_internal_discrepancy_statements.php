@@ -15,6 +15,7 @@ return new class extends Migration {
    $t->char('fingerprint',64);$t->char('evidence_sha256',64);$t->unsignedInteger('evidence_size');
    $t->string('evidence_storage_path',500);$t->foreignId('submitted_by')->constrained('users')->restrictOnDelete();
    $t->timestampTz('created_at')->useCurrent();
+   $t->unique(['company_id','id'],'internal_discrepancy_statement_identity');
    $t->unique(['company_id','id','loan_id','borrowing_hall_id'],'internal_discrepancy_statement_scope');
    $t->foreign(['company_id','loan_id'])->references(['company_id','id'])->on('hall_inventory_loan_drafts')->restrictOnDelete();
    $t->foreign(['company_id','receipt_id','borrowing_hall_id'],'internal_discrepancy_receipt_fk')
