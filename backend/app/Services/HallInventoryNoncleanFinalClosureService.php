@@ -92,6 +92,15 @@ final class HallInventoryNoncleanFinalClosureService
                 ->where('company_id',$companyId)->where('loan_id',$loanId)
                 ->where('decided_by',$actor->getKey())->exists())
                 throw new AuthorizationException('Physical disposition reviewer cannot independently close the loan.');
+            // Final issuance is a separate approval, not a re-signing of an
+            // earlier financial forgiveness decision by the same approver.
+            if(DB::table('hall_inventory_financial_waiver_decisions as d')
+                ->join('hall_inventory_financial_waiver_proposals as p',function($q):void {
+                    $q->on('p.company_id','=','d.company_id')->on('p.id','=','d.proposal_id');
+                })->where('d.company_id',$companyId)->where('p.loan_id',$loanId)
+                ->where('d.decision','approved')
+                ->where('d.decided_by',$actor->getKey())->exists())
+                throw new AuthorizationException('Financial waiver approver cannot independently issue final NCL certificate.');
             $fingerprint=hash('sha256',json_encode([
                 $companyId,$hallId,$loanId,$snapshot['items'],$snapshot['obligations'],
                 $snapshot['incidentReports'],$snapshot['unreviewedIncidents']
