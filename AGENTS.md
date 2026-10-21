@@ -37,3 +37,13 @@
 - Preserve complete VenueDesk public website/CMS, bookings, finance, approvals, staff/Telegram/audit and HAFZATECH central scope.
 - Finish Phase 12 acceptance before Phase 13. Keep inventory/finance production release OFF.
 - Preserve approved license terms, including 15-day automatic verification and independently authorized payments/signing; external production portal/KMS/provider obligations remain separately gated.
+
+## Whole-project continuation after phase acceptance
+- The owner's objective is the ENTIRE approved project roadmap, completed phase by phase. The current phase is a checkpoint, not the final stopping target.
+- Before closing a phase, reconcile every approved requirement with working backend AND UI, authorization/isolation, audit, migrations, failure/retry behavior and meaningful acceptance tests. All six required hosted CI jobs must pass at the exact source SHA; required operator/security/restore acceptance must also be evidenced.
+- Save the phase's verified source SHA, CI run/jobs, requirement evidence and unresolved blockers in the existing roadmap/feature/issue registers. Replace the concise handoff with the completed phase and the NEXT approved unfinished phase/task.
+- Once all existing phase-exit requirements pass, immediately start the next approved phase in documented dependency order on the SAME authorized branch. No additional owner prompt is needed for already approved scope. Current-phase "do not advance"/"no next phase" shorthand means UNTIL the current phase is fully accepted, not a permanent stop after acceptance.
+- Reconcile incomplete earlier approved phases and dependencies without repeating already verified work. Exclude deferred/unapproved scope; never invent a new phase.
+- If a phase remains externally blocked, keep it OPEN/BLOCKED with the exact missing input. Continue other approved work only where the existing dependency rules permit it. Never fabricate provider credentials, payments, operator acceptance or release approval.
+- Keep one writer per repository, expected_sha with force=false, normal Chat, current security/financial safeguards and production-release gates. Phase acceptance does not grant permission to deploy or activate production.
+- Continue until ALL approved project requirements and cross-module acceptance are verified, or a genuine tool/usage/external blocker prevents further authorized progress. A phase-complete report alone is not the stopping condition; never promise uninterrupted execution beyond actual limits.
