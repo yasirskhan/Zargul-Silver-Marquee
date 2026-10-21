@@ -528,6 +528,10 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
         }catch(AuthorizationException){}
         $snapshot=$reconciliation->report($reviewer,$company->id,$hall->id,$loan);
         $this->assertFalse($snapshot['finalClosureAuthorized']);
+        $this->assertContains('unreviewed_incident',$snapshot['closureBlockers']);
+        $this->assertContains('outstanding_physical_custody',$snapshot['closureBlockers']);
+        $this->assertContains('undisposed_damage',$snapshot['closureBlockers']);
+        $this->assertContains('financial_reconciliation_unavailable',$snapshot['closureBlockers']);
         $this->assertSame('2027-12-15',$snapshot['expectedReturnDate']);
         $this->assertCount(1,$snapshot['items']);
         $physical=$snapshot['items'][0];
