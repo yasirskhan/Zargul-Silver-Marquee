@@ -774,6 +774,18 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
         $this->assertNotNull($row);
         $this->assertSame(hash('sha256',$pdf),$row->pdf_sha256);
         $this->assertSame(1,DB::table('hall_inventory_nonclean_final_closures')->count());
+        Livewire::test(HallInventory::class)->set('hallId',$hall->id)
+            ->call('startFinancialClaims',$loan)->assertHasNoErrors()
+            ->assertSee('Final non-clean closure: ISSUED')
+            ->assertSee('Download existing immutable numbered NCL PDF');
+        try {
+            DB::transaction(function()use($closureId):void {
+                DB::table('hall_inventory_nonclean_final_closures')
+                    ->where('id',$closureId)->update(['pdf_sha256'=>str_repeat('0',64)]);
+                $this->fail('Final NCL issuance record could be silently modified.');
+            });
+        }catch(\Illuminate\Database\QueryException){}
+
         $storedPdf=Storage::disk('local')->get($row->pdf_storage_path);
         Storage::disk('local')->put($row->pdf_storage_path,'altered immutable certificate');
         try{
