@@ -2148,7 +2148,7 @@ final class HallInventory extends Page
                   $row['externalOutApproved'])));
         abort_unless($loan!==null,403);
         $this->internalAbnormalCustody=[];
-        if($loan['direction']==='internal' && config('inventory_controls.loan_returns_enabled'))
+        if($loan['direction']==='internal')
             $this->internalAbnormalCustody=app(\App\Services\HallInventoryInternalLoanReturnReview::class)
                 ->abnormalSourceLines($actor,$this->companyId,$this->hallId,$loanId);
         $this->incidentLoanId=$loanId;
