@@ -804,6 +804,27 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
         }catch(ConflictHttpException){}
         Storage::disk('local')->put($row->pdf_storage_path,$storedPdf);
         $this->assertSame($pdf,$finalClosure->receiptPdf($reviewer,$company->id,$hall->id,$loan));
+        // No historical NCL document may be silently superseded by later
+        // physical receiving, fresh loss allegations or a new waiver.
+        $this->be($witness);
+        try {
+            $return->receive($witness,$company->id,$hall->id,$loan,
+                (string)Str::uuid(),[$item=>1],$pdf());
+            $this->fail('Physical return mutated final NCL custody.');
+        }catch(ConflictHttpException){}
+        $this->be($owner);
+        try {
+            $writeoffs->propose($owner,$company->id,$hall->id,$report,
+                (string)Str::uuid(),1,'Cannot retire stock twice after final');
+            $this->fail('Post-closure stock loss proposal accepted.');
+        }catch(ConflictHttpException){}
+        try {
+            $waiver->propose($owner,$company->id,$hall->id,$obligationId,
+                (string)Str::uuid(),1,'Cannot add contractual waiver after closing');
+            $this->fail('Post-closure contractual waiver accepted.');
+        }catch(ConflictHttpException){}
+        $this->be($reviewer);
+
         $this->assertSame($cashJournalCount,DB::table('finance_journals')->count());
         $this->assertSame(0,DB::table('hall_inventory_external_out_clean_closures')->count());
     }
