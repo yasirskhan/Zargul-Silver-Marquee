@@ -1,6 +1,9 @@
 <?php
 namespace Tests\Feature;
 
+use App\Filament\Pages\HallInventory;
+use Filament\Facades\Filament;
+use Livewire\Livewire;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\Hall;
@@ -288,6 +291,12 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         $history=$incidentSvc->history($owner,$company->id,$src->id,$loan);
         $this->assertCount(1,$history);
         $this->assertSame('damage',$history[0]['kind']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Livewire::test(HallInventory::class)->set('hallId',$src->id)
+            ->call('startLoanIncident',$loan)->assertHasNoErrors()
+            ->assertSee('Original lending hall physical custody (read-only)')
+            ->assertSee('Closure BLOCKED; no money posted by this reconciliation.');
+
         $reviewSvc=app(\App\Services\HallInventoryLoanIncidentDecisionService::class);
         $reviewId=(string)Str::uuid();
         try {
