@@ -292,8 +292,9 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         $this->assertCount(1,$history);
         $this->assertSame('damage',$history[0]['kind']);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
-        Livewire::test(HallInventory::class)->set('hallId',$src->id)
-            ->call('startLoanIncident',$loan)->assertHasNoErrors()
+        Livewire::test(HallInventory::class)->set('companyId',$company->id)
+            ->set('hallId',$src->id)->call('startLoanIncident',$loan)
+            ->assertHasNoErrors()->assertSet('internalAbnormalCustody.0.dispatched',12)
             ->assertSee('Original lending hall physical custody (read-only)')
             ->assertSee('Closure BLOCKED; no money posted by this reconciliation.');
 
