@@ -60,6 +60,10 @@ final class HallInventoryNoncleanWriteoffService {
             $company=DB::table('companies')->where('id',$companyId)->where('is_active',true)->lockForUpdate()->first();
             if(!$company)throw new AuthorizationException('Inactive inventory company.');
             $incident=$this->incident($companyId,$incidentId);
+            if(DB::table('hall_inventory_nonclean_final_closures')->where('company_id',$companyId)
+                ->where('loan_id',$incident->loan_id)->exists())
+                throw new ConflictHttpException('Finalized non-clean loan inventory cannot be changed.');
+
             if((string)$incident->source_hall_id!==$hallId||$quantity>(int)$incident->quantity)
                 throw new ConflictHttpException('Requested write-off exceeds original substantiated hall evidence.');
             $fingerprint=hash('sha256',json_encode([$companyId,$hallId,$incidentId,
@@ -103,6 +107,10 @@ final class HallInventoryNoncleanWriteoffService {
                 ->lockForUpdate()->first();
             if(!$proposal)throw new AuthorizationException('Other hall loss proposal is private.');
             $incident=$this->incident($companyId,$proposal->incident_id);
+            if(DB::table('hall_inventory_nonclean_final_closures')->where('company_id',$companyId)
+                ->where('loan_id',$proposal->loan_id)->exists())
+                throw new ConflictHttpException('Finalized non-clean loan inventory cannot be changed.');
+
             if((string)$incident->loan_id!==(string)$proposal->loan_id||
                 (string)$incident->source_item_id!==(string)$proposal->item_id||
                 (string)$incident->source_hall_id!==$hallId||
