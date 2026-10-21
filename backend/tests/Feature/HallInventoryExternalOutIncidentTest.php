@@ -768,6 +768,23 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
         } catch (AuthorizationException) {}
         $this->assertSame(0,DB::table('hall_inventory_nonclean_final_closures')->count());
         $this->be($reviewer);
+        // SQL must reject a forged final NCL certificate that pairs a real
+        // loan with a DIFFERENT valid hall in the same customer company.
+        try {
+            DB::transaction(function()use($company,$wrong,$loan,$reviewer):void {
+                DB::table('hall_inventory_nonclean_final_closures')->insert([
+                    'id'=>(string)Str::uuid(),'company_id'=>$company->id,
+                    'hall_id'=>$wrong->id,'loan_id'=>$loan,
+                    'receipt_number'=>99999,
+                    'reconciliation_sha256'=>str_repeat('a',64),
+                    'pdf_sha256'=>str_repeat('b',64),'pdf_size'=>16,
+                    'pdf_storage_path'=>'private/forged-ncl-test.pdf',
+                    'closed_by'=>$reviewer->getKey()
+                ]);
+                $this->fail('SQL accepted a forged foreign-hall NCL certificate.');
+            });
+        } catch (\Illuminate\Database\QueryException) {}
+        $this->assertSame(0,DB::table('hall_inventory_nonclean_final_closures')->count());
         $closureId=(string)Str::uuid();
         $closed=$finalClosure->close($reviewer,$company->id,$hall->id,$loan,$closureId);
         $this->assertSame(1,$closed['receiptNumber']);
