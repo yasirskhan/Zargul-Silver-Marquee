@@ -1,6 +1,9 @@
 <?php
 namespace Tests\Feature;
 
+use App\Filament\Pages\HallInventory;
+use Filament\Facades\Filament;
+use Livewire\Livewire;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\Hall;
@@ -288,6 +291,29 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         $history=$incidentSvc->history($owner,$company->id,$src->id,$loan);
         $this->assertCount(1,$history);
         $this->assertSame('damage',$history[0]['kind']);
+        // Verify the actual authenticated Owner screen and its rendered
+        // original-hall custody, rather than only invoking a read service.
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->be($owner);
+        Livewire::test(HallInventory::class)
+            ->set('companyId',$company->id)
+            ->set('hallId',$src->id)
+            ->call('startLoanIncident',$loan)
+            ->assertHasNoErrors()
+            ->assertSet('incidentLoanId',$loan)
+            ->assertSee('Original lending hall physical custody (read-only)')
+            ->assertSee('dispatched 12,')
+            ->assertSee('good 6, damaged 1,')
+            ->assertSee('Closure BLOCKED; no money posted by this reconciliation.');
+        $this->be($receiver);
+        Livewire::test(HallInventory::class)
+            ->set('companyId',$company->id)
+            ->set('hallId',$dest->id)
+            ->call('startLoanIncident',$loan)
+            ->assertForbidden();
+        $this->be($owner);
+        $this->assertSame(0,DB::table('finance_journals')->count());
+
         $reviewSvc=app(\App\Services\HallInventoryLoanIncidentDecisionService::class);
         $reviewId=(string)Str::uuid();
         try {
