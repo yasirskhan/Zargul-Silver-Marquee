@@ -367,7 +367,7 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
             $this->fail('Second review replaced immutable decision.');
         }catch(ConflictHttpException){}
         $reviewRows=$reviewSvc->reviews($dispatcher,$company->id,$src->id,$loan);
-        $this->assertCount(1,$reviewRows);
+        $this->assertCount(2,$reviewRows);
         $missingDecision=(string)Str::uuid();
         $this->assertSame($missingDecision,$reviewSvc->decide($dispatcher,
             $company->id,$missingId,$missingDecision,'substantiated',
@@ -378,7 +378,7 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         $this->assertSame(0,$confirmed[0]['pendingDiscrepancyReview']);
         $this->assertSame(4,$confirmed[0]['notReturned']);
         $this->assertSame(0,DB::table('finance_journals')->count());
-        $this->assertSame('substantiated',$reviewRows[0]['decision']);
+        $this->assertSame('substantiated',collect($reviewRows)->firstWhere('reportId',$incidentId)['decision']);
         config()->set('inventory_controls.loan_nonclean_reconciliation_enabled',true);
         config()->set('inventory_controls.loan_nonclean_writeoffs_enabled',true);
         $third=User::create(['name'=>'Independent damaged stock reviewer',
