@@ -580,3 +580,8 @@ Verify live branch/CI → reconcile current handoff + specific requirement/featu
 
 ## PHASE 12 PREPARED FINANCIAL OBLIGATION FORGIVENESS
 - Detached successor to independently verified physical writeoff candidate adds separate default-OFF noncash contractual partial forgiveness, independently posted only after second active current company owner review, immutable amount cap including pending and reversed collections, existing claim/currency/loan SQL scope and live owner forms. No actual payment claimed and cash-basis finance journals are not rewritten. PostgreSQL regression and full six-job exact SHA required. Still missing immutable numbered final non-clean closure and pilot.
+
+
+## PHASE 12 NON-CLEAN FINAL CLOSURE SAFETY READINESS (2026-10-20, CI PENDING)
+- Published default-OFF read-only reconciliation blockers: unreviewed incident, unresolved physical return, pending condition review, on-loan custody, undisposed damage, pending collection/waiver review and remaining authorized obligations. Exposed only through existing owner-scoped nonclean view. Regression exercises outstanding loss and financial-release blockers. This is diagnostic ONLY; `finalClosureAuthorized` remains false and no numbered nonclean final PDF, final closure record or inventory production gate is active.
+- Exact hosted six-job CI for this latest SHA is REQUIRED. Next substantial batch must add independent final approval transaction, SQL immutable numbered final document and replay-safe download, negative PostgreSQL and authenticated Livewire acceptance. Do not declare Phase 12 finished.
