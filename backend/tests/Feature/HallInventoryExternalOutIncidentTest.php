@@ -744,6 +744,45 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
         $this->assertSame(0,DB::table('hall_inventory_nonclean_final_closures')->count());
         $this->assertSame(0,DB::table('hall_inventory_external_out_clean_closures')->count());
         $this->assertSame(1,DB::table('hall_inventory_financial_recovery_reversals')->count());
+        // Finish remaining authorized contractual amount without fabricating cash.
+        $this->be($owner);
+        $secondWaiver=(string)Str::uuid();
+        $waiver->propose($owner,$company->id,$hall->id,$obligationId,$secondWaiver,
+            20000,'Signed documented final contractual release of remaining balance');
+        $this->be($independent);
+        $waiver->decide($independent,$company->id,$hall->id,$secondWaiver,
+            (string)Str::uuid(),'approved','Independent verified remainder accepted as final contract release');
+        $this->assertSame(0,$recoveries->outstanding($independent,$company->id,$hall->id,$loan)
+            [$obligationId]['remainingMinor']);
+        $this->be($reviewer);
+        config()->set('inventory_controls.loan_nonclean_final_closure_enabled',true);
+        $ready=$reconciliation->report($reviewer,$company->id,$hall->id,$loan);
+        $this->assertSame([],$ready['closureBlockers']);
+        $this->assertFalse($ready['finalClosureAuthorized']); // read-only cannot itself close
+        $closureId=(string)Str::uuid();
+        $closed=$finalClosure->close($reviewer,$company->id,$hall->id,$loan,$closureId);
+        $this->assertSame(1,$closed['receiptNumber']);
+        $this->assertSame($closed,$finalClosure->close($reviewer,$company->id,$hall->id,$loan,$closureId));
+        try {
+            $finalClosure->close($reviewer,$company->id,$hall->id,$loan,(string)Str::uuid());
+            $this->fail('Second final numbered PDF issued for same original loan.');
+        }catch(ConflictHttpException){}
+        $pdf=$finalClosure->receiptPdf($reviewer,$company->id,$hall->id,$loan);
+        $this->assertStringStartsWith('%PDF-1.4',$pdf);
+        $this->assertStringContainsString('NCL-1',$pdf);
+        $row=DB::table('hall_inventory_nonclean_final_closures')->where('id',$closureId)->first();
+        $this->assertNotNull($row);
+        $this->assertSame(hash('sha256',$pdf),$row->pdf_sha256);
+        $this->assertSame(1,DB::table('hall_inventory_nonclean_final_closures')->count());
+        $storedPdf=Storage::disk('local')->get($row->pdf_storage_path);
+        Storage::disk('local')->put($row->pdf_storage_path,'altered immutable certificate');
+        try{
+            $finalClosure->receiptPdf($reviewer,$company->id,$hall->id,$loan);
+            $this->fail('Tampered final NCL PDF remained downloadable.');
+        }catch(ConflictHttpException){}
+        Storage::disk('local')->put($row->pdf_storage_path,$storedPdf);
+        $this->assertSame($pdf,$finalClosure->receiptPdf($reviewer,$company->id,$hall->id,$loan));
+        $this->assertSame($cashJournalCount,DB::table('finance_journals')->count());
         $this->assertSame(0,DB::table('hall_inventory_external_out_clean_closures')->count());
     }
 }
