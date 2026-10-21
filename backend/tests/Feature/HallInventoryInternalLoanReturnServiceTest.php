@@ -119,7 +119,9 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
             $this->fail('Source decision overwritten.');
         }catch(ConflictHttpException){}
         Livewire::test(HallInventory::class)->set('companyId',$company->id)
-            ->set('hallId',$src->id)->call('startInternalDiscrepancyReview',$loan)
+            ->set('hallId',$src->id)
+            ->assertSee('Review original borrower signed discrepancy evidence')
+            ->call('startInternalDiscrepancyReview',$loan)
             ->assertHasNoErrors()->assertSee('requires_more_evidence');
         $this->assertSame(0,DB::table('finance_journals')->count());
         $this->assertSame(12,(int)DB::table('hall_inventory_positions')

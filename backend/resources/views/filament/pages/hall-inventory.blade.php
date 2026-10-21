@@ -916,7 +916,7 @@
                                     $loan['direction']==='internal' && $loan['destinationReceiptConfirmed'])
                                     @if(($loan['viewRole']??'')==='receiving')
                                         <button type="button" wire:click="startInternalDiscrepancy('{{ $loan['id'] }}')">File signed borrowing-hall missing/dispute statement</button>
-                                    @elseif($loan['lendingHallId']===$hallId && $this->canManageSourceCleanClosure())
+                                    @elseif($loan['lendingHallId']===$hallId && $this->canReviewInternalDiscrepancy())
                                         <button type="button" wire:click="startInternalDiscrepancyReview('{{ $loan['id'] }}')">Review original borrower signed discrepancy evidence</button>
                                     @endif
                                 @endif

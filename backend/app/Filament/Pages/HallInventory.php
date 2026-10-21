@@ -2063,6 +2063,14 @@ final class HallInventory extends Page
         $this->discrepancyRequestId=(string)Str::uuid();
         $this->discrepancyFile=null;
     }
+    public function canReviewInternalDiscrepancy():bool {
+        if(!config('inventory_controls.internal_discrepancy_enabled'))return false;
+        $actor=auth()->user();
+        $hall=Hall::query()->where('company_id',$this->companyId)
+            ->where('id',$this->hallId)->where('is_active',true)->first();
+        return $actor instanceof User&&$hall!==null&&
+            app(TenantAccess::class)->canConfigureHall($actor,$hall);
+    }
     public function startInternalDiscrepancyReview(string $loanId):void {
         $actor=$this->authorizeSelection();
         abort_unless(config('inventory_controls.internal_discrepancy_enabled'),403);
@@ -2070,8 +2078,7 @@ final class HallInventory extends Page
             ->recent($actor,$this->companyId,$this->hallId))
             ->first(fn($l):bool=>$l['id']===$loanId&&$l['direction']==='internal'&&
                 $l['lendingHallId']===$this->hallId);
-        abort_unless($loan!==null&&app(TenantAccess::class)->canConfigureHall($actor,
-            Hall::query()->where('company_id',$this->companyId)->findOrFail($this->hallId)),403);
+        abort_unless($loan!==null&&$this->canReviewInternalDiscrepancy(),403);
         $this->discrepancyLoanId=$loanId;
         $this->discrepancyLines=[];
         $this->discrepancyHistory=app(\App\Services\HallInventoryInternalDiscrepancyService::class)
