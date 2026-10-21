@@ -1,19 +1,19 @@
-# Zargul / VenueDesk / HAFZATECH — Phase 12 active checkpoint
-Observed 2026-10-21 UTC. ONLY repo yasirskhan/Zargul-Silver-Marquee, branch chatgpt/phase0-foundation.
-Actual worker Chat https://chatgpt.com/c/6ad84c8c-ca60-83e9-a05b-782fd6a675e5
-Read root AGENTS.md, ENTIRE handoff, docs/SESSION_CONTROL.md, current specs/roadmap/registers/source first.
+# Zargul / VenueDesk / HAFZATECH — active Phase 12 borrower-statement checkpoint
+Observed 2026-10-21 UTC. ONLY yasirskhan/Zargul-Silver-Marquee, branch chatgpt/phase0-foundation.
+Normal Chat worker https://chatgpt.com/c/6ad84c8c-ca60-83e9-a05b-782fd6a675e5
+Read AGENTS.md, ENTIRE handoff, docs/SESSION_CONTROL.md, relevant spec/register/source and actual live HEAD+job list.
 
-## Exact source / six-job hosted success
-- Earlier verified NCL issue `49c363e5` 39552677040, NCL issuer `9b0fda8a` 39553744103, external incident audit `3002a268` 39554429867, INTERNAL owner original custody and revocation `0481a43f` 39667565865.
-- INTERNAL independent owned-DAMAGED retirement `3d4342d9` 39671584251, forged original incident/proposal denial `d7669b4c` 39672712150, movement provenance `aa2fb869` 39676230895, all six SUCCESS.
-- First missing evidence `38fe7b5b` [39678171613](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39678171613) FAILED old one-report expectation; real repair `ed5e18b28bdb06461869c8488e881f25a5e64898` [39679437961](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39679437961) SIX SUCCESS: original lending owner missing evidence + independent reviewer, no stock/cash mutation.
-- Borrower destination item aggregate book and requires-more-evidence pending `8068931925d79bbfefae9e2c8cc5adc28bbafb44` [39680732971](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39680732971) SIX SUCCESS. Original loan maps destination catalog item. Posted borrower buckets may combine loans; they are NOT independently signed per-loan borrower acceptance.
-## New published successor / pending own CI
-- UI wording explicitly labels book as destination ITEM AGGREGATE, notes multi-loan sharing and no borrower signature. Owner Livewire assertion enforces label. Check live successor SHA and exact six job conclusions, fix failures. Prior handoff archived verbatim docs/AI_HANDOFF_ARCHIVE_2026-10-21_80689319.md. Older archives preserved.
-## Phase12 OPEN
-- Next substantive approved: actual borrowing-hall manager signed missing/dispute evidence on original INTERNAL loan, independently reviewed source-hall decision, immutable private proof, secure retry/role isolation, physical conservation with no phantom cash; then separate actual authorized financial obligation/settlement and numbered abnormal final receipt. Existing missing source testimony does NOT authorize retirement of physically unreturned owned stock.
-- EXTERNAL_IN partner short/damage/disputed return evidence and reconciliation/final close OPEN. Real operator staging physical pilot, restore/backup, security/release approval EXTERNAL BLOCKED; no invented evidence. Production inventory/finance flags OFF; Phase13 blocked until all Phase12 acceptance, then whole approved roadmap.
-- Keep full VenueDesk website/CMS/bookings, approvals, finance, staff/Telegram/audit, HAFZATECH licensing. Review all Phase12 feature register entries against actual UI/backend/SQL/tests/PG/roles/retry.
-## Rules / references
-- docs/PROJECT_MASTER_SPEC.md; docs/COMMERCIAL_PRODUCT_EXPANSION.md; docs/INVENTORY_IMPLEMENTATION_PLAN.md; docs/PHASE12_FINANCIAL_CLAIM_SCOPE.md; docs/ROADMAP.md; docs/FEATURE_REGISTER.csv; docs/ISSUE_AND_BUG_REGISTER.md; docs/DEVELOPMENT_PROTOCOL.md; docs/QUALITY_AND_BUG_REMEDIATION_POLICY.md.
-- One writer, normal Chat, no Work/main/new branch/force push/property-platform. Use expected_sha and force=false. All six: prototype-checks, central-postgres, licensing-postgres, laravel-postgres, editor-browser-e2e, authenticated-panel-e2e.
+## Exact verified successful predecessor
+- `495903b315f7514a5ab048f0be5928b57d703a19` [run 39682074643](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39682074643) all SIX SUCCESS: previous owned damage independently authorized physical disposition, original source missing testimony, source independent incident review, mapped destination ITEM AGGREGATE (not signed per loan), no cash/stock removal.
+- Historical red `afa2438c` run39671406699 repaired `3d4342d9` run39671584251 SIX; `969f59bf` run39673758671 repaired `f5804884` run39675049673 SIX; `38fe7b5b` run39678171613 repaired `ed5e18b2` run39679437961 SIX. Red records never rewritten.
+
+## New source successor: VERIFY OWN ALL SIX CI
+- Adds `VENUE_INVENTORY_INTERNAL_DISCREPANCY_ENABLED` default false. Original INTERNAL borrowing-hall manager signed PDF/photo missing/disputed evidence in new immutable company+loan+receipt+original source-item table, SHA256+private path/fingerprint. Independent original lender Owner/Admin decision once, audit, idempotent retry, scoped histories; no stock/journal/financial admission/final closure.
+- Filament receiving manager submission and lender owner independent decision UI; actual PostgreSQL multi-actor Livewire regression and negative conflicting retry/foreign hall. Verify actual successor HEAD, all six jobs (prototype-checks, central-postgres, licensing-postgres, laravel-postgres, editor-browser-e2e, authenticated-panel-e2e). Fix true failures, do not delete tests. Prior handoff archived at docs/AI_HANDOFF_ARCHIVE_2026-10-21_495903b3.md verbatim.
+- Prepared candidates from earlier interrupted work beyond published blobs are UNKNOWN; no duplicate writer.
+
+## Remaining Phase12
+- Need borrower/lender physical discrepancy agreement/counterparty dispute resolution, independently verified return/disposition/conservation, financial obligations and settlement/reversal, immutable numbered abnormal original loan closure. Signed statement is evidence, NOT unit retirement, borrower agreement to pay or final loan custody acceptance.
+- EXTERNAL_IN short/damaged/disputed partner returns with independently signed counterparty evidence and closure remain OPEN. No invented external partner confirmation, money, bank receipts, operator/staging UAT, restore, security/release approval. Production inventory/finance OFF. Phase13 only after complete Phase12 exit, then entire approved roadmap per AGENTS.md.
+- Current approved docs: docs/PROJECT_MASTER_SPEC.md, COMMERCIAL_PRODUCT_EXPANSION.md, INVENTORY_IMPLEMENTATION_PLAN.md, PHASE12_FINANCIAL_CLAIM_SCOPE.md, ROADMAP.md, FEATURE_REGISTER.csv, ISSUE_AND_BUG_REGISTER.md, DEVELOPMENT_PROTOCOL.md, QUALITY_AND_BUG_REMEDIATION_POLICY.md. Preserve full VenueDesk website/CMS, booking, finance, approvals, staff/Telegram/audit and HAFZATECH licensing.
+- One writer normal Chat; never Work, main, new branch, force-push or property-platform. expected_sha force=false CAS and reconcile unexpected branch movements. Do not enable production.

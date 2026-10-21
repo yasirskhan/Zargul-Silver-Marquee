@@ -912,6 +912,14 @@
                                     @endif
                                     @error('cleanLoanClosure') <p role="alert">{{ $message }}</p> @enderror
                                 @endif
+                                @if(config('inventory_controls.internal_discrepancy_enabled') &&
+                                    $loan['direction']==='internal' && $loan['destinationReceiptConfirmed'])
+                                    @if(($loan['viewRole']??'')==='receiving')
+                                        <button type="button" wire:click="startInternalDiscrepancy('{{ $loan['id'] }}')">File signed borrowing-hall missing/dispute statement</button>
+                                    @elseif($loan['lendingHallId']===$hallId && $this->canManageSourceCleanClosure())
+                                        <button type="button" wire:click="startInternalDiscrepancyReview('{{ $loan['id'] }}')">Review original borrower signed discrepancy evidence</button>
+                                    @endif
+                                @endif
                                 @if(config('inventory_controls.loan_returns_enabled') &&
                                     ($loan['viewRole'] ?? '') === 'receiving' &&
                                     in_array(($loan['status'] ?? ''),[
@@ -1847,6 +1855,48 @@
                         <button type="button" wire:click="sendInternalReturn" class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">
                             Record witnessed return shipment
                         </button>
+                    </section>
+                @endif
+                @if(config('inventory_controls.internal_discrepancy_enabled') && $discrepancyLoanId !== '')
+                    <section class="space-y-2 rounded-xl border p-4" aria-label="Signed internal discrepancy evidence">
+                        <h3>Original internal loan signed discrepancy evidence (no stock or money posting)</h3>
+                        <p>Loan {{ $discrepancyLoanId }}. Statements are testimony only, not borrower acceptance or liability.</p>
+                        @if(count($discrepancyLines)>0)
+                            <select wire:model="discrepancyItemId" aria-label="Original discrepancy item">
+                                <option value="">Select original loan item</option>
+                                @foreach($discrepancyLines as $line)
+                                    <option value="{{ $line['sourceItemId'] }}">{{ $line['name'] }} — originally received {{ $line['receivedQuantity'] }}</option>
+                                @endforeach
+                            </select>
+                            <select wire:model="discrepancyKind" aria-label="Discrepancy kind">
+                                <option value="missing">Missing</option><option value="dispute">Disputed count</option>
+                            </select>
+                            <input type="number" wire:model="discrepancyQuantity" min="1" aria-label="Claimed discrepancy quantity" placeholder="Claimed quantity">
+                            <input wire:model="discrepancyReason" aria-label="Signed statement reason" placeholder="Explain physically observed discrepancy">
+                            <input type="file" wire:model="discrepancyFile" accept=".pdf,.jpg,.jpeg,.png" aria-label="Signed borrower physical evidence">
+                            <button type="button" wire:click="submitInternalDiscrepancy">Submit signed borrowing-hall statement</button>
+                            @error('discrepancyFile') <p role="alert">{{ $message }}</p> @enderror
+                        @endif
+                        @foreach($discrepancyHistory as $e)
+                            <p>Statement {{ $e['id'] }} item {{ $e['itemId'] }}: {{ $e['quantity'] }} {{ $e['kind'] }} — {{ $e['decision'] ?? 'SOURCE REVIEW PENDING' }}; SHA256 {{ $e['sha256'] }}. No financial posting or stock change.</p>
+                        @endforeach
+                        @if(count($discrepancyLines)===0)
+                            <select wire:model="discrepancyReviewStatementId" aria-label="Independent signed statement review">
+                                <option value="">Choose pending signed borrower evidence</option>
+                                @foreach($discrepancyHistory as $e)
+                                    @if($e['decision']===null)
+                                        <option value="{{ $e['id'] }}">{{ $e['id'] }} — {{ $e['kind'] }} {{ $e['quantity'] }}</option>
+                                    @endif
+                                @endforeach
+                            </select>
+                            <select wire:model="discrepancyReviewDecision" aria-label="Independent discrepancy decision">
+                                <option value="requires_more_evidence">More evidence required</option>
+                                <option value="corroborated">Evidence corroborated only</option>
+                                <option value="disputed">Dispute statement</option>
+                            </select>
+                            <input wire:model="discrepancyReviewReason" aria-label="Independent review reason" placeholder="Independent review reason">
+                            <button type="button" wire:click="decideInternalDiscrepancy">Record independent source review</button>
+                        @endif
                     </section>
                 @endif
                 @if($lastReturnBatchId)

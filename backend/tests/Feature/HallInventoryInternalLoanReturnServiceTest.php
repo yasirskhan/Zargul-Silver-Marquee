@@ -73,6 +73,58 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         app(HallInventoryInternalLoanReceiptService::class)->receive(
             $receiver,$company->id,$loan,(string)Str::uuid(),
             [$srcItem=>$dstItem],[$dstItem=>0],$pdf());
+
+        config()->set('inventory_controls.catalog_enabled',true);
+        config()->set('inventory_controls.loan_returns_enabled',true);
+        $signed=app(\App\Services\HallInventoryInternalDiscrepancyService::class);
+        $statementId=(string)Str::uuid();
+        try {
+            $signed->submit($receiver,$company->id,$dest->id,$loan,$srcItem,$statementId,
+                'missing',2,'Signed receiving-hall count discrepancy observed.',$pdf());
+            $this->fail('Unreleased signed discrepancy allowed.');
+        }catch(ConflictHttpException){}
+        config()->set('inventory_controls.internal_discrepancy_enabled',true);
+        $this->assertSame($statementId,$signed->submit($receiver,$company->id,
+            $dest->id,$loan,$srcItem,$statementId,'missing',2,
+            'Signed receiving-hall count discrepancy observed.',$pdf()));
+        $this->assertSame($statementId,$signed->submit($receiver,$company->id,
+            $dest->id,$loan,$srcItem,$statementId,'missing',2,
+            'Signed receiving-hall count discrepancy observed.',$pdf()));
+        try {
+            $signed->submit($receiver,$company->id,$dest->id,$loan,$srcItem,$statementId,
+                'missing',3,'Changed signed receiving count must fail replay.',$pdf());
+            $this->fail('Conflicting borrower evidence retry accepted.');
+        }catch(ConflictHttpException){}
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Livewire::test(HallInventory::class)->set('companyId',$company->id)
+            ->set('hallId',$dest->id)->call('startInternalDiscrepancy',$loan)
+            ->assertHasNoErrors()->assertSee('Signed internal discrepancy evidence')
+            ->assertSee('SOURCE REVIEW PENDING');
+        $this->be($owner);
+        try {
+            $signed->submit($owner,$company->id,$src->id,$loan,$srcItem,(string)Str::uuid(),
+                'missing',1,'Source owner must not sign borrower physical evidence.',$pdf());
+            $this->fail('Source owner signed borrower evidence.');
+        }catch(AuthorizationException){}
+        $reviewId=(string)Str::uuid();
+        $this->assertSame($reviewId,$signed->review($owner,$company->id,$src->id,
+            $statementId,$reviewId,'requires_more_evidence',
+            'Independent source witness requests corroborating delivery document.'));
+        $this->assertSame($reviewId,$signed->review($owner,$company->id,$src->id,
+            $statementId,$reviewId,'requires_more_evidence',
+            'Independent source witness requests corroborating delivery document.'));
+        try {
+            $signed->review($owner,$company->id,$src->id,$statementId,(string)Str::uuid(),
+                'corroborated','Conflicting immutable borrower review must fail.');
+            $this->fail('Source decision overwritten.');
+        }catch(ConflictHttpException){}
+        Livewire::test(HallInventory::class)->set('companyId',$company->id)
+            ->set('hallId',$src->id)->call('startInternalDiscrepancyReview',$loan)
+            ->assertHasNoErrors()->assertSee('requires_more_evidence');
+        $this->assertSame(0,DB::table('finance_journals')->count());
+        $this->assertSame(12,(int)DB::table('hall_inventory_positions')
+            ->where('hall_id',$src->id)->where('item_id',$srcItem)->value('owned_on_loan'));
+        $this->be($receiver);
         $svc=app(HallInventoryInternalLoanReturnService::class);
         $first=(string)Str::uuid();
         $send=fn(string $id,int $qty,int $revision)=>$svc->send(

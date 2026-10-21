@@ -226,6 +226,24 @@ final class HallInventory extends Page
     public ?string $lastLoanReceiptReference = null;
 
     #[Locked]
+    public string $discrepancyLoanId = '';
+    #[Locked]
+    public string $discrepancyRequestId = '';
+    #[Locked]
+    public string $discrepancyDecisionId = '';
+    #[Locked]
+    public array $discrepancyLines = [];
+    #[Locked]
+    public array $discrepancyHistory = [];
+    public string $discrepancyItemId = '';
+    public string $discrepancyKind = 'missing';
+    public string $discrepancyQuantity = '';
+    public string $discrepancyReason = '';
+    public $discrepancyFile = null;
+    public string $discrepancyReviewStatementId = '';
+    public string $discrepancyReviewDecision = 'requires_more_evidence';
+    public string $discrepancyReviewReason = '';
+    #[Locked]
     public string $returnLoanId = '';
     #[Locked]
     public string $returnBatchId = '';
@@ -558,6 +576,12 @@ final class HallInventory extends Page
         $this->loanReturnDate = '';
         $this->loanPurpose = '';
         $this->lastLoanReference = null;
+        $this->discrepancyLoanId='';
+        $this->discrepancyLines=[];
+        $this->discrepancyHistory=[];
+        $this->discrepancyRequestId=(string)Str::uuid();
+        $this->discrepancyDecisionId=(string)Str::uuid();
+        $this->discrepancyFile=null;
         $this->incidentLoanId = '';
         $this->internalDamageWriteoffs=[];
         $this->internalDamageEligible=[];
@@ -2005,6 +2029,70 @@ final class HallInventory extends Page
         $this->reloadLoanHistory();
     }
 
+
+    public function startInternalDiscrepancy(string $loanId):void {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.internal_discrepancy_enabled'),403);
+        $loan=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($l):bool=>$l['id']===$loanId&&$l['direction']==='internal'&&
+                ($l['viewRole']??'')==='receiving'&&$l['destinationReceiptConfirmed']);
+        abort_unless($loan!==null,403);
+        $this->discrepancyLines=app(HallInventoryInternalLoanReturnReview::class)
+            ->destinationLines($actor,$this->companyId,$this->hallId,$loanId);
+        $this->discrepancyLoanId=$loanId;
+        $this->discrepancyRequestId=(string)Str::uuid();
+        $this->discrepancyHistory=app(\App\Services\HallInventoryInternalDiscrepancyService::class)
+            ->history($actor,$this->companyId,$this->hallId,$loanId,false);
+    }
+    public function submitInternalDiscrepancy():void {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->discrepancyLoanId!==''&&config('inventory_controls.internal_discrepancy_enabled'),403);
+        $this->validate(['discrepancyItemId'=>'required|uuid','discrepancyKind'=>'required|in:missing,dispute',
+            'discrepancyQuantity'=>'required|integer|min:1|max:100000000',
+            'discrepancyReason'=>'required|string|min:10|max:500',
+            'discrepancyFile'=>'required|file|max:5120|mimes:jpg,jpeg,png,pdf']);
+        abort_unless(collect($this->discrepancyLines)
+            ->contains(fn($l):bool=>$l['sourceItemId']===$this->discrepancyItemId),403);
+        app(\App\Services\HallInventoryInternalDiscrepancyService::class)->submit(
+            $actor,$this->companyId,$this->hallId,$this->discrepancyLoanId,$this->discrepancyItemId,
+            $this->discrepancyRequestId,$this->discrepancyKind,(int)$this->discrepancyQuantity,
+            $this->discrepancyReason,$this->discrepancyFile);
+        $this->discrepancyHistory=app(\App\Services\HallInventoryInternalDiscrepancyService::class)
+            ->history($actor,$this->companyId,$this->hallId,$this->discrepancyLoanId,false);
+        $this->discrepancyRequestId=(string)Str::uuid();
+        $this->discrepancyFile=null;
+    }
+    public function startInternalDiscrepancyReview(string $loanId):void {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.internal_discrepancy_enabled'),403);
+        $loan=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($l):bool=>$l['id']===$loanId&&$l['direction']==='internal'&&
+                $l['lendingHallId']===$this->hallId);
+        abort_unless($loan!==null&&app(TenantAccess::class)->canConfigureHall($actor,
+            Hall::query()->where('company_id',$this->companyId)->findOrFail($this->hallId)),403);
+        $this->discrepancyLoanId=$loanId;
+        $this->discrepancyLines=[];
+        $this->discrepancyHistory=app(\App\Services\HallInventoryInternalDiscrepancyService::class)
+            ->history($actor,$this->companyId,$this->hallId,$loanId,true);
+        $this->discrepancyDecisionId=(string)Str::uuid();
+    }
+    public function decideInternalDiscrepancy():void {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->discrepancyLoanId!==''&&config('inventory_controls.internal_discrepancy_enabled'),403);
+        $this->validate(['discrepancyReviewStatementId'=>'required|uuid',
+            'discrepancyReviewDecision'=>'required|in:corroborated,disputed,requires_more_evidence',
+            'discrepancyReviewReason'=>'required|string|min:10|max:500']);
+        abort_unless(collect($this->discrepancyHistory)->contains(
+            fn($l):bool=>$l['id']===$this->discrepancyReviewStatementId&&$l['decision']===null),403);
+        app(\App\Services\HallInventoryInternalDiscrepancyService::class)->review(
+            $actor,$this->companyId,$this->hallId,$this->discrepancyReviewStatementId,
+            $this->discrepancyDecisionId,$this->discrepancyReviewDecision,$this->discrepancyReviewReason);
+        $this->discrepancyHistory=app(\App\Services\HallInventoryInternalDiscrepancyService::class)
+            ->history($actor,$this->companyId,$this->hallId,$this->discrepancyLoanId,true);
+        $this->discrepancyDecisionId=(string)Str::uuid();
+    }
 
     public function startInternalReturn(string $loanId):void
     {

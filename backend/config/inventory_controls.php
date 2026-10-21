@@ -21,6 +21,7 @@ return [
     // Owner/admin independent physical return condition acceptance (default OFF).
     'loan_return_acceptance_enabled' => (bool) env('VENUE_INVENTORY_LOAN_RETURN_ACCEPTANCE_ENABLED', false),
     // Immutable staff incident reporting only. Financial settlement remains separately gated.
+    'internal_discrepancy_enabled' => (bool) env('VENUE_INVENTORY_INTERNAL_DISCREPANCY_ENABLED', false),
     'loan_incidents_enabled' => (bool) env('VENUE_INVENTORY_LOAN_INCIDENTS_ENABLED', false),
     // Independent evidence assessment only; does not assign financial liability.
     'loan_incident_reviews_enabled' => (bool) env('VENUE_INVENTORY_LOAN_INCIDENT_REVIEWS_ENABLED', false),
