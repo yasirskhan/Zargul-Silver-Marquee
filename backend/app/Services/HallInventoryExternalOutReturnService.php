@@ -110,6 +110,9 @@ final class HallInventoryExternalOutReturnService {
             if(!$loan||$loan->direction!=='external_out'||$loan->lending_hall_id!==$hallId)
                 throw new ConflictHttpException('Outside return must bind the original lending hall.');
             $this->hall($witness,$companyId,$hallId,false);
+            if(DB::table('hall_inventory_nonclean_final_closures')->where('company_id',$companyId)
+                ->where('loan_id',$loanId)->exists())
+                throw new ConflictHttpException('Physical return cannot change an immutable final NCL certificate.');
             $dispatch=DB::table('hall_inventory_external_out_dispatches')
                 ->where('company_id',$companyId)->where('loan_id',$loanId)
                 ->where('hall_id',$hallId)->lockForUpdate()->first();
@@ -204,6 +207,9 @@ final class HallInventoryExternalOutReturnService {
             if(!$loan||$loan->direction!=='external_out'||$loan->lending_hall_id!==$hallId)
                 throw new ConflictHttpException('Outside return review cannot change original loan hall.');
             $this->hall($owner,$companyId,$hallId,true);
+            if(DB::table('hall_inventory_nonclean_final_closures')->where('company_id',$companyId)
+                ->where('loan_id',$receipt->loan_id)->exists())
+                throw new ConflictHttpException('Physical return cannot change an immutable final NCL certificate.');
             if((int)$receipt->received_by===(int)$owner->getKey()||
                (int)$loan->created_by===(int)$owner->getKey())
                 throw new AuthorizationException('Different owner must independently assess returned partner items.');
