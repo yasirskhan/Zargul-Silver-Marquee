@@ -159,8 +159,15 @@ final class HallInventoryNoncleanReconciliationService
                     $j->on('d.company_id','=','p.company_id')->on('d.proposal_id','=','p.id');
                 })->where('p.company_id',$companyId)->where('p.hall_id',$hallId)
                 ->where('p.loan_id',$loanId)->where('d.decision','approved')
-                ->get(['p.item_id','p.kind','p.quantity']);
+                ->get(['p.id','p.item_id','p.kind','p.quantity','d.movement_id','d.decided_by']);
             foreach($posted as $w) {
+                $movement=DB::table('hall_inventory_movement_events')
+                    ->where('company_id',$companyId)->where('hall_id',$hallId)
+                    ->where('item_id',$w->item_id)->where('id',$w->movement_id)
+                    ->where('event_kind',$w->kind==='damage'?'writeoff_owned_damaged':'writeoff_owned_on_loan')
+                    ->where('quantity',$w->quantity)->where('actor_id',$w->decided_by)->first();
+                if(!$movement||$movement->reason!=='Independently authorized non-clean loss disposition '.$w->id)
+                    throw new ConflictHttpException('Approved physical write-off lacks exact posted inventory movement.');
                 $item=(string)$w->item_id;
                 if(!isset($items[$item]))throw new ConflictHttpException('Write-off references another physical loan item.');
                 $writtenOff[$item][$w->kind]=($writtenOff[$item][$w->kind]??0)+(int)$w->quantity;
