@@ -17,6 +17,7 @@ use App\Services\HallInventoryFinancialClaimService;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -783,7 +784,7 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
             try {
                 $finalClosure->close($reviewer,$company->id,$hall->id,$loan,(string)Str::uuid());
                 $this->fail('NCL issuer bypassed the original company serialization lock.');
-            } catch (\\Illuminate\\Database\\QueryException $error) {
+            } catch (QueryException $error) {
                 $this->assertStringContainsString('lock timeout',strtolower($error->getMessage()));
             }
             $this->assertSame(0,$other->table('hall_inventory_nonclean_final_closures')
