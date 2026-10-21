@@ -35,6 +35,9 @@ final class HallInventoryFinancialClaimService
             $loan=DB::table('hall_inventory_loan_drafts')
                 ->where('company_id',$companyId)->where('id',$report->loan_id)
                 ->lockForUpdate()->first();
+            if(DB::table('hall_inventory_nonclean_final_closures')->where('company_id',$companyId)
+                ->where('loan_id',$report->loan_id)->exists())
+                throw new ConflictHttpException('No new money claim may follow the immutable final NCL certificate.');
             if(!$loan||$loan->direction!=='external_out'||
                 $loan->lending_hall_id!==$report->source_hall_id)
                 throw new ConflictHttpException('Original owned external lending is required.');
