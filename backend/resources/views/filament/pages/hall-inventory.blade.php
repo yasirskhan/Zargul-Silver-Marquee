@@ -1020,8 +1020,11 @@
                                 <p>Pending closure checks: {{ implode(', ', $noncleanReconciliation['closureBlockers'] ?? []) ?: 'No detected data blocker; final authorization still required' }}.</p>
                                 @if(config('inventory_controls.loan_nonclean_final_closure_enabled'))
                                     <div class="flex flex-wrap gap-2" aria-label="Independently authorized final non-clean closure">
-                                        <button type="button" wire:click="closeNoncleanFinalLoan" class="rounded border px-3 py-2" @disabled(count($noncleanReconciliation['closureBlockers'] ?? []) > 0)>Independently finalize non-clean loan</button>
-                                        <button type="button" wire:click="downloadNoncleanFinalLoanPdf" class="rounded border px-3 py-2">Download existing immutable numbered NCL PDF</button>
+                                        @if(\Illuminate\Support\Facades\DB::table('hall_inventory_nonclean_final_closures')->where('company_id',$this->companyId)->where('hall_id',$this->hallId)->where('loan_id',$financialClaimLoanId)->exists())
+                                            <button type="button" wire:click="downloadNoncleanFinalLoanPdf" class="rounded border px-3 py-2">Download existing immutable numbered NCL PDF</button>
+                                        @else
+                                            <button type="button" wire:click="closeNoncleanFinalLoan" class="rounded border px-3 py-2" @disabled(count($noncleanReconciliation['closureBlockers'] ?? []) > 0)>Independently finalize non-clean loan</button>
+                                        @endif
                                     </div>
                                     @error('noncleanFinalClosure')<p role="alert">{{ $message }}</p>@enderror
                                 @endif
