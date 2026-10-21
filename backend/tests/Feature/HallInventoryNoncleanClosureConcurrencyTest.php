@@ -46,7 +46,9 @@ final class HallInventoryNoncleanClosureConcurrencyTest extends TestCase
         DB::purge('second_pgsql');
         $other=DB::connection('second_pgsql');
         $this->assertNotSame(DB::connection()->getPdo(),$other->getPdo());
-        $loanId=(string)Str::uuid();
+        // Distinct loan IDs contend on the same company-wide serial allocator.
+        // Neither request may bypass the lock simply because its loan differs.
+        $loanIds=[(string)Str::uuid(),(string)Str::uuid()];
         $service=app(HallInventoryNoncleanFinalClosureService::class);
         $other->beginTransaction();
         try {
@@ -54,11 +56,13 @@ final class HallInventoryNoncleanClosureConcurrencyTest extends TestCase
                 ->lockForUpdate()->first(['id']);
             $this->assertSame($company->id,$locked->id);
             DB::statement("SET lock_timeout = '300ms'");
-            try {
-                $service->close($owner,$company->id,$hall->id,$loanId,(string)Str::uuid());
-                $this->fail('A competing closure bypassed the company serial lock.');
-            } catch (QueryException $e) {
-                $this->assertStringContainsString('lock timeout',strtolower($e->getMessage()));
+            foreach ($loanIds as $loanId) {
+                try {
+                    $service->close($owner,$company->id,$hall->id,$loanId,(string)Str::uuid());
+                    $this->fail('A competing distinct-loan closure bypassed the company serial lock.');
+                } catch (QueryException $e) {
+                    $this->assertStringContainsString('lock timeout',strtolower($e->getMessage()));
+                }
             }
             $this->assertSame(0,$other->table('hall_inventory_nonclean_final_closures')
                 ->where('company_id',$company->id)->count());
@@ -71,6 +75,6 @@ final class HallInventoryNoncleanClosureConcurrencyTest extends TestCase
         // Once the lock is released, normal company authorization and exact
         // source-loan checks run, without manufacturing a receipt or document.
         $this->expectException(AuthorizationException::class);
-        $service->close($owner,$company->id,$hall->id,$loanId,(string)Str::uuid());
+        $service->close($owner,$company->id,$hall->id,$loanIds[0],(string)Str::uuid());
     }
 }
