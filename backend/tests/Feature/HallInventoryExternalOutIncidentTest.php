@@ -823,8 +823,11 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
         // physical receiving, fresh loss allegations or a new waiver.
         $this->be($witness);
         try {
-            $return->receive($witness,$company->id,$hall->id,$loan,
-                (string)Str::uuid(),[$item=>1],$pdf());
+            app(HallInventoryExternalOutReturnService::class)->receive(
+                $witness,$company->id,$hall->id,$loan,
+                (string)Str::uuid(),[$item=>1],
+                UploadedFile::fake()->createWithContent(
+                    'post-final-signed-return.pdf',"%PDF-1.4\n%%EOF"));
             $this->fail('Physical return mutated final NCL custody.');
         }catch(ConflictHttpException){}
         $this->be($owner);
