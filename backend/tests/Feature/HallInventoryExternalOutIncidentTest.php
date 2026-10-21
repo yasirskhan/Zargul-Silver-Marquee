@@ -785,6 +785,30 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
             });
         } catch (\Illuminate\Database\QueryException) {}
         $this->assertSame(0,DB::table('hall_inventory_nonclean_final_closures')->count());
+        // A valid INTERNAL source-hall loan also cannot enter the NCL series.
+        // The serial ledger accepts only actual outside-owned lending loans.
+        $internal=(string)Str::uuid();
+        DB::table('hall_inventory_loan_drafts')->insert([
+            'id'=>$internal,'company_id'=>$company->id,'direction'=>'internal',
+            'lending_hall_id'=>$hall->id,'borrowing_hall_id'=>$wrong->id,
+            'external_partner_id'=>null,'expected_return_date'=>'2027-12-15',
+            'purpose'=>'Synthetic internal loan cannot receive external NCL receipt',
+            'request_fingerprint'=>str_repeat('e',64),'created_by'=>$owner->getKey()
+        ]);
+        try {
+            DB::transaction(function()use($company,$hall,$internal,$reviewer):void {
+                DB::table('hall_inventory_nonclean_final_closures')->insert([
+                    'id'=>(string)Str::uuid(),'company_id'=>$company->id,
+                    'hall_id'=>$hall->id,'loan_id'=>$internal,'receipt_number'=>99998,
+                    'reconciliation_sha256'=>str_repeat('a',64),
+                    'pdf_sha256'=>str_repeat('b',64),'pdf_size'=>16,
+                    'pdf_storage_path'=>'private/forged-internal-ncl-test.pdf',
+                    'closed_by'=>$reviewer->getKey()
+                ]);
+                $this->fail('SQL accepted an internal loan into the external NCL series.');
+            });
+        } catch (\Illuminate\Database\QueryException) {}
+        $this->assertSame(0,DB::table('hall_inventory_nonclean_final_closures')->count());
         $closureId=(string)Str::uuid();
         $closed=$finalClosure->close($reviewer,$company->id,$hall->id,$loan,$closureId);
         $this->assertSame(1,$closed['receiptNumber']);
