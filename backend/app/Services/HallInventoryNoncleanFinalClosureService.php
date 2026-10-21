@@ -109,7 +109,13 @@ final class HallInventoryNoncleanFinalClosureService
                 ->where('company_id',$companyId)->max('receipt_number');
             $pdf=$this->renderPdf($companyId,$hallId,$loanId,$number,$fingerprint,$snapshot);
             $storagePath='private/hall-inventory-nonclean-final/'.$companyId.'/'.$id.'.pdf';
-            if(!Storage::disk('local')->put($storagePath,$pdf))
+            $disk=Storage::disk('local');
+            // A client-supplied idempotency UUID must never overwrite a
+            // pre-existing original, including an orphan from a failed issue.
+            // The company FOR UPDATE lock serializes all normal NCL writers.
+            if($disk->exists($storagePath))
+                throw new ConflictHttpException('Immutable numbered document storage key already exists.');
+            if(!$disk->put($storagePath,$pdf))
                 throw new ConflictHttpException('Numbered final document storage failed.');
             try {
                 DB::table('hall_inventory_nonclean_final_closures')->insert([
@@ -126,7 +132,7 @@ final class HallInventoryNoncleanFinalClosureService
                     'after_values'=>json_encode(['closed'=>true,'number'=>$number,'sha256'=>$fingerprint],JSON_THROW_ON_ERROR),
                     'context'=>json_encode(['loanId'=>$loanId,'hallId'=>$hallId,'moneyInvented'=>false],JSON_THROW_ON_ERROR)
                 ]);
-            }catch(\Throwable $e){Storage::disk('local')->delete($storagePath);throw $e;}
+            }catch(\Throwable $e){$disk->delete($storagePath);throw $e;}
             return ['id'=>$id,'receiptNumber'=>$number];
         },3);
     }

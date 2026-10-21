@@ -809,6 +809,21 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
             });
         } catch (\Illuminate\Database\QueryException) {}
         $this->assertSame(0,DB::table('hall_inventory_nonclean_final_closures')->count());
+        // A colliding client-provided closure UUID must NOT overwrite an
+        // existing immutable file or remove it on a failed database insert.
+        // Simulate a previously issued/orphaned object at the target key.
+        $occupiedId=(string)Str::uuid();
+        $occupiedPath='private/hall-inventory-nonclean-final/'.$company->id.'/'.$occupiedId.'.pdf';
+        $originalBytes="%PDF-1.4\nPreviously issued evidence must remain unchanged\n%%EOF\n";
+        Storage::disk('local')->put($occupiedPath,$originalBytes);
+        try {
+            $finalClosure->close($reviewer,$company->id,$hall->id,$loan,$occupiedId);
+            $this->fail('Existing numbered PDF storage key was silently overwritten.');
+        } catch (ConflictHttpException) {}
+        $this->assertSame($originalBytes,Storage::disk('local')->get($occupiedPath));
+        $this->assertSame(0,DB::table('hall_inventory_nonclean_final_closures')->count());
+        Storage::disk('local')->delete($occupiedPath);
+
         $closureId=(string)Str::uuid();
         $closed=$finalClosure->close($reviewer,$company->id,$hall->id,$loan,$closureId);
         $this->assertSame(1,$closed['receiptNumber']);
