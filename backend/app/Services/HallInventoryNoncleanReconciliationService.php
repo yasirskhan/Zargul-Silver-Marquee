@@ -215,6 +215,24 @@ final class HallInventoryNoncleanReconciliationService
                 $j->whereNull('d.id')->orWhere('d.decision','disputed');
             })->count();
         if($unresolvedClaims>0)$blockers[]='unresolved_financial_claim';
+        // An approved collection claim cannot disappear merely because no
+        // separately authorized partner obligation has been established.
+        $unboundClaim=DB::table('hall_inventory_financial_claims as c')
+            ->join('hall_inventory_financial_claim_decisions as d',function($j):void {
+                $j->on('d.company_id','=','c.company_id')->on('d.claim_id','=','c.id');
+            })->where('c.company_id',$companyId)->where('c.loan_id',$loanId)
+            ->where('d.decision','approved_for_collection')
+            ->whereNotExists(function($j):void {
+                $j->selectRaw('1')
+                    ->from('hall_inventory_financial_obligations as o')
+                    ->join('hall_inventory_financial_obligation_decisions as od',function($q):void {
+                        $q->on('od.company_id','=','o.company_id')->on('od.obligation_id','=','o.id');
+                    })->whereColumn('o.company_id','c.company_id')
+                    ->whereColumn('o.claim_id','c.id')
+                    ->where('od.decision','authorized');
+            })->exists();
+        if($unboundClaim)$blockers[]='collection_claim_without_authorized_obligation';
+
 
         foreach($items as $item){
             if($item['pendingReview']>0)$blockers[]='pending_return_review';
