@@ -38,6 +38,7 @@ final class HallInventoryNoncleanClosureConcurrencyTest extends TestCase
             'loan_nonclean_final_closure_enabled','loan_nonclean_reconciliation_enabled',
             'loan_nonclean_writeoffs_enabled','loan_financial_waivers_enabled',
             'loan_recoveries_enabled','loan_authorized_obligations_enabled',
+            'loan_partner_responses_enabled',
             'external_out_dispatch_enabled','external_out_return_enabled'
         ] as $gate) config()->set('inventory_controls.'.$gate,true);
 
