@@ -13,8 +13,9 @@ Read root AGENTS.md, this ENTIRE concise handoff, docs/SESSION_CONTROL.md, spec/
 - 49c363e5008c2ee4f76a1c614ed5367e3a710a89 run 39552677040: GENUINE two-process concurrently eligible PostgreSQL NCL issuance, second backend observed blocked by company serial lock then succeeded with distinct original SHA-verified PDFs.
 - 9b0fda8adfd8890d32379f41b01e9be47132d85d run 39553744103: authenticated issuer ID + server UTC timestamp captured in NEW immutable NCL original PDF and row; all six SUCCESS.
 
-## Current substantive successor (verify its own CI)
-- External-out independent incident-review immutable audit formerly mislabeled as INTERNAL. Correct direction-derived event action plus PostgreSQL integration assertions. Source and tests changed; do NOT call verified until ALL six job conclusions SUCCESS on its exact SHA.
+## Verified latest source and next abnormal-internal candidate
+- HEAD 3002a268572b163db0b6dfae1a4970a0b216bb7b: Actions 39554429867 SUCCESS all six required jobs, including external-out incident-review audit direction repair.
+- New successor adds scoped read-only INTERNAL physical abnormal line-level custody reconciliation and lending-hall incident-screen UI, with PostgreSQL authorization/conservation assertions. It requires its own exact-SHA six-job verification. Not a disposition/finance settlement or full phase acceptance.
 - Check live branch HEAD and branch-filtered Actions. Fix any red and preserve original failure -> repaired commit -> six green linkage.
 
 ## Phase 12 still OPEN, production inventory and finance OFF

@@ -152,6 +152,78 @@ final class HallInventoryInternalLoanReturnReview
         ])->all();
     }
 
+
+    /**
+     * Original-source-only read-only abnormal custody reconciliation.
+     * Never treats damaged or disputed units as good, or incident testimony
+     * as an approved financial obligation or stock disposition.
+     */
+    public function abnormalSourceLines(User $actor,string $companyId,string $hallId,string $loanId):array
+    {
+        $this->gated();
+        if(!Str::isUuid($companyId)||!Str::isUuid($hallId)||!Str::isUuid($loanId))
+            throw new InvalidArgumentException('Invalid abnormal loan scope.');
+        $hall=Hall::query()->where('company_id',$companyId)->where('id',$hallId)
+            ->where('is_active',true)->first();
+        if(!$hall||!Auth::check()||(int)Auth::id()!==(int)$actor->getKey()||
+            !$this->access->canConfigureHall($actor,$hall))
+            throw new AuthorizationException('Current lending hall owner/admin required.');
+        $loan=DB::table('hall_inventory_loan_drafts')->where('company_id',$companyId)
+            ->where('id',$loanId)->where('lending_hall_id',$hallId)
+            ->where('direction','internal')->first();
+        if(!$loan)throw new AuthorizationException('Original internal loan scope required.');
+        $dispatch=DB::table('hall_inventory_loan_dispatches')
+            ->where('company_id',$companyId)->where('loan_id',$loanId)->first();
+        if(!$dispatch)throw new ConflictHttpException('No physically dispatched original custody.');
+        $lines=DB::table('hall_inventory_loan_dispatch_lines')
+            ->where('company_id',$companyId)->where('dispatch_id',$dispatch->id)
+            ->orderBy('item_id')->get(['item_id','quantity']);
+        if($lines->isEmpty())throw new ConflictHttpException('No original custody lines.');
+        $returned=DB::table('hall_inventory_internal_loan_return_acceptance_lines as l')
+            ->join('hall_inventory_internal_loan_return_acceptances as a',function($j):void {
+                $j->on('a.company_id','=','l.company_id')->on('a.id','=','l.acceptance_id');
+            })->join('hall_inventory_internal_loan_return_batches as b',function($j):void {
+                $j->on('b.company_id','=','a.company_id')->on('b.id','=','a.return_batch_id');
+            })->where('l.company_id',$companyId)->where('b.loan_id',$loanId)
+            ->select('l.source_item_id')->selectRaw('SUM(l.good_quantity) as good')
+            ->selectRaw('SUM(l.damaged_quantity) as damaged')
+            ->selectRaw('SUM(l.unresolved_quantity) as unresolved')
+            ->groupBy('l.source_item_id')->get()->keyBy('source_item_id');
+        $pending=DB::table('hall_inventory_internal_loan_return_lines as l')
+            ->join('hall_inventory_internal_loan_return_batches as b',function($j):void {
+                $j->on('b.company_id','=','l.company_id')->on('b.id','=','l.return_batch_id');
+            })->leftJoin('hall_inventory_internal_loan_return_acceptances as a',function($j):void {
+                $j->on('a.company_id','=','b.company_id')->on('a.return_batch_id','=','b.id');
+            })->where('l.company_id',$companyId)->where('b.loan_id',$loanId)
+            ->whereNull('a.id')->select('l.source_item_id')
+            ->selectRaw('SUM(l.quantity) as pending')->groupBy('l.source_item_id')
+            ->pluck('pending','source_item_id');
+        $incidents=DB::table('hall_inventory_loan_incident_reports as r')
+            ->leftJoin('hall_inventory_loan_incident_decisions as d',function($j):void {
+                $j->on('d.company_id','=','r.company_id')->on('d.report_id','=','r.id');
+            })->where('r.company_id',$companyId)->where('r.loan_id',$loanId)
+            ->select('r.source_item_id')->selectRaw('COUNT(*) as reported')
+            ->selectRaw("SUM(CASE WHEN d.decision = 'substantiated' THEN 1 ELSE 0 END) as substantiated")
+            ->groupBy('r.source_item_id')->get()->keyBy('source_item_id');
+        $result=[];
+        foreach($lines as $line) {
+            $id=(string)$line->item_id;$total=(int)$line->quantity;
+            $a=$returned->get($id);$good=(int)($a->good??0);
+            $damaged=(int)($a->damaged??0);$unresolved=(int)($a->unresolved??0);
+            $inTransit=(int)($pending[$id]??0);
+            $notSent=$total-$good-$damaged-$unresolved-$inTransit;
+            $integrityWarning=$notSent<0;
+            $incident=$incidents->get($id);
+            $result[]=['itemId'=>$id,'dispatched'=>$total,'good'=>$good,
+                'damaged'=>$damaged,'unresolved'=>$unresolved,'inTransit'=>$inTransit,
+                'notReturned'=>max(0,$notSent),'integrityWarning'=>$integrityWarning,
+                'incidentReports'=>(int)($incident->reported??0),
+                'substantiatedReports'=>(int)($incident->substantiated??0),
+                'closureBlocked'=>true,'moneyPosted'=>false];
+        }
+        return $result;
+    }
+
     private function gated():void
     {
         if(!config('inventory_controls.loan_drafts_enabled')||

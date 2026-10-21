@@ -360,3 +360,8 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - Source: HallInventoryLoanIncidentDecisionService::decide was consistently persisting action `hall_inventory.internal_loan_incident_reviewed` for both INTERNAL and EXTERNAL_OUT substantiated owner assessments. This is incorrect historical provenance, especially for outside-owned partner damage or missing incidents. Existing immutable events are not rewritten.
 - Fix candidate: retain the original internal audit action for INTERNAL; emit `hall_inventory.external_owned_loan_incident_reviewed` for EXTERNAL_OUT according to trusted server-side locked loan direction, with an end-to-end PostgreSQL regression on actual independently reviewed outside-owned incidents and assertion against misclassification.
 - This source successor requires its own all-six exact-SHA hosted CI; no balances, release flags, partner liability or approval duties changed. The wider abnormal INTERNAL and EXTERNAL_IN disposition/financial closure work remains open.
+
+
+## INV-INTERNAL-20261021-045 — Source-scope abnormal internal custody reconciliation
+- Current verified predecessor 3002a268 / run 39554429867 SUCCESS all six.
+- New staged implementation: source Owner/Admin read-only exact loan per-item dispatched, good, damaged, unresolved, pending review and unreturned counts. Explicit integrity warning and closure-blocked/no-money semantics; UI on existing incident review screen. Never reclassifies damage as good or posts financial liability or stock. Cross-role and physical conservation regression added. Full independently approved physical disposition, finance/settlement and final abnormal closure still OPEN; production flags OFF.

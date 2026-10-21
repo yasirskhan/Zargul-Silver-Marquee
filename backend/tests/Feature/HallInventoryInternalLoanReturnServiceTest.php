@@ -238,6 +238,26 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         $this->assertSame(1,(int)DB::table('hall_inventory_positions')
             ->where('hall_id',$dest->id)->where('item_id',$dstItem)->value('borrowed_transit'));
         $this->assertSame(0,DB::table('finance_journals')->count());
+        $custody=app(HallInventoryInternalLoanReturnReview::class)
+            ->abnormalSourceLines($owner,$company->id,$src->id,$loan);
+        $this->assertCount(1,$custody);
+        $this->assertSame(12,$custody[0]['dispatched']);
+        $this->assertSame(6,$custody[0]['good']);
+        $this->assertSame(1,$custody[0]['damaged']);
+        $this->assertSame(1,$custody[0]['unresolved']);
+        $this->assertSame(0,$custody[0]['inTransit']);
+        $this->assertSame(4,$custody[0]['notReturned']);
+        $this->assertFalse($custody[0]['integrityWarning']);
+        $this->assertTrue($custody[0]['closureBlocked']);
+        $this->assertFalse($custody[0]['moneyPosted']);
+        try {
+            $this->be($receiver);
+            app(HallInventoryInternalLoanReturnReview::class)
+                ->abnormalSourceLines($receiver,$company->id,$src->id,$loan);
+            $this->fail('Borrower accessed original lender abnormal custody.');
+        } catch (AuthorizationException) {}
+        $this->be($owner);
+        $this->assertSame(0,DB::table('finance_journals')->count());
         $this->assertFalse($loanHistory['overdueWithOutstandingCustody']);
         $incidentSvc=app(\App\Services\HallInventoryLoanIncidentService::class);
         $incidentId=(string)Str::uuid();

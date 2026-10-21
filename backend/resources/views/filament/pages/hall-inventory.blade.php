@@ -940,6 +940,24 @@
                         <h3 class="font-semibold">Independent incident report</h3>
                         <p class="text-sm">Evidence only. Reports do not assess charges, settle damage, transfer inventory or close the loan.</p>
                         <p>Loan: {{ $incidentLoanId }}</p>
+                        @if(count($internalAbnormalCustody)>0)
+                            <section aria-label="Internal abnormal custody reconciliation" class="rounded-lg border p-3 space-y-2">
+                                <h4 class="font-semibold">Original lending hall physical custody (read-only)</h4>
+                                <p>Good units are separate from damaged, unresolved and in-transit units. This view cannot authorize a write-off, debt, receipt, or final closure.</p>
+                                @foreach($internalAbnormalCustody as $balance)
+                                    <p wire:key="internal-custody-{{ $balance['itemId'] }}">
+                                        Item {{ $balance['itemId'] }}: dispatched {{ $balance['dispatched'] }},
+                                        good {{ $balance['good'] }}, damaged {{ $balance['damaged'] }},
+                                        unresolved {{ $balance['unresolved'] }}, return pending review {{ $balance['inTransit'] }},
+                                        not yet returned {{ $balance['notReturned'] }},
+                                        incident reports {{ $balance['incidentReports'] }},
+                                        independently substantiated reports {{ $balance['substantiatedReports'] }}.
+                                        @if($balance['integrityWarning']) INTEGRITY REVIEW REQUIRED. @endif
+                                        Closure BLOCKED; no money posted by this reconciliation.
+                                    </p>
+                                @endforeach
+                            </section>
+                        @endif
                         <label class="block">Source item
                             <select wire:model="incidentItemId" class="w-full rounded-lg border p-2 text-gray-900">
                                 <option value="">Choose loan item</option>

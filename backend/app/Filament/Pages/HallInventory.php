@@ -257,6 +257,7 @@ final class HallInventory extends Page
     public array $incidentLines = [];
     #[Locked]
     public array $incidentHistory = [];
+    public array $internalAbnormalCustody = [];
     public string $incidentItemId = '';
     public string $incidentKind = 'damage';
     public string $incidentQuantity = '';
@@ -2146,6 +2147,10 @@ final class HallInventory extends Page
                   config('inventory_controls.external_out_return_enabled') &&
                   $row['externalOutApproved'])));
         abort_unless($loan!==null,403);
+        $this->internalAbnormalCustody=[];
+        if($loan['direction']==='internal' && config('inventory_controls.loan_returns_enabled'))
+            $this->internalAbnormalCustody=app(\App\Services\HallInventoryInternalLoanReturnReview::class)
+                ->abnormalSourceLines($actor,$this->companyId,$this->hallId,$loanId);
         $this->incidentLoanId=$loanId;
         $this->incidentRequestId=(string) Str::uuid();
         $this->incidentLines=$loan['lines'];
