@@ -77,6 +77,9 @@ final class HallInventoryLoanDraftReview
             ->leftJoin('hall_inventory_external_out_clean_closures as oc',function($j):void {
                 $j->on('oc.company_id','=','d.company_id')->on('oc.loan_id','=','d.id');
             })
+            ->leftJoin('hall_inventory_nonclean_final_closures as nc',function($j):void {
+                $j->on('nc.company_id','=','d.company_id')->on('nc.loan_id','=','d.id');
+            })
             ->leftJoin('hall_inventory_external_in_receipts as er',function($j):void {
                 $j->on('er.company_id','=','d.company_id')->on('er.loan_id','=','d.id');
             })
@@ -120,7 +123,7 @@ final class HallInventoryLoanDraftReview
                 'lr.id as receipt_id','lr.created_at as received_at',
                 'er.id as external_receipt_id','ea.id as external_acceptance_id',
                 'oh.id as external_out_handover_id','od.id as external_out_dispatch_id',
-                'oc.id as external_out_closure_id',
+                'oc.id as external_out_closure_id','nc.id as external_out_nonclean_final_id',
                 'ec.id as external_clean_closure_id',
                 'rb.return_batch_count','rb.acknowledged_batch_count',
                 'p.name as external_partner_name',
@@ -347,7 +350,8 @@ final class HallInventoryLoanDraftReview
                 'createdBy'=>(int)$draft->created_by,
                 'externalOutHandoverRecorded'=>$draft->external_out_handover_id!==null,
                 'externalOutReturnReconciliation'=>$outRecon,
-                'externalOutClosed'=>$draft->external_out_closure_id!==null,
+                'externalOutClosed'=>$draft->external_out_closure_id!==null || $draft->external_out_nonclean_final_id!==null,
+                'externalOutNoncleanClosed'=>$draft->external_out_nonclean_final_id!==null,
                 'externalOutApproved'=>$draft->external_out_dispatch_id!==null,
                 'externalOutCounts'=>$draft->direction==='external_out' ? $outCounts : [],
                 'externalOutCountMatchesDraft'=>$outMatches,
@@ -365,7 +369,7 @@ final class HallInventoryLoanDraftReview
                 'expectedReturnDate'=>(string)$draft->expected_return_date,
                 // Informational only: a past due date has no charging or closure effect.
                 // Unshipped drafts are never labeled overdue physical custody.
-                'overdueWithOutstandingCustody'=>($draft->dispatch_id !== null ||
+                'overdueWithOutstandingCustody'=>$draft->external_out_nonclean_final_id===null && ($draft->dispatch_id !== null ||
                     $draft->external_out_dispatch_id!==null ||
                     $draft->external_acceptance_id!==null)
                     && (string)$draft->expected_return_date < now()->toDateString()
@@ -392,13 +396,15 @@ final class HallInventoryLoanDraftReview
                         : ($draft->external_receipt_id!==null ? 'external_physical_receipt_pending_review' : 'draft_only')) :
                     ($draft->direction==='external_out'
                         ? ($draft->external_out_dispatch_id!==null
-                            ? ($draft->external_out_closure_id!==null
-                                ? 'external_out_clean_closed'
+                            ? ($draft->external_out_nonclean_final_id!==null
+                                ? 'external_out_nonclean_closed'
+                                : ($draft->external_out_closure_id!==null
+                                    ? 'external_out_clean_closed'
                                 : (($outRecon['allFullyReturnedClean']??false)
                                     ? 'external_out_physically_returned_clean_closure_pending'
                                     : (($outRecon['physicallyReceived']??0)>0
                                         ? 'external_out_partial_return_review'
-                                        : 'external_out_partner_custody_outstanding')))
+                                        : 'external_out_partner_custody_outstanding'))))
                             : ($draft->external_out_handover_id!==null
                                 ? 'external_out_handover_pending_approval' : 'draft_only'))
                         : ($draft->closure_id !== null ? 'clean_loan_closed' : ($draft->receipt_id !== null
