@@ -291,6 +291,21 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         $this->be($owner);
         $history=$incidentSvc->history($owner,$company->id,$src->id,$loan);
         $this->assertCount(1,$history);
+        // Separate missing-custody evidence may be submitted by the source
+        // Owner, but it is neither an accepted return nor stock retirement.
+        $missingId=(string)Str::uuid();
+        $this->assertSame($missingId,$incidentSvc->report($owner,$company->id,
+            $loan,$missingId,$srcItem,'missing',1,
+            'One source quantity remains physically unreturned and disputed.'));
+        $this->assertSame($missingId,$incidentSvc->report($owner,$company->id,
+            $loan,$missingId,$srcItem,'missing',1,
+            'One source quantity remains physically unreturned and disputed.'));
+        $pending=app(HallInventoryInternalLoanReturnReview::class)
+            ->abnormalSourceLines($owner,$company->id,$src->id,$loan);
+        $this->assertSame(1,$pending[0]['pendingDiscrepancyReview']);
+        $this->assertSame(0,$pending[0]['substantiatedMissingEvidence']);
+        $this->assertSame(4,$pending[0]['notReturned']);
+        $this->assertSame(0,DB::table('finance_journals')->count());
         $this->assertSame('damage',$history[0]['kind']);
         // Verify the actual authenticated Owner screen and its rendered
         // original-hall custody, rather than only invoking a read service.
@@ -353,6 +368,16 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         }catch(ConflictHttpException){}
         $reviewRows=$reviewSvc->reviews($dispatcher,$company->id,$src->id,$loan);
         $this->assertCount(1,$reviewRows);
+        $missingDecision=(string)Str::uuid();
+        $this->assertSame($missingDecision,$reviewSvc->decide($dispatcher,
+            $company->id,$missingId,$missingDecision,'substantiated',
+            'Independent source-hall discrepancy evidence examined.'));
+        $confirmed=app(HallInventoryInternalLoanReturnReview::class)
+            ->abnormalSourceLines($dispatcher,$company->id,$src->id,$loan);
+        $this->assertSame(1,$confirmed[0]['substantiatedMissingEvidence']);
+        $this->assertSame(0,$confirmed[0]['pendingDiscrepancyReview']);
+        $this->assertSame(4,$confirmed[0]['notReturned']);
+        $this->assertSame(0,DB::table('finance_journals')->count());
         $this->assertSame('substantiated',$reviewRows[0]['decision']);
         config()->set('inventory_controls.loan_nonclean_reconciliation_enabled',true);
         config()->set('inventory_controls.loan_nonclean_writeoffs_enabled',true);

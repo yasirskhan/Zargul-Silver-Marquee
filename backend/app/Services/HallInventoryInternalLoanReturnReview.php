@@ -204,6 +204,9 @@ final class HallInventoryInternalLoanReturnReview
             })->where('r.company_id',$companyId)->where('r.loan_id',$loanId)
             ->select('r.source_item_id')->selectRaw('COUNT(*) as reported')
             ->selectRaw("SUM(CASE WHEN d.decision = 'substantiated' THEN 1 ELSE 0 END) as substantiated")
+            ->selectRaw("SUM(CASE WHEN r.kind = 'missing' AND d.decision = 'substantiated' THEN r.quantity ELSE 0 END) as substantiated_missing")
+            ->selectRaw("SUM(CASE WHEN r.kind = 'dispute' AND d.decision = 'substantiated' THEN r.quantity ELSE 0 END) as substantiated_dispute")
+            ->selectRaw("SUM(CASE WHEN r.kind IN ('missing','dispute') AND d.id IS NULL THEN r.quantity ELSE 0 END) as pending_discrepancy_review")
             ->groupBy('r.source_item_id')->get()->keyBy('source_item_id');
         // Approved documents are not enough: the immutable decision must
         // reference an exact owned-damage retirement movement. Reject any
@@ -245,11 +248,25 @@ final class HallInventoryInternalLoanReturnReview
             $retiredDamage=(int)($retired[$id]??0);
             $integrityWarning=$notSent<0||$retiredDamage>$damaged;
             $incident=$incidents->get($id);
+            // Incident decisions are original-hall witness findings, not
+            // a stock movement or a borrower admission. Keep disputed
+            // evidence separate from true unreturned physical quantity.
+            $substantiatedMissing=(int)($incident->substantiated_missing??0);
+            $substantiatedDispute=(int)($incident->substantiated_dispute??0);
+            $pendingReview=(int)($incident->pending_discrepancy_review??0);
+            $unsettledPhysical=max(0,$total-$good-$damaged);
+            $integrityWarning=$integrityWarning||
+                $substantiatedMissing>$unsettledPhysical||
+                $substantiatedDispute>$unsettledPhysical;
             $result[]=['itemId'=>$id,'dispatched'=>$total,'good'=>$good,
                 'damaged'=>$damaged,'approvedDamagedRetirement'=>$retiredDamage,
                 'remainingDamagedForDisposition'=>max(0,$damaged-$retiredDamage),
                 'unresolved'=>$unresolved,'inTransit'=>$inTransit,
                 'notReturned'=>max(0,$notSent),'integrityWarning'=>$integrityWarning,
+                'substantiatedMissingEvidence'=>$substantiatedMissing,
+                'substantiatedDisputeEvidence'=>$substantiatedDispute,
+                'pendingDiscrepancyReview'=>$pendingReview,
+                'unsettledPhysical'=>$unsettledPhysical,
                 'incidentReports'=>(int)($incident->reported??0),
                 'substantiatedReports'=>(int)($incident->substantiated??0),
                 'closureBlocked'=>true,'moneyPosted'=>false];

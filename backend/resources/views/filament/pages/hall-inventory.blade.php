@@ -952,6 +952,10 @@
                                         damaged still awaiting disposition {{ $balance['remainingDamagedForDisposition'] }},
                                         unresolved {{ $balance['unresolved'] }}, return pending review {{ $balance['inTransit'] }},
                                         not yet returned {{ $balance['notReturned'] }},
+                                        original physically unsettled {{ $balance['unsettledPhysical'] }},
+                                        independently substantiated missing evidence {{ $balance['substantiatedMissingEvidence'] }},
+                                        independently substantiated dispute evidence {{ $balance['substantiatedDisputeEvidence'] }},
+                                        discrepancy evidence awaiting independent review {{ $balance['pendingDiscrepancyReview'] }},
                                         incident reports {{ $balance['incidentReports'] }},
                                         independently substantiated reports {{ $balance['substantiatedReports'] }}.
                                         @if($balance['integrityWarning']) INTEGRITY REVIEW REQUIRED. @endif
