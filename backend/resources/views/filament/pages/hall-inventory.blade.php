@@ -1012,7 +1012,11 @@
                             <section aria-label="Read-only non-clean loan reconciliation" class="rounded-lg border p-3 space-y-2">
                                 <h4 class="font-semibold">Non-clean loan reconciliation (read-only)</h4>
                                 <p>Original expected partner return date: {{ $noncleanReconciliation['expectedReturnDate'] }}. Due-date disputes need separate hall-local assessment.</p>
-                                <p role="status">Final non-clean closure: BLOCKED. No write-off, custody disposal, financial waiver or numbered final certificate has been authorized by this view.</p>
+                                @if(config('inventory_controls.loan_nonclean_final_closure_enabled') && \Illuminate\Support\Facades\DB::table('hall_inventory_nonclean_final_closures')->where('company_id',$this->companyId)->where('hall_id',$this->hallId)->where('loan_id',$financialClaimLoanId)->exists())
+                                    <p role="status">Final non-clean closure: ISSUED. Reprint the immutable NCL certificate below.</p>
+                                @else
+                                    <p role="status">Final non-clean closure: BLOCKED. No write-off, custody disposal, financial waiver or numbered final certificate has been authorized by this view.</p>
+                                @endif
                                 <p>Pending closure checks: {{ implode(', ', $noncleanReconciliation['closureBlockers'] ?? []) ?: 'No detected data blocker; final authorization still required' }}.</p>
                                 @if(config('inventory_controls.loan_nonclean_final_closure_enabled'))
                                     <div class="flex flex-wrap gap-2" aria-label="Independently authorized final non-clean closure">
