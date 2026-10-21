@@ -92,6 +92,10 @@ final class HallInventoryFinancialWaiverService {
                 ->lockForUpdate()->first();
             if(!$company)throw new AuthorizationException('Inactive company cannot waive obligations.');
             $obligation=$this->obligation($companyId,$hallId,$obligationId);
+            if(DB::table('hall_inventory_nonclean_final_closures')->where('company_id',$companyId)
+                ->where('loan_id',$obligation->loan_id)->exists())
+                throw new ConflictHttpException('Final non-clean financial settlement is immutable.');
+
             $fingerprint=hash('sha256',json_encode([$companyId,$hallId,$obligationId,
                 (int)$actor->getKey(),$amountMinor,$reason],JSON_THROW_ON_ERROR));
             $old=DB::table('hall_inventory_financial_waiver_proposals')
@@ -140,6 +144,10 @@ final class HallInventoryFinancialWaiverService {
             if((int)$proposal->proposed_by===(int)$actor->getKey())
                 throw new AuthorizationException('Financial waiver proposer cannot approve self.');
             $obligation=$this->obligation($companyId,$hallId,$proposal->obligation_id);
+            if(DB::table('hall_inventory_nonclean_final_closures')->where('company_id',$companyId)
+                ->where('loan_id',$obligation->loan_id)->exists())
+                throw new ConflictHttpException('Final non-clean financial settlement is immutable.');
+
             if((string)$obligation->loan_id!==(string)$proposal->loan_id||
                 (string)$obligation->currency!==(string)$proposal->currency||
                 (string)$obligation->claim_id!==(string)$proposal->claim_id)
