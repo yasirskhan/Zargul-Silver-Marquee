@@ -353,6 +353,44 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         $reviewRows=$reviewSvc->reviews($dispatcher,$company->id,$src->id,$loan);
         $this->assertCount(1,$reviewRows);
         $this->assertSame('substantiated',$reviewRows[0]['decision']);
+        config()->set('inventory_controls.loan_nonclean_reconciliation_enabled',true);
+        config()->set('inventory_controls.loan_nonclean_writeoffs_enabled',true);
+        $third=User::create(['name'=>'Independent damaged stock reviewer',
+            'email'=>'internal-writeoff-reviewer@example.test','password'=>'test-only']);
+        $third->markEmailAsVerified();
+        CompanyMembership::create(['company_id'=>$company->id,'user_id'=>$third->id,'role'=>'owner']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->be($owner);
+        Livewire::test(HallInventory::class)->set('companyId',$company->id)
+            ->set('hallId',$src->id)->call('startLoanIncident',$loan)
+            ->assertSee('Damaged owned stock: independent physical disposition')
+            ->set('internalDamageIncidentId',$incidentId)
+            ->set('internalDamageQuantity','1')
+            ->set('internalDamageReason','Documented damaged owned serving tray disposal')
+            ->call('proposeInternalDamageDisposition')->assertHasNoErrors();
+        $proposal=(string)DB::table('hall_inventory_nonclean_writeoff_proposals')
+            ->where('incident_id',$incidentId)->value('id');
+        $this->assertTrue(Str::isUuid($proposal));
+        $this->be($owner);
+        try {
+            app(\\App\\Services\\HallInventoryNoncleanWriteoffService::class)
+                ->decide($owner,$company->id,$src->id,$proposal,(string)Str::uuid(),
+                    'approved','Cannot self authorize damage');
+            $this->fail('Reporter authorized own physical damage.');
+        }catch(AuthorizationException){}
+        $this->be($third);
+        Livewire::test(HallInventory::class)->set('companyId',$company->id)
+            ->set('hallId',$src->id)->call('startLoanIncident',$loan)
+            ->set('internalDamageReviewProposalId',$proposal)
+            ->set('internalDamageReviewDecision','approved')
+            ->set('internalDamageReviewReason','Independently verified damaged return evidence')
+            ->call('decideInternalDamageDisposition')->assertHasNoErrors()
+            ->assertSee('approved');
+        $this->assertSame(0,(int)DB::table('hall_inventory_positions')
+            ->where('hall_id',$src->id)->where('item_id',$srcItem)->value('owned_damaged'));
+        $this->assertSame(0,DB::table('finance_journals')->count());
+        $this->be($dispatcher);
+
         $this->assertFalse($reviewRows[0]['monetaryObligationSettled']);
         $this->assertFalse($reviewRows[0]['loanClosed']);
         $this->be($receiver);

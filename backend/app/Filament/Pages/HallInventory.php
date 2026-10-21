@@ -259,6 +259,20 @@ final class HallInventory extends Page
     public array $incidentHistory = [];
     #[Locked]
     public array $internalAbnormalCustody = [];
+    #[Locked]
+    public array $internalDamageWriteoffs = [];
+    #[Locked]
+    public array $internalDamageEligible = [];
+    #[Locked]
+    public string $internalDamageProposalId = '';
+    #[Locked]
+    public string $internalDamageDecisionId = '';
+    public string $internalDamageIncidentId = '';
+    public string $internalDamageQuantity = '';
+    public string $internalDamageReason = '';
+    public string $internalDamageReviewProposalId = '';
+    public string $internalDamageReviewDecision = 'rejected';
+    public string $internalDamageReviewReason = '';
     public string $incidentItemId = '';
     public string $incidentKind = 'damage';
     public string $incidentQuantity = '';
@@ -545,6 +559,8 @@ final class HallInventory extends Page
         $this->loanPurpose = '';
         $this->lastLoanReference = null;
         $this->incidentLoanId = '';
+        $this->internalDamageWriteoffs=[];
+        $this->internalDamageEligible=[];
         $this->incidentRequestId = (string) Str::uuid();
         $this->incidentLines = [];
         $this->incidentHistory = [];
@@ -2150,9 +2166,16 @@ final class HallInventory extends Page
                   $row['externalOutApproved'])));
         abort_unless($loan!==null,403);
         $this->internalAbnormalCustody=[];
+        $this->internalDamageWriteoffs=[];
+        $this->internalDamageEligible=[];
         if($loan['direction']==='internal')
             $this->internalAbnormalCustody=app(\App\Services\HallInventoryInternalLoanReturnReview::class)
                 ->abnormalSourceLines($actor,$this->companyId,$this->hallId,$loanId);
+        if($loan['direction']==='internal'&&
+            config('inventory_controls.loan_nonclean_writeoffs_enabled')&&
+            config('inventory_controls.loan_nonclean_reconciliation_enabled')) {
+            $this->reloadInternalDamageDisposition($actor,$loanId);
+        }
         $this->incidentLoanId=$loanId;
         $this->incidentRequestId=(string) Str::uuid();
         $this->incidentLines=$loan['lines'];
@@ -2167,6 +2190,42 @@ final class HallInventory extends Page
             $this->incidentReviews=app(\App\Services\HallInventoryLoanIncidentDecisionService::class)
                 ->reviews($actor,$this->companyId,$this->hallId,$loanId);
         }
+    }
+
+    private function reloadInternalDamageDisposition(User $actor,string $loanId):void {
+        $svc=app(\\App\\Services\\HallInventoryNoncleanWriteoffService::class);
+        $this->internalDamageWriteoffs=$svc->history($actor,$this->companyId,$this->hallId,$loanId);
+        $this->internalDamageEligible=$svc->eligible($actor,$this->companyId,$this->hallId,$loanId);
+    }
+    public function proposeInternalDamageDisposition():void {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->incidentLoanId!==''&&count($this->internalAbnormalCustody)>0,403);
+        $this->validate([
+            'internalDamageIncidentId'=>'required|uuid',
+            'internalDamageQuantity'=>'required|integer|min:1|max:100000000',
+            'internalDamageReason'=>'required|string|min:10|max:500'
+        ]);
+        if($this->internalDamageProposalId==='')$this->internalDamageProposalId=(string)Str::uuid();
+        app(\\App\\Services\\HallInventoryNoncleanWriteoffService::class)
+            ->propose($actor,$this->companyId,$this->hallId,$this->internalDamageIncidentId,
+                $this->internalDamageProposalId,(int)$this->internalDamageQuantity,$this->internalDamageReason);
+        $this->internalDamageProposalId=(string)Str::uuid();
+        $this->reloadInternalDamageDisposition($actor,$this->incidentLoanId);
+    }
+    public function decideInternalDamageDisposition():void {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->incidentLoanId!==''&&count($this->internalAbnormalCustody)>0,403);
+        $this->validate([
+            'internalDamageReviewProposalId'=>'required|uuid',
+            'internalDamageReviewDecision'=>'required|in:approved,rejected',
+            'internalDamageReviewReason'=>'required|string|min:10|max:500'
+        ]);
+        if($this->internalDamageDecisionId==='')$this->internalDamageDecisionId=(string)Str::uuid();
+        app(\\App\\Services\\HallInventoryNoncleanWriteoffService::class)
+            ->decide($actor,$this->companyId,$this->hallId,$this->internalDamageReviewProposalId,
+                $this->internalDamageDecisionId,$this->internalDamageReviewDecision,$this->internalDamageReviewReason);
+        $this->internalDamageDecisionId=(string)Str::uuid();
+        $this->reloadInternalDamageDisposition($actor,$this->incidentLoanId);
     }
 
     public function submitLoanIncident(): void

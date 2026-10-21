@@ -957,6 +957,37 @@
                                     </p>
                                 @endforeach
                             </section>
+                            @if(config('inventory_controls.loan_nonclean_writeoffs_enabled') && config('inventory_controls.loan_nonclean_reconciliation_enabled'))
+                                <section aria-label="Independent internal damaged stock disposition" class="space-y-2 rounded-lg border p-3">
+                                    <h4 class="font-semibold">Damaged owned stock: independent physical disposition</h4>
+                                    <p>This only retires confirmed damaged owned stock. A different Owner/Admin must approve. No financial settlement or loan closure occurs.</p>
+                                    <select wire:model="internalDamageIncidentId" aria-label="Substantiated damaged incident">
+                                        <option value="">Choose reviewed damage evidence</option>
+                                        @foreach($internalDamageEligible as $entry)
+                                            <option value="{{ $entry['id'] }}">{{ $entry['itemId'] }} - {{ $entry['quantity'] }} {{ $entry['kind'] }}</option>
+                                        @endforeach
+                                    </select>
+                                    <input wire:model="internalDamageQuantity" type="number" min="1" aria-label="Disposal quantity" placeholder="Quantity">
+                                    <input wire:model="internalDamageReason" aria-label="Physical disposal reason" placeholder="Physical disposal reason">
+                                    <button type="button" wire:click="proposeInternalDamageDisposition">Request physical write-off</button>
+                                    @foreach($internalDamageWriteoffs as $item)
+                                        <p>Physical proposal {{ $item['id'] }}: {{ $item['quantity'] }} {{ $item['kind'] }} — {{ $item['decision'] ?? 'PENDING INDEPENDENT APPROVAL' }}</p>
+                                    @endforeach
+                                    <select wire:model="internalDamageReviewProposalId" aria-label="Independent physical proposal">
+                                        <option value="">Select proposal for independent decision</option>
+                                        @foreach($internalDamageWriteoffs as $item)
+                                            @if($item['decision']===null)
+                                                <option value="{{ $item['id'] }}">{{ $item['id'] }} - {{ $item['quantity'] }}</option>
+                                            @endif
+                                        @endforeach
+                                    </select>
+                                    <select wire:model="internalDamageReviewDecision" aria-label="Physical disposition decision">
+                                        <option value="rejected">Reject</option><option value="approved">Approve verified damage</option>
+                                    </select>
+                                    <input wire:model="internalDamageReviewReason" aria-label="Independent disposal decision reason" placeholder="Independent decision reason">
+                                    <button type="button" wire:click="decideInternalDamageDisposition">Record independent decision</button>
+                                </section>
+                            @endif
                         @endif
                         <label class="block">Source item
                             <select wire:model="incidentItemId" class="w-full rounded-lg border p-2 text-gray-900">

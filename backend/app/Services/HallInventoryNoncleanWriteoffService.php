@@ -19,9 +19,17 @@ final class HallInventoryNoncleanWriteoffService {
     private function gate():void {
         foreach(['loan_nonclean_reconciliation_enabled','loan_nonclean_writeoffs_enabled',
             'loan_incidents_enabled','loan_incident_reviews_enabled',
-            'external_out_dispatch_enabled','external_out_return_enabled'] as $flag)
+            ] as $flag)
             if(!config('inventory_controls.'.$flag))
                 throw new ConflictHttpException('Independent physical write-off is not released.');
+    }
+    private function directionGate(string $direction):void {
+        $flags=$direction==='internal'
+            ?['loan_dispatch_enabled','loan_receipt_enabled','loan_returns_enabled','loan_return_acceptance_enabled']
+            :['external_out_dispatch_enabled','external_out_return_enabled'];
+        foreach($flags as $flag)
+            if(!config('inventory_controls.'.$flag))
+                throw new ConflictHttpException('Original physical custody gate is not released.');
     }
     private function scope(User $actor,string $companyId,string $hallId):void {
         $hall=Hall::query()->where('company_id',$companyId)->where('id',$hallId)
@@ -41,12 +49,12 @@ final class HallInventoryNoncleanWriteoffService {
             })->join('hall_inventory_loan_drafts as l',function($j):void {
                 $j->on('l.company_id','=','i.company_id')->on('l.id','=','i.loan_id');
             })->where('i.company_id',$companyId)->where('i.id',$incidentId)
-            ->where('d.decision','substantiated')->where('l.direction','external_out')
+            ->where('d.decision','substantiated')->whereIn('l.direction',['external_out','internal'])
             ->first(['i.id','i.company_id','i.loan_id','i.source_hall_id',
                 'i.source_item_id','i.kind','i.quantity','i.reported_by',
-                'd.reviewed_by','l.created_by']);
+                'd.reviewed_by','l.created_by','l.direction']);
         if(!$r||!in_array($r->kind,['damage','missing'],true))
-            throw new ConflictHttpException('Only independently substantiated external-owned physical losses qualify.');
+            throw new ConflictHttpException('Only independently substantiated owned physical losses qualify.');
         return $r;
     }
     public function propose(User $actor,string $companyId,string $hallId,string $incidentId,
@@ -60,6 +68,9 @@ final class HallInventoryNoncleanWriteoffService {
             $company=DB::table('companies')->where('id',$companyId)->where('is_active',true)->lockForUpdate()->first();
             if(!$company)throw new AuthorizationException('Inactive inventory company.');
             $incident=$this->incident($companyId,$incidentId);
+            $this->directionGate((string)$incident->direction);
+            if($incident->direction==='internal'&&$incident->kind!=='damage')
+                throw new ConflictHttpException('Unreturned internal custody cannot be silently written off.');
             if(DB::table('hall_inventory_nonclean_final_closures')->where('company_id',$companyId)
                 ->where('loan_id',$incident->loan_id)->exists())
                 throw new ConflictHttpException('Finalized non-clean loan inventory cannot be changed.');
@@ -107,6 +118,7 @@ final class HallInventoryNoncleanWriteoffService {
                 ->lockForUpdate()->first();
             if(!$proposal)throw new AuthorizationException('Other hall loss proposal is private.');
             $incident=$this->incident($companyId,$proposal->incident_id);
+            $this->directionGate((string)$incident->direction);
             if(DB::table('hall_inventory_nonclean_final_closures')->where('company_id',$companyId)
                 ->where('loan_id',$proposal->loan_id)->exists())
                 throw new ConflictHttpException('Finalized non-clean loan inventory cannot be changed.');
@@ -131,15 +143,25 @@ final class HallInventoryNoncleanWriteoffService {
             }
             $loan=DB::table('hall_inventory_loan_drafts')->where('company_id',$companyId)
                 ->where('id',$proposal->loan_id)->lockForUpdate()->first();
-            if(!$loan||$loan->direction!=='external_out'||(string)$loan->lending_hall_id!==$hallId||
+            if(!$loan||!in_array($loan->direction,['external_out','internal'],true)||(string)$loan->lending_hall_id!==$hallId||
                 DB::table('hall_inventory_external_out_clean_closures')
                     ->where('company_id',$companyId)->where('loan_id',$proposal->loan_id)->exists())
                 throw new ConflictHttpException('Outside owned source loan is not open for abnormal resolution.');
             $movementId=null;
             if($decision==='approved') {
-                $snapshot=app(HallInventoryNoncleanReconciliationService::class)
-                    ->report($actor,$companyId,$hallId,$proposal->loan_id);
-                $line=collect($snapshot['items'])->firstWhere('itemId',(string)$proposal->item_id);
+                if($loan->direction==='internal') {
+                    if($proposal->kind!=='damage')
+                        throw new ConflictHttpException('Unreturned internal custody cannot be physically retired.');
+                    $line=collect(app(HallInventoryInternalLoanReturnReview::class)
+                        ->abnormalSourceLines($actor,$companyId,$hallId,$proposal->loan_id))
+                        ->firstWhere('itemId',(string)$proposal->item_id);
+                    if($line&&$line['integrityWarning'])
+                        throw new ConflictHttpException('Internal physical custody integrity needs review.');
+                } else {
+                    $snapshot=app(HallInventoryNoncleanReconciliationService::class)
+                        ->report($actor,$companyId,$hallId,$proposal->loan_id);
+                    $line=collect($snapshot['items'])->firstWhere('itemId',(string)$proposal->item_id);
+                }
                 if(!$line)throw new ConflictHttpException('Original physical loan item missing.');
                 $previous=(int)DB::table('hall_inventory_nonclean_writeoff_proposals as p')
                     ->join('hall_inventory_nonclean_writeoff_decisions as d',function($j):void{
@@ -204,7 +226,7 @@ final class HallInventoryNoncleanWriteoffService {
         $this->scope($actor,$companyId,$hallId);
         if(!DB::table('hall_inventory_loan_drafts')->where('company_id',$companyId)
             ->where('id',$loanId)->where('lending_hall_id',$hallId)
-            ->where('direction','external_out')->exists())
+            ->whereIn('direction',['external_out','internal'])->exists())
             throw new AuthorizationException('Outside owned physical write-off history is hall private.');
         return DB::table('hall_inventory_nonclean_writeoff_proposals as p')
             ->leftJoin('hall_inventory_nonclean_writeoff_decisions as d',function($j):void {
@@ -231,6 +253,18 @@ final class HallInventoryNoncleanWriteoffService {
             })->where('i.company_id',$companyId)->where('i.source_hall_id',$hallId)
             ->where('i.loan_id',$loanId)->where('d.decision','substantiated')
             ->whereIn('i.kind',['damage','missing'])->whereNull('p.id')
+            ->whereExists(function($q):void {
+                $q->selectRaw('1')->from('hall_inventory_loan_drafts as l')
+                    ->whereColumn('l.company_id','i.company_id')
+                    ->whereColumn('l.id','i.loan_id')
+                    ->where(function($d):void {
+                        $d->where('l.direction','external_out')
+                          ->orWhere(function($v):void {
+                              $v->where('l.direction','internal')
+                                ->where('i.kind','damage');
+                          });
+                    });
+            })
             ->get(['i.id','i.source_item_id','i.kind','i.quantity'])
             ->map(static fn($r):array=>[
                 'id'=>(string)$r->id,'itemId'=>(string)$r->source_item_id,
