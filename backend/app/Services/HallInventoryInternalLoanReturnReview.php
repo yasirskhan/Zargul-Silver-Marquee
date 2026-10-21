@@ -206,8 +206,23 @@ final class HallInventoryInternalLoanReturnReview
             ->selectRaw("SUM(CASE WHEN d.decision = 'substantiated' THEN 1 ELSE 0 END) as substantiated")
             ->selectRaw("SUM(CASE WHEN r.kind = 'missing' AND d.decision = 'substantiated' THEN r.quantity ELSE 0 END) as substantiated_missing")
             ->selectRaw("SUM(CASE WHEN r.kind = 'dispute' AND d.decision = 'substantiated' THEN r.quantity ELSE 0 END) as substantiated_dispute")
-            ->selectRaw("SUM(CASE WHEN r.kind IN ('missing','dispute') AND d.id IS NULL THEN r.quantity ELSE 0 END) as pending_discrepancy_review")
+            ->selectRaw("SUM(CASE WHEN r.kind IN ('missing','dispute') AND (d.id IS NULL OR d.decision = 'requires_more_evidence') THEN r.quantity ELSE 0 END) as pending_discrepancy_review")
             ->groupBy('r.source_item_id')->get()->keyBy('source_item_id');
+        // Borrower-book corroboration is a distinct original-loan custody
+        // signal, NOT an independently signed admission or return condition.
+        $borrowerReceipt=DB::table('hall_inventory_internal_loan_receipts')
+            ->where('company_id',$companyId)->where('loan_id',$loanId)
+            ->first(['id','receiving_hall_id']);
+        if(!$borrowerReceipt)
+            throw new ConflictHttpException('Original destination custody receipt missing.');
+        $mapped=DB::table('hall_inventory_internal_loan_receipt_lines')
+            ->where('company_id',$companyId)->where('receipt_id',$borrowerReceipt->id)
+            ->get(['source_item_id','item_id'])->keyBy('source_item_id');
+        $destinationPositions=DB::table('hall_inventory_positions')
+            ->where('company_id',$companyId)->where('hall_id',$borrowerReceipt->receiving_hall_id)
+            ->whereIn('item_id',$mapped->pluck('item_id')->all())
+            ->get(['item_id','borrowed_usable','borrowed_transit','borrowed_damaged'])
+            ->keyBy('item_id');
         // Approved documents are not enough: the immutable decision must
         // reference an exact owned-damage retirement movement. Reject any
         // privileged cross-kind/quantity/actor misbinding rather than showing a
@@ -247,6 +262,10 @@ final class HallInventoryInternalLoanReturnReview
             $notSent=$total-$good-$damaged-$unresolved-$inTransit;
             $retiredDamage=(int)($retired[$id]??0);
             $integrityWarning=$notSent<0||$retiredDamage>$damaged;
+            $map=$mapped->get($id);
+            $destBook=$map?$destinationPositions->get((string)$map->item_id):null;
+            if(!$destBook)
+                throw new ConflictHttpException('Original borrower book line missing from custody reconciliation.');
             $incident=$incidents->get($id);
             // Incident decisions are original-hall witness findings, not
             // a stock movement or a borrower admission. Keep disputed
@@ -267,6 +286,9 @@ final class HallInventoryInternalLoanReturnReview
                 'substantiatedDisputeEvidence'=>$substantiatedDispute,
                 'pendingDiscrepancyReview'=>$pendingReview,
                 'unsettledPhysical'=>$unsettledPhysical,
+                'borrowerBookUsable'=>(int)$destBook->borrowed_usable,
+                'borrowerBookTransit'=>(int)$destBook->borrowed_transit,
+                'borrowerBookDamaged'=>(int)$destBook->borrowed_damaged,
                 'incidentReports'=>(int)($incident->reported??0),
                 'substantiatedReports'=>(int)($incident->substantiated??0),
                 'closureBlocked'=>true,'moneyPosted'=>false];

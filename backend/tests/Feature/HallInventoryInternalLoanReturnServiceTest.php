@@ -251,6 +251,9 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         $this->assertSame(1,$custody[0]['unresolved']);
         $this->assertSame(0,$custody[0]['inTransit']);
         $this->assertSame(4,$custody[0]['notReturned']);
+        $this->assertSame(4,$custody[0]['borrowerBookUsable']);
+        $this->assertSame(1,$custody[0]['borrowerBookTransit']);
+        $this->assertSame(0,$custody[0]['borrowerBookDamaged']);
         $this->assertFalse($custody[0]['integrityWarning']);
         $this->assertTrue($custody[0]['closureBlocked']);
         $this->assertFalse($custody[0]['moneyPosted']);
@@ -376,6 +379,23 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
             ->abnormalSourceLines($dispatcher,$company->id,$src->id,$loan);
         $this->assertSame(1,$confirmed[0]['substantiatedMissingEvidence']);
         $this->assertSame(0,$confirmed[0]['pendingDiscrepancyReview']);
+        $this->be($owner);
+        $disputeId=(string)Str::uuid();
+        $incidentSvc->report($owner,$company->id,$loan,$disputeId,
+            $srcItem,'dispute',1,'Borrower disputed original return quantity pending independent documents.');
+        $this->be($dispatcher);
+        $reviewSvc->decide($dispatcher,$company->id,$disputeId,(string)Str::uuid(),
+            'requires_more_evidence','Independent review requests further witnessed return evidence.');
+        $open=app(HallInventoryInternalLoanReturnReview::class)
+            ->abnormalSourceLines($dispatcher,$company->id,$src->id,$loan);
+        $this->assertSame(1,$open[0]['pendingDiscrepancyReview']);
+        $this->assertSame(1,$open[0]['substantiatedMissingEvidence']);
+        $this->assertSame(0,$open[0]['substantiatedDisputeEvidence']);
+        $this->assertSame(4,$open[0]['notReturned']);
+        $this->assertSame(4,$open[0]['borrowerBookUsable']);
+        $this->assertSame(1,$open[0]['borrowerBookTransit']);
+        $this->assertSame(0,DB::table('finance_journals')->count());
+
         $this->assertSame(4,$confirmed[0]['notReturned']);
         $this->assertSame(0,DB::table('finance_journals')->count());
         $this->assertSame('substantiated',collect($reviewRows)->firstWhere('reportId',$incidentId)['decision']);
