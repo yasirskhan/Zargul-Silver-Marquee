@@ -324,6 +324,8 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
             ->assertSee('Original lending hall physical custody (read-only)')
             ->assertSee('dispatched 12,')
             ->assertSee('good 6, damaged 1,')
+            ->assertSee('destination item aggregate borrowed usable 4')
+            ->assertSee('destination item buckets may combine multiple loans; not signed borrower acceptance')
             ->assertSee('Closure BLOCKED; no money posted by this reconciliation.');
         // A hall change must discard already rendered source custody.
         $page=Livewire::test(HallInventory::class)

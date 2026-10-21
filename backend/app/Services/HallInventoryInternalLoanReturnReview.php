@@ -208,8 +208,8 @@ final class HallInventoryInternalLoanReturnReview
             ->selectRaw("SUM(CASE WHEN r.kind = 'dispute' AND d.decision = 'substantiated' THEN r.quantity ELSE 0 END) as substantiated_dispute")
             ->selectRaw("SUM(CASE WHEN r.kind IN ('missing','dispute') AND (d.id IS NULL OR d.decision = 'requires_more_evidence') THEN r.quantity ELSE 0 END) as pending_discrepancy_review")
             ->groupBy('r.source_item_id')->get()->keyBy('source_item_id');
-        // Borrower-book corroboration is a distinct original-loan custody
-        // signal, NOT an independently signed admission or return condition.
+        // Mapped borrower-item book corroboration is an AGGREGATE custody
+        // signal shared by any loan using that catalog item; NOT per-loan\n        // attribution, a signed admission or a return condition.
         $borrowerReceipt=DB::table('hall_inventory_internal_loan_receipts')
             ->where('company_id',$companyId)->where('loan_id',$loanId)
             ->first(['id','receiving_hall_id']);
