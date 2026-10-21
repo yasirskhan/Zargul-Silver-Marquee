@@ -136,6 +136,16 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
         $decisionRow=DB::table('hall_inventory_loan_incident_decisions')
             ->where('company_id',$company->id)->where('report_id',$report)->first();
         $this->assertNotNull($decisionRow);
+        // External owned-stock incidents are independently reviewed under
+        // their actual provenance, not mislabeled as internal loan events.
+        $this->assertSame(1,DB::table('audit_events')
+            ->where('company_id',$company->id)
+            ->where('entity_type','hall_inventory_loan_incident_decision')
+            ->where('entity_id',$decisionRow->id)
+            ->where('action','hall_inventory.external_owned_loan_incident_reviewed')->count());
+        $this->assertSame(0,DB::table('audit_events')
+            ->where('entity_id',$decisionRow->id)
+            ->where('action','hall_inventory.internal_loan_incident_reviewed')->count());
         $this->assertSame($decisionRow->id,$decision->decide(
             $reviewer,$company->id,$report,$decisionRow->id,
             'substantiated','Independent physical return count substantiates documented damage'));

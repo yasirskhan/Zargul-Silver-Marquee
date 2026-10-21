@@ -70,7 +70,9 @@ final class HallInventoryLoanIncidentDecisionService
             DB::table('audit_events')->insert([
                 'id'=>(string)Str::uuid(),'company_id'=>$companyId,
                 'actor_id'=>$actor->getKey(),
-                'action'=>'hall_inventory.internal_loan_incident_reviewed',
+                'action'=>$loan->direction==='external_out'
+                    ?'hall_inventory.external_owned_loan_incident_reviewed'
+                    :'hall_inventory.internal_loan_incident_reviewed',
                 'entity_type'=>'hall_inventory_loan_incident_decision',
                 'entity_id'=>$decisionId,
                 'before_values'=>json_encode(['incidentReportId'=>$reportId,'decision'=>null],JSON_THROW_ON_ERROR),
