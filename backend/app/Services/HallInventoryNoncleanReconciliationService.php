@@ -205,6 +205,17 @@ final class HallInventoryNoncleanReconciliationService
         // Read-only diagnostics never authorize a closure or payment.
         $blockers=[];
         if($unreviewed>0)$blockers[]='unreviewed_incident';
+        // Financial claims without an independent final outcome, and disputed
+        // proposals, cannot silently disappear from a final loan certificate.
+        $unresolvedClaims=DB::table('hall_inventory_financial_claims as c')
+            ->leftJoin('hall_inventory_financial_claim_decisions as d',function($j):void {
+                $j->on('d.company_id','=','c.company_id')->on('d.claim_id','=','c.id');
+            })->where('c.company_id',$companyId)->where('c.loan_id',$loanId)
+            ->where(function($j):void {
+                $j->whereNull('d.id')->orWhere('d.decision','disputed');
+            })->count();
+        if($unresolvedClaims>0)$blockers[]='unresolved_financial_claim';
+
         foreach($items as $item){
             if($item['pendingReview']>0)$blockers[]='pending_return_review';
             if($item['unresolved']>0)$blockers[]='unresolved_return_condition';
