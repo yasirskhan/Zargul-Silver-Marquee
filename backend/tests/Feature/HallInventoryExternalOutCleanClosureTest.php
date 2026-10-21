@@ -168,6 +168,17 @@ final class HallInventoryExternalOutCleanClosureTest extends TestCase {
             $this->fail('Manager self-closed outside stock return.');
         }catch(AuthorizationException){}
         $this->be($owner);
+        $occupiedId=(string)Str::uuid();
+        $occupiedPath='private/hall-external-out-clean-closures/'.$company->id.'/'.$occupiedId.'.pdf';
+        $occupiedPdf="%PDF-1.4\nExisting outside-owned clean evidence\n%%EOF\n";
+        Storage::disk('local')->put($occupiedPath,$occupiedPdf);
+        try {
+            $closure->close($owner,$company->id,$loan,$occupiedId);
+            $this->fail('Existing outside-owned numbered receipt was overwritten.');
+        }catch(ConflictHttpException){}
+        $this->assertSame($occupiedPdf,Storage::disk('local')->get($occupiedPath));
+        $this->assertSame(0,DB::table('hall_inventory_external_out_clean_closures')->count());
+        Storage::disk('local')->delete($occupiedPath);
         Livewire::test(HallInventory::class)->set('hallId',$hall->id)
             ->assertSee('Finalize outside-owned clean physical loan')
             ->call('closeExternalOutCleanLoan',$loan)->assertHasNoErrors()

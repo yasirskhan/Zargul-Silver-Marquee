@@ -174,6 +174,8 @@ final class HallInventoryExternalOutCleanClosureService {
             $pdfHash=hash('sha256',$pdf);
             $key='private/hall-external-out-clean-closures/'.$companyId.'/'.$closureId.'.pdf';
             $disk=Storage::disk('local');
+            if($disk->exists($key))
+                throw new ConflictHttpException('Immutable outside-owned receipt identifier already occupies private storage.');
             if(!$disk->put($key,$pdf))
                 throw new ConflictHttpException('Immutable outside owned clean PDF storage failed.');
             try{

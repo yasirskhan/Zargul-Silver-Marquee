@@ -105,6 +105,18 @@ class HallInventoryCleanLoanClosureTest extends TestCase
             $this->fail('Source dispatcher performed final closeout.');
         }catch(AuthorizationException){}
         $this->be($owner);
+        // Conflicting receipt UUIDs must never corrupt pre-existing evidence.
+        $occupiedId=(string)Str::uuid();
+        $occupiedPath='private/hall-inventory-loan-closures/'.$company->id.'/'.$occupiedId.'.pdf';
+        $occupiedPdf="%PDF-1.4\nExisting internal numbered evidence\n%%EOF\n";
+        Storage::disk('local')->put($occupiedPath,$occupiedPdf);
+        try {
+            $closure->close($owner,$company->id,$loan,$occupiedId);
+            $this->fail('Previously stored internal loan certificate was overwritten.');
+        }catch(ConflictHttpException){}
+        $this->assertSame($occupiedPdf,Storage::disk('local')->get($occupiedPath));
+        $this->assertSame(0,DB::table('hall_inventory_internal_loan_closures')->count());
+        Storage::disk('local')->delete($occupiedPath);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         Livewire::test(HallInventory::class)
             ->set('hallId',$src->id)

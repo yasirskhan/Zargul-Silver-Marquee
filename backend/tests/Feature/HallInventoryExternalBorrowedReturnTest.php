@@ -278,6 +278,16 @@ final class HallInventoryExternalBorrowedReturnTest extends TestCase
         }catch(ConflictHttpException){}
         $this->assertSame(0,DB::table('hall_inventory_external_in_clean_closures')->count());
         $disk->put($handoverRow->evidence_storage_path,$original);
+        $occupiedPath='private/hall-external-clean-return-closures/'.$company->id.'/'.$closureId.'.pdf';
+        $occupiedPdf="%PDF-1.4\nExisting external borrowing evidence\n%%EOF\n";
+        $disk->put($occupiedPath,$occupiedPdf);
+        try {
+            $closure->close($owner,$company->id,$loan,$closureId);
+            $this->fail('Existing external borrowed numbered receipt was overwritten.');
+        } catch (ConflictHttpException) {}
+        $this->assertSame($occupiedPdf,$disk->get($occupiedPath));
+        $this->assertSame(0,DB::table('hall_inventory_external_in_clean_closures')->count());
+        $disk->delete($occupiedPath);
         Livewire::test(HallInventory::class)
             ->set('hallId',$hall->id)
             ->assertSee('Finalize externally borrowed clean loan')

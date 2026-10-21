@@ -214,6 +214,17 @@ final class HallInventoryNoncleanReconciliationService
             if($pendingDisposition)$blockers[]='pending_physical_disposition_approval';
         }
 
+        // An unreviewed counterparty document may introduce new dispute or
+        // settlement evidence. Do not finalize while it is waiting for the
+        // independent document-integrity review.
+        $pendingPartnerReview=DB::table('hall_inventory_financial_counterparty_evidence as p')
+            ->leftJoin('hall_inventory_financial_counterparty_reviews as r',function($j):void {
+                $j->on('r.company_id','=','p.company_id')
+                    ->on('r.evidence_id','=','p.id');
+            })->where('p.company_id',$companyId)->where('p.loan_id',$loanId)
+            ->whereNull('r.id')->exists();
+        if($pendingPartnerReview)$blockers[]='pending_partner_document_review';
+
         // Financial claims without an independent final outcome, and disputed
         // proposals, cannot silently disappear from a final loan certificate.
         $unresolvedClaims=DB::table('hall_inventory_financial_claims as c')
@@ -253,7 +264,12 @@ final class HallInventoryNoncleanReconciliationService
             if(($balance['pendingMinor']??0)>0||($balance['waiverPendingMinor']??0)>0)$blockers[]='pending_financial_review';
             if(($balance['remainingMinor']??0)>0)$blockers[]='unsettled_obligation';
         }
-        if(!config('inventory_controls.loan_recoveries_enabled')||!config('inventory_controls.loan_financial_waivers_enabled'))
+        // Suppressing the partner/obligation workflow must not erase an
+        // existing financial balance and make an unpaid NCL case appear clean.
+        if(!config('inventory_controls.loan_recoveries_enabled')||
+            !config('inventory_controls.loan_financial_waivers_enabled')||
+            !config('inventory_controls.loan_authorized_obligations_enabled')||
+            !config('inventory_controls.loan_partner_responses_enabled'))
             $blockers[]='financial_reconciliation_unavailable';
         $blockers=array_values(array_unique($blockers));
         return ['items'=>array_values($items),'incidentReports'=>(int)$incidentReports,

@@ -148,6 +148,8 @@ final class HallInventoryExternalCleanLoanClosureService
             $pdfHash=hash('sha256',$pdf);
             $key='private/hall-external-clean-return-closures/'.$companyId.'/'.$closureId.'.pdf';
             $disk=Storage::disk('local');
+            if($disk->exists($key))
+                throw new ConflictHttpException('Immutable external borrowed receipt identifier already occupies private storage.');
             if(!$disk->put($key,$pdf))
                 throw new ConflictHttpException('Private immutable partner return PDF could not be written.');
             try {

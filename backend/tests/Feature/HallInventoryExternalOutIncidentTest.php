@@ -771,9 +771,35 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
             [$obligationId]['remainingMinor']);
         $this->be($reviewer);
         config()->set('inventory_controls.loan_nonclean_final_closure_enabled',true);
+        // A new signed correspondence item must be independently reviewed
+        // before a final certificate, even when physical/cash amounts are zero.
+        $this->be($owner);
+        $lateDocument=(string)Str::uuid();
+        $partner->record($owner,$company->id,$claim,$lateDocument,
+            'other_document',null,$partnerPdf());
+        $this->be($reviewer);
+        $pendingPartner=$reconciliation->report($reviewer,$company->id,$hall->id,$loan);
+        $this->assertContains('pending_partner_document_review',$pendingPartner['closureBlockers']);
+        try {
+            $finalClosure->close($reviewer,$company->id,$hall->id,$loan,(string)Str::uuid());
+            $this->fail('Final NCL issued before independent partner document review.');
+        } catch (ConflictHttpException) {}
+        $partner->review($reviewer,$company->id,$lateDocument,(string)Str::uuid(),
+            'document_integrity_confirmed','Independent verification of late document original bytes');
         $ready=$reconciliation->report($reviewer,$company->id,$hall->id,$loan);
         $this->assertSame([],$ready['closureBlockers']);
         $this->assertFalse($ready['finalClosureAuthorized']); // read-only cannot itself close
+        // A disabled partner evidence gate must NEVER hide authorized debts
+        // by replacing independently attested obligations with an empty array.
+        config()->set('inventory_controls.loan_partner_responses_enabled',false);
+        $withoutProof=$reconciliation->report($reviewer,$company->id,$hall->id,$loan);
+        $this->assertContains('financial_reconciliation_unavailable',$withoutProof['closureBlockers']);
+        try {
+            $finalClosure->close($reviewer,$company->id,$hall->id,$loan,(string)Str::uuid());
+            $this->fail('Final NCL issued while financial partner verification was disabled.');
+        } catch (ConflictHttpException) {}
+        $this->assertSame(0,DB::table('hall_inventory_nonclean_final_closures')->count());
+        config()->set('inventory_controls.loan_partner_responses_enabled',true);
         // The independently appointed write-off and waiver approver cannot
         // also serve as the separate final numbered-document signatory.
         $this->be($independent);
@@ -903,6 +929,12 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
         }catch(ConflictHttpException){}
         $this->be($owner);
         try {
+            $service->report($owner,$company->id,$loan,(string)Str::uuid(),
+                $item,'damage',1,'New damage evidence must not follow finalized NCL history');
+            $this->fail('Finalized NCL accepted a new physical incident report.');
+        } catch (ConflictHttpException) {}
+        $this->assertSame(2,DB::table('hall_inventory_loan_incident_reports')->count());
+        try {
             $writeoffs->propose($owner,$company->id,$hall->id,$report,
                 (string)Str::uuid(),1,'Cannot retire stock twice after final');
             $this->fail('Post-closure stock loss proposal accepted.');
@@ -925,8 +957,8 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
                 'other_document',null,$partnerPdf());
             $this->fail('Late partner correspondence modified finalized loan history.');
         } catch (ConflictHttpException) {}
-        $this->assertSame(2,DB::table('hall_inventory_financial_counterparty_evidence')->count());
-        $this->assertSame(2,DB::table('hall_inventory_financial_counterparty_reviews')->count());
+        $this->assertSame(3,DB::table('hall_inventory_financial_counterparty_evidence')->count());
+        $this->assertSame(3,DB::table('hall_inventory_financial_counterparty_reviews')->count());
         $this->be($reviewer);
 
         $this->assertSame($cashJournalCount,DB::table('finance_journals')->count());

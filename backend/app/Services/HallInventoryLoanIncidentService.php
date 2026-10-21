@@ -38,15 +38,18 @@ final class HallInventoryLoanIncidentService
         ],JSON_THROW_ON_ERROR));
         return DB::transaction(function()use($actor,$companyId,$loanId,
             $requestId,$sourceItemId,$kind,$quantity,$reason,$fingerprint):string {
-            if(DB::table('hall_inventory_nonclean_final_closures')->where('company_id',$companyId)
-                ->where('loan_id',$loanId)->exists())
-                throw new ConflictHttpException('Immutable final outside loan is closed to new incident postings.');
             $loan=DB::table('hall_inventory_loan_drafts')
                 ->where('company_id',$companyId)->where('id',$loanId)
                 ->lockForUpdate()->first();
             if(!$loan || !in_array($loan->direction,['internal','external_out'],true) ||
                 !$loan->lending_hall_id)
                 throw new ConflictHttpException('An originating physically approved loan is required.');
+            // Recheck after acquiring the exact loan row lock. A competing NCL
+            // issuer holds this same lock until certificate commit; checking
+            // before it could admit an incident after a final certificate.
+            if(DB::table('hall_inventory_nonclean_final_closures')->where('company_id',$companyId)
+                ->where('loan_id',$loanId)->exists())
+                throw new ConflictHttpException('Immutable final outside loan is closed to new incident postings.');
             $external=$loan->direction==='external_out';
             if($external && (!config('inventory_controls.external_out_dispatch_enabled') ||
                 !config('inventory_controls.external_out_return_enabled')))

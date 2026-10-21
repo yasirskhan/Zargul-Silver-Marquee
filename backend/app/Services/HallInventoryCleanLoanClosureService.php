@@ -109,6 +109,8 @@ final class HallInventoryCleanLoanClosureService
             $pdfSha=hash('sha256',$bytes);
             $pdfPath='private/hall-inventory-loan-closures/'.$companyId.'/'.$closureId.'.pdf';
             $disk=Storage::disk('local');
+            if($disk->exists($pdfPath))
+                throw new ConflictHttpException('Immutable clean receipt identifier already occupies private storage.');
             if(!$disk->put($pdfPath,$bytes))
                 throw new ConflictHttpException('Immutable numbered receipt storage failed.');
             try {

@@ -327,3 +327,21 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 - 103f5f3737d9bd777e3e1c61e2b241c4ee5ff76c failed hosted CI because converting the entire long-lived external-owned lifecycle test to DatabaseMigrations allowed immutable test records to leak into later tests (51 unrelated fixture failures). Recovery separated PostgreSQL company-lock concurrency into its own minimal DatabaseMigrations test, preserving original RefreshDatabase lifecycle. Corrected source b15ca51e0da9e1e9abc11e51d6cc4074a1efc77f / CI 39535802293 SUCCESS all six jobs.
 - Additive SQL origin guard candidate ede17499fb01b72e531e253c2939523e92621b03 enforces company+loan+original lending hall compound FK and external_out-only NCL direction trigger; regression rejects forged same-company foreign-hall certificate. Successor 71a10d7123cd2f5055a11c1f699bd82817fb0e63 also rejects an internal loan's forged NCL certificate in PostgreSQL. Latest CI 39536263888 remains PENDING full exact six-job verification; do not call this additive SQL guard VERIFIED before passing.
 - All inventory/finance production release flags remain OFF. Outstanding Phase 12 certification: exact final CI, operator/staging pilot, full physical/financial reconciliations across internal/external-in/out including abnormal loans, missing old approved feature-register reconciliation and any remaining issue fixes; no Phase 13 promotion.
+
+
+## BUG-20261021-036 — Final NCL client UUID collision could overwrite existing PDF before unique-row failure
+- Root cause: local immutable document path derived from untrusted requested UUID was written before SQL insert; a conflicting source file could be replaced and then deleted on insert failure.
+- Repair source: `5afb3fb6`; fail closed when path exists, reuse current company serial lock, verify original bytes unchanged and no extra receipt in authenticated PostgreSQL lifecycle. Hosted CI run 39541773468 requires final six-job confirmation before VERIFIED. No flags enabled.
+
+## BUG-20261021-037 — Private partner correspondence could mutate after NCL and overwrite a prior evidence blob
+- Candidate source: `7e5f4b15`; acquire company lock before partner record/review, forbid mutations after final loan certificate, refuse occupied immutable storage keys. PostgreSQL/Livewire lifecycle regression asserts post-final rejection, evidence file preservation, no additional documents or reviews. Detached until predecessor six GREEN; own CI required.
+
+## BUG-20261021-038 — Partner gate disabled suppressed recognized financial obligation balances
+- Candidate source: `62461f3f`; reconciliation now reports financial_reconciliation_unavailable when required independently authorized partner/obligation controls are disabled; NCL issuer requires partner response gate. Full lifecycle test prevents issuance under disabled partner evidence verification. Detached until its parent six GREEN; no production release.
+
+
+## BUG-20261021-039 — Incident reporting had non-atomic final-NCL existence check
+- Root cause: original incident posting checked the NCL ledger BEFORE locking the original loan, allowing a window where it could wait behind an issuer then continue on stale evidence. Candidate `ba62dec6` moves the check after source-loan row lock; post-NCL reports remain refused and audited history unchanged. Detached, exact six-job CI still required.
+
+## BUG-20261021-040 — Unreviewed late partner documents were omitted from NCL closure blockers
+- Candidate `30617b57` adds company/loan-scoped pending signed-document independent review blocker; Livewire/PostgreSQL full lifecycle demonstrates premature final rejection and proper review before close. Detached, own exact six-job CI pending. This does not authenticate external payment and does not turn inventory release ON.
