@@ -1014,6 +1014,13 @@
                                 <p>Original expected partner return date: {{ $noncleanReconciliation['expectedReturnDate'] }}. Due-date disputes need separate hall-local assessment.</p>
                                 <p role="status">Final non-clean closure: BLOCKED. No write-off, custody disposal, financial waiver or numbered final certificate has been authorized by this view.</p>
                                 <p>Pending closure checks: {{ implode(', ', $noncleanReconciliation['closureBlockers'] ?? []) ?: 'No detected data blocker; final authorization still required' }}.</p>
+                                @if(config('inventory_controls.loan_nonclean_final_closure_enabled'))
+                                    <div class="flex flex-wrap gap-2" aria-label="Independently authorized final non-clean closure">
+                                        <button type="button" wire:click="closeNoncleanFinalLoan" class="rounded border px-3 py-2" @disabled(count($noncleanReconciliation['closureBlockers'] ?? []) > 0)>Independently finalize non-clean loan</button>
+                                        <button type="button" wire:click="downloadNoncleanFinalLoanPdf" class="rounded border px-3 py-2">Download existing immutable numbered NCL PDF</button>
+                                    </div>
+                                    @error('noncleanFinalClosure')<p role="alert">{{ $message }}</p>@enderror
+                                @endif
                                 @foreach($noncleanReconciliation['items'] as $physical)
                                     <p wire:key="nonclean-{{ $physical['itemId'] }}">Item {{ $physical['itemId'] }}: dispatched {{ $physical['dispatched'] }}, good {{ $physical['good'] }}, damaged {{ $physical['damaged'] }}, unresolved {{ $physical['unresolved'] }}, pending independent review {{ $physical['pendingReview'] }}. Physically unreturned: {{ $physical['unreturned'] }}. On-loan custody outstanding: {{ $physical['onLoan'] }}. Written off missing {{ $physical['writtenOffMissing'] }}, written off damaged {{ $physical['writtenOffDamaged'] }} (financial liability unchanged).</p>
                                 @endforeach
