@@ -759,6 +759,15 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
         $ready=$reconciliation->report($reviewer,$company->id,$hall->id,$loan);
         $this->assertSame([],$ready['closureBlockers']);
         $this->assertFalse($ready['finalClosureAuthorized']); // read-only cannot itself close
+        // The independently appointed write-off and waiver approver cannot
+        // also serve as the separate final numbered-document signatory.
+        $this->be($independent);
+        try {
+            $finalClosure->close($independent,$company->id,$hall->id,$loan,(string)Str::uuid());
+            $this->fail('Prior financial/physical approver signed final NCL certificate.');
+        } catch (AuthorizationException) {}
+        $this->assertSame(0,DB::table('hall_inventory_nonclean_final_closures')->count());
+        $this->be($reviewer);
         $closureId=(string)Str::uuid();
         $closed=$finalClosure->close($reviewer,$company->id,$hall->id,$loan,$closureId);
         $this->assertSame(1,$closed['receiptNumber']);
