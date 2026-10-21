@@ -46,6 +46,22 @@ final class HallInventoryFinancialCounterpartyEvidenceService
             throw new AuthorizationException('Current owner/admin of original lending hall required.');
     }
 
+    // Lock the company FIRST, as the NCL issuer does, so an evidence
+    // transaction cannot append to a loan concurrently with final signing.
+    private function lockCompany(string $companyId):void
+    {
+        if(!DB::table('companies')->where('id',$companyId)
+            ->where('is_active',true)->lockForUpdate()->exists())
+            throw new ConflictHttpException('Inactive company cannot amend loan correspondence.');
+    }
+
+    private function assertNotFinal(string $companyId,string $loanId):void
+    {
+        if(DB::table('hall_inventory_nonclean_final_closures')
+            ->where('company_id',$companyId)->where('loan_id',$loanId)->exists())
+            throw new ConflictHttpException('Final NCL certificate freezes partner correspondence.');
+    }
+
     private function evidence(UploadedFile $file):array
     {
         $path=$file->getRealPath();$size=$file->getSize();
@@ -88,11 +104,13 @@ final class HallInventoryFinancialCounterpartyEvidenceService
         $disk=Storage::disk('local');
         return DB::transaction(function()use($actor,$companyId,$claimId,$evidenceId,
             $position,$counterofferMinor,$bytes,$size,$mime,$sha,$fingerprint,$disk):string {
+            $this->lockCompany($companyId);
             $claim=DB::table('hall_inventory_financial_claims')
                 ->where('company_id',$companyId)->where('id',$claimId)
                 ->lockForUpdate()->first();
             if(!$claim)throw new ConflictHttpException('Original provisionally assessed claim not found.');
             $this->authorize($actor,$companyId,(string)$claim->source_hall_id);
+            $this->assertNotFinal($companyId,(string)$claim->loan_id);
             $decision=DB::table('hall_inventory_financial_claim_decisions')
                 ->where('company_id',$companyId)->where('claim_id',$claimId)->first();
             if(!$decision||!in_array($decision->decision,['approved_for_collection','disputed'],true))
@@ -112,6 +130,9 @@ final class HallInventoryFinancialCounterpartyEvidenceService
                 ->where('fingerprint',$fingerprint)->exists())
                 throw new ConflictHttpException('Duplicate counterparty correspondence already recorded.');
             $key='private/hall-inventory-financial-partner/'.$companyId.'/'.$claimId.'/'.$evidenceId;
+            // Existing immutable bytes are never safe to overwrite or delete.
+            if($disk->exists($key))
+                throw new ConflictHttpException('Immutable partner evidence storage key already exists.');
             if(!$disk->put($key,$bytes))
                 throw new ConflictHttpException('Private document custody write failed.');
             try {
@@ -149,11 +170,13 @@ final class HallInventoryFinancialCounterpartyEvidenceService
         ],JSON_THROW_ON_ERROR));
         return DB::transaction(function()use($actor,$companyId,$evidenceId,
             $reviewId,$assessment,$reason,$fingerprint):string {
+            $this->lockCompany($companyId);
             $row=DB::table('hall_inventory_financial_counterparty_evidence')
                 ->where('company_id',$companyId)->where('id',$evidenceId)
                 ->lockForUpdate()->first();
             if(!$row)throw new ConflictHttpException('Private correspondence not found.');
             $this->authorize($actor,$companyId,(string)$row->source_hall_id);
+            $this->assertNotFinal($companyId,(string)$row->loan_id);
             $claim=DB::table('hall_inventory_financial_claims')
                 ->where('company_id',$companyId)->where('id',$row->claim_id)->first();
             if(!$claim||(int)$row->recorded_by===(int)$actor->getKey()||

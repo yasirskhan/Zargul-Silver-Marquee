@@ -250,6 +250,21 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
         $partner=app(\App\Services\HallInventoryFinancialCounterpartyEvidenceService::class);
         $this->assertSame($document,$partner->record($owner,$company->id,$claim,
             $document,'document_says_disputes',null,$partnerPdf()));
+        // A conflicting UUID must preserve private bytes, even when an
+        // interrupted prior issuance left no ledger row behind.
+        $partnerOccupiedId=(string)Str::uuid();
+        $partnerOccupiedPath='private/hall-inventory-financial-partner/'.$company->id
+            .'/'.$claim.'/'.$partnerOccupiedId;
+        $partnerOriginalBytes="%PDF-1.4\nPreviously signed evidence\n%%EOF\n";
+        Storage::disk('local')->put($partnerOccupiedPath,$partnerOriginalBytes);
+        try {
+            $partner->record($owner,$company->id,$claim,$partnerOccupiedId,
+                'other_document',null,$partnerPdf());
+            $this->fail('An existing immutable evidence file was overwritten.');
+        } catch (ConflictHttpException) {}
+        $this->assertSame($partnerOriginalBytes,Storage::disk('local')->get($partnerOccupiedPath));
+        $this->assertSame(1,DB::table('hall_inventory_financial_counterparty_evidence')->count());
+        Storage::disk('local')->delete($partnerOccupiedPath);
         try {
             $partner->record($owner,$company->id,$claim,(string)Str::uuid(),
                 'document_says_disputes',null,$partnerPdf());
@@ -897,6 +912,21 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
                 (string)Str::uuid(),1,'Cannot add contractual waiver after closing');
             $this->fail('Post-closure contractual waiver accepted.');
         }catch(ConflictHttpException){}
+        $this->be($reviewer);
+        // Finalization freezes the documentary and independent review history.
+        try {
+            $partner->review($reviewer,$company->id,$document,(string)Str::uuid(),
+                'document_integrity_confirmed','No reviews may be added after final NCL issuance');
+            $this->fail('Late documentary review modified finalized loan history.');
+        } catch (ConflictHttpException) {}
+        $this->be($owner);
+        try {
+            $partner->record($owner,$company->id,$claim,(string)Str::uuid(),
+                'other_document',null,$partnerPdf());
+            $this->fail('Late partner correspondence modified finalized loan history.');
+        } catch (ConflictHttpException) {}
+        $this->assertSame(2,DB::table('hall_inventory_financial_counterparty_evidence')->count());
+        $this->assertSame(2,DB::table('hall_inventory_financial_counterparty_reviews')->count());
         $this->be($reviewer);
 
         $this->assertSame($cashJournalCount,DB::table('finance_journals')->count());
