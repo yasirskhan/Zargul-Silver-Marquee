@@ -1,35 +1,29 @@
-# Zargul / VenueDesk / HAFZATECH — active Phase 12 recovery
-
+# Zargul / VenueDesk / HAFZATECH — current Phase 12 recovery
 Observed: 2026-10-21 UTC. Repository `yasirskhan/Zargul-Silver-Marquee`.
-ONLY branch: `chatgpt/phase0-foundation`. Read root AGENTS.md and docs/SESSION_CONTROL.md first.
-Active development conversation: https://chatgpt.com/c/6ad84c8c-ca60-83e9-a05b-782fd6a675e5
-Prior ended worker: https://chatgpt.com/c/6ad838a3-27c4-83e8-aa7b-5b085b774aae
+ONLY `chatgpt/phase0-foundation`. Read root AGENTS.md and docs/SESSION_CONTROL.md first.
+Active Chat: https://chatgpt.com/c/6ad84c8c-ca60-83e9-a05b-782fd6a675e5
+Previous ended Chat: https://chatgpt.com/c/6ad838a3-27c4-83e8-aa7b-5b085b774aae
 
-## Exact CI evidence
-- `60f10026c3d90dc4c14450934a15002301c358fd`, run [39549293204](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39549293204): six SUCCESS; archival/session cleanup verified.
-- `18c694b9e88f7ee4fbe0932f9a120d1cf1bf4daa`, run [39549530413](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39549530413): six SUCCESS; independent PostgreSQL lock-blocking against distinct loan IDs.
-- `81c5230f327e2128d9916a40398532add055df33`, run [39550494027](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39550494027): six SUCCESS; successful two separate real abnormal external-out loan issuance cases with NCL-1 / NCL-2, original scoped SHA256 PDFs, same-ID replay and zero new stock/finance movements.
-- This successor adds cross-loan client-UUID collision, original bytes, nonconsumed sequence, and original financial/physical accounting assertions plus register/handoff reconciliation. Its own exact CI is NOT YET VERIFIED until all six jobs succeed. Verify its actual published SHA and branch HEAD before work.
+## Exact verified checkpoints (all six required jobs SUCCESS)
+- `60f10026c3d90dc4c14450934a15002301c358fd`: Actions [39549293204](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39549293204), recovery docs verified.
+- `18c694b9e88f7ee4fbe0932f9a120d1cf1bf4daa`: [39549530413](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39549530413), company lock blocks distinct loan callers.
+- `81c5230f327e2128d9916a40398532add055df33`: [39550494027](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39550494027), two eligible sequential NCL loans, independent custody/finance evidence and original PDFs.
+- `5324c1bf6e90d62878dfb7f3753a54488cc8b984`: [39551382495](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39551382495), cross-loan UUID collision does not overwrite bytes or spend next number.
+- Owner's independent docs commit `8b4ac83f16fa4c1598abfc99b83623d4b93825e3`: [39551756758](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39551756758), six SUCCESS; new whole-roadmap-after-acceptance guidance preserved.
+- `49c363e5008c2ee4f76a1c614ed5367e3a710a89`: [39552677040](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39552677040), six SUCCESS. TRUE two-process committed-fixture PostgreSQL successful NCL serial race, observed second backend lock wait, distinct original NCL-1/NCL-2 certificates and cleanup.
 
-## Phase 12 status, next required implementation
-Phase 12 OPEN. Inventory and finance production flags OFF. No Phase 13. Already verified source contains clean and non-clean physical handover/returns, NCL and EOL and external-in PDFs, provisional claim/partner documents, approved obligation, independent write-off and waiver, verified cash recovery and journal reversal, owner controls and immutable audit. A green source run does not certify the whole phase.
-1. Run/inspect all six required exact-source jobs for this successor. Fix any reds; preserve failed-run links and test strength.
-2. NEXT: genuine simultaneously contending successful multi-loan numbered issuance with committed PostgreSQL fixtures and distinct connections/processes, original company/hall/loan bindings, PDF bytes and rollback/retry integrity. Existing one-company held-lock timeout test plus sequential positive two-loan issuance are necessary but do NOT certify actual simultaneous successful completion.
-3. Complete abnormal inventory/financial life cycles for INTERNAL, EXTERNAL_IN and EXTERNAL_OUT, permission and role revocation, original custody, physical return and financial conservation, immutable audits and UI acceptance.
-4. Reconcile every Phase 12 requirement against docs/FEATURE_REGISTER.csv, docs/ROADMAP.md, docs/ISSUE_AND_BUG_REGISTER.md and actual code/tests; do not silently mark entire features complete based on subtests.
-5. Operator staging physical count/borrow/return/financial cases, backup/restore, security approval and production release remain independent gates; no fabricated acceptance.
+## Newly prepared/published next source to verify
+- New authenticated issuer account ID and server UTC issue time included ONLY in NEW original SHA256-pinned NCL PDF bytes, matching stored row creation time. Adds positive and concurrent regression assertions. This follow-on commit requires its OWN exact-source six-job hosted CI, not verified merely because 49c363 passed.
+- Check LIVE branch HEAD and branch-filtered Actions before editing. If any red, inspect exact job logs and repair before other work.
 
-## Source and discipline
-Required: docs/PROJECT_MASTER_SPEC.md, docs/INVENTORY_IMPLEMENTATION_PLAN.md,
-docs/PHASE12_FINANCIAL_CLAIM_SCOPE.md, docs/ROADMAP.md,
-docs/FEATURE_REGISTER.csv, docs/ISSUE_AND_BUG_REGISTER.md,
-docs/DEVELOPMENT_PROTOCOL.md, docs/DEVELOPMENT_EFFICIENCY.md,
-docs/QUALITY_AND_BUG_REMEDIATION_POLICY.md; actual inventory services,
-migrations, authenticated Livewire and PostgreSQL/browser tests.
-One writer; never touch main/property-platform or create branches; no force push.
-Use expected_sha with force=false; preserve unexpected commits. No Work mode.
-All six jobs: prototype-checks, central-postgres, licensing-postgres,
-laravel-postgres, editor-browser-e2e, authenticated-panel-e2e.
-Do not re-run already verified NCL multi-page pagination simply to repeat it.
-Archive history remains verbatim at docs/AI_HANDOFF_ARCHIVE_2026-10-21_d9afb21c.md and earlier archives.
-This rewrite's prior concise handoff is preserved at docs/AI_HANDOFF_ARCHIVE_2026-10-21_60f10026.md.
+## Remaining Phase 12 accepted work
+1. Real abnormal physical/financial reconciliation across INTERNAL and EXTERNAL_IN and complete EXTERNAL_OUT edge cases, independent custody/finance/final signers, operator UI, immutable audit, scoped PDFs, retry/reversal integrity.
+2. Reconcile EVERY existing Phase 12 entry in docs/FEATURE_REGISTER.csv and docs/ROADMAP.md against actual backend + UI + SQL + permissions + tests; do not equate green CI with full phase acceptance.
+3. Staging/operator physical case acceptance, restore/backup, security and authorized inventory/finance release are NOT evidenced and cannot be fabricated.
+4. Inventory and finance production flags OFF; Phase 12 OPEN; no Phase 13 until all phase exit requirements pass. The owner's whole-roadmap continuation directive applies AFTER full acceptance.
+
+## Required source and rules
+- docs/PROJECT_MASTER_SPEC.md; docs/COMMERCIAL_PRODUCT_EXPANSION.md; docs/INVENTORY_IMPLEMENTATION_PLAN.md; docs/PHASE12_FINANCIAL_CLAIM_SCOPE.md; docs/FEATURE_REGISTER.csv; docs/ROADMAP.md; docs/ISSUE_AND_BUG_REGISTER.md; docs/DEVELOPMENT_PROTOCOL.md; docs/QUALITY_AND_BUG_REMEDIATION_POLICY.md; relevant services/migrations/Livewire and PostgreSQL/browser tests.
+- Preserve approved CMS/public website, booking, finance, approvals, staff/Telegram/audit, HAFZATECH central/licensing scope.
+- One writer. Normal Chat, do not touch main/property-platform/create branches/force-push. Publish only with expected_sha, force=false. While CI runs prepare the next independent batch; then verify all six exact SHA jobs.
+- Archives preserved verbatim in docs/AI_HANDOFF_ARCHIVE_2026-10-21_d9afb21c.md, docs/AI_HANDOFF_ARCHIVE_2026-10-21_60f10026.md and earlier. This predecessor concise handoff is archived at docs/AI_HANDOFF_ARCHIVE_2026-10-21_5324c1.md.

@@ -108,7 +108,9 @@ final class HallInventoryNoncleanFinalClosureService
             ],JSON_THROW_ON_ERROR));
             $number=1+(int)DB::table('hall_inventory_nonclean_final_closures')
                 ->where('company_id',$companyId)->max('receipt_number');
-            $pdf=$this->renderPdf($companyId,$hallId,$loanId,$number,$fingerprint,$snapshot);
+            $issuedAtUtc=now('UTC')->toIso8601String();
+            $pdf=$this->renderPdf($companyId,$hallId,$loanId,$number,$fingerprint,$snapshot,
+                (int)$actor->getKey(),$issuedAtUtc);
             $storagePath='private/hall-inventory-nonclean-final/'.$companyId.'/'.$id.'.pdf';
             $disk=Storage::disk('local');
             // A client-supplied idempotency UUID must never overwrite a
@@ -123,7 +125,8 @@ final class HallInventoryNoncleanFinalClosureService
                     'id'=>$id,'company_id'=>$companyId,'hall_id'=>$hallId,'loan_id'=>$loanId,
                     'receipt_number'=>$number,'reconciliation_sha256'=>$fingerprint,
                     'pdf_sha256'=>hash('sha256',$pdf),'pdf_size'=>strlen($pdf),
-                    'pdf_storage_path'=>$storagePath,'closed_by'=>$actor->getKey()
+                    'pdf_storage_path'=>$storagePath,'closed_by'=>$actor->getKey(),
+                    'created_at'=>$issuedAtUtc
                 ]);
                 DB::table('audit_events')->insert([
                     'id'=>(string)Str::uuid(),'company_id'=>$companyId,
@@ -161,11 +164,16 @@ final class HallInventoryNoncleanFinalClosureService
         return $bytes;
     }
 
-    private function renderPdf(string $companyId,string $hallId,string $loanId,int $number,string $hash,array $snapshot):string {
+    private function renderPdf(string $companyId,string $hallId,string $loanId,int $number,string $hash,array $snapshot,?int $issuerId=null,?string $issuedAtUtc=null):string {
         $lines=['VENUEDESK - FINAL NON-CLEAN OUTSIDE OWNED LOAN',
             'Immutable receipt NCL-'.$number,'Company '.$companyId,'Hall '.$hallId,
             'Loan '.$loanId,'Reconciliation SHA256 '.$hash,
             'Inventory disposition and finance are separately independently authorized'];
+        // Account identity and UTC issuance time are server-generated and
+        // permanently pinned inside the original hashed PDF. This is an
+        // internal audit claim, not a forged legal handwritten signature.
+        if($issuerId!==null&&$issuedAtUtc!==null)
+            $lines[]='Final issuer account '.$issuerId.' UTC issued '.$issuedAtUtc;
         foreach($snapshot['items'] as $item)
             $lines[]='Item '.$item['itemId'].' dispatched '.$item['dispatched'].
                 ' good '.$item['good'].' damaged '.$item['damaged'].

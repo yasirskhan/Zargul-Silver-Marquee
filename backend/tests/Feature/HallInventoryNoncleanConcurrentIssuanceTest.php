@@ -186,6 +186,7 @@ final class HallInventoryNoncleanConcurrentIssuanceTest extends TestCase
             $bytes=$final->receiptPdf($staff['reviewer'],$co->id,$hall->id,$loan);
             $this->assertStringContainsString('NCL-'.($i+1),$bytes);
             $this->assertStringContainsString('Loan '.$loan,$bytes);
+            $this->assertStringContainsString('Final issuer account '.$staff['reviewer']->getKey().' UTC issued ',$bytes);
             $this->assertSame(hash('sha256',$bytes),$rows[$i]->pdf_sha256);
             $this->assertSame($bytes,Storage::disk('local')->get($rows[$i]->pdf_storage_path));
             $this->assertSame($bytes,$final->receiptPdf($staff['reviewer'],$co->id,$hall->id,$loan));

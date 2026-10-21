@@ -123,6 +123,7 @@ final class HallInventoryNoncleanMultiLoanIssuanceTest extends TestCase
             $bytes=$final->receiptPdf($staff['reviewer'],$co->id,$hall->id,$loan);
             $this->assertStringContainsString('NCL-'.($i+1),$bytes);
             $this->assertStringContainsString('Loan '.$loan,$bytes);
+            $this->assertStringContainsString('Final issuer account '.$staff['reviewer']->getKey().' UTC issued ',$bytes);
             $this->assertSame($issuedResult,$final->close($staff['reviewer'],$co->id,$hall->id,$loan,$id));
             $this->assertSame($bytes,$final->receiptPdf($staff['reviewer'],$co->id,$hall->id,$loan));
             $this->assertSame($movementCount,DB::table('hall_inventory_movement_events')->count());
