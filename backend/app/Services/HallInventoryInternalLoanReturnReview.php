@@ -205,6 +205,15 @@ final class HallInventoryInternalLoanReturnReview
             ->select('r.source_item_id')->selectRaw('COUNT(*) as reported')
             ->selectRaw("SUM(CASE WHEN d.decision = 'substantiated' THEN 1 ELSE 0 END) as substantiated")
             ->groupBy('r.source_item_id')->get()->keyBy('source_item_id');
+        $retired=DB::table('hall_inventory_nonclean_writeoff_proposals as p')
+            ->join('hall_inventory_nonclean_writeoff_decisions as d',function($j):void {
+                $j->on('d.company_id','=','p.company_id')
+                  ->on('d.proposal_id','=','p.id');
+            })->where('p.company_id',$companyId)->where('p.hall_id',$hallId)
+            ->where('p.loan_id',$loanId)->where('p.kind','damage')
+            ->where('d.decision','approved')
+            ->select('p.item_id')->selectRaw('SUM(p.quantity) as retired')
+            ->groupBy('p.item_id')->pluck('retired','p.item_id');
         $result=[];
         foreach($lines as $line) {
             $id=(string)$line->item_id;$total=(int)$line->quantity;
@@ -212,10 +221,13 @@ final class HallInventoryInternalLoanReturnReview
             $damaged=(int)($a->damaged??0);$unresolved=(int)($a->unresolved??0);
             $inTransit=(int)($pending[$id]??0);
             $notSent=$total-$good-$damaged-$unresolved-$inTransit;
-            $integrityWarning=$notSent<0;
+            $retiredDamage=(int)($retired[$id]??0);
+            $integrityWarning=$notSent<0||$retiredDamage>$damaged;
             $incident=$incidents->get($id);
             $result[]=['itemId'=>$id,'dispatched'=>$total,'good'=>$good,
-                'damaged'=>$damaged,'unresolved'=>$unresolved,'inTransit'=>$inTransit,
+                'damaged'=>$damaged,'approvedDamagedRetirement'=>$retiredDamage,
+                'remainingDamagedForDisposition'=>max(0,$damaged-$retiredDamage),
+                'unresolved'=>$unresolved,'inTransit'=>$inTransit,
                 'notReturned'=>max(0,$notSent),'integrityWarning'=>$integrityWarning,
                 'incidentReports'=>(int)($incident->reported??0),
                 'substantiatedReports'=>(int)($incident->substantiated??0),

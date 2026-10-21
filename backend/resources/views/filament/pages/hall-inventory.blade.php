@@ -948,6 +948,8 @@
                                     <p wire:key="internal-custody-{{ $balance['itemId'] }}">
                                         Item {{ $balance['itemId'] }}: dispatched {{ $balance['dispatched'] }},
                                         good {{ $balance['good'] }}, damaged {{ $balance['damaged'] }},
+                                        independently retired damaged {{ $balance['approvedDamagedRetirement'] }},
+                                        damaged still awaiting disposition {{ $balance['remainingDamagedForDisposition'] }},
                                         unresolved {{ $balance['unresolved'] }}, return pending review {{ $balance['inTransit'] }},
                                         not yet returned {{ $balance['notReturned'] }},
                                         incident reports {{ $balance['incidentReports'] }},

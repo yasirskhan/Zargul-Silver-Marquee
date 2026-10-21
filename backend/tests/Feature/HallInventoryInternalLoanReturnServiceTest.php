@@ -140,6 +140,18 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         $this->assertSame(0,DB::table('finance_journals')->count());
         $this->assertSame(0,(int)DB::table('hall_inventory_positions')
             ->where('hall_id',$src->id)->where('item_id',$srcItem)->value('owned_damaged'));
+        $this->be($third);
+        $retired=app(HallInventoryInternalLoanReturnReview::class)
+            ->abnormalSourceLines($third,$company->id,$src->id,$loan);
+        $this->assertSame(1,$retired[0]['damaged']);
+        $this->assertSame(1,$retired[0]['approvedDamagedRetirement']);
+        $this->assertSame(0,$retired[0]['remainingDamagedForDisposition']);
+        Livewire::test(HallInventory::class)->set('companyId',$company->id)
+            ->set('hallId',$src->id)->call('startLoanIncident',$loan)
+            ->assertSee('independently retired damaged 1')
+            ->assertSee('damaged still awaiting disposition 0')
+            ->assertSee('Closure BLOCKED; no money posted by this reconciliation.');
+
         // Source ownership stays ON LOAN until independent arrival/condition review.
         $this->assertSame(12,(int)DB::table('hall_inventory_positions')
             ->where('hall_id',$src->id)->where('item_id',$srcItem)->value('owned_on_loan'));
