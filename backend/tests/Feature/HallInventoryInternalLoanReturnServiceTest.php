@@ -306,6 +306,18 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
             ->assertSee('dispatched 12,')
             ->assertSee('good 6, damaged 1,')
             ->assertSee('Closure BLOCKED; no money posted by this reconciliation.');
+        // A hall change must discard already rendered source custody.
+        $page=Livewire::test(HallInventory::class)
+            ->set('companyId',$company->id)->set('hallId',$src->id)
+            ->call('startLoanIncident',$loan)
+            ->assertSee('dispatched 12,');
+        $page->set('hallId',$dest->id)
+            ->assertSet('internalAbnormalCustody',[])
+            ->assertDontSee('Original lending hall physical custody (read-only)');
+        // This rendered custody is server-owned, never client-submitted.
+        $property=new \ReflectionProperty(HallInventory::class,'internalAbnormalCustody');
+        $this->assertNotEmpty($property->getAttributes(\Livewire\Attributes\Locked::class));
+
         $this->be($receiver);
         Livewire::test(HallInventory::class)
             ->set('companyId',$company->id)

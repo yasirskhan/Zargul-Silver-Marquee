@@ -257,6 +257,7 @@ final class HallInventory extends Page
     public array $incidentLines = [];
     #[Locked]
     public array $incidentHistory = [];
+    #[Locked]
     public array $internalAbnormalCustody = [];
     public string $incidentItemId = '';
     public string $incidentKind = 'damage';
