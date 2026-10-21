@@ -717,7 +717,7 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
         $this->assertSame(1,DB::table('hall_inventory_financial_waiver_decisions')->count());
         // No operator may mint a numbered non-clean closure through a disabled
         // release gate, even after independent incident and money review.
-        $finalClosure=app(\\App\\Services\\HallInventoryNoncleanFinalClosureService::class);
+        $finalClosure=app(\App\Services\HallInventoryNoncleanFinalClosureService::class);
         $this->be($reviewer);
         try {
             $finalClosure->close($reviewer,$company->id,$hall->id,$loan,(string)Str::uuid());
