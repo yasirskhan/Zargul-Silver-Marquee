@@ -730,6 +730,16 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
             $finalClosure->close($reviewer,$company->id,$hall->id,$loan,(string)Str::uuid());
             $this->fail('Final closure bypassed independent financial release gates.');
         }catch(ConflictHttpException){}
+        // Even with individually enabled synthetic release controls, the
+        // original missing units and unresolved case prevent final issuance.
+        foreach(['loan_nonclean_writeoffs_enabled','loan_recoveries_enabled',
+                 'loan_financial_waivers_enabled','loan_authorized_obligations_enabled',
+                 'loan_partner_responses_enabled'] as $flag)
+            config()->set('inventory_controls.'.$flag,true);
+        try {
+            $finalClosure->close($reviewer,$company->id,$hall->id,$loan,(string)Str::uuid());
+            $this->fail('Unreturned stock and unresolved claims obtained final NCL document.');
+        }catch(ConflictHttpException){}
         config()->set('inventory_controls.loan_nonclean_final_closure_enabled',false);
         $this->assertSame(0,DB::table('hall_inventory_nonclean_final_closures')->count());
         $this->assertSame(0,DB::table('hall_inventory_external_out_clean_closures')->count());
