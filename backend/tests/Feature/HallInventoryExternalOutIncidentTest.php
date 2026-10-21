@@ -784,6 +784,12 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
         $this->assertNotNull($row);
         $this->assertSame(hash('sha256',$pdf),$row->pdf_sha256);
         $this->assertSame(1,DB::table('hall_inventory_nonclean_final_closures')->count());
+        $loanHistory=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($reviewer,$company->id,$hall->id))->firstWhere('id',$loan);
+        $this->assertSame('external_out_nonclean_closed',$loanHistory['status']);
+        $this->assertTrue($loanHistory['externalOutNoncleanClosed']);
+        $this->assertFalse($loanHistory['overdueWithOutstandingCustody']);
+
         Livewire::test(HallInventory::class)->set('hallId',$hall->id)
             ->call('startFinancialClaims',$loan)->assertHasNoErrors()
             ->assertSee('Final non-clean closure: ISSUED')
