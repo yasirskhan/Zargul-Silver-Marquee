@@ -2193,7 +2193,7 @@ final class HallInventory extends Page
     }
 
     private function reloadInternalDamageDisposition(User $actor,string $loanId):void {
-        $svc=app(\\App\\Services\\HallInventoryNoncleanWriteoffService::class);
+        $svc=app(\App\Services\HallInventoryNoncleanWriteoffService::class);
         $this->internalDamageWriteoffs=$svc->history($actor,$this->companyId,$this->hallId,$loanId);
         $this->internalDamageEligible=$svc->eligible($actor,$this->companyId,$this->hallId,$loanId);
     }
@@ -2206,7 +2206,7 @@ final class HallInventory extends Page
             'internalDamageReason'=>'required|string|min:10|max:500'
         ]);
         if($this->internalDamageProposalId==='')$this->internalDamageProposalId=(string)Str::uuid();
-        app(\\App\\Services\\HallInventoryNoncleanWriteoffService::class)
+        app(\App\Services\HallInventoryNoncleanWriteoffService::class)
             ->propose($actor,$this->companyId,$this->hallId,$this->internalDamageIncidentId,
                 $this->internalDamageProposalId,(int)$this->internalDamageQuantity,$this->internalDamageReason);
         $this->internalDamageProposalId=(string)Str::uuid();
@@ -2221,7 +2221,7 @@ final class HallInventory extends Page
             'internalDamageReviewReason'=>'required|string|min:10|max:500'
         ]);
         if($this->internalDamageDecisionId==='')$this->internalDamageDecisionId=(string)Str::uuid();
-        app(\\App\\Services\\HallInventoryNoncleanWriteoffService::class)
+        app(\App\Services\HallInventoryNoncleanWriteoffService::class)
             ->decide($actor,$this->companyId,$this->hallId,$this->internalDamageReviewProposalId,
                 $this->internalDamageDecisionId,$this->internalDamageReviewDecision,$this->internalDamageReviewReason);
         $this->internalDamageDecisionId=(string)Str::uuid();

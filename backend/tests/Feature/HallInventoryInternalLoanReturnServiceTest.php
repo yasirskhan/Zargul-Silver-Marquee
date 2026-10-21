@@ -373,7 +373,7 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         $this->assertTrue(Str::isUuid($proposal));
         $this->be($owner);
         try {
-            app(\\App\\Services\\HallInventoryNoncleanWriteoffService::class)
+            app(\App\Services\HallInventoryNoncleanWriteoffService::class)
                 ->decide($owner,$company->id,$src->id,$proposal,(string)Str::uuid(),
                     'approved','Cannot self authorize damage');
             $this->fail('Reporter authorized own physical damage.');
