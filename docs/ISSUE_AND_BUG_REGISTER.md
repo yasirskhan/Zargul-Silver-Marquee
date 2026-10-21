@@ -309,3 +309,8 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 ## INV-NONCLEAN-20261020-031 — Final closeout readiness not surfaced in owner review
 - New owner-only read-only blocker taxonomy surfaces pending incident and return-condition review, outstanding custody, undisposed owned damage, pending independent financial verification, remaining authorized obligation, or disabled financial reconciliation. Production flags remain OFF, no financial receipt or final closure is issued by these diagnostics.
 - Status: IMPLEMENTED, exact hosted all-six CI PENDING. Source regression added to HallInventoryExternalOutIncidentTest.php and owner Blade reconciliation display. Next: independent immutable nonclean final closure transaction and numbered PDF + authenticated acceptance; no final closure authorized.
+
+
+## INV-NONCLEAN-20261020-032 — Final non-clean closure and private numbered certificate
+- Implemented candidate migration and independently gated NCL final closure service, scoped owner-only operator actions, zero remaining custody/financial balance checks, separate writeoff/waiver approvals, serial numbering under company transaction lock, immutable SHA256 private PDF and audit, plus duplicate/replay/tamper regressions. Stock and finance proposal/review services now refuse post-certificate mutations. No environment flags enabled.
+- CI status: PENDING, not ACCEPTED or production ready. Remaining: verify exact six-job hosted CI, resolve failures, test actual concurrency using two PostgreSQL connections, independent operator pilot and any unreconciled Phase 12 acceptance items. Do not mark Phase 12 complete.
