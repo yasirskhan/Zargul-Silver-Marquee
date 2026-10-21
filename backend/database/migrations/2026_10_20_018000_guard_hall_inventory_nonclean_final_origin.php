@@ -21,7 +21,7 @@ return new class extends Migration {
             REFERENCES hall_inventory_loan_drafts(company_id, id, lending_hall_id)
             ON DELETE RESTRICT');
         DB::unprepared(<<<'SQL'
-CREATE FUNCTION venuedesk_ncl_guard_final_direction() RETURNS trigger
+CREATE OR REPLACE FUNCTION venuedesk_ncl_guard_final_direction() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
     IF NOT EXISTS (
