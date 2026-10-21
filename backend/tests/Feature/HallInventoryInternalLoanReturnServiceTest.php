@@ -376,5 +376,18 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
             $this->travelBack();
         }
 
+        // A loaded owner panel must recheck membership after revocation,
+        // regardless of previously cached company/hall and custody state.
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->be($owner);
+        $loaded=Livewire::test(HallInventory::class)
+            ->set('companyId',$company->id)->set('hallId',$src->id)
+            ->call('startLoanIncident',$loan)
+            ->assertHasNoErrors()->assertSee('dispatched 12,');
+        DB::table('company_memberships')->where('company_id',$company->id)
+            ->where('user_id',$owner->id)->update(['is_active'=>false]);
+        $loaded->call('startLoanIncident',$loan)->assertForbidden();
+        $this->assertSame(0,DB::table('finance_journals')->count());
+
     }
 }
