@@ -293,6 +293,7 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         $this->assertSame('damage',$history[0]['kind']);
         // Verify the actual authenticated Owner screen and its rendered
         // original-hall custody, rather than only invoking a read service.
+        config()->set('inventory_controls.catalog_enabled',true);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $this->be($owner);
         Livewire::test(HallInventory::class)
