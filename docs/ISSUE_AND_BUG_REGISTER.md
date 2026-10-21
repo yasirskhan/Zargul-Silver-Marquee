@@ -345,3 +345,8 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 
 ## BUG-20261021-040 — Unreviewed late partner documents were omitted from NCL closure blockers
 - Candidate `30617b57` adds company/loan-scoped pending signed-document independent review blocker; Livewire/PostgreSQL full lifecycle demonstrates premature final rejection and proper review before close. Detached, own exact six-job CI pending. This does not authenticate external payment and does not turn inventory release ON.
+
+## INV-NCL-20261021-041 — Cross-loan positive company-wide issuance certification
+- `18c694b9e88f7ee4fbe0932f9a120d1cf1bf4daa` [CI 39549530413](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39549530413): six SUCCESS, distinct invalid loan IDs blocked by the same company serial lock across PostgreSQL connections, no fabricated closure.
+- `81c5230f327e2128d9916a40398532add055df33` [CI 39550494027](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39550494027): six SUCCESS, separate fully evidenced external-out abnormal loans close sequentially with two unique original-scoped numbered PDF certificates and unchanged inventory/finance journal counts.
+- Follow-on: regression for second eligible loan reusing first loan's UUID, original bytes preservation, retry without consuming a serial, explicit full-waiver versus cash segregation. Requires its own exact six-job hosted CI. Actual simultaneous two-connection successful close() race, staging operator UAT, backup/restore and release approval remain OPEN. No Phase 13 or production flags.

@@ -8,6 +8,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\{DB,Storage};
 use Illuminate\Support\Str;
 use Tests\TestCase;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /** Two separate genuinely eligible loans; no direct forged final ledger rows. */
 final class HallInventoryNoncleanMultiLoanIssuanceTest extends TestCase
@@ -97,8 +98,26 @@ final class HallInventoryNoncleanMultiLoanIssuanceTest extends TestCase
             $snapshot=app(HallInventoryNoncleanReconciliationService::class)->report($staff['reviewer'],$co->id,$hall->id,$loan);
             $this->assertSame([],$snapshot['closureBlockers']);
             $this->assertSame(0,$snapshot['obligations'][$obligation]['remainingMinor']);
+            $this->assertSame(0,$snapshot['obligations'][$obligation]['paidMinor']);
+            $this->assertSame(1000,$snapshot['obligations'][$obligation]['waivedMinor']);
+            $this->assertSame(0,$snapshot['items'][0]['onLoan']);
+            $this->assertSame(1,$snapshot['items'][0]['writtenOffDamaged']);
             $movementCount=DB::table('hall_inventory_movement_events')->count();
             $journalCount=DB::table('finance_journals')->count();
+            // Cross-loan idempotency UUID collision must not replace the
+            // first certificate, consume the next serial or mutate balances.
+            if($i===1) {
+                $first=$issued[0];
+                try {
+                    $final->close($staff['reviewer'],$co->id,$hall->id,$loan,$first['id']);
+                    $this->fail('Reusing first loan UUID silently overwrote its original PDF.');
+                } catch (ConflictHttpException) {}
+                $path='private/hall-inventory-nonclean-final/'.$co->id.'/'.$first['id'].'.pdf';
+                $this->assertSame($first['bytes'],Storage::disk('local')->get($path));
+                $this->assertSame(1,DB::table('hall_inventory_nonclean_final_closures')->where('company_id',$co->id)->count());
+                $this->assertSame($movementCount,DB::table('hall_inventory_movement_events')->count());
+                $this->assertSame($journalCount,DB::table('finance_journals')->count());
+            }
             $id=$this->id();$issuedResult=$final->close($staff['reviewer'],$co->id,$hall->id,$loan,$id);
             $this->assertSame($i+1,$issuedResult['receiptNumber']);
             $bytes=$final->receiptPdf($staff['reviewer'],$co->id,$hall->id,$loan);
