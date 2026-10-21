@@ -124,6 +124,11 @@ final class HallInventoryNoncleanFinalClosureService
 
     public function receiptPdf(User $actor,string $companyId,string $hallId,string $loanId):string {
         $this->gate();$this->scoped($actor,$companyId,$hallId);
+        // A valid owner of another hall cannot probe a loan's private certificate.
+        if(!DB::table('hall_inventory_loan_drafts')
+            ->where('company_id',$companyId)->where('id',$loanId)
+            ->where('lending_hall_id',$hallId)->where('direction','external_out')->exists())
+            throw new AuthorizationException('Original lending hall loan access required.');
         $row=DB::table('hall_inventory_nonclean_final_closures')
             ->where('company_id',$companyId)->where('hall_id',$hallId)
             ->where('loan_id',$loanId)->first();
