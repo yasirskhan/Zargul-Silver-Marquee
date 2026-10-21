@@ -205,6 +205,15 @@ final class HallInventoryNoncleanReconciliationService
         // Read-only diagnostics never authorize a closure or payment.
         $blockers=[];
         if($unreviewed>0)$blockers[]='unreviewed_incident';
+        if(config('inventory_controls.loan_nonclean_writeoffs_enabled')){
+            $pendingDisposition=DB::table('hall_inventory_nonclean_writeoff_proposals as p')
+                ->leftJoin('hall_inventory_nonclean_writeoff_decisions as d',function($j):void {
+                    $j->on('d.company_id','=','p.company_id')->on('d.proposal_id','=','p.id');
+                })->where('p.company_id',$companyId)->where('p.hall_id',$hallId)
+                ->where('p.loan_id',$loanId)->whereNull('d.id')->exists();
+            if($pendingDisposition)$blockers[]='pending_physical_disposition_approval';
+        }
+
         // Financial claims without an independent final outcome, and disputed
         // proposals, cannot silently disappear from a final loan certificate.
         $unresolvedClaims=DB::table('hall_inventory_financial_claims as c')
