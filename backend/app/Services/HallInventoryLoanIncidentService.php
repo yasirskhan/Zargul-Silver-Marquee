@@ -38,6 +38,9 @@ final class HallInventoryLoanIncidentService
         ],JSON_THROW_ON_ERROR));
         return DB::transaction(function()use($actor,$companyId,$loanId,
             $requestId,$sourceItemId,$kind,$quantity,$reason,$fingerprint):string {
+            if(DB::table('hall_inventory_nonclean_final_closures')->where('company_id',$companyId)
+                ->where('loan_id',$loanId)->exists())
+                throw new ConflictHttpException('Immutable final outside loan is closed to new incident postings.');
             $loan=DB::table('hall_inventory_loan_drafts')
                 ->where('company_id',$companyId)->where('id',$loanId)
                 ->lockForUpdate()->first();
