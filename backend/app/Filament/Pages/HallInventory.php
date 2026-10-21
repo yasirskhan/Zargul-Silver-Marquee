@@ -2780,6 +2780,40 @@ final class HallInventory extends Page
         $this->reloadFinancialClaims($actor);
     }
 
+    public function closeNoncleanFinalLoan():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canManageFinancialClaims() &&
+            config('inventory_controls.loan_nonclean_final_closure_enabled') &&
+            $this->financialClaimLoanId!=='' && Str::isUuid($this->financialClaimLoanId),403);
+        $this->reloadFinancialClaims($actor);
+        abort_unless(count($this->noncleanReconciliation)>0,403);
+        try {
+            app(\App\Services\HallInventoryNoncleanFinalClosureService::class)->close(
+                $actor,$this->companyId,$this->hallId,$this->financialClaimLoanId,
+                (string)Str::uuid());
+        }catch(InvalidArgumentException|ConflictHttpException $e){
+            throw ValidationException::withMessages(['noncleanFinalClosure'=>$e->getMessage()]);
+        }
+        $this->reloadFinancialClaims($actor);
+        $this->reloadLoanHistory();
+    }
+
+    public function downloadNoncleanFinalLoanPdf():\Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canManageFinancialClaims() &&
+            config('inventory_controls.loan_nonclean_final_closure_enabled') &&
+            $this->financialClaimLoanId!=='' && Str::isUuid($this->financialClaimLoanId),403);
+        $bytes=app(\App\Services\HallInventoryNoncleanFinalClosureService::class)
+            ->receiptPdf($actor,$this->companyId,$this->hallId,$this->financialClaimLoanId);
+        return response()->streamDownload(static function()use($bytes):void {echo $bytes;},
+            'venue-inventory-nonclean-final-'.$this->financialClaimLoanId.'.pdf',[
+                'Content-Type'=>'application/pdf','Cache-Control'=>'private, no-store',
+                'X-Content-Type-Options'=>'nosniff'
+            ]);
+    }
+
     public function canManageSourceCleanClosure():bool
     {
         if(!config('inventory_controls.loan_clean_closure_enabled'))return false;
