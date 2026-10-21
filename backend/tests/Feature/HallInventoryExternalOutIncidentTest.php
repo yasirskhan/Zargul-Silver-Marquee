@@ -16,7 +16,7 @@ use App\Services\HallInventoryLoanIncidentDecisionService;
 use App\Services\HallInventoryFinancialClaimService;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -27,7 +27,7 @@ use Tests\TestCase;
 
 final class HallInventoryExternalOutIncidentTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseMigrations;
 
     public function test_external_owned_damage_missing_and_dispute_are_evidenced_and_independently_reviewed_without_financial_assumption():void
     {
@@ -768,6 +768,33 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
         } catch (AuthorizationException) {}
         $this->assertSame(0,DB::table('hall_inventory_nonclean_final_closures')->count());
         $this->be($reviewer);
+        // Real two-connection PostgreSQL stress: while another connection owns
+        // the same company lock, NCL issuance must fail before allocating a
+        // receipt number, writing a PDF, or changing any finalized balances.
+        config(['database.connections.second_pgsql'=>config('database.connections.pgsql')]);
+        DB::purge('second_pgsql');
+        $other=DB::connection('second_pgsql');
+        $this->assertNotSame(DB::connection()->getPdo(),$other->getPdo());
+        $other->beginTransaction();
+        try {
+            $this->assertNotNull($other->table('companies')->where('id',$company->id)
+                ->lockForUpdate()->first(['id']));
+            DB::statement("SET lock_timeout = '300ms'");
+            try {
+                $finalClosure->close($reviewer,$company->id,$hall->id,$loan,(string)Str::uuid());
+                $this->fail('NCL issuer bypassed the original company serialization lock.');
+            } catch (\\Illuminate\\Database\\QueryException $error) {
+                $this->assertStringContainsString('lock timeout',strtolower($error->getMessage()));
+            }
+            $this->assertSame(0,$other->table('hall_inventory_nonclean_final_closures')
+                ->where('company_id',$company->id)->count());
+        } finally {
+            DB::statement('SET lock_timeout TO DEFAULT');
+            $other->rollBack();
+            DB::disconnect('second_pgsql');
+        }
+        $this->assertSame(0,DB::table('hall_inventory_nonclean_final_closures')
+            ->where('company_id',$company->id)->count());
         $closureId=(string)Str::uuid();
         $closed=$finalClosure->close($reviewer,$company->id,$hall->id,$loan,$closureId);
         $this->assertSame(1,$closed['receiptNumber']);
