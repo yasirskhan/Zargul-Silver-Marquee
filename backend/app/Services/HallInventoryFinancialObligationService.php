@@ -75,6 +75,9 @@ final class HallInventoryFinancialObligationService
                 ->where('company_id',$companyId)->where('id',$claimId)
                 ->lockForUpdate()->first();
             if(!$claim)throw new ConflictHttpException('Original external financial claim not found.');
+            if(DB::table('hall_inventory_nonclean_final_closures')->where('company_id',$companyId)
+                ->where('loan_id',$claim->loan_id)->exists())
+                throw new ConflictHttpException('A finalized NCL receipt prohibits new monetary obligations.');
             $this->authorize($actor,$companyId,(string)$claim->source_hall_id);
             $assessment=DB::table('hall_inventory_financial_claim_decisions')
                 ->where('company_id',$companyId)->where('claim_id',$claimId)->first();
@@ -145,6 +148,9 @@ final class HallInventoryFinancialObligationService
                 ->where('company_id',$companyId)->where('id',$obligationId)
                 ->lockForUpdate()->first();
             if(!$obligation)throw new ConflictHttpException('Manual agreement proposal not found.');
+            if(DB::table('hall_inventory_nonclean_final_closures')->where('company_id',$companyId)
+                ->where('loan_id',$obligation->loan_id)->exists())
+                throw new ConflictHttpException('A finalized NCL receipt prohibits new monetary obligations.');
             $claim=DB::table('hall_inventory_financial_claims')
                 ->where('company_id',$companyId)->where('id',$obligation->claim_id)
                 ->lockForUpdate()->first();
