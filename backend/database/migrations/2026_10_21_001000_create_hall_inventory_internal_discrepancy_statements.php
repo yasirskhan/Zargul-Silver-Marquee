@@ -5,6 +5,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
  public function up():void {
+  Schema::table('hall_inventory_internal_loan_receipts',function(Blueprint $t):void {
+   $t->unique(['company_id','id','loan_id','receiving_hall_id'],'internal_discrepancy_original_loan_scope');
+  });
   Schema::table('hall_inventory_internal_loan_receipt_lines',function(Blueprint $t):void {
    $t->unique(['company_id','receipt_id','source_item_id'],'internal_discrepancy_receipt_line_scope');
   });
@@ -18,8 +21,8 @@ return new class extends Migration {
    $t->unique(['company_id','id'],'internal_discrepancy_statement_identity');
    $t->unique(['company_id','id','loan_id','borrowing_hall_id'],'internal_discrepancy_statement_scope');
    $t->foreign(['company_id','loan_id'])->references(['company_id','id'])->on('hall_inventory_loan_drafts')->restrictOnDelete();
-   $t->foreign(['company_id','receipt_id','borrowing_hall_id'],'internal_discrepancy_receipt_fk')
-    ->references(['company_id','id','receiving_hall_id'])->on('hall_inventory_internal_loan_receipts')->restrictOnDelete();
+   $t->foreign(['company_id','receipt_id','loan_id','borrowing_hall_id'],'internal_discrepancy_receipt_fk')
+    ->references(['company_id','id','loan_id','receiving_hall_id'])->on('hall_inventory_internal_loan_receipts')->restrictOnDelete();
    $t->foreign(['company_id','receipt_id','source_item_id'],'internal_discrepancy_line_fk')
     ->references(['company_id','receipt_id','source_item_id'])->on('hall_inventory_internal_loan_receipt_lines')->restrictOnDelete();
   });
@@ -40,5 +43,11 @@ return new class extends Migration {
   if(DB::table('hall_inventory_internal_discrepancy_statements')->exists())throw new RuntimeException('Immutable signed discrepancy evidence cannot be rolled back.');
   Schema::dropIfExists('hall_inventory_internal_discrepancy_decisions');
   Schema::dropIfExists('hall_inventory_internal_discrepancy_statements');
+  Schema::table('hall_inventory_internal_loan_receipt_lines',function(Blueprint $t):void {
+   $t->dropUnique('internal_discrepancy_receipt_line_scope');
+  });
+  Schema::table('hall_inventory_internal_loan_receipts',function(Blueprint $t):void {
+   $t->dropUnique('internal_discrepancy_original_loan_scope');
+  });
  }
 };
