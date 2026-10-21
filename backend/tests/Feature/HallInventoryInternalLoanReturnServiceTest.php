@@ -125,6 +125,7 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         $this->assertSame(12,(int)DB::table('hall_inventory_positions')
             ->where('hall_id',$src->id)->where('item_id',$srcItem)->value('owned_on_loan'));
         $this->be($receiver);
+        config()->set('inventory_controls.loan_returns_enabled',false);
         $svc=app(HallInventoryInternalLoanReturnService::class);
         $first=(string)Str::uuid();
         $send=fn(string $id,int $qty,int $revision)=>$svc->send(
