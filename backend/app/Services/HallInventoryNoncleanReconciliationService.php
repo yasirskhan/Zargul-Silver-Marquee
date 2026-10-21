@@ -195,9 +195,25 @@ final class HallInventoryNoncleanReconciliationService
             config('inventory_controls.loan_partner_responses_enabled'))
             $balances=app(HallInventoryFinancialRecoveryService::class)
                 ->outstanding($actor,$companyId,$hallId,$loanId);
+        // Read-only diagnostics never authorize a closure or payment.
+        $blockers=[];
+        if($unreviewed>0)$blockers[]='unreviewed_incident';
+        foreach($items as $item){
+            if($item['pendingReview']>0)$blockers[]='pending_return_review';
+            if($item['unresolved']>0)$blockers[]='unresolved_return_condition';
+            if($item['onLoan']>0)$blockers[]='outstanding_physical_custody';
+            if($item['damaged']>$item['writtenOffDamaged'])$blockers[]='undisposed_damage';
+        }
+        foreach($balances as $balance){
+            if(($balance['pendingMinor']??0)>0||($balance['waiverPendingMinor']??0)>0)$blockers[]='pending_financial_review';
+            if(($balance['remainingMinor']??0)>0)$blockers[]='unsettled_obligation';
+        }
+        if(!config('inventory_controls.loan_recoveries_enabled')||!config('inventory_controls.loan_financial_waivers_enabled'))
+            $blockers[]='financial_reconciliation_unavailable';
+        $blockers=array_values(array_unique($blockers));
         return ['items'=>array_values($items),'incidentReports'=>(int)$incidentReports,
             'unreviewedIncidents'=>(int)$unreviewed,'obligations'=>$balances,
             'expectedReturnDate'=>(string)$loan->expected_return_date,
-            'finalClosureAuthorized'=>false];
+            'finalClosureAuthorized'=>false,'closureBlockers'=>$blockers];
     }
 }
