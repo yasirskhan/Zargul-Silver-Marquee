@@ -105,6 +105,10 @@ final class HallInventoryFinancialRecoveryService
             abort_unless(DB::table('companies')->where('id',$companyId)
                 ->where('is_active',true)->lockForUpdate()->exists(),403);
             $agreement=$this->agreement($companyId,$obligationId);
+            if(DB::table('hall_inventory_nonclean_final_closures')->where('company_id',$companyId)
+                ->where('loan_id',$agreement->loan_id)->exists())
+                throw new ConflictHttpException('Final NCL certificate locks the recorded financial recovery state.');
+
             $this->authorize($actor,$companyId,(string)$agreement->source_hall_id,false);
             $old=DB::table('hall_inventory_financial_recovery_receipts')
                 ->where('company_id',$companyId)->where('id',$receiptId)->first();
@@ -184,6 +188,10 @@ final class HallInventoryFinancialRecoveryService
                 ->where('company_id',$companyId)->where('id',$receiptId)
                 ->lockForUpdate()->first();
             if(!$receipt)throw new ConflictHttpException('Physical payment documentation not found.');
+            if(DB::table('hall_inventory_nonclean_final_closures')->where('company_id',$companyId)
+                ->where('loan_id',$receipt->loan_id)->exists())
+                throw new ConflictHttpException('Final NCL certificate locks the recorded financial recovery state.');
+
             $this->authorize($actor,$companyId,(string)$receipt->source_hall_id,true);
             if((int)$receipt->recorded_by===(int)$actor->getKey())
                 throw new AuthorizationException('Payment reporter cannot verify their own payment.');
@@ -257,6 +265,10 @@ final class HallInventoryFinancialRecoveryService
                 ->where('company_id',$companyId)->where('id',$receiptId)
                 ->lockForUpdate()->first();
             if(!$receipt)throw new ConflictHttpException('Recovery payment record does not exist.');
+            if(DB::table('hall_inventory_nonclean_final_closures')->where('company_id',$companyId)
+                ->where('loan_id',$receipt->loan_id)->exists())
+                throw new ConflictHttpException('Final NCL certificate locks the recorded financial recovery state.');
+
             $this->authorize($actor,$companyId,(string)$receipt->source_hall_id,true);
             $review=DB::table('hall_inventory_financial_recovery_reviews')
                 ->where('company_id',$companyId)->where('receipt_id',$receiptId)
