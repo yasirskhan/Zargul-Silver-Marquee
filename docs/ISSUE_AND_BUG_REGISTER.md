@@ -304,3 +304,8 @@ No NEW defect was discovered by this documentation-only policy change. Existing 
 ## INV-FIN-20261020-035 — No independent partial contractual waiver separate from cash recovery
 - Detached Phase 12 candidate adds signed original authorized monetary obligation scoped waiver proposals, current owner finance permission and distinct decision actor, company lock and limit against confirmed recoveries and other pending waivers, append-only immutable decisions and auditable balance with separate paidMinor/waivedMinor/pendingMinor fields. Contractual debt forgiveness does not create a cash journal, reverse actual money, dispose stock or close a loan. Livewire owner controls and PostgreSQL negative/replay regressions. All production switches OFF.
 - Status: PREPARED DETACHED pending six-green parent 39517326833 and its own six-job hosted CI.
+
+
+## INV-NONCLEAN-20261020-031 — Final closeout readiness not surfaced in owner review
+- New owner-only read-only blocker taxonomy surfaces pending incident and return-condition review, outstanding custody, undisposed owned damage, pending independent financial verification, remaining authorized obligation, or disabled financial reconciliation. Production flags remain OFF, no financial receipt or final closure is issued by these diagnostics.
+- Status: IMPLEMENTED, exact hosted all-six CI PENDING. Source regression added to HallInventoryExternalOutIncidentTest.php and owner Blade reconciliation display. Next: independent immutable nonclean final closure transaction and numbered PDF + authenticated acceptance; no final closure authorized.
