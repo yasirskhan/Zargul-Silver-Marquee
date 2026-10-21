@@ -1,20 +1,22 @@
-# Zargul / VenueDesk / HAFZATECH — active Phase 12 recovery
-Observed 2026-10-21 UTC. Repository `yasirskhan/Zargul-Silver-Marquee`, ONLY `chatgpt/phase0-foundation`.
-This worker Chat: https://chatgpt.com/c/6ad84c8c-ca60-83e9-a05b-782fd6a675e5
-Read AGENTS.md and docs/SESSION_CONTROL.md first. No Work/main/new branch/force-push/property-platform.
+# Zargul / VenueDesk / HAFZATECH — active Phase 12 checkpoint
+Observed 2026-10-21T20:41Z. Repository `yasirskhan/Zargul-Silver-Marquee`; ONLY `chatgpt/phase0-foundation`.
+This normal worker: https://chatgpt.com/c/6ad84c8c-ca60-83e9-a05b-782fd6a675e5
+Read root AGENTS.md, this entire handoff, docs/SESSION_CONTROL.md, docs/ROADMAP.md / feature/issue registers and current source.
 
-## Exact verifications: SIX successful jobs for each
-- Base external NCL race `49c363e5` run 39552677040; authenticated issuer PDF `9b0fda8a` run 39553744103; external-out incident audit `3002a268` run 39554429867.
-- Abnormal INTERNAL read-only custody preparatory source was after `3002a268`. Original owner UI red runs 39637790365, 39639269216 exposed absent custody field, then deleted tests at `a8ac773e` six GREEN 39642197515 DID NOT certify UI.
-- `d2dd660d` CI 39663947357 FAILED backend (page gate disabled in fixture). True repair `7dd71bbe8bfc89be45cdfe142f278fb4e4a49363`, [39665310369](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39665310369), SIX SUCCESS, 639-ish tests plus existing risky. Restored authenticated Owner/Filament Livewire screen assertions on original loan and company/hall, displayed dispatched 12/good 6/damaged 1 and BLOCKED/no cash, denied destination manager.
-- This new successor adds `#[Locked]` to the server-produced internalAbnormalCustody screen snapshot; clears it in resetForms on company/hall change; tests removal of stale original-lending custody and locked property. Successor requires its OWN SHA / six-job verification; inspect actual live SHA/run before marking it verified.
+## Exact six-job hosted verifications
+- `49c363e5` CI 39552677040: TRUE original outside-owned two-process NCL lock race. `9b0fda8a` CI 39553744103: signed issuer account/UTC original NCL bytes. `3002a268` CI 39554429867: external incident audit provenance; all six SUCCESS.
+- `7dd71bbe` CI 39665310369: original source Owner Livewire custody UI restored. `0481a43f3c4a1bb2a70b2eeabaa0c4f51616b694` [39667565865](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39667565865): SIX SUCCESS, 639 passed and 3 preexisting risky, 5282 assertions. Original company/hall select, displayed dispatched 12/good 6/damaged 1, closure BLOCKED / no cash, borrower denial, #[Locked] custody, hall switch clearing, loaded owner revocation.
+- `afa2438c70774e62055f6f13e0ae4cbd8463947d` [39671406699](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39671406699): historical FAILED early PHP namespace parse. Corrected `3d4342d99465ffe29fdc3b8e95703a2f923b95c0` [39671584251](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39671584251) SIX SUCCESS. Actual abnormal INTERNAL owned DAMAGED loss report and independent physical write-off with owner proposal/approval UI, SQL revision-CAS stock retirement, immutable audit, no journals. Not an approved financial obligation or final loan closure.
 
-## Remaining approved Phase 12 implementation
-- FULL abnormal INTERNAL independently authorized stock disposition, borrower/lender reconciliation, financial obligation/no-fabricated-money, audit and final original PDF remain OPEN. Current source offers read-only UI, not final settlement. Similarly abnormal EXTERNAL_IN short/damaged/disputed original partner counts and authorized resolution/closure still OPEN.
-- Reconcile every approved requirement in docs/FEATURE_REGISTER.csv, docs/ROADMAP.md, docs/ISSUE_AND_BUG_REGISTER.md with actual service, UI, SQL, security, custody, finance, regression and staging acceptance. Existing verified clean/external-out features must not be duplicated.
-- Production inventory/finance flags OFF. Staging operator physical cases, backup/restore, full security/release approval not evidenced. Phase 12 OPEN; no Phase 13 until accepted, then continue whole roadmap per AGENTS.md.
+## New source successor / exact CI required
+- Hardens INTERNAL damage proposal and decision form selectors to the server-locked original incident loan, rejects forged cross-loan IDs, and requires original custody release gates even for write-off history. Blocks write-off on previously completed INTERNAL clean loan. The successor requires its OWN exact six-job hosted verification; never infer green from predecessor. Read LIVE HEAD and CI before editing.
+- Archive predecessor concise handoff at docs/AI_HANDOFF_ARCHIVE_2026-10-21_0481a43f.md; earlier archives untouched. Check this successor HEAD/CI then update checkpoint if fully verified.
 
-## Required references and discipline
-- docs/PROJECT_MASTER_SPEC.md; docs/COMMERCIAL_PRODUCT_EXPANSION.md; docs/INVENTORY_IMPLEMENTATION_PLAN.md; docs/PHASE12_FINANCIAL_CLAIM_SCOPE.md; docs/FEATURE_REGISTER.csv; docs/ROADMAP.md; docs/ISSUE_AND_BUG_REGISTER.md; docs/DEVELOPMENT_PROTOCOL.md; docs/QUALITY_AND_BUG_REMEDIATION_POLICY.md; code/migrations/Filament and PostgreSQL/browser tests.
-- Six jobs: prototype-checks, central-postgres, licensing-postgres, laravel-postgres, editor-browser-e2e, authenticated-panel-e2e. No skipped jobs or red ignored. Expected_sha force=false; maintain one writer.
-- Older handoffs archived verbatim at docs/AI_HANDOFF_ARCHIVE_2026-10-21_9b0fda8a.md and earlier. The prior concise handoff for this batch is archived at docs/AI_HANDOFF_ARCHIVE_2026-10-21_a8ac773e.md.
+## Phase 12 OPEN and next actual requirements
+- Continue INTERNAL damaged/missing/unreturned independent custody reconciliation with permanent immutable original receipt, independent financial liability (not merely provisional claim), contested settlement and final closure only after real, separately verified evidence. EXTERNAL_IN short/damaged/disputed signed counterparty returns require separate certified abnormal closure. Do NOT fabricate bank receipts, counterparty acceptance, cash, waiver, third-party signature or operator acceptance.
+- Reconcile all Phase 12 features against code + UI + tenant/source hall scoping + immutable audit + SQL + retries/rollback and PostgreSQL/browser tests. Earlier verified clean external-out/internal/external-in not enough to mark phase complete.
+- Operator staging physical scenarios, restore, security, production release signoff not evidenced; inventory and finance flags OFF. Phase 13 blocked until all phase exit criteria, after which whole approved roadmap continues per AGENTS.md.
+
+## Rules / source
+- Required docs: PROJECT_MASTER_SPEC.md, COMMERCIAL_PRODUCT_EXPANSION.md, INVENTORY_IMPLEMENTATION_PLAN.md, PHASE12_FINANCIAL_CLAIM_SCOPE.md, ROADMAP.md, FEATURE_REGISTER.csv, ISSUE_AND_BUG_REGISTER.md, DEVELOPMENT_PROTOCOL.md, QUALITY_AND_BUG_REMEDIATION_POLICY.md. Respect root AGENTS.md and SESSION_CONTROL.md.
+- One writer only. Normal Chat, no Work, main, new branch, force push or property-platform. All writes expected_sha + force=false; any unexpected changes require reconciliation first. CI jobs prototype-checks, central-postgres, licensing-postgres, laravel-postgres, editor-browser-e2e, authenticated-panel-e2e. Production feature flags OFF.

@@ -2205,6 +2205,8 @@ final class HallInventory extends Page
             'internalDamageQuantity'=>'required|integer|min:1|max:100000000',
             'internalDamageReason'=>'required|string|min:10|max:500'
         ]);
+        abort_unless(collect($this->internalDamageEligible)
+            ->contains(fn($entry):bool=>$entry['id']===$this->internalDamageIncidentId),403);
         if($this->internalDamageProposalId==='')$this->internalDamageProposalId=(string)Str::uuid();
         app(\App\Services\HallInventoryNoncleanWriteoffService::class)
             ->propose($actor,$this->companyId,$this->hallId,$this->internalDamageIncidentId,
@@ -2220,6 +2222,9 @@ final class HallInventory extends Page
             'internalDamageReviewDecision'=>'required|in:approved,rejected',
             'internalDamageReviewReason'=>'required|string|min:10|max:500'
         ]);
+        abort_unless(collect($this->internalDamageWriteoffs)
+            ->contains(fn($entry):bool=>$entry['id']===$this->internalDamageReviewProposalId &&
+                $entry['decision']===null),403);
         if($this->internalDamageDecisionId==='')$this->internalDamageDecisionId=(string)Str::uuid();
         app(\App\Services\HallInventoryNoncleanWriteoffService::class)
             ->decide($actor,$this->companyId,$this->hallId,$this->internalDamageReviewProposalId,

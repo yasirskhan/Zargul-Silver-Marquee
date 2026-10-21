@@ -361,6 +361,14 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         CompanyMembership::create(['company_id'=>$company->id,'user_id'=>$third->id,'role'=>'owner']);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $this->be($owner);
+        // Stale or forged form IDs cannot select evidence from any different loan.
+        Livewire::test(HallInventory::class)->set('companyId',$company->id)
+            ->set('hallId',$src->id)->call('startLoanIncident',$loan)
+            ->set('internalDamageIncidentId',(string)Str::uuid())
+            ->set('internalDamageQuantity','1')
+            ->set('internalDamageReason','Cross loan evidence cannot be silently selected')
+            ->call('proposeInternalDamageDisposition')->assertForbidden();
+        $this->assertSame(0,DB::table('hall_inventory_nonclean_writeoff_proposals')->count());
         Livewire::test(HallInventory::class)->set('companyId',$company->id)
             ->set('hallId',$src->id)->call('startLoanIncident',$loan)
             ->assertSee('Damaged owned stock: independent physical disposition')
@@ -379,6 +387,12 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
             $this->fail('Reporter authorized own physical damage.');
         }catch(AuthorizationException){}
         $this->be($third);
+        Livewire::test(HallInventory::class)->set('companyId',$company->id)
+            ->set('hallId',$src->id)->call('startLoanIncident',$loan)
+            ->set('internalDamageReviewProposalId',(string)Str::uuid())
+            ->set('internalDamageReviewDecision','approved')
+            ->set('internalDamageReviewReason','Forged foreign proposal rejected by source panel')
+            ->call('decideInternalDamageDisposition')->assertForbidden();
         Livewire::test(HallInventory::class)->set('companyId',$company->id)
             ->set('hallId',$src->id)->call('startLoanIncident',$loan)
             ->set('internalDamageReviewProposalId',$proposal)
