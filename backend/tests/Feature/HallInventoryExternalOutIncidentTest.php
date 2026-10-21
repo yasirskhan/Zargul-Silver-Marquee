@@ -715,6 +715,23 @@ final class HallInventoryExternalOutIncidentTest extends TestCase
             $this->fail('Second financial waiver decision accepted.');
         } catch (ConflictHttpException) {}
         $this->assertSame(1,DB::table('hall_inventory_financial_waiver_decisions')->count());
+        // No operator may mint a numbered non-clean closure through a disabled
+        // release gate, even after independent incident and money review.
+        $finalClosure=app(\\App\\Services\\HallInventoryNoncleanFinalClosureService::class);
+        $this->be($reviewer);
+        try {
+            $finalClosure->close($reviewer,$company->id,$hall->id,$loan,(string)Str::uuid());
+            $this->fail('Non-clean closure bypassed its disabled production feature gate.');
+        }catch(ConflictHttpException){}
+        config()->set('inventory_controls.loan_nonclean_final_closure_enabled',true);
+        // Enabling only the final gate is never enough: financial waiver and
+        // actual evidence-backed recovery controls remain independently OFF.
+        try {
+            $finalClosure->close($reviewer,$company->id,$hall->id,$loan,(string)Str::uuid());
+            $this->fail('Final closure bypassed independent financial release gates.');
+        }catch(ConflictHttpException){}
+        config()->set('inventory_controls.loan_nonclean_final_closure_enabled',false);
+        $this->assertSame(0,DB::table('hall_inventory_nonclean_final_closures')->count());
         $this->assertSame(0,DB::table('hall_inventory_external_out_clean_closures')->count());
         $this->assertSame(1,DB::table('hall_inventory_financial_recovery_reversals')->count());
         $this->assertSame(0,DB::table('hall_inventory_external_out_clean_closures')->count());
