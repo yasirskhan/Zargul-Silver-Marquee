@@ -185,3 +185,7 @@ Independent original-hall Owner/Admin closeout now has a dedicated company-scope
 ## Phase 12 internal physical balance after independently approved damage retirement
 - d7669b4c [CI 39672712150](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39672712150) six SUCCESS: bound original internal loan choices, immutable financial/physical scope gating and source-hall postclosure safety.
 - Next read-only Owner UI reports original externally witnessed damaged return, separately approved physical retirement, outstanding damaged disposition and integrity mismatch without manufacturing financial settlement. This follow-on requires its own exact CI. No acceptance or production release inferred.
+
+## Internal damage integrity follow-on
+- `f5804884` / [39675049673](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39675049673) six SUCCESS: real independently approved physical damaged-stock retirement is visibly segregated from original damaged quantity and unresolved financial/final closure status. Historical `969f59bf` [39673758671](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39673758671) failed solely due prematurely placed third-owner test, fixed in f580.
+- Movement provenance hardening successor requires own exact six-job verification; no staged operator signoff, settlement, external partner acceptance or production flag activation.

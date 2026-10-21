@@ -205,15 +205,36 @@ final class HallInventoryInternalLoanReturnReview
             ->select('r.source_item_id')->selectRaw('COUNT(*) as reported')
             ->selectRaw("SUM(CASE WHEN d.decision = 'substantiated' THEN 1 ELSE 0 END) as substantiated")
             ->groupBy('r.source_item_id')->get()->keyBy('source_item_id');
-        $retired=DB::table('hall_inventory_nonclean_writeoff_proposals as p')
+        // Approved documents are not enough: the immutable decision must
+        // reference an exact owned-damage retirement movement. Reject any
+        // privileged cross-kind/quantity/actor misbinding rather than showing a
+        // fabricated cleared stock balance.
+        $approved=DB::table('hall_inventory_nonclean_writeoff_proposals as p')
             ->join('hall_inventory_nonclean_writeoff_decisions as d',function($j):void {
                 $j->on('d.company_id','=','p.company_id')
                   ->on('d.proposal_id','=','p.id');
+            })->leftJoin('hall_inventory_movement_events as m',function($j):void {
+                $j->on('m.company_id','=','d.company_id')
+                  ->on('m.hall_id','=','d.hall_id')
+                  ->on('m.item_id','=','d.item_id')
+                  ->on('m.id','=','d.movement_id');
             })->where('p.company_id',$companyId)->where('p.hall_id',$hallId)
             ->where('p.loan_id',$loanId)->where('p.kind','damage')
             ->where('d.decision','approved')
-            ->select('p.item_id')->selectRaw('SUM(p.quantity) as retired')
-            ->groupBy('p.item_id')->pluck('retired','p.item_id');
+            ->get(['p.id','p.item_id','p.quantity','d.fingerprint','d.decided_by',
+                'm.event_kind','m.quantity as movement_quantity',
+                'm.reason as movement_reason','m.actor_id as movement_actor',
+                'm.request_fingerprint as movement_fingerprint']);
+        $retired=[];
+        foreach($approved as $w) {
+            if($w->event_kind!=='writeoff_owned_damaged'||
+                (int)$w->movement_quantity!==(int)$w->quantity||
+                (int)$w->movement_actor!==(int)$w->decided_by||
+                (string)$w->movement_reason!=='Independently authorized non-clean loss disposition '.$w->id||
+                !hash_equals((string)$w->fingerprint,(string)$w->movement_fingerprint))
+                throw new ConflictHttpException('Approved physical retirement has inconsistent immutable movement provenance.');
+            $retired[(string)$w->item_id]=($retired[(string)$w->item_id]??0)+(int)$w->quantity;
+        }
         $result=[];
         foreach($lines as $line) {
             $id=(string)$line->item_id;$total=(int)$line->quantity;
