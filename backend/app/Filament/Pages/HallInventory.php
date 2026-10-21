@@ -547,6 +547,7 @@ final class HallInventory extends Page
         $this->incidentRequestId = (string) Str::uuid();
         $this->incidentLines = [];
         $this->incidentHistory = [];
+        $this->internalAbnormalCustody = [];
         $this->incidentItemId = '';
         $this->incidentKind = 'damage';
         $this->incidentQuantity = '';
