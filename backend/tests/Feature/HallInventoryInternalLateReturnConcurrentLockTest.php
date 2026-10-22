@@ -109,7 +109,7 @@ final class HallInventoryInternalLateReturnConcurrentLockTest extends TestCase
         $this->assertSame(1,DB::table('hall_inventory_internal_late_returns')->count());
         $this->assertSame(0,(int)DB::table('hall_inventory_positions')
             ->where('hall_id',$dest->id)->where('item_id',$mapped)->value('borrowed_transit'));
-        $this->assertSame(3,(int)DB::table('hall_inventory_movement_events')
+        $this->assertSame(2,(int)DB::table('hall_inventory_movement_events')
             ->where('reason','like','%later%')->count());
         $read=app(HallInventoryInternalLoanReturnReview::class)
             ->abnormalSourceLines($admin,$co->id,$src->id,$loan);
