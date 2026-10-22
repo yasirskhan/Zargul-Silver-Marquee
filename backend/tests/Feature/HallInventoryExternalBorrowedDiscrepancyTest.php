@@ -533,7 +533,9 @@ final class HallInventoryExternalBorrowedDiscrepancyTest extends TestCase
         $readiness=app(HallInventoryExternalInNoncleanReadinessService::class)
             ->assess($approver,$company->id,$hall->id,$loan);
         $this->assertFalse($readiness['ready']);
-        $this->assertSame(0,$readiness['physicalUnitsAtHall']);
+        $this->assertSame(2,$readiness['physicalUnitsAtHall']);
+        $this->assertContains('Physical borrowed units remain in the hall.',
+            $readiness['blockers']);
         $this->assertSame(2,$readiness['missingInTransit']);
         $this->assertSame(2,$readiness['partnerReportedMissing']);
         $this->assertSame(0,$readiness['pendingDiscrepancies']);
