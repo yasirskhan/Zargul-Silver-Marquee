@@ -40,15 +40,34 @@ final class HallInventoryExternalInNoncleanReadinessService
             !$this->access->canManageHallInventory($actor,$hall))
             throw new AuthorizationException('Current borrowing-hall inventory access required.');
 
-        $itemIds=DB::table('hall_inventory_loan_draft_lines')
-            ->where('company_id',$companyId)->where('loan_id',$loanId)->pluck('item_id')->all();
-        $position=DB::table('hall_inventory_positions')->where('company_id',$companyId)
-            ->where('hall_id',$hallId)->whereIn('item_id',$itemIds)
-            ->selectRaw('COALESCE(SUM(borrowed_usable),0) AS usable,
-                COALESCE(SUM(borrowed_transit),0) AS transit,
-                COALESCE(SUM(borrowed_damaged),0) AS damaged')->first();
-        $atHall=(int)($position->usable??0)+(int)($position->damaged??0);
-        $inTransit=(int)($position->transit??0);
+        // Hall positions aggregate every external-in loan sharing a catalog
+        // item. Readiness is for THIS original loan, not those other loans.
+        // Reconstruct only signed, independently accepted original custody.
+        $acceptance=DB::table('hall_inventory_external_in_acceptances')
+            ->where('company_id',$companyId)->where('loan_id',$loanId)
+            ->where('hall_id',$hallId)->first();
+        $accepted=$acceptance?(int)DB::table('hall_inventory_external_in_acceptance_lines')
+            ->where('company_id',$companyId)->where('hall_id',$hallId)
+            ->where('acceptance_id',$acceptance->id)->sum('quantity'):0;
+        $dispatched=(int)DB::table('hall_inventory_external_in_return_lines as l')
+            ->join('hall_inventory_external_in_return_batches as b',function($j):void {
+                $j->on('b.company_id','=','l.company_id')->on('b.id','=','l.batch_id');
+            })->where('b.company_id',$companyId)->where('b.loan_id',$loanId)
+            ->where('b.hall_id',$hallId)->sum('l.quantity');
+        $confirmed=(int)DB::table('hall_inventory_external_in_return_confirmation_lines as l')
+            ->join('hall_inventory_external_in_return_confirmations as c',function($j):void {
+                $j->on('c.company_id','=','l.company_id')->on('c.id','=','l.confirmation_id');
+            })->join('hall_inventory_external_in_return_batches as b',function($j):void {
+                $j->on('b.company_id','=','c.company_id')->on('b.id','=','c.batch_id');
+            })->where('b.company_id',$companyId)->where('b.loan_id',$loanId)
+            ->where('b.hall_id',$hallId)->sum('l.quantity');
+        $cleared=(int)DB::table('hall_inventory_external_in_discrepancy_clearance_lines as l')
+            ->join('hall_inventory_external_in_discrepancy_clearances as c',function($j):void {
+                $j->on('c.company_id','=','l.company_id')->on('c.id','=','l.clearance_id');
+            })->where('c.company_id',$companyId)->where('c.loan_id',$loanId)
+            ->where('c.hall_id',$hallId)->sum('l.quantity');
+        $atHall=$accepted-$dispatched;
+        $inTransit=$dispatched-$confirmed-$cleared;
 
         $discrepancies=DB::table('hall_inventory_external_in_discrepancies as d')
             ->leftJoin('hall_inventory_external_in_discrepancy_decisions as x',function($j):void {
@@ -112,6 +131,12 @@ final class HallInventoryExternalInNoncleanReadinessService
         $ledgerReady=$postingEnabled && $settled>0 && $ledgerPosted &&
             $unsettled===0 && $pendingObligations===0 && $missingObligations===0;
         $blockers=[];
+        if(!$acceptance||$accepted<1)$blockers[]='Original loan has no signed independently accepted physical stock.';
+        if($atHall<0||$inTransit<0)
+            $blockers[]='Original loan physical custody movements are inconsistent.';
+        if(DB::table('hall_inventory_external_in_nonclean_closures')
+            ->where('company_id',$companyId)->where('loan_id',$loanId)->exists())
+            $blockers[]='Original loan already has an immutable final closure.';
         if($atHall>0)$blockers[]='Physical borrowed units remain in the hall.';
         if($inTransit!==$partnerMissing)
             $blockers[]='Borrowed transit does not equal the independently substantiated missing quantity.';

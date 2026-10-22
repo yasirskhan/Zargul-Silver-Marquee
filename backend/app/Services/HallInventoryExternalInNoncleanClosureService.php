@@ -157,16 +157,16 @@ final class HallInventoryExternalInNoncleanClosureService
                 if($missing<1)continue;
                 $position=DB::table('hall_inventory_positions')->where('company_id',$companyId)
                     ->where('hall_id',$hallId)->where('item_id',$itemId)->lockForUpdate()->first();
-                if(!$position||(int)$position->borrowed_transit!==$missing)
+                if(!$position||(int)$position->borrowed_transit<$missing)
                     throw new ConflictHttpException('Borrowed transit does not exactly match the settled missing quantity.');
                 $this->movement($actor,$companyId,$hallId,$itemId,$position,$missing,$closureId,
                     'Settled missing borrowed transit for non-clean loan '.$loanId);
             }
-            $remaining=(int)DB::table('hall_inventory_positions')->where('company_id',$companyId)
-                ->where('hall_id',$hallId)->whereIn('item_id',array_keys($missingByItem))
-                ->sum('borrowed_transit');
-            if($remaining!==0)
-                throw new ConflictHttpException('Borrowed transit remains after the final write-off.');
+            // Other original loans can still hold transit on the same hall
+            // item. This closure retires only the individually evidenced
+            // outstanding units from the current original loan.
+            if(array_sum($missingByItem)!==(int)$readiness['missingInTransit'])
+                throw new ConflictHttpException('Original loan missing quantity changed during closure.');
             $approved=DB::table('hall_inventory_external_in_loss_obligations as o')
                 ->join('hall_inventory_external_in_loss_obligation_decisions as d',function($j):void {
                     $j->on('d.company_id','=','o.company_id')->on('d.obligation_id','=','o.id');

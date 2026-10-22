@@ -598,6 +598,54 @@ final class HallInventoryExternalBorrowedDiscrepancyTest extends TestCase
         $settlements->review($approver,$company->id,$hall->id,$closureSettlement,
             (string)Str::uuid(),'verified',
             'Independent verification of the final closure payment.');
+        // Another genuine external-in original loan shares this exact
+        // hall/catalog position. Both loans have their own signed short return,
+        // approved obligation and independently verified partner settlement.
+        $sharedLoan=(string)Str::uuid();
+        $this->be($drafter);
+        app(HallInventoryLoanDraftService::class)->create($drafter,$company->id,$sharedLoan,
+            'external_in',null,$hall->id,[['itemId'=>$closureItem,'quantity'=>3]],
+            '2027-12-31','Second original loan same physical catalog','Second Partner',
+            'Separately signed counterparty');
+        $this->be($handler);
+        app(HallInventoryExternalBorrowedIntakeService::class)->record(
+            $handler,$company->id,$hall->id,$sharedLoan,(string)Str::uuid(),
+            $signed('second-intake.pdf','second-intake'),[$closureItem=>3]);
+        $this->be($owner);
+        app(HallInventoryExternalBorrowedIntakeService::class)->accept(
+            $owner,$company->id,$hall->id,$sharedLoan,(string)Str::uuid());
+        $this->be($handler);
+        $sharedBatch=(string)Str::uuid();
+        $returns->dispatch($handler,$company->id,$hall->id,$sharedLoan,$sharedBatch,
+            [$closureItem=>3],$signed('second-return.pdf','second-return'));
+        $this->be($owner);
+        $sharedDiscrepancy=(string)Str::uuid();
+        $discrimination->report($owner,$company->id,$hall->id,$sharedBatch,$sharedDiscrepancy,
+            [$closureItem=>['received'=>2,'damaged'=>0]],
+            'Partner independently received two of three units on second loan.',
+            $signed('second-short.pdf','second-short'));
+        $this->be($reviewer);
+        $discrimination->decide($reviewer,$company->id,$hall->id,$sharedDiscrepancy,
+            (string)Str::uuid(),'substantiated','Second loan signed independent shortfall.');
+        $clearance->clear($reviewer,$company->id,$hall->id,$sharedDiscrepancy,
+            (string)Str::uuid());
+        $sharedObligation=(string)Str::uuid();
+        $obligations->propose($reviewer,$company->id,$hall->id,$sharedDiscrepancy,
+            $sharedObligation,'PKR',1000,'Independent second original loss obligation.');
+        $this->be($approver);
+        $obligations->decide($approver,$company->id,$hall->id,$sharedObligation,
+            (string)Str::uuid(),'approved','Second independent partner obligation approval.');
+        $this->be($reviewer);
+        $sharedSettlement=(string)Str::uuid();
+        $settlements->record($reviewer,$company->id,$hall->id,$sharedObligation,
+            $sharedSettlement,1000,'PKR','bank','BANK-CLOSURE-SECOND','2026-10-22',
+            UploadedFile::fake()->createWithContent('second-payment.pdf',
+                "%PDF-1.4\nsecond payment\n%%EOF"));
+        $this->be($approver);
+        $settlements->review($approver,$company->id,$hall->id,$sharedSettlement,
+            (string)Str::uuid(),'verified','Second partner evidence independently verified.');
+        $this->assertSame(2,(int)DB::table('hall_inventory_positions')
+            ->where('item_id',$closureItem)->sum('borrowed_transit'));
         $ready=app(HallInventoryExternalInNoncleanReadinessService::class)
             ->assess($approver,$company->id,$hall->id,$closureLoan);
         $this->assertTrue($ready['ready']);
@@ -613,7 +661,7 @@ final class HallInventoryExternalBorrowedDiscrepancyTest extends TestCase
         $this->assertNotNull($closureRow);
         $this->assertSame(1,(int)$closureRow->missing_quantity);
         $this->assertSame(1000,(int)$closureRow->amount_minor);
-        $this->assertSame(0,(int)DB::table('hall_inventory_positions')
+        $this->assertSame(1,(int)DB::table('hall_inventory_positions')
             ->where('item_id',$closureItem)->sum('borrowed_transit'));
         $this->assertSame(0,(int)DB::table('hall_inventory_positions')
             ->where('item_id',$closureItem)->sum('owned_usable'));
@@ -629,6 +677,20 @@ final class HallInventoryExternalBorrowedDiscrepancyTest extends TestCase
                 $closureLoan,(string)Str::uuid());
             $this->fail('Non-clean closure was mutable through a second identifier.');
         }catch(ConflictHttpException){}
+        $journalsBefore=DB::table('finance_journals')->count();
+        $sharedClosureId=(string)Str::uuid();
+        $this->assertSame('ENCL-2',$closureService->close($approver,$company->id,$hall->id,
+            $sharedLoan,$sharedClosureId)['serialNumber']);
+        $this->assertSame('ENCL-2',$closureService->close($approver,$company->id,$hall->id,
+            $sharedLoan,$sharedClosureId)['serialNumber']);
+        $this->assertSame(0,(int)DB::table('hall_inventory_positions')
+            ->where('item_id',$closureItem)->sum('borrowed_transit'));
+        $this->assertSame($journalsBefore,DB::table('finance_journals')->count());
+        $this->assertSame(2,DB::table('hall_inventory_external_in_nonclean_closures')
+            ->where('company_id',$company->id)->count());
+        $this->assertSame(2,DB::table('hall_inventory_movement_events')
+            ->where('company_id',$company->id)->where('item_id',$closureItem)
+            ->where('event_kind','writeoff_borrowed_transit')->count());
         $auditAction='hall_inventory.external_in_nonclean_certificate_downloaded';
         $beforeDownloads=DB::table('audit_events')->where('company_id',$company->id)
             ->where('action',$auditAction)->count();
