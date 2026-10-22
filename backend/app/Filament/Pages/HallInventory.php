@@ -236,6 +236,23 @@ final class HallInventory extends Page
     public string $externalObligationDecisionReason = '';
     #[Locked]
     public ?string $lastExternalObligationReference = null;
+    #[Locked]
+    public array $externalSettlementHistory = [];
+    #[Locked]
+    public string $externalSettlementObligationId = '';
+    #[Locked]
+    public string $externalSettlementRequestId = '';
+    public string $externalSettlementAmount = '';
+    public string $externalSettlementMethod = 'bank';
+    public string $externalSettlementReference = '';
+    public string $externalSettlementPaidOn = '';
+    public $externalSettlementFile = null;
+    #[Locked]
+    public string $externalSettlementReviewTarget = '';
+    public string $externalSettlementReviewDecision = 'verified';
+    public string $externalSettlementReviewReason = '';
+    #[Locked]
+    public ?string $lastExternalSettlementReference = null;
 
     #[Locked]
     public string $loanDispatchLoanId = '';
@@ -822,6 +839,18 @@ final class HallInventory extends Page
         $this->externalObligationDecision = 'approved';
         $this->externalObligationDecisionReason = '';
         $this->lastExternalObligationReference = null;
+        $this->externalSettlementHistory = [];
+        $this->externalSettlementObligationId = '';
+        $this->externalSettlementRequestId = (string) Str::uuid();
+        $this->externalSettlementAmount = '';
+        $this->externalSettlementMethod = 'bank';
+        $this->externalSettlementReference = '';
+        $this->externalSettlementPaidOn = '';
+        $this->externalSettlementFile = null;
+        $this->externalSettlementReviewTarget = '';
+        $this->externalSettlementReviewDecision = 'verified';
+        $this->externalSettlementReviewReason = '';
+        $this->lastExternalSettlementReference = null;
         $this->externalIntakeLoanId = '';
         $this->externalIntakeRequestId = (string)Str::uuid();
         $this->externalIntakeFile = null;
@@ -1155,6 +1184,15 @@ final class HallInventory extends Page
             config('inventory_controls.external_borrowed_intake_enabled'))
             $this->externalObligationHistory = app(
                 \App\Services\HallInventoryExternalInLossObligationService::class
+            )->recent($actor,$this->companyId,$this->hallId);
+        $this->externalSettlementHistory = [];
+        if(config('inventory_controls.external_in_loss_settlement_enabled') &&
+            config('inventory_controls.external_in_loss_obligation_enabled') &&
+            config('inventory_controls.external_borrowed_discrepancy_enabled') &&
+            config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled'))
+            $this->externalSettlementHistory = app(
+                \App\Services\HallInventoryExternalInLossSettlementService::class
             )->recent($actor,$this->companyId,$this->hallId);
         $this->externalCleanReceipts=[];
         if(config('inventory_controls.external_borrowed_clean_closure_enabled')) {
@@ -2138,6 +2176,124 @@ final class HallInventory extends Page
         $this->externalObligationDecisionTarget='';
         $this->externalObligationDecision='approved';
         $this->externalObligationDecisionReason='';
+        $this->reloadLoanHistory();
+    }
+
+    public function startExternalSettlement(string $obligationId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_in_loss_settlement_enabled') &&
+            config('inventory_controls.external_in_loss_obligation_enabled') &&
+            config('inventory_controls.external_borrowed_discrepancy_enabled') &&
+            config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled') &&
+            $this->canIndependentlyAcceptExternalBorrowing(),403);
+        $row=collect($this->externalObligationHistory)->first(
+            fn($o):bool=>$o['id']===$obligationId && $o['decision']==='approved'
+        );
+        abort_unless($row!==null,403);
+        abort_if(collect($this->externalSettlementHistory)
+            ->contains(fn($s):bool=>$s['obligationId']===$obligationId),403);
+        $this->externalSettlementObligationId=$obligationId;
+        $this->externalSettlementRequestId=(string)Str::uuid();
+        $this->externalSettlementAmount=(string)$row['amountMinor'];
+        $this->externalSettlementMethod='bank';
+        $this->externalSettlementReference='';
+        $this->externalSettlementPaidOn=now()->toDateString();
+        $this->externalSettlementFile=null;
+        $this->lastExternalSettlementReference=null;
+    }
+
+    public function submitExternalSettlement():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_in_loss_settlement_enabled') &&
+            config('inventory_controls.external_in_loss_obligation_enabled') &&
+            config('inventory_controls.external_borrowed_discrepancy_enabled') &&
+            config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled') &&
+            $this->canIndependentlyAcceptExternalBorrowing() &&
+            $this->externalSettlementObligationId!=='',403);
+        $this->validate([
+            'externalSettlementAmount'=>'required|string|regex:/^[1-9][0-9]{0,11}$/',
+            'externalSettlementMethod'=>'required|in:cash,bank',
+            'externalSettlementReference'=>'required|string|max:120',
+            'externalSettlementPaidOn'=>'required|date_format:Y-m-d',
+            'externalSettlementFile'=>'required|file|max:5120|mimes:jpg,jpeg,png,pdf',
+        ]);
+        $obligation=collect($this->externalObligationHistory)->first(
+            fn($o):bool=>$o['id']===$this->externalSettlementObligationId
+        );
+        abort_unless($obligation!==null,403);
+        $amount=(int)$this->externalSettlementAmount;
+        if($amount<1||$amount>(int)$obligation['amountMinor'])
+            throw ValidationException::withMessages([
+                'externalSettlementAmount'=>'Amount must not exceed the approved obligation.'
+            ]);
+        try {
+            $this->lastExternalSettlementReference=app(
+                \App\Services\HallInventoryExternalInLossSettlementService::class
+            )->record($actor,$this->companyId,$this->hallId,
+                $this->externalSettlementObligationId,$this->externalSettlementRequestId,
+                $amount,$obligation['currency'],$this->externalSettlementMethod,
+                $this->externalSettlementReference,$this->externalSettlementPaidOn,
+                $this->externalSettlementFile);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['externalSettlementReference'=>$e->getMessage()]);
+        }
+        $this->externalSettlementObligationId='';
+        $this->externalSettlementRequestId=(string)Str::uuid();
+        $this->externalSettlementReference='';
+        $this->externalSettlementFile=null;
+        $this->reloadLoanHistory();
+    }
+
+    public function startExternalSettlementReview(string $settlementId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_in_loss_settlement_enabled') &&
+            config('inventory_controls.external_in_loss_obligation_enabled') &&
+            config('inventory_controls.external_borrowed_discrepancy_enabled') &&
+            config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled') &&
+            $this->canIndependentlyAcceptExternalBorrowing(),403);
+        $row=collect($this->externalSettlementHistory)->first(
+            fn($s):bool=>$s['id']===$settlementId && $s['decision']===null &&
+                $s['recordedBy']!==(int)$actor->getKey()
+        );
+        abort_unless($row!==null,403);
+        $this->externalSettlementReviewTarget=$settlementId;
+        $this->externalSettlementReviewDecision='verified';
+        $this->externalSettlementReviewReason='';
+    }
+
+    public function submitExternalSettlementReview():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_in_loss_settlement_enabled') &&
+            config('inventory_controls.external_in_loss_obligation_enabled') &&
+            config('inventory_controls.external_borrowed_discrepancy_enabled') &&
+            config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled') &&
+            $this->canIndependentlyAcceptExternalBorrowing() &&
+            $this->externalSettlementReviewTarget!=='',403);
+        $this->validate([
+            'externalSettlementReviewDecision'=>'required|in:verified,rejected',
+            'externalSettlementReviewReason'=>'required|string|min:10|max:500',
+        ]);
+        try {
+            $this->lastExternalSettlementReference=app(
+                \App\Services\HallInventoryExternalInLossSettlementService::class
+            )->review($actor,$this->companyId,$this->hallId,
+                $this->externalSettlementReviewTarget,(string)Str::uuid(),
+                $this->externalSettlementReviewDecision,
+                $this->externalSettlementReviewReason);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['externalSettlementReviewReason'=>$e->getMessage()]);
+        }
+        $this->externalSettlementReviewTarget='';
+        $this->externalSettlementReviewDecision='verified';
+        $this->externalSettlementReviewReason='';
         $this->reloadLoanHistory();
     }
 

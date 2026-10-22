@@ -463,5 +463,39 @@ final class HallInventoryExternalBorrowedDiscrepancyTest extends TestCase
         $this->assertSame(0,(int)DB::table('hall_inventory_positions')->sum('owned_usable'));
         $this->assertSame(2,(int)DB::table('hall_inventory_positions')->sum('borrowed_transit'));
         $this->assertSame(0,DB::table('hall_inventory_external_in_clean_closures')->count());
+
+        $this->be($approver);
+        Livewire::test(HallInventory::class)
+            ->set('hallId',$hall->id)
+            ->assertSee('Record partner payment evidence')
+            ->call('startExternalSettlement',$secondObligation->id)->assertHasNoErrors()
+            ->set('externalSettlementAmount','25000')
+            ->set('externalSettlementMethod','bank')
+            ->set('externalSettlementReference','BANK-2026-002')
+            ->set('externalSettlementPaidOn','2026-10-22')
+            ->set('externalSettlementFile',UploadedFile::fake()->createWithContent(
+                'partner-payment-2.pdf',"%PDF-1.4\nPartner second payment receipt\n%%EOF"))
+            ->call('submitExternalSettlement')->assertHasNoErrors()
+            ->assertSee('PARTNER PAYMENT EVIDENCE');
+        $secondSettlement=DB::table('hall_inventory_external_in_loss_settlements')
+            ->where('obligation_id',$secondObligation->id)->first();
+        $this->assertNotNull($secondSettlement);
+        $this->assertSame(25000,(int)$secondSettlement->amount_minor);
+        Livewire::test(HallInventory::class)
+            ->set('hallId',$hall->id)
+            ->call('startExternalSettlementReview',$secondSettlement->id)->assertForbidden();
+        $this->be($owner);
+        Livewire::test(HallInventory::class)
+            ->set('hallId',$hall->id)
+            ->assertSee('Independently verify partner payment evidence')
+            ->call('startExternalSettlementReview',$secondSettlement->id)->assertHasNoErrors()
+            ->set('externalSettlementReviewDecision','verified')
+            ->set('externalSettlementReviewReason','Independent owner verified the second payment reference and signed receipt.')
+            ->call('submitExternalSettlementReview')->assertHasNoErrors()
+            ->assertSee('BANK-2026-002');
+        $this->assertSame(0,DB::table('finance_journals')->count());
+        $this->assertSame(0,(int)DB::table('hall_inventory_positions')->sum('owned_usable'));
+        $this->assertSame(2,(int)DB::table('hall_inventory_positions')->sum('borrowed_transit'));
+        $this->assertSame(0,DB::table('hall_inventory_external_in_clean_closures')->count());
     }
 }

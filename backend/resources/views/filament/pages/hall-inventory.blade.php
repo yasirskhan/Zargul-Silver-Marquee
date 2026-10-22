@@ -1768,6 +1768,23 @@
                                             <button type="button" wire:click="startExternalObligationReview('{{ $partnerObligation['id'] }}')"
                                                 class="rounded-lg border px-3 py-2">Independently review partner loss obligation</button>
                                         @endif
+                                        @php($partnerSettlement = collect($externalSettlementHistory)->firstWhere('obligationId', $partnerObligation['id']))
+                                        @if($partnerSettlement)
+                                            <p class="font-medium">PARTNER PAYMENT EVIDENCE — {{ strtoupper($partnerSettlement['method']) }} {{ $partnerSettlement['currency'] }} {{ $partnerSettlement['amountMinor'] }} minor units, reference {{ $partnerSettlement['paymentReference'] }} — {{ $partnerSettlement['decision'] === null ? 'INDEPENDENT VERIFICATION PENDING' : strtoupper($partnerSettlement['decision']) }}</p>
+                                            <p>Evidence only; no journal, cash mutation, settlement or closure is posted.</p>
+                                            @if($partnerSettlement['decision'] === null &&
+                                                $partnerSettlement['recordedBy'] !== (int)auth()->id() &&
+                                                config('inventory_controls.external_in_loss_settlement_enabled') &&
+                                                $this->canIndependentlyAcceptExternalBorrowing())
+                                                <button type="button" wire:click="startExternalSettlementReview('{{ $partnerSettlement['id'] }}')"
+                                                    class="rounded-lg border px-3 py-2">Independently verify partner payment evidence</button>
+                                            @endif
+                                        @elseif($partnerObligation['decision'] === 'approved' &&
+                                            config('inventory_controls.external_in_loss_settlement_enabled') &&
+                                            $this->canIndependentlyAcceptExternalBorrowing())
+                                            <button type="button" wire:click="startExternalSettlement('{{ $partnerObligation['id'] }}')"
+                                                class="rounded-lg border px-3 py-2">Record partner payment evidence</button>
+                                        @endif
                                     @elseif($partnerDiscrepancy['decision'] === 'substantiated' &&
                                         $partnerDiscrepancy['reportedBy'] !== (int)auth()->id() &&
                                         config('inventory_controls.external_in_loss_obligation_enabled') &&
@@ -1941,6 +1958,63 @@
                         <button type="button" wire:click="submitExternalObligationReview"
                             class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">Record independent partner loss obligation decision</button>
                     </section>
+                @endif
+                @if(config('inventory_controls.external_in_loss_settlement_enabled') && $externalSettlementObligationId !== '')
+                    <section class="rounded-xl border p-4 space-y-3" aria-label="Record partner payment evidence">
+                        <h3 class="font-semibold">Record partner payment evidence</h3>
+                        <p class="text-sm">Obligation {{ $externalSettlementObligationId }}. Record a cash or bank payment against the approved amount. This is private evidence only; no journal, cash mutation, settlement or closure is posted.</p>
+                        <label class="block text-sm">Amount in minor units
+                            <input type="number" min="1" step="1" wire:model="externalSettlementAmount"
+                                class="w-full rounded-lg border p-2 text-gray-900">
+                        </label>
+                        <label class="block text-sm">Method
+                            <select wire:model="externalSettlementMethod" class="w-full rounded-lg border p-2 text-gray-900">
+                                <option value="bank">Bank transfer</option>
+                                <option value="cash">Cash</option>
+                            </select>
+                        </label>
+                        <label class="block text-sm">Payment reference
+                            <input type="text" maxlength="120" wire:model="externalSettlementReference"
+                                class="w-full rounded-lg border p-2 text-gray-900">
+                        </label>
+                        <label class="block text-sm">Paid on
+                            <input type="date" wire:model="externalSettlementPaidOn"
+                                class="w-full rounded-lg border p-2 text-gray-900">
+                        </label>
+                        <label class="block text-sm">Signed payment receipt or transfer proof (PDF/photo, up to 5 MB)
+                            <input type="file" wire:model="externalSettlementFile" accept=".pdf,.jpg,.jpeg,.png"
+                                class="w-full rounded-lg border p-2"></label>
+                        @error('externalSettlementAmount') <p role="alert">{{ $message }}</p> @enderror
+                        @error('externalSettlementMethod') <p role="alert">{{ $message }}</p> @enderror
+                        @error('externalSettlementReference') <p role="alert">{{ $message }}</p> @enderror
+                        @error('externalSettlementPaidOn') <p role="alert">{{ $message }}</p> @enderror
+                        @error('externalSettlementFile') <p role="alert">{{ $message }}</p> @enderror
+                        <button type="button" wire:click="submitExternalSettlement"
+                            class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">Record partner payment evidence</button>
+                    </section>
+                @endif
+                @if(config('inventory_controls.external_in_loss_settlement_enabled') && $externalSettlementReviewTarget !== '')
+                    <section class="rounded-xl border p-4 space-y-3" aria-label="Independent partner payment review">
+                        <h3 class="font-semibold">Independently verify partner payment evidence</h3>
+                        <p class="text-sm">Settlement {{ $externalSettlementReviewTarget }}. A different current owner/admin verifies the cash/bank reference and private evidence. No journal or settlement is posted.</p>
+                        <label class="block text-sm">Decision
+                            <select wire:model="externalSettlementReviewDecision" class="w-full rounded-lg border p-2 text-gray-900">
+                                <option value="verified">Verify partner payment evidence</option>
+                                <option value="rejected">Reject</option>
+                            </select>
+                        </label>
+                        <label class="block text-sm">Independent review reason
+                            <textarea wire:model="externalSettlementReviewReason" rows="2"
+                                class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                        </label>
+                        @error('externalSettlementReviewDecision') <p role="alert">{{ $message }}</p> @enderror
+                        @error('externalSettlementReviewReason') <p role="alert">{{ $message }}</p> @enderror
+                        <button type="button" wire:click="submitExternalSettlementReview"
+                            class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">Record independent partner payment review</button>
+                    </section>
+                @endif
+                @if($lastExternalSettlementReference)
+                    <p role="status">Partner payment evidence {{ $lastExternalSettlementReference }} recorded. No journal, cash mutation, settlement or closure was posted.</p>
                 @endif
                 @if($lastExternalObligationReference)
                     <p role="status">Provisional partner loss obligation {{ $lastExternalObligationReference }} recorded. No invoice, journal, payment, settlement or closure was posted.</p>
