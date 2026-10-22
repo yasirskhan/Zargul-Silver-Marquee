@@ -484,6 +484,7 @@ final class HallInventoryExternalBorrowedDiscrepancyTest extends TestCase
         Livewire::test(HallInventory::class)
             ->set('hallId',$hall->id)
             ->call('startExternalSettlementReview',$secondSettlement->id)->assertForbidden();
+        config()->set('finance_controls.posting_enabled',true);
         $this->be($owner);
         Livewire::test(HallInventory::class)
             ->set('hallId',$hall->id)
@@ -493,7 +494,34 @@ final class HallInventoryExternalBorrowedDiscrepancyTest extends TestCase
             ->set('externalSettlementReviewReason','Independent owner verified the second payment reference and signed receipt.')
             ->call('submitExternalSettlementReview')->assertHasNoErrors()
             ->assertSee('BANK-2026-002');
-        $this->assertSame(0,DB::table('finance_journals')->count());
+        $journal=DB::table('finance_journals')->where('company_id',$company->id)
+            ->where('entry_type','inventory_partner_payment')->first();
+        $this->assertNotNull($journal);
+        $this->assertSame(25000,(int)$journal->amount_minor);
+        $this->assertSame('PKR',$journal->currency_code);
+        $journalLines=DB::table('finance_journal_lines')->where('journal_id',$journal->id)->get();
+        $this->assertSame(2,$journalLines->count());
+        $this->assertSame('inventory_partner_loss',
+            $journalLines->firstWhere('side','debit')->account_code);
+        $this->assertSame('bank_clearing',
+            $journalLines->firstWhere('side','credit')->account_code);
+        $this->assertSame(1,DB::table('finance_journals')->count());
+
+        $settlementService=app(HallInventoryExternalInLossSettlementService::class);
+        $this->be($reviewer);
+        $reversalId=(string)Str::uuid();
+        $this->assertSame($reversalId,$settlementService->reverse($reviewer,$company->id,$hall->id,
+            $secondSettlement->id,$reversalId,
+            'Independent correction after bank reversal of the second payment.'));
+        $this->assertSame(2,DB::table('finance_journals')->count());
+        $reversal=DB::table('finance_journals')->where('id',$reversalId)->first();
+        $this->assertSame('reversal',$reversal->entry_type);
+        $this->assertSame($journal->id,$reversal->reversal_of);
+        $reversalLines=DB::table('finance_journal_lines')->where('journal_id',$reversalId)->get();
+        $this->assertSame('bank_clearing',
+            $reversalLines->firstWhere('side','debit')->account_code);
+        $this->assertSame('inventory_partner_loss',
+            $reversalLines->firstWhere('side','credit')->account_code);
         $this->assertSame(0,(int)DB::table('hall_inventory_positions')->sum('owned_usable'));
         $this->assertSame(2,(int)DB::table('hall_inventory_positions')->sum('borrowed_transit'));
         $this->assertSame(0,DB::table('hall_inventory_external_in_clean_closures')->count());

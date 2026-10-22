@@ -3,6 +3,7 @@ namespace App\Services;
 
 use App\Models\Hall;
 use App\Models\User;
+use App\Policies\FinanceAccessPolicy;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
@@ -147,8 +148,9 @@ final class HallInventoryExternalInLossSettlementService
             mb_strlen(trim($reason))<10||mb_strlen($reason)>500)
             throw new InvalidArgumentException('Independent partner payment review and reason required.');
         $reason=trim($reason);
+        $posting=$decision==='verified' && config('finance_controls.posting_enabled')===true;
         return DB::transaction(function()use($actor,$companyId,$hallId,$settlementId,
-            $reviewId,$decision,$reason):string {
+            $reviewId,$decision,$reason,$posting):string {
             $ref=DB::table('hall_inventory_external_in_loss_settlements')
                 ->where('company_id',$companyId)->where('hall_id',$hallId)
                 ->where('id',$settlementId)->first(['loan_id','recorded_by']);
@@ -169,6 +171,12 @@ final class HallInventoryExternalInLossSettlementService
             if(!$settlement)throw new ConflictHttpException('Partner payment evidence was not found.');
             if((int)$settlement->recorded_by===(int)$actor->getKey())
                 throw new AuthorizationException('Payment recorder cannot independently verify their own evidence.');
+            if($posting) {
+                abort_unless(DB::table('companies')->where('id',$companyId)
+                    ->where('is_active',true)->lockForUpdate()->exists(),403);
+                if(!(new FinanceAccessPolicy())->post($actor,$companyId))
+                    throw new AuthorizationException('Finance posting permission required.');
+            }
             $this->verified($settlement);
             $fingerprint=hash('sha256',json_encode([$companyId,$hallId,$settlementId,
                 (int)$actor->getKey(),$decision,$reason],JSON_THROW_ON_ERROR));
@@ -181,15 +189,126 @@ final class HallInventoryExternalInLossSettlementService
                     throw new ConflictHttpException('Partner payment evidence already has an immutable review.');
                 return $reviewId;
             }
+            $journalId=null;
+            if($posting) {
+                $journalId=$reviewId;
+                DB::table('finance_journals')->insert([
+                    'id'=>$journalId,'company_id'=>$companyId,
+                    'entry_type'=>'inventory_partner_payment',
+                    'currency_code'=>$settlement->currency,
+                    'amount_minor'=>$settlement->amount_minor,
+                    'reversal_of'=>null,'created_by'=>$actor->getKey(),
+                    'reason'=>'Verified external-in partner payment '.$settlementId
+                ]);
+                foreach([
+                    ['inventory_partner_loss','debit'],
+                    [$settlement->method==='cash'?'cash_on_hand':'bank_clearing','credit']
+                ] as [$code,$side])
+                    DB::table('finance_journal_lines')->insert([
+                        'id'=>(string)Str::uuid(),'company_id'=>$companyId,
+                        'journal_id'=>$journalId,'account_code'=>$code,'side'=>$side,
+                        'amount_minor'=>$settlement->amount_minor
+                    ]);
+                DB::statement('SET CONSTRAINTS finance_parent_balanced, finance_lines_balanced IMMEDIATE');
+                DB::statement('SET CONSTRAINTS finance_parent_balanced, finance_lines_balanced DEFERRED');
+            }
             DB::table('hall_inventory_external_in_loss_settlement_reviews')->insert([
                 'id'=>$reviewId,'company_id'=>$companyId,'hall_id'=>$hallId,
                 'settlement_id'=>$settlementId,'decision'=>$decision,'reason'=>$reason,
-                'fingerprint'=>$fingerprint,'reviewed_by'=>$actor->getKey()
+                'journal_id'=>$journalId,'fingerprint'=>$fingerprint,'reviewed_by'=>$actor->getKey()
             ]);
             $this->audit($actor,$companyId,'reviewed',$reviewId,(string)$loan->id,
                 ['settlementId'=>$settlementId,'decision'=>$decision,
-                 'journalPosted'=>false,'cashMutated'=>false,'loanClosed'=>false]);
+                 'journalId'=>$journalId,'journalPosted'=>$journalId!==null,
+                 'cashMutated'=>false,'loanClosed'=>false]);
             return $reviewId;
+        },3);
+    }
+    public function reverse(User $actor,string $companyId,string $hallId,string $settlementId,
+        string $reversalId,string $reason):string {
+        $this->gate();
+        if(config('finance_controls.posting_enabled')!==true)
+            throw new ConflictHttpException('Financial journal release is OFF.');
+        foreach([$companyId,$hallId,$settlementId,$reversalId] as $id)
+            if(!Str::isUuid($id))
+                throw new InvalidArgumentException('Exact settlement reversal UUIDs are required.');
+        $reason=trim($reason);
+        if(mb_strlen($reason)<15||mb_strlen($reason)>500)
+            throw new InvalidArgumentException('Independent settlement reversal reason is required.');
+        return DB::transaction(function()use($actor,$companyId,$hallId,$settlementId,
+            $reversalId,$reason):string {
+            abort_unless(DB::table('companies')->where('id',$companyId)
+                ->where('is_active',true)->lockForUpdate()->exists(),403);
+            $ref=DB::table('hall_inventory_external_in_loss_settlements')
+                ->where('company_id',$companyId)->where('hall_id',$hallId)
+                ->where('id',$settlementId)->first(['loan_id','amount_minor','currency','method']);
+            if(!$ref)throw new AuthorizationException('Partner payment evidence is outside this hall.');
+            $loan=DB::table('hall_inventory_loan_drafts')->where('company_id',$companyId)
+                ->where('id',$ref->loan_id)->lockForUpdate()->first();
+            if(!$loan||$loan->direction!=='external_in'||
+                (string)$loan->borrowing_hall_id!==$hallId)
+                throw new ConflictHttpException('Reversal must belong to the original borrowing-hall loan.');
+            $hall=Hall::query()->where('company_id',$companyId)->where('id',$hallId)
+                ->where('is_active',true)->lockForUpdate()->first();
+            if(!$hall||!Auth::check()||(int)Auth::id()!==(int)$actor->getKey()||
+                !$this->access->canConfigureHall($actor,$hall)||
+                !(new FinanceAccessPolicy())->post($actor,$companyId))
+                throw new AuthorizationException('Current borrowing-hall owner/admin finance posting access required.');
+            $settlement=DB::table('hall_inventory_external_in_loss_settlements')
+                ->where('company_id',$companyId)->where('hall_id',$hallId)
+                ->where('id',$settlementId)->lockForUpdate()->first();
+            if(!$settlement)throw new ConflictHttpException('Partner payment evidence was not found.');
+            $review=DB::table('hall_inventory_external_in_loss_settlement_reviews')
+                ->where('company_id',$companyId)->where('settlement_id',$settlementId)
+                ->where('decision','verified')->first();
+            if(!$review||$review->journal_id===null)
+                throw new ConflictHttpException('Only a verified posted partner payment can be reversed.');
+            if((int)$review->reviewed_by===(int)$actor->getKey())
+                throw new AuthorizationException('Payment verifier may not reverse their own posting.');
+            $old=DB::table('hall_inventory_external_in_loss_settlement_reversals')
+                ->where('company_id',$companyId)->where('settlement_id',$settlementId)->first();
+            if($old) {
+                if((string)$old->id!==$reversalId||
+                    (int)$old->reversed_by!==(int)$actor->getKey()||
+                    (string)$old->reason!==$reason)
+                    throw new ConflictHttpException('Partner payment evidence already has an immutable reversal.');
+                return $reversalId;
+            }
+            $journal=DB::table('finance_journals')->where('company_id',$companyId)
+                ->where('id',$review->journal_id)->where('entry_type','inventory_partner_payment')
+                ->first();
+            if(!$journal||(int)$journal->amount_minor!==(int)$settlement->amount_minor||
+                (string)$journal->currency_code!==(string)$settlement->currency)
+                throw new ConflictHttpException('Exact original partner payment journal mismatch.');
+            $this->verified($settlement);
+            DB::table('finance_journals')->insert([
+                'id'=>$reversalId,'company_id'=>$companyId,'entry_type'=>'reversal',
+                'currency_code'=>$settlement->currency,'amount_minor'=>$settlement->amount_minor,
+                'reversal_of'=>$review->journal_id,'created_by'=>$actor->getKey(),
+                'reason'=>$reason
+            ]);
+            foreach([
+                [$settlement->method==='cash'?'cash_on_hand':'bank_clearing','debit'],
+                ['inventory_partner_loss','credit']
+            ] as [$code,$side])
+                DB::table('finance_journal_lines')->insert([
+                    'id'=>(string)Str::uuid(),'company_id'=>$companyId,
+                    'journal_id'=>$reversalId,'account_code'=>$code,'side'=>$side,
+                    'amount_minor'=>$settlement->amount_minor
+                ]);
+            DB::statement('SET CONSTRAINTS finance_parent_balanced, finance_lines_balanced IMMEDIATE');
+            DB::statement('SET CONSTRAINTS finance_parent_balanced, finance_lines_balanced DEFERRED');
+            DB::table('hall_inventory_external_in_loss_settlement_reversals')->insert([
+                'id'=>$reversalId,'company_id'=>$companyId,'hall_id'=>$hallId,
+                'settlement_id'=>$settlementId,'original_journal_id'=>$review->journal_id,
+                'reversal_journal_id'=>$reversalId,'reason'=>$reason,
+                'reversed_by'=>$actor->getKey()
+            ]);
+            $this->audit($actor,$companyId,'reversed',$reversalId,(string)$loan->id,
+                ['settlementId'=>$settlementId,'reversalOf'=>$review->journal_id,
+                 'amountMinor'=>$settlement->amount_minor,'currency'=>$settlement->currency,
+                 'cashMutated'=>false,'loanClosed'=>false]);
+            return $reversalId;
         },3);
     }
     /** Read-only payment evidence history for current hall inventory staff. */
@@ -205,17 +324,22 @@ final class HallInventoryExternalInLossSettlementService
         return DB::table('hall_inventory_external_in_loss_settlements as s')
             ->leftJoin('hall_inventory_external_in_loss_settlement_reviews as r',function($j):void {
                 $j->on('r.company_id','=','s.company_id')->on('r.settlement_id','=','s.id');
+            })->leftJoin('hall_inventory_external_in_loss_settlement_reversals as x',function($j):void {
+                $j->on('x.company_id','=','s.company_id')->on('x.settlement_id','=','s.id');
             })->where('s.company_id',$companyId)->where('s.hall_id',$hallId)
             ->orderByDesc('s.created_at')->orderByDesc('s.id')->limit(100)
             ->get(['s.id','s.obligation_id','s.amount_minor','s.currency','s.method',
-                's.payment_reference','s.paid_at','s.recorded_by','r.decision','r.reviewed_by'])
+                's.payment_reference','s.paid_at','s.recorded_by','r.decision','r.reviewed_by',
+                'r.journal_id','x.id as reversal_id','x.reversal_journal_id'])
             ->map(static fn($x):array=>[
                 'id'=>(string)$x->id,'obligationId'=>(string)$x->obligation_id,
                 'amountMinor'=>(int)$x->amount_minor,'currency'=>(string)$x->currency,
                 'method'=>(string)$x->method,'paymentReference'=>(string)$x->payment_reference,
                 'paidAt'=>(string)$x->paid_at,'recordedBy'=>(int)$x->recorded_by,
                 'decision'=>$x->decision,'reviewedBy'=>$x->reviewed_by,
-                'journalPosted'=>false,'cashMutated'=>false,'loanClosed'=>false,
+                'journalId'=>$x->journal_id,'reversalId'=>$x->reversal_id,
+                'journalPosted'=>$x->journal_id!==null,'reversed'=>$x->reversal_id!==null,
+                'cashMutated'=>false,'loanClosed'=>false,
             ])->all();
     }
     private function audit(User $actor,string $companyId,string $action,string $id,

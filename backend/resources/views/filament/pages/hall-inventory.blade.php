@@ -1770,8 +1770,8 @@
                                         @endif
                                         @php($partnerSettlement = collect($externalSettlementHistory)->firstWhere('obligationId', $partnerObligation['id']))
                                         @if($partnerSettlement)
-                                            <p class="font-medium">PARTNER PAYMENT EVIDENCE — {{ strtoupper($partnerSettlement['method']) }} {{ $partnerSettlement['currency'] }} {{ $partnerSettlement['amountMinor'] }} minor units, reference {{ $partnerSettlement['paymentReference'] }} — {{ $partnerSettlement['decision'] === null ? 'INDEPENDENT VERIFICATION PENDING' : strtoupper($partnerSettlement['decision']) }}</p>
-                                            <p>Evidence only; no journal, cash mutation, settlement or closure is posted.</p>
+                                            <p class="font-medium">PARTNER PAYMENT EVIDENCE — {{ strtoupper($partnerSettlement['method']) }} {{ $partnerSettlement['currency'] }} {{ $partnerSettlement['amountMinor'] }} minor units, reference {{ $partnerSettlement['paymentReference'] }} — {{ $partnerSettlement['decision'] === null ? 'INDEPENDENT VERIFICATION PENDING' : strtoupper($partnerSettlement['decision']) }}@if($partnerSettlement['journalPosted'] ?? false) — BALANCED LEDGER POSTED @endif@if($partnerSettlement['reversed'] ?? false) — LEDGER REVERSED @endif</p>
+                                            <p>@if($partnerSettlement['journalPosted'] ?? false) A balanced partner-payment ledger entry follows the company finance gate. @else Evidence only; no journal is posted. @endif Cash mutation, settlement and closure remain unrecorded.</p>
                                             @if($partnerSettlement['decision'] === null &&
                                                 $partnerSettlement['recordedBy'] !== (int)auth()->id() &&
                                                 config('inventory_controls.external_in_loss_settlement_enabled') &&
@@ -1996,7 +1996,7 @@
                 @if(config('inventory_controls.external_in_loss_settlement_enabled') && $externalSettlementReviewTarget !== '')
                     <section class="rounded-xl border p-4 space-y-3" aria-label="Independent partner payment review">
                         <h3 class="font-semibold">Independently verify partner payment evidence</h3>
-                        <p class="text-sm">Settlement {{ $externalSettlementReviewTarget }}. A different current owner/admin verifies the cash/bank reference and private evidence. No journal or settlement is posted.</p>
+                        <p class="text-sm">Settlement {{ $externalSettlementReviewTarget }}. A different current owner/admin verifies the cash/bank reference and private evidence. When company finance posting is enabled, verification also posts a balanced ledger entry; cash, settlement and closure remain unchanged.</p>
                         <label class="block text-sm">Decision
                             <select wire:model="externalSettlementReviewDecision" class="w-full rounded-lg border p-2 text-gray-900">
                                 <option value="verified">Verify partner payment evidence</option>
