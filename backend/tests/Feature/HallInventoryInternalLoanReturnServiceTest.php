@@ -123,6 +123,21 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
             ->assertSee('Review original borrower signed discrepancy evidence')
             ->call('startInternalDiscrepancyReview',$loan)
             ->assertHasNoErrors()->assertSee('requires_more_evidence');
+        // A signed statement is only usable while the original private
+        // bytes still match the immutable recorded hash on HISTORY reads.
+        $private=DB::table('hall_inventory_internal_discrepancy_statements')
+            ->where('company_id',$company->id)->where('id',$statementId)->first();
+        $path=$private->evidence_storage_path;
+        $disk=Storage::disk('local');
+        $original=$disk->get($path);
+        $this->assertCount(1,$signed->history($owner,$company->id,$src->id,$loan,true));
+        $disk->put($path,'tampered original statement bytes');
+        try {
+            $signed->history($owner,$company->id,$src->id,$loan,true);
+            $this->fail('Corrupt signed private statement remained readable.');
+        }catch(ConflictHttpException){}
+        $disk->put($path,$original);
+        $this->assertCount(1,$signed->history($owner,$company->id,$src->id,$loan,true));
         $this->assertSame(0,DB::table('finance_journals')->count());
         $this->assertSame(12,(int)DB::table('hall_inventory_positions')
             ->where('hall_id',$src->id)->where('item_id',$srcItem)->value('owned_on_loan'));
