@@ -106,6 +106,16 @@ class HallInventoryInternalLateReturnTest extends TestCase
             ->set('hallId',$source->id)
             ->call('startLatePhysicalReturn',$batch,$item)->assertHasNoErrors()
             ->assertSee('Later independently witnessed physical arrival');
+        $blocked=(string)Str::uuid();
+        $blockedKey='private/hall-internal-late-return/'.$company->id.'/'.$batch.'/'.$blocked;
+        Storage::disk('local')->put($blockedKey,'preexisting independent private evidence');
+        try {
+            $svc->record($admin,$company->id,$batch,$blocked,$item,1,0,3,3,$this->proof());
+            $this->fail('New physical receipt overwrote previously occupied private evidence path.');
+        }catch(ConflictHttpException){}
+        $this->assertSame('preexisting independent private evidence',Storage::disk('local')->get($blockedKey));
+        $this->assertSame(0,DB::table('hall_inventory_internal_late_returns')->count());
+        Storage::disk('local')->delete($blockedKey);
         $this->assertSame($id,$svc->record($admin,$company->id,$batch,$id,$item,1,0,3,3,$this->proof()));
         $this->assertSame($id,$svc->record($admin,$company->id,$batch,$id,$item,1,0,3,3,$this->proof()));
         try {
