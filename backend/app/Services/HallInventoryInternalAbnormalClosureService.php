@@ -278,6 +278,22 @@ final class HallInventoryInternalAbnormalClosureService
             !hash_equals((string)$row->pdf_sha256,hash('sha256',$bytes)))
             throw new ConflictHttpException('Closure PDF integrity verification failed.');
     }
+    public function download(User $actor,string $companyId,string $sourceHallId,
+        string $closureId):array {
+        $hall=Hall::query()->where('company_id',$companyId)->where('id',$sourceHallId)
+            ->where('is_active',true)->first();
+        if(!$hall||!Auth::check()||(int)Auth::id()!==(int)$actor->getKey()||
+            !$this->access->canManageHallInventory($actor,$hall))
+            throw new AuthorizationException('Internal abnormal certificate is source-hall restricted.');
+        $row=DB::table('hall_inventory_internal_abnormal_closures')
+            ->where('company_id',$companyId)->where('source_hall_id',$sourceHallId)
+            ->where('id',$closureId)->first();
+        if(!$row)throw new ConflictHttpException('Internal abnormal certificate was not found.');
+        $this->verifyPdf($row);
+        return ['bytes'=>Storage::disk('local')->get((string)$row->pdf_path),
+            'mime'=>'application/pdf',
+            'name'=>'internal-abnormal-'.$row->serial_number.'.pdf'];
+    }
     private function audit(User $actor,string $companyId,string $action,string $id,
         string $loanId,array $data):void {
         DB::table('audit_events')->insert(['id'=>(string)Str::uuid(),'company_id'=>$companyId,

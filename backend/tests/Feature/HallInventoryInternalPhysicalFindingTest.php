@@ -450,6 +450,6 @@ class HallInventoryInternalPhysicalFindingTest extends TestCase {
             ->call('checkInternalAbnormalReadiness')->assertHasNoErrors()
             ->assertSee('INTERNAL ABNORMAL CLOSURE READINESS: BLOCKED')
             ->assertSee('12 owned-on-loan')
-            ->assertSee('Accounting/owner decision');
+            ->assertSee('No independent source owner/admin write-off authorization');
     }
 }

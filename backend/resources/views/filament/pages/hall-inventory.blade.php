@@ -2226,6 +2226,29 @@
                                     </ul>
                                     <p class="text-xs">Read-only assessment; no journal, write-off, stock retirement or closure is posted.</p>
                                 @endif
+                                @if($internalClosure)
+                                    <p class="font-medium">INTERNAL ABNORMAL FINAL CERTIFICATE {{ $internalClosure['serialNumber'] }} — {{ $internalClosure['currency'] }} {{ $internalClosure['amountMinor'] }} minor units, {{ $internalClosure['writeoffQuantity'] }} owned-on-loan unit(s) written off. SHA256 {{ $internalClosure['pdfSha256'] }}.</p>
+                                    <p>ADR-0009 Option A: evidence-backed inter-hall allocation; no company-level journal. No unconfirmed stock was retired. Closed {{ $internalClosure['closedAt'] }}.</p>
+                                    <button type="button" wire:click="downloadInternalAbnormalCertificate"
+                                        class="rounded border px-3 py-2">Private numbered certificate (audited)</button>
+                                @elseif($internalWriteoffAuthorizedQuantity > 0)
+                                    <p class="font-medium">Internal write-off authorized for {{ $internalWriteoffAuthorizedQuantity }} owned-on-loan unit(s). No final certificate has been issued.</p>
+                                    <button type="button" wire:click="closeInternalAbnormal"
+                                        class="rounded bg-emerald-800 px-4 py-2 text-sm text-white">Issue internal abnormal final certificate</button>
+                                @elseif($internalReadiness &&
+                                    config('inventory_controls.internal_abnormal_writeoff_enabled') &&
+                                    config('inventory_controls.internal_abnormal_closure_enabled') &&
+                                    $this->canReviewInternalDiscrepancy())
+                                    <label>Independent write-off authorization reason
+                                        <textarea wire:model="internalWriteoffReason" rows="2" class="w-full rounded border p-2"></textarea>
+                                    </label>
+                                    @error('internalWriteoffReason') <p role="alert">{{ $message }}</p> @enderror
+                                    <button type="button" wire:click="authorizeInternalAbnormalWriteOff"
+                                        class="rounded bg-emerald-800 px-4 py-2 text-sm text-white">Authorize internal write-off</button>
+                                @endif
+                                @if($lastInternalClosureReference)
+                                    <p role="status">Internal abnormal reference {{ $lastInternalClosureReference }} recorded. No company-level journal was posted.</p>
+                                @endif
                                 @foreach($physicalFindingHistory as $finding)
                                     <article wire:key="physical-finding-{{ $finding['id'] }}" class="rounded-lg border p-2 text-sm">
                                         <p>Finding {{ $finding['id'] }}: {{ $finding['kind'] }} {{ $finding['quantity'] }} original item {{ $finding['itemId'] }}</p>

@@ -55,22 +55,32 @@ final class HallInventoryInternalAbnormalReadinessService
             })->where('s.company_id',$companyId)->whereIn('s.obligation_id',$obligations->pluck('id'))
             ->where('r.decision','verified')->count();
         $currencies=array_values(array_unique($obligations->pluck('currency')->all()));
+        $authorization=DB::table('hall_inventory_internal_abnormal_writeoff_authorizations')
+            ->where('company_id',$companyId)->where('loan_id',$loanId)->first();
+        $closure=DB::table('hall_inventory_internal_abnormal_closures')
+            ->where('company_id',$companyId)->where('loan_id',$loanId)->first();
         $blockers=[];
         if($confirmed===[]) $blockers[]='No independently confirmed physical finding.';
-        if($physical>0) $blockers[]=$physical.' owned-on-loan unit(s) remain physically open; authorized write-off is not released.';
+        if($physical>0) $blockers[]=$physical.' owned-on-loan unit(s) remain physically open; authorized write-off is pending.';
         if($obligations->isEmpty()) $blockers[]='No independently approved internal loss obligation.';
         if(count($currencies)>1) $blockers[]='Approved internal obligations use more than one currency.';
         if(!$obligations->isEmpty()&&$settlements===0)
             $blockers[]='No independently verified internal settlement evidence.';
-        $blockers[]='Accounting/owner decision for the inter-hall settlement direction and ledger accounts is pending; no balanced journal is posted.';
-        $blockers[]='Authorized physical write-off and numbered abnormal final certificate are not released.';
+        if(!$authorization)
+            $blockers[]='No independent source owner/admin write-off authorization.';
+        if(!$closure)
+            $blockers[]='No numbered internal abnormal final certificate.';
+        $ready=$closure!==null&&$physical===0&&$confirmed!==[]&&!$obligations->isEmpty()&&
+            $settlements>0&&count($currencies)<=1;
         return ['loanId'=>$loanId,'sourceHallId'=>$sourceHallId,
             'confirmedFindings'=>count($confirmed),'physicalUnitsOpen'=>$physical,
             'approvedObligations'=>$obligations->count(),
             'verifiedSettlements'=>$settlements,
             'obligationCurrencies'=>$currencies,
             'obligationAmountMinor'=>(int)$obligations->sum('amount_minor'),
-            'ledgerPosted'=>false,'writeOffReleased'=>false,'certificateIssued'=>false,
-            'ready'=>false,'blockers'=>$blockers];
+            'optionA'=>true,'ledgerRequired'=>false,'ledgerPosted'=>false,
+            'writeoffAuthorized'=>$authorization!==null,
+            'certificateIssued'=>$closure!==null,
+            'ready'=>$ready,'blockers'=>$blockers];
     }
 }

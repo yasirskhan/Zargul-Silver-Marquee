@@ -17,12 +17,14 @@ use App\Services\HallInventoryInternalPhysicalFindingService;
 use App\Services\HallInventoryLoanDraftService;
 use App\Services\HallInventoryLoanIncidentDecisionService;
 use App\Services\HallInventoryLoanIncidentService;
+use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /** ADR-0009 Option A: authorized write-off and numbered certificate, no company journal. */
@@ -141,5 +143,11 @@ class HallInventoryInternalAbnormalClosureTest extends TestCase {
                 'Settlement recorder cannot authorize the related write-off.');
             $this->fail('Settlement recorder authorized the write-off.');
         }catch(AuthorizationException|ConflictHttpException){}
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->be($authorizer);
+        Livewire::test(\App\Filament\Pages\HallInventory::class)
+            ->set('companyId',$company->id)->set('hallId',$source->id)
+            ->call('startInternalDiscrepancyReview',$loan)
+            ->assertSee('INTERNAL ABNORMAL FINAL CERTIFICATE IAC-1');
     }
 }

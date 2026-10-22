@@ -354,6 +354,13 @@ final class HallInventory extends Page
     public ?string $lastInternalSettlementReference = null;
     #[Locked]
     public ?array $internalReadiness = null;
+    public string $internalWriteoffReason = '';
+    #[Locked]
+    public int $internalWriteoffAuthorizedQuantity = 0;
+    #[Locked]
+    public ?array $internalClosure = null;
+    #[Locked]
+    public ?string $lastInternalClosureReference = null;
     #[Locked]
     public string $physicalCorrectionId = '';
     #[Locked]
@@ -739,6 +746,10 @@ final class HallInventory extends Page
         $this->internalSettlementReviewReason='';
         $this->lastInternalSettlementReference=null;
         $this->internalReadiness=null;
+        $this->internalWriteoffReason='';
+        $this->internalWriteoffAuthorizedQuantity=0;
+        $this->internalClosure=null;
+        $this->lastInternalClosureReference=null;
         $this->physicalFindingFile=null;
         $this->physicalFindingStatementId='';
         $this->physicalFindingIncidentId='';
@@ -2791,6 +2802,10 @@ final class HallInventory extends Page
         $this->internalSettlementReviewReason='';
         $this->lastInternalSettlementReference=null;
         $this->internalReadiness=null;
+        $this->internalWriteoffReason='';
+        $this->internalWriteoffAuthorizedQuantity=0;
+        $this->internalClosure=null;
+        $this->lastInternalClosureReference=null;
         $this->physicalFindingFile=null;
         if(config('inventory_controls.internal_physical_finding_enabled')) {
             $this->physicalFindingIncidents=app(\App\Services\HallInventoryLoanIncidentDecisionService::class)
@@ -2807,6 +2822,25 @@ final class HallInventory extends Page
                 ? app(\App\Services\HallInventoryInternalLossSettlementService::class)
                     ->recent($actor,$this->companyId,$this->hallId)
                 : [];
+            $authorization=config('inventory_controls.internal_abnormal_writeoff_enabled')
+                ? DB::table('hall_inventory_internal_abnormal_writeoff_authorizations')
+                    ->where('company_id',$this->companyId)->where('loan_id',$loanId)->first()
+                : null;
+            $this->internalWriteoffAuthorizedQuantity=$authorization
+                ? (int)$authorization->authorized_quantity : 0;
+            $closure=config('inventory_controls.internal_abnormal_closure_enabled')
+                ? DB::table('hall_inventory_internal_abnormal_closures')
+                    ->where('company_id',$this->companyId)->where('loan_id',$loanId)->first()
+                : null;
+            $this->internalClosure=$closure?['id'=>(string)$closure->id,
+                'loanId'=>(string)$closure->loan_id,
+                'serialNumber'=>(string)$closure->serial_number,
+                'currency'=>(string)$closure->currency,
+                'amountMinor'=>(int)$closure->amount_minor,
+                'writeoffQuantity'=>(int)$closure->writeoff_quantity,
+                'pdfSha256'=>(string)$closure->pdf_sha256,
+                'closedBy'=>(int)$closure->closed_by,
+                'closedAt'=>(string)$closure->created_at]:null;
         }else {
             $this->physicalFindingIncidents=[];
             $this->physicalFindingHistory=[];
@@ -3041,6 +3075,54 @@ final class HallInventory extends Page
         }catch(InvalidArgumentException|ConflictHttpException $e) {
             throw ValidationException::withMessages(['internalReadiness'=>$e->getMessage()]);
         }
+    }
+    public function authorizeInternalAbnormalWriteOff():void {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.internal_abnormal_writeoff_enabled') &&
+            config('inventory_controls.internal_abnormal_closure_enabled') &&
+            config('inventory_controls.internal_loss_settlement_enabled') &&
+            config('inventory_controls.internal_loss_obligation_enabled') &&
+            $this->discrepancyLoanId!=='' && $this->canReviewInternalDiscrepancy(),403);
+        $this->validate(['internalWriteoffReason'=>'required|string|min:10|max:500']);
+        try {
+            $id=app(\App\Services\HallInventoryInternalAbnormalClosureService::class)
+                ->authorize($actor,$this->companyId,$this->hallId,$this->discrepancyLoanId,
+                    (string)Str::uuid(),$this->internalWriteoffReason);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['internalWriteoffReason'=>$e->getMessage()]);
+        }
+        $this->startInternalDiscrepancyReview($this->discrepancyLoanId);
+        $this->lastInternalClosureReference=$id;
+    }
+    public function closeInternalAbnormal():void {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.internal_abnormal_closure_enabled') &&
+            config('inventory_controls.internal_abnormal_writeoff_enabled') &&
+            config('inventory_controls.internal_loss_settlement_enabled') &&
+            config('inventory_controls.internal_loss_obligation_enabled') &&
+            $this->discrepancyLoanId!=='' && $this->canReviewInternalDiscrepancy(),403);
+        try {
+            $result=app(\App\Services\HallInventoryInternalAbnormalClosureService::class)
+                ->close($actor,$this->companyId,$this->hallId,$this->discrepancyLoanId,
+                    (string)Str::uuid());
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['internalReadiness'=>$e->getMessage()]);
+        }
+        $this->startInternalDiscrepancyReview($this->discrepancyLoanId);
+        $this->internalClosure=$result;
+        $this->lastInternalClosureReference=$result['id'];
+    }
+    public function downloadInternalAbnormalCertificate() {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.internal_abnormal_closure_enabled') &&
+            $this->internalClosure!==null && $this->canReviewInternalDiscrepancy(),403);
+        $row=app(\App\Services\HallInventoryInternalAbnormalClosureService::class)
+            ->download($actor,$this->companyId,$this->hallId,(string)$this->internalClosure['id']);
+        return response()->streamDownload(static function()use($row):void {
+            echo $row['bytes'];
+        },$row['name'],['Content-Type'=>$row['mime'],
+            'Cache-Control'=>'private, no-store','Pragma'=>'no-cache',
+            'X-Content-Type-Options'=>'nosniff']);
     }
     public function decideInternalDiscrepancy():void {
         $actor=$this->authorizeSelection();
