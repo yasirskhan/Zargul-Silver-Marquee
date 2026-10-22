@@ -8,10 +8,15 @@ Read AGENTS.md, entire concise handoff, docs/SESSION_CONTROL.md, current specs/r
 - Original signed borrower statement/history integrity, independent source review, lock order, original source incident/testimony, independent damage retirement existed. Aggregate borrower item book is NOT signed per-loan proof.
 
 ## Current substantial candidate: VERIFY exact new SHA!
-- New default-OFF gate internal_physical_finding_enabled, original-loan composite-FK scoped physical missing/dispute finding and independent immutable decision migration.
+- VERIFIED 244d4eafc870154c3661bcb188ff301f06de84e6 GitHub Actions [39703264721](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39703264721) ALL SIX SUCCESS. New default-OFF gate internal_physical_finding_enabled, original-loan composite-FK scoped physical missing/dispute finding and independent immutable decision migration.
 - Requires corroborated signed borrower statement and substantiated independent lender incident, EXACT source item, loan, kind and quantity; signed lender source PDF/photo 5 MiB SHA256 private checked on every read and decision; current scope/roles and separate lender investigator/reviewer. Reject over-allocation against not-returned+unresolved per-loan counts, preserve source owned_on_loan and borrower custody, no finance/journal or final close.
-- Filament source owner review, signed PDF/photo proposal, decision, borrower/source history, permission-checked audited private download and new real PostgreSQL/Livewire test. Entire new code must pass hosted six jobs. No local PHP/Postgres execution claimed.
+- Filament source owner review, signed PDF/photo proposal, decision, borrower/source history, permission-checked audited private download and real PostgreSQL/Livewire tests; hosted Laravel suite 641 passed, 3 risky in overall suite. Exact six jobs SUCCESS for source 244d4eaf. Production gate still OFF.
 - NOTE: Because a finding is still evidence only, this batch does NOT resolve custody, authorize write-off, collect money, or issue abnormal numbered receipt. Further action includes amended/reversal flow, return-after-finding recalculation and concurrency/operator evidence.
+
+## Next new source successor: exact SHA CI PENDING
+- Strengthens original borrower-signed private PDF/photo authenticated download with exact original loan/hall path, current role check, SHA256+size verification, valid file mime, successful read audit, private no-store/anti-sniff headers. Strengthens same-ID borrower upload retry to validate storage size as well as SHA256 before success.
+- Adds Livewire source proof action and regression for original bytes, tamper fail-closed, conflict replay, borrower/source access, no money/stock movement. Verify hosted run all-six on exact new SHA; do not mark green before inspection.
+- Current replacement normal Chat URL not exposed via available GitHub/Browser connector; retired URL documented; supervisor must record actual new URL without guessing.
 
 ## Next work
 - Verify exact new SHA on six hosted jobs, inspect real failures and repair without weakening tests. Recheck branch HEAD before writes; expected_sha force=false, single writer.

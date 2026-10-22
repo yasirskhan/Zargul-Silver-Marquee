@@ -131,13 +131,41 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         $disk=Storage::disk('local');
         $original=$disk->get($path);
         $this->assertCount(1,$signed->history($owner,$company->id,$src->id,$loan,true));
+        $proof=$signed->proof($owner,$company->id,$src->id,$statementId,true);
+        $this->assertSame($original,$proof['bytes']);
+        $this->assertSame('application/pdf',$proof['mime']);
+        Livewire::test(HallInventory::class)->set('companyId',$company->id)
+            ->set('hallId',$src->id)->call('startInternalDiscrepancyReview',$loan)
+            ->assertSee('Download original signed borrower proof (audited)')
+            ->call('downloadInternalBorrowerSignedProof',$statementId)->assertHasNoErrors();
+        $this->assertSame(2,DB::table('audit_events')
+            ->where('company_id',$company->id)
+            ->where('action','hall_inventory.internal_discrepancy_borrower_proof_read')->count());
         $disk->put($path,'tampered original statement bytes');
         try {
             $signed->history($owner,$company->id,$src->id,$loan,true);
             $this->fail('Corrupt signed private statement remained readable.');
         }catch(ConflictHttpException){}
+        try {
+            $signed->proof($owner,$company->id,$src->id,$statementId,true);
+            $this->fail('Corrupt original borrower signed file downloaded.');
+        }catch(ConflictHttpException){}
+        $this->be($receiver);
+        try {
+            $signed->submit($receiver,$company->id,$dest->id,$loan,$srcItem,$statementId,
+                'missing',2,'Signed receiving-hall count discrepancy observed.',$pdf());
+            $this->fail('Tampered source storage allowed idempotent replay.');
+        }catch(ConflictHttpException){}
         $disk->put($path,$original);
         $this->assertCount(1,$signed->history($owner,$company->id,$src->id,$loan,true));
+        $this->be($receiver);
+        $this->assertSame($original,$signed->proof(
+            $receiver,$company->id,$dest->id,$statementId,false)['bytes']);
+        try {
+            $signed->proof($receiver,$company->id,$src->id,$statementId,true);
+            $this->fail('Manager forged original source access.');
+        }catch(AuthorizationException){}
+        $this->be($owner);
         $this->assertSame(0,DB::table('finance_journals')->count());
         $this->assertSame(12,(int)DB::table('hall_inventory_positions')
             ->where('hall_id',$src->id)->where('item_id',$srcItem)->value('owned_on_loan'));

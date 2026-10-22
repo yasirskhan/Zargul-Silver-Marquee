@@ -54,8 +54,11 @@ final class HallInventoryInternalDiscrepancyService {
    $old=DB::table('hall_inventory_internal_discrepancy_statements')->where('company_id',$company)->where('id',$id)->first();
    $disk=Storage::disk('local');
    if($old){
-    if(!hash_equals((string)$old->fingerprint,$fingerprint)||!$disk->exists($old->evidence_storage_path)||
-     !hash_equals((string)$old->evidence_sha256,hash('sha256',$disk->get($old->evidence_storage_path))))
+    if(!hash_equals((string)$old->fingerprint,$fingerprint)||!$disk->exists($old->evidence_storage_path))
+      throw new ConflictHttpException('Conflicting or damaged signed evidence replay.');
+    $saved=$disk->get($old->evidence_storage_path);
+    if(!is_string($saved)||strlen($saved)!==(int)$old->evidence_size||
+      !hash_equals((string)$old->evidence_sha256,hash('sha256',$saved)))
       throw new ConflictHttpException('Conflicting or damaged signed evidence replay.');
     return $id;
    }
@@ -142,6 +145,36 @@ final class HallInventoryInternalDiscrepancyService {
      'id'=>$x->id,'itemId'=>$x->source_item_id,'kind'=>$x->kind,'quantity'=>(int)$x->quantity,
      'reason'=>$x->reason,'sha256'=>$x->evidence_sha256,'submittedBy'=>(int)$x->submitted_by,
      'decision'=>$x->decision,'reviewedBy'=>$x->reviewed_by];})->all();
+ }
+ /** Authenticated original signed borrower PDF/photo. The immutable statement is not a physical return. */
+ public function proof(User $actor,string $company,string $hall,string $statementId,bool $source):array {
+  $this->gate();
+  foreach([$company,$hall,$statementId] as $id)
+   if(!Str::isUuid($id))throw new InvalidArgumentException('Original signed statement scope UUID required.');
+  $this->scope($actor,$company,$hall,$source);
+  $statement=DB::table('hall_inventory_internal_discrepancy_statements as s')
+   ->join('hall_inventory_loan_drafts as l',function($j):void {
+    $j->on('l.company_id','=','s.company_id')->on('l.id','=','s.loan_id');
+   })->where('s.company_id',$company)->where('s.id',$statementId)
+   ->where('l.direction','internal')
+   ->where($source?'l.lending_hall_id':'l.borrowing_hall_id',$hall)
+   ->first(['s.id','s.loan_id','s.evidence_storage_path','s.evidence_size','s.evidence_sha256']);
+  if(!$statement)throw new AuthorizationException('Original signed borrower evidence outside your hall.');
+  $path=(string)$statement->evidence_storage_path;
+  $prefix='private/hall-internal-discrepancy/'.$company.'/'.$statement->loan_id.'/'.$statementId;
+  if(!hash_equals($prefix,$path)||!Storage::disk('local')->exists($path))
+   throw new ConflictHttpException('Original signed borrower proof is missing.');
+  $bytes=Storage::disk('local')->get($path);
+  if(!is_string($bytes)||strlen($bytes)!==(int)$statement->evidence_size||
+   !hash_equals((string)$statement->evidence_sha256,hash('sha256',$bytes)))
+   throw new ConflictHttpException('Original signed borrower proof failed integrity check.');
+  $mime=(new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
+  if(!in_array($mime,['application/pdf','image/png','image/jpeg'],true))
+   throw new ConflictHttpException('Stored borrower evidence format invalid.');
+  $this->audit($actor,$company,'borrower_proof_read',$statementId,(string)$statement->loan_id,
+   ['proofSha256'=>$statement->evidence_sha256,'physicalReturnRecorded'=>false,'moneyPosted'=>false]);
+  return ['bytes'=>$bytes,'mime'=>$mime,'name'=>'internal-borrower-signed-'.$statementId.
+   ($mime==='application/pdf'?'.pdf':($mime==='image/png'?'.png':'.jpg'))];
  }
  private function audit(User $actor,string $company,string $action,string $id,string $loan,array $data):void {
   DB::table('audit_events')->insert(['id'=>(string)Str::uuid(),'company_id'=>$company,

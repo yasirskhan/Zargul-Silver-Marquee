@@ -42,3 +42,8 @@ Before claiming automated session recovery works, verify that the scheduled exec
 - If a phase remains externally blocked, keep it OPEN/BLOCKED with the exact missing input. Continue other approved work only where the existing dependency rules permit it. Never fabricate provider credentials, payments, operator acceptance or release approval.
 - Keep one writer per repository, expected_sha with force=false, normal Chat, current security/financial safeguards and production-release gates. Phase acceptance does not grant permission to deploy or activate production.
 - Continue until ALL approved project requirements and cross-module acceptance are verified, or a genuine tool/usage/external blocker prevents further authorized progress. A phase-complete report alone is not the stopping condition; never promise uninterrupted execution beyond actual limits.
+
+## 2026-10-22 Zargul writer succession record
+- Retired maximum-length normal Chat: https://chatgpt.com/c/6ad84c8c-ca60-83e9-a05b-782fd6a675e5. Superseded, do not resume as a writer.
+- Replacement is this normal Chat; its canonical conversation URL was not exposed through available GitHub tools and browser integration failed to initialize, so UNKNOWN. The supervising Chat must fill exact real URL when visible, never invent it. No second repository writer/source edits were reported.
+- Verified original fcdcc5d GitHub Actions 39698916554 SIX SUCCESS, new original-loan physical finding 244d4eaf GitHub Actions 39703264721 SIX SUCCESS. Current replacement proceeds under expected_sha force=false. This note is not a distributed write lock.

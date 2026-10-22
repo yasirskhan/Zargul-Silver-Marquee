@@ -1879,6 +1879,7 @@
                         @endif
                         @foreach($discrepancyHistory as $e)
                             <p>Statement {{ $e['id'] }} item {{ $e['itemId'] }}: {{ $e['quantity'] }} {{ $e['kind'] }} — {{ $e['decision'] ?? 'SOURCE REVIEW PENDING' }}; SHA256 {{ $e['sha256'] }}. No financial posting or stock change.</p>
+                            <button type="button" wire:click="downloadInternalBorrowerSignedProof('{{ $e['id'] }}')" class="rounded border px-2 py-1">Download original signed borrower proof (audited)</button>
                         @endforeach
                         @if(count($discrepancyLines)===0)
                             <select wire:model="discrepancyReviewStatementId" aria-label="Independent signed statement review">

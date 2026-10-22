@@ -2144,6 +2144,27 @@ final class HallInventory extends Page
 
 
     /** Lending-hall owner/admin submits source signed physical proof bound to exact original borrower statement and incident. */
+    /** Audited original borrower-signed document access for either authorized original hall. */
+    public function downloadInternalBorrowerSignedProof(string $statementId) {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.internal_discrepancy_enabled') &&
+            $this->discrepancyLoanId!=='',403);
+        $loan=DB::table('hall_inventory_loan_drafts')->where('company_id',$this->companyId)
+            ->where('id',$this->discrepancyLoanId)->where('direction','internal')->first();
+        abort_unless($loan && ($loan->lending_hall_id===$this->hallId ||
+            $loan->borrowing_hall_id===$this->hallId),403);
+        $source=$loan->lending_hall_id===$this->hallId;
+        $entry=app(\App\Services\HallInventoryInternalDiscrepancyService::class)->history(
+            $actor,$this->companyId,$this->hallId,$this->discrepancyLoanId,$source);
+        abort_unless(collect($entry)->contains(fn($x):bool=>$x['id']===$statementId),403);
+        $row=app(\App\Services\HallInventoryInternalDiscrepancyService::class)->proof(
+            $actor,$this->companyId,$this->hallId,$statementId,$source);
+        return response()->streamDownload(static function()use($row):void {
+            echo $row['bytes'];
+        },$row['name'],['Content-Type'=>$row['mime'],
+            'Cache-Control'=>'private, no-store','Pragma'=>'no-cache',
+            'X-Content-Type-Options'=>'nosniff']);
+    }
     public function submitInternalPhysicalFinding():void {
         $actor=$this->authorizeSelection();
         abort_unless($this->canReviewInternalDiscrepancy() &&
