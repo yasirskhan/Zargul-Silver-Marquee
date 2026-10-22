@@ -2213,6 +2213,19 @@
                             <div class="space-y-2 rounded-lg border p-3" aria-label="Independent original-loan physical findings">
                                 <h4 class="font-semibold">Original loan physical discrepancy findings</h4>
                                 <p class="text-sm">Signed borrower statement and separately substantiated lender incident must agree on the same original loan, item, missing/disputed kind and exact quantity. Confirmed findings keep outstanding physical custody OPEN. They are not returns, stock write-offs, financial admissions, settlements or final receipts.</p>
+                                @if(config('inventory_controls.internal_loss_settlement_enabled') && $this->canReviewInternalDiscrepancy())
+                                    <button type="button" wire:click="checkInternalAbnormalReadiness"
+                                        class="rounded-lg border px-3 py-2">Check internal abnormal closure readiness</button>
+                                @endif
+                                @if($internalReadiness)
+                                    <p class="font-medium">INTERNAL ABNORMAL CLOSURE READINESS: {{ $internalReadiness['ready'] ? 'READY' : 'BLOCKED' }} — confirmed findings {{ $internalReadiness['confirmedFindings'] }}, physical units open {{ $internalReadiness['physicalUnitsOpen'] }}, approved obligations {{ $internalReadiness['approvedObligations'] }}, verified settlements {{ $internalReadiness['verifiedSettlements'] }}.</p>
+                                    <ul class="list-inside list-disc text-sm">
+                                        @foreach($internalReadiness['blockers'] as $blocker)
+                                            <li>{{ $blocker }}</li>
+                                        @endforeach
+                                    </ul>
+                                    <p class="text-xs">Read-only assessment; no journal, write-off, stock retirement or closure is posted.</p>
+                                @endif
                                 @foreach($physicalFindingHistory as $finding)
                                     <article wire:key="physical-finding-{{ $finding['id'] }}" class="rounded-lg border p-2 text-sm">
                                         <p>Finding {{ $finding['id'] }}: {{ $finding['kind'] }} {{ $finding['quantity'] }} original item {{ $finding['itemId'] }}</p>

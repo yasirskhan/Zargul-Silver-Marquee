@@ -353,6 +353,8 @@ final class HallInventory extends Page
     #[Locked]
     public ?string $lastInternalSettlementReference = null;
     #[Locked]
+    public ?array $internalReadiness = null;
+    #[Locked]
     public string $physicalCorrectionId = '';
     #[Locked]
     public string $physicalCorrectionReviewId = '';
@@ -736,6 +738,7 @@ final class HallInventory extends Page
         $this->internalSettlementReviewDecision='verified';
         $this->internalSettlementReviewReason='';
         $this->lastInternalSettlementReference=null;
+        $this->internalReadiness=null;
         $this->physicalFindingFile=null;
         $this->physicalFindingStatementId='';
         $this->physicalFindingIncidentId='';
@@ -2787,6 +2790,7 @@ final class HallInventory extends Page
         $this->internalSettlementReviewDecision='verified';
         $this->internalSettlementReviewReason='';
         $this->lastInternalSettlementReference=null;
+        $this->internalReadiness=null;
         $this->physicalFindingFile=null;
         if(config('inventory_controls.internal_physical_finding_enabled')) {
             $this->physicalFindingIncidents=app(\App\Services\HallInventoryLoanIncidentDecisionService::class)
@@ -3023,6 +3027,20 @@ final class HallInventory extends Page
             ? app(\App\Services\HallInventoryInternalLossSettlementService::class)
                 ->recent($actor,$this->companyId,$this->hallId)
             : [];
+    }
+    public function checkInternalAbnormalReadiness():void {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.internal_loss_settlement_enabled') &&
+            config('inventory_controls.internal_loss_obligation_enabled') &&
+            config('inventory_controls.internal_physical_finding_enabled') &&
+            $this->discrepancyLoanId!=='' && $this->canReviewInternalDiscrepancy(),403);
+        try {
+            $this->internalReadiness=app(
+                \App\Services\HallInventoryInternalAbnormalReadinessService::class
+            )->assess($actor,$this->companyId,$this->hallId,$this->discrepancyLoanId);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['internalReadiness'=>$e->getMessage()]);
+        }
     }
     public function decideInternalDiscrepancy():void {
         $actor=$this->authorizeSelection();

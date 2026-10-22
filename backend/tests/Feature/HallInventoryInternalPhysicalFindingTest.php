@@ -444,5 +444,12 @@ class HallInventoryInternalPhysicalFindingTest extends TestCase {
             ->assertSee('INTERNAL SETTLEMENT EVIDENCE')
             ->assertSee('BANK-INTERNAL-1')
             ->assertSee('VERIFIED');
+        Livewire::test(HallInventory::class)
+            ->set('companyId',$company->id)->set('hallId',$source->id)
+            ->call('startInternalDiscrepancyReview',$loan)
+            ->call('checkInternalAbnormalReadiness')->assertHasNoErrors()
+            ->assertSee('INTERNAL ABNORMAL CLOSURE READINESS: BLOCKED')
+            ->assertSee('12 owned-on-loan')
+            ->assertSee('Accounting/owner decision');
     }
 }
