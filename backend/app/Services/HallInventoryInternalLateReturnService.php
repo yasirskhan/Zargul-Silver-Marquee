@@ -250,7 +250,12 @@ final class HallInventoryInternalLateReturnService
             ->where('source_item_id',$row->source_item_id)->first();
         $batch=DB::table('hall_inventory_internal_loan_return_batches')
             ->where('company_id',$row->company_id)->where('id',$row->return_batch_id)->first();
-        if(!$batch||!$acceptLine||$batch->loan_id!==$row->loan_id||
+        $acceptance=DB::table('hall_inventory_internal_loan_return_acceptances')
+            ->where('company_id',$row->company_id)->where('id',$row->acceptance_id)
+            ->where('return_batch_id',$row->return_batch_id)->first();
+        if(!$batch||!$acceptance||!$acceptLine||
+            $acceptance->source_hall_id!==$row->source_hall_id||
+            $batch->loan_id!==$row->loan_id||
             $batch->source_hall_id!==$row->source_hall_id||
             $acceptLine->dest_item_id!==$row->dest_item_id||
             (int)$row->good_quantity+(int)$row->damaged_quantity>
