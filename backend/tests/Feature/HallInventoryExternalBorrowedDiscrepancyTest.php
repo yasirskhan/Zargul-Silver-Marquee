@@ -248,8 +248,8 @@ final class HallInventoryExternalBorrowedDiscrepancyTest extends TestCase
         $pendingRead=collect(app(HallInventoryLoanDraftReview::class)
             ->recent($reviewer,$company->id,$hall->id))->firstWhere('id',$loan);
         $this->assertTrue($pendingRead['externalReturnReconciliation']['partnerDiscrepancyPending']);
-        $this->assertSame(10,$pendingRead['externalReturnReconciliation']['partnerReportedShipped']);
-        $this->assertSame(9,$pendingRead['externalReturnReconciliation']['partnerReportedReceived']);
+        $this->assertSame(14,$pendingRead['externalReturnReconciliation']['partnerReportedShipped']);
+        $this->assertSame(12,$pendingRead['externalReturnReconciliation']['partnerReportedReceived']);
         Livewire::test(HallInventory::class)
             ->set('hallId',$hall->id)
             ->assertSee('Independently review partner discrepancy')

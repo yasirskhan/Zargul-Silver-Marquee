@@ -229,18 +229,21 @@ final class HallInventoryLoanDraftReview
             ->where('b.company_id',$companyId)->whereIn('b.loan_id',$loanIds)
             ->select(['b.loan_id','l.item_id'])->selectRaw('SUM(l.quantity) AS quantity')
             ->groupBy('b.loan_id','l.item_id')->get()->groupBy('loan_id');
-        // Independently substantiated partner-signed short/damaged counts are
-        // read-only custody evidence. They never imply a cleared transit
-        // balance, liability, journal, payment, stock retirement or closure.
+        // Partner-signed short/damaged counts (pending or independently
+        // substantiated) are read-only custody evidence. Rejected counts are
+        // excluded. They never imply a cleared transit balance, liability,
+        // journal, payment, stock retirement or closure.
         $externalDiscrepancy=DB::table('hall_inventory_external_in_discrepancies as d')
             ->join('hall_inventory_external_in_discrepancy_lines as l',function($j):void {
                 $j->on('l.company_id','=','d.company_id')->on('l.discrepancy_id','=','d.id');
             })
-            ->join('hall_inventory_external_in_discrepancy_decisions as x',function($j):void {
+            ->leftJoin('hall_inventory_external_in_discrepancy_decisions as x',function($j):void {
                 $j->on('x.company_id','=','d.company_id')->on('x.discrepancy_id','=','d.id');
             })
             ->where('d.company_id',$companyId)->whereIn('d.loan_id',$loanIds)
-            ->where('x.decision','substantiated')
+            ->where(function($q):void {
+                $q->whereNull('x.id')->orWhere('x.decision','!=','rejected');
+            })
             ->get(['d.loan_id','l.item_id','l.shipped_quantity','l.received_quantity',
                 'l.damaged_quantity'])->groupBy('loan_id');
         $externalDiscrepancyPending=DB::table('hall_inventory_external_in_discrepancies as d')
