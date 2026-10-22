@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\HallInventoryCatalogService;
 use App\Services\HallInventoryInternalDiscrepancyService;
 use App\Services\HallInventoryInternalPhysicalFindingService;
+use App\Services\HallInventoryInternalLossObligationService;
 use App\Services\HallInventoryInternalLoanDispatchService;
 use App\Services\HallInventoryInternalLoanReceiptService;
 use App\Services\HallInventoryLoanDraftService;
@@ -325,5 +326,67 @@ class HallInventoryInternalPhysicalFindingTest extends TestCase {
             $this->fail('Forged originating source hall accepted.');
         }catch(AuthorizationException){}
         $this->assertSame(0,DB::table('hall_inventory_internal_physical_findings')->count());
+    }
+
+    public function test_confirmed_internal_finding_grounds_provisional_obligation_without_money_or_stock():void {
+        $f=$this->fixture();extract($f);
+        config()->set('inventory_controls.internal_physical_finding_enabled',true);
+        $findings=app(HallInventoryInternalPhysicalFindingService::class);
+        $finding=(string)Str::uuid();
+        $findings->propose($admin,$company->id,$source->id,$loan,$statement,$incident,$finding,
+            'Independent source physical count supports discrepancy.',$this->pdf());
+        $this->be($owner);
+        $findings->decide($owner,$company->id,$source->id,$finding,(string)Str::uuid(),
+            'confirmed_outstanding','Independent confirmation of the original physical discrepancy.');
+        $approver=User::create(['name'=>'Independent internal obligation owner',
+            'email'=>'internal-obligation-owner@example.test','password'=>'test-only']);
+        $approver->markEmailAsVerified();
+        CompanyMembership::create(['company_id'=>$company->id,'user_id'=>$approver->id,'role'=>'owner']);
+        config()->set('inventory_controls.internal_loss_obligation_enabled',true);
+        $obligations=app(HallInventoryInternalLossObligationService::class);
+        $this->be($admin);
+        $obligation=(string)Str::uuid();
+        $this->assertSame($obligation,$obligations->propose($admin,$company->id,$source->id,
+            $finding,$obligation,'PKR',5000,
+            'Confirmed three-unit internal discrepancy grounds the provisional obligation.'));
+        $row=DB::table('hall_inventory_internal_loss_obligations')->where('id',$obligation)->first();
+        $this->assertSame(3,(int)$row->quantity_basis);
+        $this->assertSame(5000,(int)$row->amount_minor);
+        try {
+            $obligations->decide($admin,$company->id,$source->id,$obligation,
+                (string)Str::uuid(),'approved','Proposer cannot approve their own amount.');
+            $this->fail('Internal obligation proposer self-approved.');
+        }catch(AuthorizationException){}
+        $this->be($owner);
+        try {
+            $obligations->decide($owner,$company->id,$source->id,$obligation,
+                (string)Str::uuid(),'approved','Finding reviewer cannot approve the amount.');
+            $this->fail('Finding reviewer approved the financial amount.');
+        }catch(AuthorizationException){}
+        $this->be($approver);
+        $decision=(string)Str::uuid();
+        $this->assertSame($decision,$obligations->decide($approver,$company->id,$source->id,
+            $obligation,$decision,'approved',
+            'Independent source owner approves the provisional amount without any money.'));
+        $this->assertSame($decision,$obligations->decide($approver,$company->id,$source->id,
+            $obligation,$decision,'approved',
+            'Independent source owner approves the provisional amount without any money.'));
+        try {
+            $obligations->decide($approver,$company->id,$source->id,$obligation,
+                (string)Str::uuid(),'rejected','Conflicting replay attempts to reverse the decision.');
+            $this->fail('Internal obligation decision was mutable through replay.');
+        }catch(ConflictHttpException){}
+        $history=collect($obligations->recent($approver,$company->id,$source->id))
+            ->firstWhere('id',$obligation);
+        $this->assertNotNull($history);
+        $this->assertSame('approved',$history['decision']);
+        $this->assertSame(3,$history['quantityBasis']);
+        $this->assertSame(5000,$history['amountMinor']);
+        $this->assertSame(0,DB::table('finance_journals')->count());
+        $this->assertSame(12,(int)DB::table('hall_inventory_positions')
+            ->where('company_id',$company->id)->where('hall_id',$source->id)
+            ->where('item_id',$item)->value('owned_on_loan'));
+        $this->assertSame(0,DB::table('hall_inventory_internal_loan_closures')->count());
+        $this->assertSame(0,DB::table('hall_inventory_external_in_clean_closures')->count());
     }
 }
