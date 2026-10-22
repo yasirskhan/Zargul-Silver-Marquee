@@ -81,11 +81,17 @@ final class HallInventoryInternalDiscrepancyService {
    throw new InvalidArgumentException('Independent documented review required.');
   $this->scope($actor,$company,$hall,true);
   return DB::transaction(function()use($actor,$company,$hall,$statementId,$decisionId,$decision,$reason):string{
-   $statement=DB::table('hall_inventory_internal_discrepancy_statements')
-    ->where('company_id',$company)->where('id',$statementId)->lockForUpdate()->first();
-   if(!$statement)throw new AuthorizationException('Signed statement is outside authorized scope.');
+   // Match submission lock order (loan before statement) under concurrent
+   // borrower retry and lender review to prevent a circular wait.
+   $identity=DB::table('hall_inventory_internal_discrepancy_statements')
+    ->where('company_id',$company)->where('id',$statementId)->first(['loan_id']);
+   if(!$identity)throw new AuthorizationException('Signed statement is outside authorized scope.');
    $loan=DB::table('hall_inventory_loan_drafts')->where('company_id',$company)
-    ->where('id',$statement->loan_id)->lockForUpdate()->first();
+    ->where('id',$identity->loan_id)->lockForUpdate()->first();
+   $statement=DB::table('hall_inventory_internal_discrepancy_statements')
+    ->where('company_id',$company)->where('id',$statementId)->where('loan_id',$identity->loan_id)
+    ->lockForUpdate()->first();
+   if(!$statement)throw new ConflictHttpException('Signed statement changed during review.');
    if(!$loan||$loan->direction!=='internal'||(string)$loan->lending_hall_id!==$hall)
     throw new AuthorizationException('Original lending hall reviewer required.');
    if((int)$statement->submitted_by===(int)$actor->getKey())
@@ -118,15 +124,24 @@ final class HallInventoryInternalDiscrepancyService {
   $loan=DB::table('hall_inventory_loan_drafts')->where('company_id',$company)->where('id',$loanId)->where('direction','internal')
    ->where($source?'lending_hall_id':'borrowing_hall_id',$hall)->first();
   if(!$loan)throw new AuthorizationException('Original loan not accessible from this hall.');
+  $disk=Storage::disk('local');
   return DB::table('hall_inventory_internal_discrepancy_statements as s')
    ->leftJoin('hall_inventory_internal_discrepancy_decisions as d',function($j):void{
     $j->on('d.company_id','=','s.company_id')->on('d.statement_id','=','s.id');
    })->where('s.company_id',$company)->where('s.loan_id',$loanId)->orderBy('s.created_at')
    ->get(['s.id','s.source_item_id','s.kind','s.quantity','s.reason','s.evidence_sha256',
-    's.submitted_by','d.decision','d.reviewed_by'])->map(static fn($x):array=>[
+    's.submitted_by','s.evidence_storage_path','s.evidence_size','d.decision','d.reviewed_by'])
+   ->map(function($x)use($disk):array{
+     if(!$disk->exists((string)$x->evidence_storage_path))
+       throw new ConflictHttpException('Original signed borrower statement evidence missing.');
+     $bytes=$disk->get((string)$x->evidence_storage_path);
+     if(!is_string($bytes)||strlen($bytes)!==(int)$x->evidence_size||
+       !hash_equals((string)$x->evidence_sha256,hash('sha256',$bytes)))
+       throw new ConflictHttpException('Original signed borrower statement integrity failed.');
+     return [
      'id'=>$x->id,'itemId'=>$x->source_item_id,'kind'=>$x->kind,'quantity'=>(int)$x->quantity,
      'reason'=>$x->reason,'sha256'=>$x->evidence_sha256,'submittedBy'=>(int)$x->submitted_by,
-     'decision'=>$x->decision,'reviewedBy'=>$x->reviewed_by])->all();
+     'decision'=>$x->decision,'reviewedBy'=>$x->reviewed_by];})->all();
  }
  private function audit(User $actor,string $company,string $action,string $id,string $loan,array $data):void {
   DB::table('audit_events')->insert(['id'=>(string)Str::uuid(),'company_id'=>$company,
