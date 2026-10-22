@@ -32,6 +32,10 @@ return [
     // Private internal settlement evidence and independent verification only.
     // No journal, cash mutation, stock retirement, waiver or closure. OFF.
     'internal_loss_settlement_enabled' => (bool) env('VENUE_INVENTORY_INTERNAL_LOSS_SETTLEMENT_ENABLED', false),
+    // ADR-0009 Option A: separate source owner/admin write-off authorization and
+    // numbered immutable internal abnormal final certificate. No company journal. OFF.
+    'internal_abnormal_writeoff_enabled' => (bool) env('VENUE_INVENTORY_INTERNAL_ABNORMAL_WRITEOFF_ENABLED', false),
+    'internal_abnormal_closure_enabled' => (bool) env('VENUE_INVENTORY_INTERNAL_ABNORMAL_CLOSURE_ENABLED', false),
     'loan_incidents_enabled' => (bool) env('VENUE_INVENTORY_LOAN_INCIDENTS_ENABLED', false),
     // Independent evidence assessment only; does not assign financial liability.
     'loan_incident_reviews_enabled' => (bool) env('VENUE_INVENTORY_LOAN_INCIDENT_REVIEWS_ENABLED', false),

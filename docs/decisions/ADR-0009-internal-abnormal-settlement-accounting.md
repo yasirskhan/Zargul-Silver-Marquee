@@ -1,6 +1,6 @@
 # ADR-0009 — INTERNAL abnormal settlement accounting and final closure
 
-- Status: **PROPOSED — OWNER/ACCOUNTING DECISION REQUIRED**
+- Status: **ACCEPTED — OPTION A** (owner decision, 2026-10-22)
 - Date: 2026-10-22
 - Branch: `chatgpt/phase0-foundation`
 - Related: ADR-0008 (external-in partner loss obligation), Phase 12 acceptance status
@@ -52,4 +52,4 @@ Option A, subject to explicit owner/accounting approval. It avoids inventing cha
 
 ## Decision
 
-**PENDING.** The owner must choose A, B or C. This ADR does not itself authorize a journal, write-off, certificate or production release.
+**Option A accepted by the owner on 2026-10-22.** The internal settlement is an evidence-backed inter-hall allocation, not a company-level cash journal. Final abnormal closure requires confirmed findings covering all outstanding custody, an independently approved obligation, fully verified settlement evidence, a separate source owner/admin write-off authorization, the authorized `owned_on_loan` write-off, and a company-numbered immutable final certificate. No new chart accounts and no company cash journal. Production flags remain OFF until operator/security/restore acceptance.
