@@ -138,14 +138,7 @@ final class HallInventoryInternalLoanReturnReview
             ->get();
         $late=[];
         foreach($lateRows as $lateRow) {
-            $path=(string)$lateRow->evidence_storage_path;
-            if(!str_starts_with($path,'private/hall-internal-late-return/'.$companyId.'/')||
-                !$disk->exists($path))
-                throw new ConflictHttpException('Signed later physical discovery evidence is missing.');
-            $bytes=$disk->get($path);
-            if(!is_string($bytes)||strlen($bytes)!==(int)$lateRow->evidence_size||
-                !hash_equals((string)$lateRow->evidence_sha256,hash('sha256',$bytes)))
-                throw new ConflictHttpException('Later physical discovery proof failed integrity verification.');
+            HallInventoryInternalLateReturnService::verifyRecordedProof($lateRow);
             $key=$lateRow->return_batch_id.'/'.$lateRow->source_item_id;
             $late[$key]['good']=($late[$key]['good']??0)+(int)$lateRow->good_quantity;
             $late[$key]['damaged']=($late[$key]['damaged']??0)+(int)$lateRow->damaged_quantity;
@@ -248,6 +241,10 @@ final class HallInventoryInternalLoanReturnReview
             ->select('source_item_id')->selectRaw('SUM(good_quantity) as good')
             ->selectRaw('SUM(damaged_quantity) as damaged')
             ->groupBy('source_item_id')->get()->keyBy('source_item_id');
+        $laterProofs=DB::table('hall_inventory_internal_late_returns')
+            ->where('company_id',$companyId)->where('loan_id',$loanId)->get();
+        foreach($laterProofs as $laterProof)
+            HallInventoryInternalLateReturnService::verifyRecordedProof($laterProof);
         $pending=DB::table('hall_inventory_internal_loan_return_lines as l')
             ->join('hall_inventory_internal_loan_return_batches as b',function($j):void {
                 $j->on('b.company_id','=','l.company_id')->on('b.id','=','l.return_batch_id');

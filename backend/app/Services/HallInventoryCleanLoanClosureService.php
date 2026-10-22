@@ -110,15 +110,8 @@ final class HallInventoryCleanLoanClosureService
                 throw new ConflictHttpException('An in-transit return still lacks source acknowledgment.');
             $laterProofs=DB::table('hall_inventory_internal_late_returns')
                 ->where('company_id',$companyId)->where('loan_id',$loanId)->get();
-            foreach($laterProofs as $laterProof) {
-                $disk=Storage::disk('local');
-                if(!$disk->exists((string)$laterProof->evidence_storage_path))
-                    throw new ConflictHttpException('Later physical source proof missing.');
-                $bytes=$disk->get((string)$laterProof->evidence_storage_path);
-                if(!is_string($bytes)||strlen($bytes)!==(int)$laterProof->evidence_size||
-                    !hash_equals((string)$laterProof->evidence_sha256,hash('sha256',$bytes)))
-                    throw new ConflictHttpException('Later witnessed return proof failed integrity check.');
-            }
+            foreach($laterProofs as $laterProof)
+                HallInventoryInternalLateReturnService::verifyRecordedProof($laterProof);
             $fingerprint=hash('sha256',json_encode([$companyId,$loanId,$final,
                 $laterProofs->map(fn($p)=>[$p->id,$p->evidence_sha256])->all()],JSON_THROW_ON_ERROR));
             $number=(int)DB::table('hall_inventory_internal_loan_closures')

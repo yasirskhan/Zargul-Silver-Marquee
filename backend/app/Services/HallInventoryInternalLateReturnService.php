@@ -104,11 +104,14 @@ final class HallInventoryInternalLateReturnService
                     throw new ConflictHttpException('Previously signed discovery proof has changed.');
                 return $id;
             }
-            $prior=(int)DB::table('hall_inventory_internal_late_returns')
+            $previous=DB::table('hall_inventory_internal_late_returns')
                 ->where('company_id',$company)->where('acceptance_id',$accept->id)
-                ->where('source_item_id',$item)
-                ->selectRaw('COALESCE(SUM(good_quantity+damaged_quantity),0) as total')
-                ->value('total');
+                ->where('source_item_id',$item)->get();
+            $prior=0;
+            foreach($previous as $previousRow) {
+                self::verifyRecordedProof($previousRow);
+                $prior+=(int)$previousRow->good_quantity+(int)$previousRow->damaged_quantity;
+            }
             $quantity=$good+$damaged;
             if($prior+$quantity>(int)$line->unresolved_quantity)
                 throw new ConflictHttpException('Previously unresolved shipped quantity was already reconciled.');
@@ -188,6 +191,57 @@ final class HallInventoryInternalLateReturnService
             }catch(\Throwable $error){$disk->delete($key);throw $error;}
             return $id;
         },3);
+    }
+
+    /** Fail closed on documentary or movement tampering before another posting or ledger read. */
+    public static function verifyRecordedProof(object $row):void
+    {
+        $disk=Storage::disk('local');
+        $path='private/hall-internal-late-return/'.$row->company_id.'/'
+            .$row->return_batch_id.'/'.$row->id;
+        if($path!==(string)$row->evidence_storage_path||!$disk->exists($path))
+            throw new ConflictHttpException('Original later signed physical proof missing.');
+        $bytes=$disk->get($path);
+        if(!is_string($bytes)||strlen($bytes)!==(int)$row->evidence_size||
+            !hash_equals((string)$row->evidence_sha256,hash('sha256',$bytes)))
+            throw new ConflictHttpException('Later physically witnessed proof integrity failed.');
+        $acceptLine=DB::table('hall_inventory_internal_loan_return_acceptance_lines')
+            ->where('company_id',$row->company_id)->where('acceptance_id',$row->acceptance_id)
+            ->where('source_item_id',$row->source_item_id)->first();
+        $batch=DB::table('hall_inventory_internal_loan_return_batches')
+            ->where('company_id',$row->company_id)->where('id',$row->return_batch_id)->first();
+        if(!$batch||!$acceptLine||$batch->loan_id!==$row->loan_id||
+            $batch->source_hall_id!==$row->source_hall_id||
+            $acceptLine->dest_item_id!==$row->dest_item_id||
+            (int)$row->good_quantity+(int)$row->damaged_quantity>
+                (int)$acceptLine->unresolved_quantity)
+            throw new ConflictHttpException('Later original-loan physical record is not correctly bound.');
+        foreach([
+            [$row->good_quantity,$row->good_movement_id,$row->source_hall_id,
+                $row->source_item_id,'return_owned_good','Independently witnessed later original return '.$row->return_batch_id],
+            [$row->damaged_quantity,$row->damaged_movement_id,$row->source_hall_id,
+                $row->source_item_id,'return_owned_damaged','Independently witnessed later original return '.$row->return_batch_id],
+            [(int)$row->good_quantity+(int)$row->damaged_quantity,
+                $row->dest_movement_id,$batch->destination_hall_id,
+                $row->dest_item_id,'confirm_borrowed_return',
+                'Independent later source receipt '.$row->return_batch_id]
+        ] as [$qty,$movementId,$hall,$item,$kind,$reason]) {
+            if((int)$qty===0){
+                if($movementId!==null)
+                    throw new ConflictHttpException('Zero physical quantity referenced an inventory movement.');
+                continue;
+            }
+            if(!$movementId)throw new ConflictHttpException('Signed later count lacks inventory movement.');
+            $movement=DB::table('hall_inventory_movement_events')
+                ->where('company_id',$row->company_id)->where('hall_id',$hall)
+                ->where('item_id',$item)->where('id',$movementId)
+                ->where('event_kind',$kind)->where('quantity',$qty)
+                ->where('actor_id',$row->accepted_by)->first();
+            if(!$movement||$movement->reason!==$reason||
+                !hash_equals(hash('sha256',$row->id.$item.$kind),
+                    (string)$movement->request_fingerprint))
+                throw new ConflictHttpException('Later witnessed physical count has forged movement provenance.');
+        }
     }
 
     private function state(object $p):array {

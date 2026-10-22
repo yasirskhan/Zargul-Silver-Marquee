@@ -150,6 +150,31 @@ class HallInventoryInternalLateReturnTest extends TestCase
             $this->fail('Tampered late return evidence displayed as trusted physical custody.');
         }catch(ConflictHttpException) {}
         $disk->put($row->evidence_storage_path,$original);
+        // Privileged immutability bypass is NOT assumed safe: reject an
+        // append-only extra row that reuses unrelated old movements as a
+        // supposed newly witnessed receipt.
+        $accepted=DB::table('hall_inventory_internal_loan_return_acceptances')->first();
+        $acceptedLine=DB::table('hall_inventory_internal_loan_return_acceptance_lines')->first();
+        $forged=(string)Str::uuid();
+        $forgedPath='private/hall-internal-late-return/'.$company->id.'/'.$batch.'/'.$forged;
+        $disk->put($forgedPath,$original);
+        DB::table('hall_inventory_internal_late_returns')->insert([
+            'id'=>$forged,'company_id'=>$company->id,'loan_id'=>$loan,
+            'return_batch_id'=>$batch,'acceptance_id'=>$accepted->id,
+            'source_hall_id'=>$source->id,'source_item_id'=>$item,'dest_item_id'=>$mapped,
+            'good_quantity'=>1,'damaged_quantity'=>0,
+            'good_movement_id'=>$acceptedLine->source_good_movement_id,
+            'damaged_movement_id'=>null,
+            'dest_movement_id'=>$acceptedLine->destination_movement_id,
+            'evidence_sha256'=>hash('sha256',$original),'evidence_size'=>strlen($original),
+            'evidence_storage_path'=>$forgedPath,'fingerprint'=>str_repeat('a',64),
+            'accepted_by'=>$admin->id
+        ]);
+        try {
+            app(HallInventoryInternalLoanReturnReview::class)
+                ->abnormalSourceLines($admin,$company->id,$source->id,$loan);
+            $this->fail('Forged reuse of original acceptance stock movements was counted as new physical stock.');
+        }catch(ConflictHttpException) {}
         DB::table('company_memberships')->where('company_id',$company->id)
             ->where('user_id',$admin->id)->update(['is_active'=>false]);
         try {
