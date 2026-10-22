@@ -232,7 +232,6 @@ class HallInventoryInternalAbnormalClosureTest extends TestCase {
         // original company's lock, then replay the committed original close
         // without issuing another serial, stock movement or audit event.
         $this->assertTrue(function_exists('pcntl_fork'),'IAC process certification requires pcntl_fork');
-        DB::purge();
         $pair=stream_socket_pair(STREAM_PF_UNIX,STREAM_SOCK_STREAM,0);
         $this->assertIsArray($pair);
         [$parentSocket,$childSocket]=$pair;
@@ -243,6 +242,10 @@ class HallInventoryInternalAbnormalClosureTest extends TestCase {
         $beforeClosures=DB::table('hall_inventory_internal_abnormal_closures')->count();
         $beforeAudit=DB::table('audit_events')->where('company_id',$company->id)
             ->where('action','hall_inventory.internal_abnormal_closed')->count();
+        // Close the *last* parent database connection immediately before fork.
+        // Otherwise the child inherits the socket opened for these snapshots;
+        // its DB::purge() can drop the parent's live PostgreSQL session.
+        DB::purge();
         $pid=pcntl_fork();
         $this->assertNotSame(-1,$pid);
         if($pid===0) {
