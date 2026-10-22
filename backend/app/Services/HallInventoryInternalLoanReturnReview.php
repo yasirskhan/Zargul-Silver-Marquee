@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
@@ -101,8 +102,37 @@ final class HallInventoryInternalLoanReturnReview
             ->where('b.company_id',$companyId)->where('b.source_hall_id',$hallId)
             ->orderByDesc('b.created_at')->orderByDesc('b.id')->limit($limit)
             ->get(['b.id','b.loan_id','b.destination_hall_id',
-                'b.created_at','b.returned_by','a.id as acceptance_id']);
+                'b.created_at','b.returned_by','a.id as acceptance_id',
+                'b.evidence_storage_path as shipped_path','b.evidence_size as shipped_size',
+                'b.evidence_sha256 as shipped_sha',
+                'a.evidence_storage_path as accepted_path','a.evidence_size as accepted_size',
+                'a.evidence_sha256 as accepted_sha']);
         if($rows->isEmpty())return [];
+        // Fail closed before displaying any physical custody quantity if
+        // either side's signed immutable PDF/photo has been lost or changed.
+        // Restrict reads to server-derived private paths from this scoped query.
+        $disk=Storage::disk('local');
+        foreach($rows as $row) {
+            foreach([
+                ['path'=>$row->shipped_path,'size'=>$row->shipped_size,
+                    'sha'=>$row->shipped_sha],
+                ...($row->acceptance_id===null?[]:[[
+                    'path'=>$row->accepted_path,'size'=>$row->accepted_size,
+                    'sha'=>$row->accepted_sha
+                ]])
+            ] as $proof) {
+                $path=(string)$proof['path'];
+                if(!str_starts_with($path,'private/hall-loan-return')||
+                    !$disk->exists($path))
+                    throw new ConflictHttpException('Original signed return history proof missing.');
+                $bytes=$disk->get($path);
+                if(!is_string($bytes)||
+                    strlen($bytes)!==(int)$proof['size']||
+                    !hash_equals((string)$proof['sha'],hash('sha256',$bytes)))
+                    throw new ConflictHttpException('Original signed return history proof integrity failed.');
+            }
+        }
+
         $all=DB::table('hall_inventory_internal_loan_return_lines as l')
             ->join('hall_inventory_internal_loan_return_batches as batch',function($j):void {
                 $j->on('batch.company_id','=','l.company_id')

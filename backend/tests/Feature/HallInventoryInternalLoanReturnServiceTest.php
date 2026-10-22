@@ -320,6 +320,23 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
         $secondAcceptance=(string)Str::uuid();
         $acceptor->accept($owner,$company->id,$second,$secondAcceptance,
             [$srcItem=>['good'=>3,'damaged'=>0]],[$srcItem=>3],[$dstItem=>4],$pdf());
+        // Displaying actual accepted physical quantities requires the exact
+        // original return shipment AND source acknowledgment stored bytes.
+        $returnBatch=DB::table('hall_inventory_internal_loan_return_batches')
+            ->where('id',$first)->first();
+        $ack=DB::table('hall_inventory_internal_loan_return_acceptances')
+            ->where('id',$acceptance)->first();
+        $disk=Storage::disk('local');
+        foreach([$returnBatch->evidence_storage_path,$ack->evidence_storage_path] as $path) {
+            $original=$disk->get($path);
+            $disk->put($path,'replaced physical proof');
+            try {
+                $read->sourceBatches($owner,$company->id,$src->id);
+                $this->fail('Tampered immutable return proof was displayed as trusted custody history.');
+            }catch(ConflictHttpException){}
+            $disk->put($path,$original);
+        }
+        $this->assertCount(2,$read->sourceBatches($owner,$company->id,$src->id));
         $loanRows=app(\App\Services\HallInventoryLoanDraftReview::class)
             ->recent($owner,$company->id,$src->id);
         $loanHistory=collect($loanRows)->firstWhere('id',$loan);
