@@ -140,10 +140,20 @@ final class HallInventoryInternalPhysicalFindingService {
             $allocated=DB::table('hall_inventory_internal_physical_findings as f')
                 ->leftJoin('hall_inventory_internal_physical_finding_decisions as d',function($j):void {
                     $j->on('d.company_id','=','f.company_id')->on('d.finding_id','=','f.id');
+                })->leftJoin('hall_inventory_internal_finding_corrections as c',function($j):void{
+                    $j->on('c.company_id','=','f.company_id')->on('c.finding_id','=','f.id');
+                })->leftJoin('hall_inventory_internal_finding_correction_reviews as cr',function($j):void{
+                    $j->on('cr.company_id','=','c.company_id')->on('cr.correction_id','=','c.id');
                 })->where('f.company_id',$company)->where('f.loan_id',$loanId)
                 ->where('f.source_item_id',$signed->source_item_id)
-                ->where(function($q):void {$q->whereNull('d.id')->orWhere('d.decision','confirmed_outstanding');})
-                ->sum('f.quantity');
+                ->where(function($q):void {
+                    $q->whereNull('d.id')->orWhere(function($confirmed):void {
+                        $confirmed->where('d.decision','confirmed_outstanding')
+                            ->where(function($active):void {
+                                $active->whereNull('cr.id')->orWhere('cr.decision','!=','superseded');
+                            });
+                    });
+                })->sum('f.quantity');
             if ($qty>(int)$physical['outstanding']-(int)$allocated)
                 throw new ConflictHttpException('Physical discrepancy already reserved or returned under this original loan.');
             $key='private/hall-internal-finding/'.$company.'/'.$loanId.'/'.$findingId;
@@ -208,9 +218,16 @@ final class HallInventoryInternalPhysicalFindingService {
                 $reserved=DB::table('hall_inventory_internal_physical_findings as f')
                     ->join('hall_inventory_internal_physical_finding_decisions as d',function($j):void {
                         $j->on('d.company_id','=','f.company_id')->on('d.finding_id','=','f.id');
+                    })->leftJoin('hall_inventory_internal_finding_corrections as c',function($j):void {
+                        $j->on('c.company_id','=','f.company_id')->on('c.finding_id','=','f.id');
+                    })->leftJoin('hall_inventory_internal_finding_correction_reviews as cr',function($j):void {
+                        $j->on('cr.company_id','=','c.company_id')->on('cr.correction_id','=','c.id');
                     })->where('f.company_id',$company)->where('f.loan_id',$ref->loan_id)
                     ->where('f.source_item_id',$finding->source_item_id)
-                    ->where('f.id','!=',$findingId)->where('d.decision','confirmed_outstanding')->sum('f.quantity');
+                    ->where('f.id','!=',$findingId)->where('d.decision','confirmed_outstanding')
+                    ->where(function($q):void {
+                        $q->whereNull('cr.id')->orWhere('cr.decision','!=','superseded');
+                    })->sum('f.quantity');
                 if ((int)$reserved+(int)$finding->quantity>(int)$physical['outstanding'])
                     throw new ConflictHttpException('Physical discrepancy is overallocated after newer returns.');
             }
@@ -271,11 +288,16 @@ final class HallInventoryInternalPhysicalFindingService {
         return DB::table('hall_inventory_internal_physical_findings as f')
             ->leftJoin('hall_inventory_internal_physical_finding_decisions as d',function($j):void {
                 $j->on('d.company_id','=','f.company_id')->on('d.finding_id','=','f.id');
+            })->leftJoin('hall_inventory_internal_finding_corrections as c',function($j):void {
+                $j->on('c.company_id','=','f.company_id')->on('c.finding_id','=','f.id');
+            })->leftJoin('hall_inventory_internal_finding_correction_reviews as cr',function($j):void {
+                $j->on('cr.company_id','=','c.company_id')->on('cr.correction_id','=','c.id');
             })->where('f.company_id',$company)->where('f.loan_id',$loanId)
             ->orderBy('f.created_at')->orderBy('f.id')->limit(100)
             ->get(['f.id','f.source_item_id','f.kind','f.quantity','f.borrower_statement_id',
                 'f.source_incident_id','f.source_proof_path','f.source_proof_sha256',
-                'f.source_proof_size','f.proposed_by','d.decision','d.decided_by'])
+                'f.source_proof_size','f.proposed_by','d.decision','d.decided_by',
+                'c.id as correction_id','cr.decision as correction_decision'])
             ->map(function($row)use($open):array {
                 if(!array_key_exists((string)$row->source_item_id,$open))
                     throw new ConflictHttpException('Finding is not on original physical dispatch.');
@@ -288,6 +310,9 @@ final class HallInventoryInternalPhysicalFindingService {
                     'sha256'=>(string)$row->source_proof_sha256,
                     'proposedBy'=>(int)$row->proposed_by,'decision'=>$row->decision,
                     'decidedBy'=>$row->decided_by,
+                    'correctionId'=>$row->correction_id,
+                    'correctionDecision'=>$row->correction_decision,
+                    'supersededByIndependentCorrection'=>$row->correction_decision==='superseded',
                     'currentPhysicalOutstanding'=>$open[(string)$row->source_item_id],
                     'historicalFindingStillFullyOutstanding'=>
                         $open[(string)$row->source_item_id]>=(int)$row->quantity,

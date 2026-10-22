@@ -1906,6 +1906,9 @@
                                     <article wire:key="physical-finding-{{ $finding['id'] }}" class="rounded-lg border p-2 text-sm">
                                         <p>Finding {{ $finding['id'] }}: {{ $finding['kind'] }} {{ $finding['quantity'] }} original item {{ $finding['itemId'] }}</p>
                                         <p>{{ $finding['decision'] ?? 'INDEPENDENT REVIEW PENDING' }}. Signed source proof SHA256 {{ $finding['sha256'] }}. Stock and money unchanged.</p>
+                                        @if($finding['supersededByIndependentCorrection'])
+                                            <p>Historical original finding superseded by separately signed third-person correction {{ $finding['correctionId'] }}. Not a physical return, debt waiver or stock retirement.</p>
+                                        @endif
                                         <p>Original-loan physical units currently open (not independently accepted good/damaged or merely in-transit): {{ $finding['currentPhysicalOutstanding'] }}.
                                             @unless($finding['historicalFindingStillFullyOutstanding'])
                                                 Historical discrepancy evidence is STALE after later physical return activity. New reconciliation and independent review required; do not charge or close from this finding.
@@ -1959,6 +1962,51 @@
                                     <label>Independent physical reviewer reason <textarea wire:model="physicalFindingDecisionReason" class="w-full rounded border p-2"></textarea></label>
                                     <button type="button" wire:click="decideInternalPhysicalFinding" class="rounded border px-3 py-2">Record immutable source review</button>
                                     @error('physicalFindingDecisionReason') <p role="alert">{{ $message }}</p> @enderror
+                                    <div class="space-y-2 rounded-lg border p-3" aria-label="Independent immutable physical finding correction">
+                                        <h5 class="font-semibold">Correct historical physical discrepancy finding (never silently erase)</h5>
+                                        <p>After a confirmed source finding, a current source owner/admin may file new signed correction proof. A THIRD independent owner/admin must approve the correction. The original signed evidence stays visible. This never posts a return, waives debt, deletes stock or closes a loan.</p>
+                                        <label>Original confirmed finding
+                                            <select wire:model="physicalCorrectionFindingId" class="w-full rounded border p-2">
+                                                <option value="">Choose a confirmed and not yet corrected finding</option>
+                                                @foreach($physicalFindingHistory as $finding)
+                                                    @if($finding['decision']==='confirmed_outstanding' && $finding['correctionId']===null)
+                                                        <option value="{{ $finding['id'] }}">{{ $finding['id'] }}: {{ $finding['kind'] }} {{ $finding['quantity'] }}</option>
+                                                    @endif
+                                                @endforeach
+                                            </select>
+                                        </label>
+                                        <label>Reason for correction <textarea wire:model="physicalCorrectionReason" class="w-full rounded border p-2"></textarea></label>
+                                        <label>New signed original source PDF/photo <input type="file" wire:model="physicalCorrectionFile" accept=".pdf,.jpg,.jpeg,.png"></label>
+                                        <button type="button" wire:click="submitInternalFindingCorrection" class="rounded border px-3 py-2">Submit signed correction for third-person review</button>
+                                        @error('physicalCorrectionFile') <p role="alert">{{ $message }}</p> @enderror
+                                        <h5>Immutable signed correction review queue</h5>
+                                        @foreach($physicalCorrectionHistory as $correction)
+                                            <article wire:key="internal-correction-{{ $correction['id'] }}" class="rounded border p-2">
+                                                <p>Correction {{ $correction['id'] }} of finding {{ $correction['findingId'] }}: {{ $correction['decision'] ?? 'THIRD OWNER REVIEW PENDING' }}. {{ $correction['reason'] }}</p>
+                                                <p>Signed correction proof SHA256 {{ $correction['sha256'] }}. Stock and finance unchanged.</p>
+                                                <button type="button" wire:click="downloadInternalFindingCorrectionProof('{{ $correction['id'] }}')" class="rounded border px-2 py-1">Private correction proof (audited)</button>
+                                            </article>
+                                        @endforeach
+                                        <label>Pending independent correction
+                                            <select wire:model="physicalCorrectionReviewTargetId" class="w-full rounded border p-2">
+                                                <option value="">Choose pending signed correction</option>
+                                                @foreach($physicalCorrectionHistory as $correction)
+                                                    @if($correction['decision']===null)
+                                                        <option value="{{ $correction['id'] }}">{{ $correction['id'] }} for finding {{ $correction['findingId'] }}</option>
+                                                    @endif
+                                                @endforeach
+                                            </select>
+                                        </label>
+                                        <label>Independent correction review decision
+                                            <select wire:model="physicalCorrectionDecision" class="w-full rounded border p-2">
+                                                <option value="rejected">Reject correction; finding remains on record</option>
+                                                <option value="superseded">Accept documented correction; supersede documentary finding only</option>
+                                            </select>
+                                        </label>
+                                        <label>Third-owner correction reason <textarea wire:model="physicalCorrectionReviewReason" class="w-full rounded border p-2"></textarea></label>
+                                        <button type="button" wire:click="reviewInternalFindingCorrection" class="rounded border px-3 py-2">Record immutable independent correction review</button>
+                                        @error('physicalCorrectionReviewReason') <p role="alert">{{ $message }}</p> @enderror
+                                    </div>
                                 @endif
                             </div>
                         @endif

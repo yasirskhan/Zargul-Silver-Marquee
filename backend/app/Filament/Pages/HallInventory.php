@@ -259,6 +259,18 @@ final class HallInventory extends Page
     public string $physicalFindingDecision = 'requires_more_evidence';
     public string $physicalFindingDecisionReason = '';
     #[Locked]
+    public array $physicalCorrectionHistory = [];
+    #[Locked]
+    public string $physicalCorrectionId = '';
+    #[Locked]
+    public string $physicalCorrectionReviewId = '';
+    public string $physicalCorrectionFindingId = '';
+    public string $physicalCorrectionReason = '';
+    public $physicalCorrectionFile = null;
+    public string $physicalCorrectionReviewTargetId = '';
+    public string $physicalCorrectionDecision = 'rejected';
+    public string $physicalCorrectionReviewReason = '';
+    #[Locked]
     public string $returnLoanId = '';
     #[Locked]
     public string $returnBatchId = '';
@@ -607,6 +619,14 @@ final class HallInventory extends Page
         $this->physicalFindingReason='';
         $this->physicalFindingDecisionTargetId='';
         $this->physicalFindingDecisionReason='';
+        $this->physicalCorrectionHistory=[];
+        $this->physicalCorrectionId=(string)Str::uuid();
+        $this->physicalCorrectionReviewId=(string)Str::uuid();
+        $this->physicalCorrectionFindingId='';
+        $this->physicalCorrectionReason='';
+        $this->physicalCorrectionFile=null;
+        $this->physicalCorrectionReviewTargetId='';
+        $this->physicalCorrectionReviewReason='';
         $this->incidentLoanId = '';
         $this->internalDamageWriteoffs=[];
         $this->internalDamageEligible=[];
@@ -2121,9 +2141,12 @@ final class HallInventory extends Page
                 ->reviews($actor,$this->companyId,$this->hallId,$loanId);
             $this->physicalFindingHistory=app(\App\Services\HallInventoryInternalPhysicalFindingService::class)
                 ->history($actor,$this->companyId,$this->hallId,$loanId,true);
+            $this->physicalCorrectionHistory=app(\App\Services\HallInventoryInternalFindingCorrectionService::class)
+                ->history($actor,$this->companyId,$this->hallId,$loanId);
         }else {
             $this->physicalFindingIncidents=[];
             $this->physicalFindingHistory=[];
+            $this->physicalCorrectionHistory=[];
         }
     }
     public function decideInternalDiscrepancy():void {
@@ -2239,6 +2262,83 @@ final class HallInventory extends Page
         $source=$loan->lending_hall_id===$this->hallId;
         $row=app(\App\Services\HallInventoryInternalPhysicalFindingService::class)->sourceProof(
             $actor,$this->companyId,$this->hallId,$findingId,$source);
+        return response()->streamDownload(static function()use($row):void {
+            echo $row['bytes'];
+        },$row['name'],['Content-Type'=>$row['mime'],'Cache-Control'=>'private, no-store',
+            'Pragma'=>'no-cache','X-Content-Type-Options'=>'nosniff']);
+    }
+
+    /** Append-only signed source correction. Never alters underlying physical or financial books. */
+    public function submitInternalFindingCorrection():void {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canReviewInternalDiscrepancy() &&
+            config('inventory_controls.internal_physical_finding_enabled') &&
+            $this->discrepancyLoanId!=='',403);
+        $this->validate(['physicalCorrectionFindingId'=>'required|uuid',
+            'physicalCorrectionReason'=>'required|string|min:10|max:500',
+            'physicalCorrectionFile'=>'required|file|max:5120|mimes:jpg,jpeg,png,pdf']);
+        $findings=app(\App\Services\HallInventoryInternalPhysicalFindingService::class)
+            ->history($actor,$this->companyId,$this->hallId,$this->discrepancyLoanId,true);
+        abort_unless(collect($findings)->contains(fn($r):bool=>
+            $r['id']===$this->physicalCorrectionFindingId &&
+            $r['decision']==='confirmed_outstanding' &&
+            $r['correctionId']===null),403);
+        try {
+            app(\App\Services\HallInventoryInternalFindingCorrectionService::class)->propose(
+                $actor,$this->companyId,$this->hallId,$this->physicalCorrectionFindingId,
+                $this->physicalCorrectionId,$this->physicalCorrectionReason,$this->physicalCorrectionFile);
+        }catch(InvalidArgumentException|ConflictHttpException $e){
+            throw ValidationException::withMessages(['physicalCorrectionFile'=>$e->getMessage()]);
+        }
+        $this->reloadInternalPhysicalCorrection();
+        $this->physicalCorrectionId=(string)Str::uuid();
+        $this->physicalCorrectionFindingId='';
+        $this->physicalCorrectionReason='';
+        $this->physicalCorrectionFile=null;
+    }
+    public function reviewInternalFindingCorrection():void {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canReviewInternalDiscrepancy() &&
+            config('inventory_controls.internal_physical_finding_enabled') &&
+            $this->discrepancyLoanId!=='',403);
+        $this->validate(['physicalCorrectionReviewTargetId'=>'required|uuid',
+            'physicalCorrectionDecision'=>'required|in:superseded,rejected',
+            'physicalCorrectionReviewReason'=>'required|string|min:10|max:500']);
+        $history=app(\App\Services\HallInventoryInternalFindingCorrectionService::class)
+            ->history($actor,$this->companyId,$this->hallId,$this->discrepancyLoanId);
+        abort_unless(collect($history)->contains(fn($r):bool=>
+            $r['id']===$this->physicalCorrectionReviewTargetId && $r['decision']===null),403);
+        try {
+            app(\App\Services\HallInventoryInternalFindingCorrectionService::class)->review(
+                $actor,$this->companyId,$this->hallId,$this->physicalCorrectionReviewTargetId,
+                $this->physicalCorrectionReviewId,$this->physicalCorrectionDecision,
+                $this->physicalCorrectionReviewReason);
+        }catch(InvalidArgumentException|ConflictHttpException $e){
+            throw ValidationException::withMessages(['physicalCorrectionReviewReason'=>$e->getMessage()]);
+        }
+        $this->reloadInternalPhysicalCorrection();
+        $this->physicalCorrectionReviewId=(string)Str::uuid();
+        $this->physicalCorrectionReviewTargetId='';
+        $this->physicalCorrectionReviewReason='';
+    }
+    private function reloadInternalPhysicalCorrection():void {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canReviewInternalDiscrepancy() &&
+            config('inventory_controls.internal_physical_finding_enabled'),403);
+        $this->physicalCorrectionHistory=app(\App\Services\HallInventoryInternalFindingCorrectionService::class)
+            ->history($actor,$this->companyId,$this->hallId,$this->discrepancyLoanId);
+        $this->physicalFindingHistory=app(\App\Services\HallInventoryInternalPhysicalFindingService::class)
+            ->history($actor,$this->companyId,$this->hallId,$this->discrepancyLoanId,true);
+    }
+    public function downloadInternalFindingCorrectionProof(string $correctionId) {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.internal_physical_finding_enabled') &&
+            $this->canReviewInternalDiscrepancy() && $this->discrepancyLoanId!=='',403);
+        $history=app(\App\Services\HallInventoryInternalFindingCorrectionService::class)
+            ->history($actor,$this->companyId,$this->hallId,$this->discrepancyLoanId);
+        abort_unless(collect($history)->contains(fn($r):bool=>$r['id']===$correctionId),403);
+        $row=app(\App\Services\HallInventoryInternalFindingCorrectionService::class)
+            ->signedProof($actor,$this->companyId,$this->hallId,$correctionId);
         return response()->streamDownload(static function()use($row):void {
             echo $row['bytes'];
         },$row['name'],['Content-Type'=>$row['mime'],'Cache-Control'=>'private, no-store',

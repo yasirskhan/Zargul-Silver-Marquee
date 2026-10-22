@@ -202,3 +202,6 @@ Independent original-hall Owner/Admin closeout now has a dedicated company-scope
 
 ## Phase12 original loan subsequent witnessed returns safety follow-on
 - Prepared immutable original-loan return-aware physical history, marks historically confirmed findings stale when actual later good/damaged returns reduce current open count. Exact receipt/acceptance joins; no shared destination catalog aggregate treated as per-loan. New signed original loan regression exercises ten good returns against stale three-missing finding. CI PENDING; unchanged production OFF.
+
+## Phase 12 immutable INTERNAL physical finding correction (source candidate)
+- Historical confirmed source findings never silently edited or overwritten. Signed source PDF/photo amendment proposal requires an independent THIRD current source owner/admin and append-only exact FK-bound review. Approved correction supersedes documentary finding, but cannot clear physical original-loan custody, create cash/debt, waive debt or issue final receipt. Current live return ledger is separately shown. Include PostgreSQL two-connection loan lock and actual Livewire UI. New exact SHA all-six CI required; production OFF.

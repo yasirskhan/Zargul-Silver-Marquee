@@ -217,6 +217,97 @@ class HallInventoryInternalPhysicalFindingTest extends TestCase {
         $this->assertSame(0,DB::table('hall_inventory_nonclean_final_closures')->count());
     }
 
+    public function test_signed_correction_requires_third_source_owner_and_preserves_original_stock_and_proof():void {
+        $f=$this->fixture();extract($f);
+        config()->set('inventory_controls.internal_physical_finding_enabled',true);
+        $findingSvc=app(HallInventoryInternalPhysicalFindingService::class);
+        $correctionSvc=app(\App\Services\HallInventoryInternalFindingCorrectionService::class);
+        $finding=(string)Str::uuid();
+        $findingSvc->propose($admin,$company->id,$source->id,$loan,$statement,$incident,
+            $finding,'Actual source incident and borrower evidence fully agreed.',$this->pdf());
+        $this->be($owner);
+        $findingSvc->decide($owner,$company->id,$source->id,$finding,(string)Str::uuid(),
+            'confirmed_outstanding','Original source owner independently confirms still-open custody.');
+        $third=User::create(['name'=>'Third source evidence owner',
+            'email'=>'original-third-owner@example.test','password'=>'test-only']);
+        $third->markEmailAsVerified();
+        CompanyMembership::create(['company_id'=>$company->id,'user_id'=>$third->id,'role'=>'owner']);
+        $this->be($admin);
+        $correction=(string)Str::uuid();
+        $reason='Later independently reviewed signed proof rebuts this historical count.';
+        $this->assertSame($correction,$correctionSvc->propose(
+            $admin,$company->id,$source->id,$finding,$correction,$reason,$this->pdf()));
+        $this->assertSame($correction,$correctionSvc->propose(
+            $admin,$company->id,$source->id,$finding,$correction,$reason,$this->pdf()));
+        try {
+            $correctionSvc->propose($admin,$company->id,$source->id,$finding,
+                $correction,'Changed signed correction must never silently overwrite.',$this->pdf());
+            $this->fail('Changed immutable signed correction replay allowed.');
+        }catch(ConflictHttpException){}
+        $this->be($owner);
+        try {
+            $correctionSvc->review($owner,$company->id,$source->id,$correction,
+                (string)Str::uuid(),'superseded',
+                'Previous physical reviewer cannot approve their own finding correction.');
+            $this->fail('Original physical reviewer approved its own correction.');
+        }catch(AuthorizationException){}
+        $this->be($admin);
+        try {
+            $correctionSvc->review($admin,$company->id,$source->id,$correction,
+                (string)Str::uuid(),'superseded',
+                'Original signed source investigator must not approve this correction.');
+            $this->fail('Original evidence author self-reviewed correction.');
+        }catch(AuthorizationException){}
+        $this->be($third);
+        $decision=(string)Str::uuid();
+        $this->assertSame($decision,$correctionSvc->review($third,$company->id,$source->id,
+            $correction,$decision,'superseded',
+            'Third owner independently accepts correction of documentary evidence only.'));
+        $this->assertSame($decision,$correctionSvc->review($third,$company->id,$source->id,
+            $correction,$decision,'superseded',
+            'Third owner independently accepts correction of documentary evidence only.'));
+        try {
+            $correctionSvc->review($third,$company->id,$source->id,$correction,
+                (string)Str::uuid(),'rejected',
+                'Completed immutable correction cannot be overwritten.');
+            $this->fail('Independent correction decision overwritten.');
+        }catch(ConflictHttpException){}
+        $current=$findingSvc->history($third,$company->id,$source->id,$loan,true);
+        $this->assertTrue($current[0]['supersededByIndependentCorrection']);
+        $this->assertSame('confirmed_outstanding',$current[0]['decision']);
+        $this->assertSame($correction,$current[0]['correctionId']);
+        $this->assertSame('superseded',$correctionSvc->history(
+            $third,$company->id,$source->id,$loan)[0]['decision']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Livewire::test(HallInventory::class)->set('companyId',$company->id)
+            ->set('hallId',$source->id)->call('startInternalDiscrepancyReview',$loan)
+            ->assertHasNoErrors()->assertSee('Correct historical physical discrepancy finding')
+            ->assertSee('Historical original finding superseded')
+            ->assertSee($correction);
+        $proof=$correctionSvc->signedProof($third,$company->id,$source->id,$correction);
+        $this->assertSame('application/pdf',$proof['mime']);
+        $row=DB::table('hall_inventory_internal_finding_corrections')
+            ->where('company_id',$company->id)->where('id',$correction)->first();
+        $disk=Storage::disk('local');$original=$disk->get($row->proof_path);
+        $disk->put($row->proof_path,'tampered independently signed source correction');
+        try {
+            $correctionSvc->history($third,$company->id,$source->id,$loan);
+            $this->fail('Tampered immutable source correction remained readable.');
+        }catch(ConflictHttpException){}
+        try {
+            $correctionSvc->signedProof($third,$company->id,$source->id,$correction);
+            $this->fail('Tampered source correction was downloaded.');
+        }catch(ConflictHttpException){}
+        $disk->put($row->proof_path,$original);
+        $this->assertCount(1,$correctionSvc->history($third,$company->id,$source->id,$loan));
+        $this->assertSame(12,(int)DB::table('hall_inventory_positions')
+            ->where('hall_id',$source->id)->where('item_id',$item)->value('owned_on_loan'));
+        $this->assertSame(0,DB::table('finance_journals')->count());
+        $this->assertSame(0,DB::table('hall_inventory_nonclean_final_closures')->count());
+        $this->assertSame(1,DB::table('hall_inventory_internal_physical_finding_decisions')->count());
+        $this->assertSame(1,DB::table('hall_inventory_internal_finding_correction_reviews')->count());
+    }
+
     public function test_unrelated_loan_or_forged_source_hall_cannot_use_original_signatures():void {
         $f=$this->fixture();extract($f);
         config()->set('inventory_controls.internal_physical_finding_enabled',true);
