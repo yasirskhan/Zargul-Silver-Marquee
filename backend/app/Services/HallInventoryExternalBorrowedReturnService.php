@@ -131,8 +131,10 @@ final class HallInventoryExternalBorrowedReturnService {
                 return $batchId;
             }
             if(DB::table('hall_inventory_external_in_clean_closures')
-                ->where('company_id',$companyId)->where('loan_id',$loanId)->exists())
-                throw new ConflictHttpException('This partner borrowed loan is already independently closed.');
+                ->where('company_id',$companyId)->where('loan_id',$loanId)->exists()||
+                DB::table('hall_inventory_external_in_nonclean_closures')
+                    ->where('company_id',$companyId)->where('loan_id',$loanId)->exists())
+                throw new ConflictHttpException('This partner borrowed loan already has an immutable final closure.');
             $accepted=DB::table('hall_inventory_external_in_acceptance_lines')
                 ->where('company_id',$companyId)->where('acceptance_id',$accept->id)
                 ->where('hall_id',$hallId)->whereIn('item_id',array_keys($quantities))
@@ -207,6 +209,9 @@ final class HallInventoryExternalBorrowedReturnService {
                 ->where('id',$batch->loan_id)->lockForUpdate()->first();
             if(!$loan||$loan->direction!=='external_in'||$loan->borrowing_hall_id!==$hallId)
                 throw new ConflictHttpException('Partner return no longer belongs to original borrowing hall.');
+            if(DB::table('hall_inventory_external_in_nonclean_closures')
+                ->where('company_id',$companyId)->where('loan_id',$loan->id)->exists())
+                throw new ConflictHttpException('Original loan already has an immutable final non-clean closure.');
             $hall=Hall::query()->where('company_id',$companyId)->where('id',$hallId)
                 ->where('is_active',true)->lockForUpdate()->first();
             if(!$hall||!Auth::check()||(int)Auth::id()!==(int)$actor->getKey()||

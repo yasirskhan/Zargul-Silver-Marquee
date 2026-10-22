@@ -100,6 +100,9 @@ final class HallInventoryExternalBorrowedDiscrepancyService
             if(!$loan||$loan->direction!=='external_in'||
                 (string)$loan->borrowing_hall_id!==$hallId)
                 throw new ConflictHttpException('Partner discrepancy must belong to the exact borrowing-hall loan.');
+            if(DB::table('hall_inventory_external_in_nonclean_closures')
+                ->where('company_id',$companyId)->where('loan_id',$loan->id)->exists())
+                throw new ConflictHttpException('Original loan already has an immutable final non-clean closure.');
             $this->scope($actor,$companyId,$hallId,true);
             $batch=DB::table('hall_inventory_external_in_return_batches')
                 ->where('company_id',$companyId)->where('hall_id',$hallId)

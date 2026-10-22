@@ -732,6 +732,39 @@ final class HallInventoryExternalBorrowedDiscrepancyTest extends TestCase
         $this->assertSame(2,DB::table('hall_inventory_movement_events')
             ->where('company_id',$company->id)->where('item_id',$closureItem)
             ->where('event_kind','writeoff_borrowed_transit')->count());
+        // Terminal ENCL protects the original loan from later stock/document
+        // reclassification or reversing a settled partner payment. This must
+        // also preserve the second loan's independent numbered certificate.
+        $this->be($handler);
+        try {
+            $returns->dispatch($handler,$company->id,$hall->id,$sharedLoan,
+                (string)Str::uuid(),[$closureItem=>1],
+                $signed('post-close-return.pdf','post-close-return'));
+            $this->fail('New physical return started after numbered final closure.');
+        }catch(ConflictHttpException $e) {
+            $this->assertStringContainsString('immutable final closure',$e->getMessage());
+        }
+        $this->be($owner);
+        try {
+            $discrimination->report($owner,$company->id,$hall->id,$sharedBatch,
+                (string)Str::uuid(),[$closureItem=>['received'=>2,'damaged'=>0]],
+                'Unauthorized post-final amendment to original evidence.',
+                $signed('post-close-dispute.pdf','post-close-dispute'));
+            $this->fail('Partner discrepancy was silently appended after final closure.');
+        }catch(ConflictHttpException $e) {
+            $this->assertStringContainsString('immutable final non-clean closure',$e->getMessage());
+        }
+        try {
+            $settlements->reverse($owner,$company->id,$hall->id,$sharedSettlement,
+                (string)Str::uuid(),'Attempt reversal after immutable issued final ENCL.');
+            $this->fail('Final settled ENCL financial basis was reversed.');
+        }catch(ConflictHttpException $e) {
+            $this->assertStringContainsString('immutable final non-clean closure',$e->getMessage());
+        }
+        $this->assertSame($journalsBefore,DB::table('finance_journals')->count());
+        $this->assertSame(0,(int)DB::table('hall_inventory_positions')
+            ->where('item_id',$closureItem)->sum('borrowed_transit'));
+        $this->be($approver);
         $auditAction='hall_inventory.external_in_nonclean_certificate_downloaded';
         $beforeDownloads=DB::table('audit_events')->where('company_id',$company->id)
             ->where('action',$auditAction)->count();
