@@ -92,18 +92,23 @@ class HallInventoryInternalAbnormalClosureTest extends TestCase {
         app(HallInventoryInternalPhysicalFindingService::class)->decide($owner,$company->id,$source->id,
             $finding,(string)Str::uuid(),'confirmed_outstanding','Independent confirmation of the single missing unit.');
         $obligation=(string)Str::uuid();
+        $this->be($admin);
         app(HallInventoryInternalLossObligationService::class)->propose($admin,$company->id,$source->id,
             $finding,$obligation,'PKR',1000,'Confirmed single-unit internal loss obligation.');
+        $this->be($closer);
         app(HallInventoryInternalLossObligationService::class)->decide($closer,$company->id,$source->id,
             $obligation,(string)Str::uuid(),'approved','Independent approval of the single-unit obligation.');
         $settlement=(string)Str::uuid();
+        $this->be($owner);
         app(HallInventoryInternalLossSettlementService::class)->record($owner,$company->id,$source->id,
             $obligation,$settlement,1000,'PKR','bank','INTERNAL-CLOSE-1','2026-10-22',
             UploadedFile::fake()->createWithContent('internal-close-proof.pdf',"%PDF-1.4\nproof\n%%EOF"));
+        $this->be($closer);
         app(HallInventoryInternalLossSettlementService::class)->review($closer,$company->id,$source->id,
             $settlement,(string)Str::uuid(),'verified','Independent verification of the single-unit settlement.');
         $service=app(HallInventoryInternalAbnormalClosureService::class);
         $authorization=(string)Str::uuid();
+        $this->be($authorizer);
         $this->assertSame($authorization,$service->authorize($authorizer,$company->id,$source->id,
             $loan,$authorization,'Independent authorization to write off the confirmed missing unit.'));
         $this->assertSame(1,(int)DB::table('hall_inventory_positions')
