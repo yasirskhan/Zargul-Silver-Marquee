@@ -11,6 +11,7 @@ use App\Services\HallInventoryCatalogService;
 use App\Services\HallInventoryExternalBorrowedDiscrepancyService;
 use App\Services\HallInventoryExternalBorrowedIntakeService;
 use App\Services\HallInventoryExternalBorrowedReturnService;
+use App\Services\HallInventoryLoanDraftReview;
 use App\Services\HallInventoryLoanDraftService;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -185,6 +186,20 @@ final class HallInventoryExternalBorrowedDiscrepancyTest extends TestCase
         $this->assertSame(10,(int)DB::table('hall_inventory_positions')->sum('borrowed_transit'));
         $this->assertSame(0,DB::table('finance_journals')->count());
 
+        $read=collect(app(HallInventoryLoanDraftReview::class)
+            ->recent($reviewer,$company->id,$hall->id))->firstWhere('id',$loan);
+        $this->assertNotNull($read);
+        $custody=$read['externalReturnReconciliation'];
+        $this->assertTrue($custody['partnerDiscrepancyExists']);
+        $this->assertFalse($custody['partnerDiscrepancyPending']);
+        $this->assertSame(10,$custody['partnerReportedShipped']);
+        $this->assertSame(9,$custody['partnerReportedReceived']);
+        $this->assertSame(1,$custody['partnerReportedDamaged']);
+        $this->assertSame(1,$custody['partnerReportedMissing']);
+        $this->assertSame(0,$custody['partnerConfirmedQuantity']);
+        $this->assertFalse($custody['allPhysicalReturnsConfirmed']);
+        $this->assertSame(10,(int)DB::table('hall_inventory_positions')->sum('borrowed_transit'));
+
         $this->be($owner);
         try {
             $returns->confirm($owner,$company->id,$hall->id,$batch,(string)Str::uuid(),
@@ -237,8 +252,19 @@ final class HallInventoryExternalBorrowedDiscrepancyTest extends TestCase
             ->set('externalDiscrepancyDecision','substantiated')
             ->set('externalDiscrepancyDecisionReason','Partner signature independently confirms the one-unit shortfall.')
             ->call('submitExternalDiscrepancyReview')->assertHasNoErrors()
-            ->assertSee('PARTNER-SIGNED SHORT/DAMAGED COUNT — SUBSTANTIATED');
+            ->assertSee('PARTNER-SIGNED SHORT/DAMAGED COUNT — SUBSTANTIATED')
+            ->assertSee('Partner-signed short/damaged evidence');
         $this->assertSame(2,DB::table('hall_inventory_external_in_discrepancy_decisions')->count());
+        $read=collect(app(HallInventoryLoanDraftReview::class)
+            ->recent($reviewer,$company->id,$hall->id))->firstWhere('id',$loan);
+        $custody=$read['externalReturnReconciliation'];
+        $this->assertSame(14,$custody['partnerReportedShipped']);
+        $this->assertSame(12,$custody['partnerReportedReceived']);
+        $this->assertSame(1,$custody['partnerReportedDamaged']);
+        $this->assertSame(2,$custody['partnerReportedMissing']);
+        $this->assertFalse($custody['partnerDiscrepancyPending']);
+        $this->assertSame(0,$custody['partnerConfirmedQuantity']);
+        $this->assertFalse($custody['allPhysicalReturnsConfirmed']);
         $this->assertSame(14,(int)DB::table('hall_inventory_positions')->sum('borrowed_transit'));
         $this->assertSame(0,(int)DB::table('hall_inventory_positions')->sum('owned_usable'));
         $this->assertSame(0,DB::table('finance_journals')->count());

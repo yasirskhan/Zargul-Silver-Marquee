@@ -771,6 +771,20 @@
                                             @endif
                                         </p>
                                     @endif
+                                    @if($loan['externalReturnReconciliation']['partnerDiscrepancyExists'] ?? false)
+                                        <p>Partner-signed short/damaged evidence: partner reported
+                                            {{ $loan['externalReturnReconciliation']['partnerReportedReceived'] }} received,
+                                            {{ $loan['externalReturnReconciliation']['partnerReportedDamaged'] }} damaged,
+                                            {{ $loan['externalReturnReconciliation']['partnerReportedMissing'] }} missing
+                                            of {{ $loan['externalReturnReconciliation']['partnerReportedShipped'] }} shipped.
+                                            @if($loan['externalReturnReconciliation']['partnerDiscrepancyPending'] ?? false)
+                                                Independent documentary review is still pending.
+                                            @endif
+                                            Borrowed transit remains UNRECONCILED; this evidence does not retire stock, create a liability, post money or close the loan.</p>
+                                        @if($loan['externalReturnReconciliation']['partnerDiscrepancyIntegrityWarning'] ?? false)
+                                            <p role="alert">Partner-signed discrepancy quantities exceed or do not match the exact shipped lines. Do not settle or close this loan.</p>
+                                        @endif
+                                    @endif
                                 @endif
                                 <p>Source: {{ $loan['lendingHallName'] ?? $loan['externalPartnerName'] ?? 'Not assigned' }}.
                                    Destination: {{ $loan['borrowingHallName'] ?? $loan['externalPartnerName'] ?? 'Not assigned' }}.</p>

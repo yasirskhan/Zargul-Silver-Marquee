@@ -229,10 +229,32 @@ final class HallInventoryLoanDraftReview
             ->where('b.company_id',$companyId)->whereIn('b.loan_id',$loanIds)
             ->select(['b.loan_id','l.item_id'])->selectRaw('SUM(l.quantity) AS quantity')
             ->groupBy('b.loan_id','l.item_id')->get()->groupBy('loan_id');
+        // Independently substantiated partner-signed short/damaged counts are
+        // read-only custody evidence. They never imply a cleared transit
+        // balance, liability, journal, payment, stock retirement or closure.
+        $externalDiscrepancy=DB::table('hall_inventory_external_in_discrepancies as d')
+            ->join('hall_inventory_external_in_discrepancy_lines as l',function($j):void {
+                $j->on('l.company_id','=','d.company_id')->on('l.discrepancy_id','=','d.id');
+            })
+            ->join('hall_inventory_external_in_discrepancy_decisions as x',function($j):void {
+                $j->on('x.company_id','=','d.company_id')->on('x.discrepancy_id','=','d.id');
+            })
+            ->where('d.company_id',$companyId)->whereIn('d.loan_id',$loanIds)
+            ->where('x.decision','substantiated')
+            ->get(['d.loan_id','l.item_id','l.shipped_quantity','l.received_quantity',
+                'l.damaged_quantity'])->groupBy('loan_id');
+        $externalDiscrepancyPending=DB::table('hall_inventory_external_in_discrepancies as d')
+            ->leftJoin('hall_inventory_external_in_discrepancy_decisions as x',function($j):void {
+                $j->on('x.company_id','=','d.company_id')->on('x.discrepancy_id','=','d.id');
+            })
+            ->where('d.company_id',$companyId)->whereIn('d.loan_id',$loanIds)
+            ->whereNull('x.id')->select('d.loan_id')
+            ->selectRaw('COUNT(*) AS pending')->groupBy('d.loan_id')->pluck('pending','d.loan_id');
 
         return $drafts->map(static function ($draft) use ($lines,$hallId,$received,$returns,
             $physicalCounts,$externalOutCounts,$externalOutReceived,$externalOutReviewed,
-            $externalAccepted,$externalSent,$externalConfirmed):array {
+            $externalAccepted,$externalSent,$externalConfirmed,$externalDiscrepancy,
+            $externalDiscrepancyPending):array {
             $receiptCount=(int)($received->get($draft->id)??0);
             $draftLines=$lines->get($draft->id)??collect();
             $actualCounts=($physicalCounts->get($draft->id)??collect())
@@ -306,6 +328,27 @@ final class HallInventoryLoanDraftReview
                         $integrity=true;
                     $acceptedCount+=$accepted;$sentCount+=$shipped;$confirmedCount+=$verified;
                 }
+                $partnerShipped=0;$partnerReceived=0;$partnerDamaged=0;$partnerMissing=0;
+                $partnerDiscrepancy=false;$discrepancyIntegrity=false;
+                $lineIds=$draftLines->pluck('item_id')
+                    ->map(static fn($v):string=>(string)$v)->all();
+                foreach(($externalDiscrepancy->get($draft->id)??collect()) as $disc) {
+                    $discItem=(string)$disc->item_id;
+                    if(!in_array($discItem,$lineIds,true))$discrepancyIntegrity=true;
+                    $discShipped=(int)$disc->shipped_quantity;
+                    $discReceived=(int)$disc->received_quantity;
+                    $discDamaged=(int)$disc->damaged_quantity;
+                    if($discReceived>$discShipped||$discDamaged>$discReceived)
+                        $discrepancyIntegrity=true;
+                    $partnerShipped+=$discShipped;$partnerReceived+=$discReceived;
+                    $partnerDamaged+=$discDamaged;
+                    $partnerMissing+=max(0,$discShipped-$discReceived);
+                    $partnerDiscrepancy=true;
+                }
+                if($partnerShipped>$sentCount||$partnerReceived>$partnerShipped)
+                    $discrepancyIntegrity=true;
+                $partnerPending=((int)$externalDiscrepancyPending->get($draft->id,0))>0;
+                if($partnerPending)$partnerDiscrepancy=true;
                 $externalReconciliation=[
                     'acceptedQuantity'=>$acceptedCount,
                     'shippedQuantity'=>$sentCount,
@@ -313,6 +356,13 @@ final class HallInventoryLoanDraftReview
                     'stillAtHall'=>max(0,$acceptedCount-$sentCount),
                     'awaitingPartnerConfirmation'=>max(0,$sentCount-$confirmedCount),
                     'stillOutstanding'=>max(0,$acceptedCount-$confirmedCount),
+                    'partnerReportedShipped'=>$partnerShipped,
+                    'partnerReportedReceived'=>$partnerReceived,
+                    'partnerReportedDamaged'=>$partnerDamaged,
+                    'partnerReportedMissing'=>$partnerMissing,
+                    'partnerDiscrepancyPending'=>$partnerPending,
+                    'partnerDiscrepancyExists'=>$partnerDiscrepancy,
+                    'partnerDiscrepancyIntegrityWarning'=>$discrepancyIntegrity,
                     'integrityWarning'=>$integrity,
                     'allPhysicalReturnsConfirmed'=>!$integrity && $acceptedCount>0 &&
                         $acceptedCount===$confirmedCount,
