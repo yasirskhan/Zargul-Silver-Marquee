@@ -228,7 +228,78 @@ class HallInventoryInternalAbnormalClosureTest extends TestCase {
             ->where('item_id',$item)->value('owned_on_loan'));
         $this->assertSame('occupied by failed issuance',Storage::disk('local')->get($certificatePath));
         Storage::disk('local')->delete($certificatePath);
-        $closed=$service->close($authorizer,$company->id,$source->id,$loan,$closureId);
+        // A real, separately connected PostgreSQL issuer must wait for the
+        // original company's lock, then replay the committed original close
+        // without issuing another serial, stock movement or audit event.
+        $this->assertTrue(function_exists('pcntl_fork'),'IAC process certification requires pcntl_fork');
+        DB::purge();
+        $pair=stream_socket_pair(STREAM_PF_UNIX,STREAM_SOCK_STREAM,0);
+        $this->assertIsArray($pair);
+        [$parentSocket,$childSocket]=$pair;
+        $resultFile=tempnam(sys_get_temp_dir(),'iac-two-process-');
+        $this->assertNotFalse($resultFile);
+        $beforeMovement=DB::table('hall_inventory_movement_events')
+            ->where('event_kind','writeoff_owned_on_loan')->count();
+        $beforeClosures=DB::table('hall_inventory_internal_abnormal_closures')->count();
+        $beforeAudit=DB::table('audit_events')->where('company_id',$company->id)
+            ->where('action','hall_inventory.internal_abnormal_closed')->count();
+        $pid=pcntl_fork();
+        $this->assertNotSame(-1,$pid);
+        if($pid===0) {
+            fclose($parentSocket);
+            DB::purge();
+            $backendPid=(int)DB::selectOne('SELECT pg_backend_pid() AS pid')->pid;
+            fwrite($childSocket,"ready:".$backendPid."\n");
+            fgets($childSocket);
+            try {
+                $result=$service->close($authorizer,$company->id,$source->id,$loan,$closureId);
+                file_put_contents($resultFile,json_encode(['result'=>$result],JSON_THROW_ON_ERROR));
+            }catch(\Throwable $e) {
+                file_put_contents($resultFile,json_encode(['error'=>get_class($e),
+                    'message'=>$e->getMessage()],JSON_THROW_ON_ERROR));
+            }
+            fclose($childSocket);
+            exit(0);
+        }
+        fclose($childSocket);
+        $parentError=null;
+        DB::beginTransaction();
+        try {
+            $this->assertNotNull(DB::table('companies')->where('id',$company->id)
+                ->lockForUpdate()->first(['id']));
+            stream_set_timeout($parentSocket,15);
+            $readyLine=(string)fgets($parentSocket);
+            $this->assertMatchesRegularExpression('/^ready:[0-9]+$/',trim($readyLine));
+            $childBackendPid=(int)trim(substr($readyLine,6));
+            fwrite($parentSocket,"go\n");
+            $sawWait=false;
+            for($poll=0;$poll<100;$poll++) {
+                if(DB::table('pg_stat_activity')->where('pid',$childBackendPid)
+                    ->value('wait_event_type')==='Lock') {$sawWait=true;break;}
+                usleep(100000);
+            }
+            $this->assertTrue($sawWait,'Second IAC process did not wait on the original company lock.');
+            $closed=$service->close($authorizer,$company->id,$source->id,$loan,$closureId);
+            DB::commit();
+        }catch(\Throwable $e) {
+            DB::rollBack();
+            $parentError=$e;
+        }finally {
+            fclose($parentSocket);
+            pcntl_waitpid($pid,$status);
+        }
+        if($parentError!==null)throw $parentError;
+        $this->assertTrue(pcntl_wifexited($status));
+        $child=json_decode((string)file_get_contents($resultFile),true,512,JSON_THROW_ON_ERROR);
+        unlink($resultFile);
+        $this->assertArrayNotHasKey('error',$child,json_encode($child));
+        $this->assertSame($closed,$child['result']);
+        $this->assertSame($beforeClosures+1,DB::table('hall_inventory_internal_abnormal_closures')
+            ->where('company_id',$company->id)->count());
+        $this->assertSame($beforeMovement+1,DB::table('hall_inventory_movement_events')
+            ->where('company_id',$company->id)->where('event_kind','writeoff_owned_on_loan')->count());
+        $this->assertSame($beforeAudit+1,DB::table('audit_events')->where('company_id',$company->id)
+            ->where('action','hall_inventory.internal_abnormal_closed')->count());
         $this->assertSame('IAC-1',$closed['serialNumber']);
         $this->assertSame(1,$closed['writeoffQuantity']);
         $this->assertSame(1000,$closed['amountMinor']);
