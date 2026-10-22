@@ -248,8 +248,10 @@ final class HallInventoryLoanDraftReview
                 $j->on('x.company_id','=','d.company_id')->on('x.discrepancy_id','=','d.id');
             })
             ->where('d.company_id',$companyId)->whereIn('d.loan_id',$loanIds)
-            ->whereNull('x.id')->select('d.loan_id')
-            ->selectRaw('COUNT(*) AS pending')->groupBy('d.loan_id')->pluck('pending','d.loan_id');
+            ->where(function($q):void {
+                $q->whereNull('x.id')->orWhere('x.decision','requires_more_evidence');
+            })->selectRaw('d.loan_id AS loan_id, COUNT(*) AS pending')
+            ->groupBy('d.loan_id')->pluck('pending','loan_id');
 
         return $drafts->map(static function ($draft) use ($lines,$hallId,$received,$returns,
             $physicalCounts,$externalOutCounts,$externalOutReceived,$externalOutReviewed,
