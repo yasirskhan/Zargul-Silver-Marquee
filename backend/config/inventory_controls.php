@@ -29,6 +29,9 @@ return [
     // Provisional internal abnormal loss obligation and independent decision.
     // No journal, cash, stock retirement, waiver or closure. OFF.
     'internal_loss_obligation_enabled' => (bool) env('VENUE_INVENTORY_INTERNAL_LOSS_OBLIGATION_ENABLED', false),
+    // Private internal settlement evidence and independent verification only.
+    // No journal, cash mutation, stock retirement, waiver or closure. OFF.
+    'internal_loss_settlement_enabled' => (bool) env('VENUE_INVENTORY_INTERNAL_LOSS_SETTLEMENT_ENABLED', false),
     'loan_incidents_enabled' => (bool) env('VENUE_INVENTORY_LOAN_INCIDENTS_ENABLED', false),
     // Independent evidence assessment only; does not assign financial liability.
     'loan_incident_reviews_enabled' => (bool) env('VENUE_INVENTORY_LOAN_INCIDENT_REVIEWS_ENABLED', false),

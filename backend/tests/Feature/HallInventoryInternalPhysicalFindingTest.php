@@ -11,6 +11,7 @@ use App\Services\HallInventoryCatalogService;
 use App\Services\HallInventoryInternalDiscrepancyService;
 use App\Services\HallInventoryInternalPhysicalFindingService;
 use App\Services\HallInventoryInternalLossObligationService;
+use App\Services\HallInventoryInternalLossSettlementService;
 use App\Services\HallInventoryInternalLoanDispatchService;
 use App\Services\HallInventoryInternalLoanReceiptService;
 use App\Services\HallInventoryLoanDraftService;
@@ -395,5 +396,45 @@ class HallInventoryInternalPhysicalFindingTest extends TestCase {
             ->call('startInternalDiscrepancyReview',$loan)->assertHasNoErrors()
             ->assertSee('INTERNAL PROVISIONAL LOSS OBLIGATION')
             ->assertSee('basis 3 — APPROVED');
+        config()->set('inventory_controls.internal_loss_settlement_enabled',true);
+        $settlements=app(HallInventoryInternalLossSettlementService::class);
+        $this->be($approver);
+        $settlement=(string)Str::uuid();
+        $this->assertSame($settlement,$settlements->record($approver,$company->id,
+            $source->id,$obligation,$settlement,5000,'PKR','bank','BANK-INTERNAL-1',
+            '2026-10-22',UploadedFile::fake()->createWithContent('internal-settlement.pdf',
+                "%PDF-1.4\ninternal settlement\n%%EOF")));
+        $settlementRow=DB::table('hall_inventory_internal_loss_settlements')
+            ->where('id',$settlement)->first();
+        $this->assertSame(5000,(int)$settlementRow->amount_minor);
+        $this->assertSame('PKR',$settlementRow->currency);
+        try {
+            $settlements->review($approver,$company->id,$source->id,$settlement,
+                (string)Str::uuid(),'verified','Recorder cannot verify their own settlement.');
+            $this->fail('Internal settlement recorder self-verified.');
+        }catch(AuthorizationException){}
+        $this->be($owner);
+        $review=(string)Str::uuid();
+        $this->assertSame($review,$settlements->review($owner,$company->id,$source->id,
+            $settlement,$review,'verified',
+            'Independent source owner verifies the private internal settlement evidence.'));
+        $this->assertSame($review,$settlements->review($owner,$company->id,$source->id,
+            $settlement,$review,'verified',
+            'Independent source owner verifies the private internal settlement evidence.'));
+        try {
+            $settlements->review($owner,$company->id,$source->id,$settlement,
+                (string)Str::uuid(),'rejected','Conflicting replay tries to reverse verification.');
+            $this->fail('Internal settlement review was mutable through replay.');
+        }catch(ConflictHttpException){}
+        $settlementHistory=collect($settlements->recent($owner,$company->id,$source->id))
+            ->firstWhere('id',$settlement);
+        $this->assertNotNull($settlementHistory);
+        $this->assertSame('verified',$settlementHistory['decision']);
+        $this->assertSame(5000,$settlementHistory['amountMinor']);
+        $this->assertSame(0,DB::table('finance_journals')->count());
+        $this->assertSame(12,(int)DB::table('hall_inventory_positions')
+            ->where('company_id',$company->id)->where('hall_id',$source->id)
+            ->where('item_id',$item)->value('owned_on_loan'));
+        $this->assertSame(0,DB::table('hall_inventory_internal_loan_closures')->count());
     }
 }
