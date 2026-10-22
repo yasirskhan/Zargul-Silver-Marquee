@@ -281,6 +281,21 @@ class HallInventoryInternalAbnormalClosureTest extends TestCase {
             ->where('action','hall_inventory.internal_abnormal_certificate_downloaded')->count();
         $download=$service->download($authorizer,$company->id,$source->id,$closureId);
         $this->assertSame($pdf,$download['bytes']);
+        $readiness=app(\App\Services\HallInventoryInternalAbnormalReadinessService::class)
+            ->assess($authorizer,$company->id,$source->id,$loan);
+        $this->assertTrue($readiness['ready']);
+        $this->assertSame(1,$readiness['originalPhysicalUnitsBeforeWriteoff']);
+        $this->assertSame(0,$readiness['physicalUnitsOpen']);
+        $this->assertSame([],$readiness['blockers']);
+        // Already issued certificates must not appear safely reconciled if
+        // their only stored original is subsequently corrupted.
+        Storage::disk('local')->put($certificatePath,'tampered final artifact');
+        $invalid=app(\App\Services\HallInventoryInternalAbnormalReadinessService::class)
+            ->assess($authorizer,$company->id,$source->id,$loan);
+        $this->assertFalse($invalid['ready']);
+        $this->assertContains('Final numbered certificate is missing or failed immutable hash verification.',
+            $invalid['blockers']);
+        Storage::disk('local')->put($certificatePath,$pdf);
         $this->assertSame($before+1,DB::table('audit_events')->where('company_id',$company->id)
             ->where('action','hall_inventory.internal_abnormal_certificate_downloaded')->count());
         // A formerly authorized signer retains their immutable issued record,

@@ -16,6 +16,8 @@ Read root AGENTS.md, this complete handoff, docs/SESSION_CONTROL.md, docs/PHASE1
 
 - Next additive security repair: scoped immutable certificate-download read event and revoked-owner denial, with source and regression in this report's successor commit; require own exact SHA six-job CI.
 
+- Next additive post-IAC read-only source correction: current still-open book custody is separate from immutable historical signed missing units; do not double count one item, and fail closed for absent/corrupt final certificate. Regression added; successor source requires its exact six-job CI.
+
 ## Current Phase 12 status
 **OPEN / BLOCKED.** All 59 Phase 12 register IDs have code, test and current acceptance disposition in docs/PHASE12_FINAL_ACCEPTANCE_REPORT.md. New run f88 green verifies its covered synthetic code/tests, not real staging or full multi-flow stress. No release switches enabled. Phase 13 not promoted.
 
