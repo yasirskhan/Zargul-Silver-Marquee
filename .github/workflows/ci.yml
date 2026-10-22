@@ -267,6 +267,16 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: chromium-playwright-${{ runner.os }}-1.56.1
+      # Playwright invokes apt-get update; the hosted runner sometimes ships
+      # a third-party Microsoft feed that answers 403 and aborts browser setup.
+      # Chromium acceptance must still install and execute, not be skipped.
+      - name: Isolate failing optional Microsoft APT feed on hosted runner
+        run: |
+          sudo mkdir -p /tmp/venuedesk-disabled-apt-feeds
+          sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \( -name '*.list' -o -name '*.sources' \) \
+            -exec grep -l 'packages.microsoft.com' {} + | while IFS= read -r source; do
+              sudo mv "$source" /tmp/venuedesk-disabled-apt-feeds/
+            done
       - name: Install Chromium browser and dependencies
         run: npx playwright install --with-deps chromium
       - name: Exercise public website editor prototype in desktop and phone browsers
@@ -357,6 +367,16 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: chromium-playwright-${{ runner.os }}-1.56.1
+      # Playwright invokes apt-get update; the hosted runner sometimes ships
+      # a third-party Microsoft feed that answers 403 and aborts browser setup.
+      # Chromium acceptance must still install and execute, not be skipped.
+      - name: Isolate failing optional Microsoft APT feed on hosted runner
+        run: |
+          sudo mkdir -p /tmp/venuedesk-disabled-apt-feeds
+          sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \( -name '*.list' -o -name '*.sources' \) \
+            -exec grep -l 'packages.microsoft.com' {} + | while IFS= read -r source; do
+              sudo mv "$source" /tmp/venuedesk-disabled-apt-feeds/
+            done
       - name: Install Chromium for authenticated acceptance
         run: npx playwright install --with-deps chromium
       - name: Browser verify owner password TOTP and proposal editing
