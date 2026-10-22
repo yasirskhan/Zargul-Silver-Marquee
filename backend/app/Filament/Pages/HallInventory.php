@@ -221,6 +221,21 @@ final class HallInventory extends Page
     public ?string $lastExternalDiscrepancyReference = null;
     #[Locked]
     public ?string $lastExternalClearanceReference = null;
+    #[Locked]
+    public array $externalObligationHistory = [];
+    #[Locked]
+    public string $externalObligationDiscrepancyId = '';
+    #[Locked]
+    public string $externalObligationRequestId = '';
+    public string $externalObligationCurrency = 'PKR';
+    public string $externalObligationAmount = '';
+    public string $externalObligationReason = '';
+    #[Locked]
+    public string $externalObligationDecisionTarget = '';
+    public string $externalObligationDecision = 'approved';
+    public string $externalObligationDecisionReason = '';
+    #[Locked]
+    public ?string $lastExternalObligationReference = null;
 
     #[Locked]
     public string $loanDispatchLoanId = '';
@@ -797,6 +812,16 @@ final class HallInventory extends Page
         $this->externalDiscrepancyDecisionReason = '';
         $this->lastExternalDiscrepancyReference = null;
         $this->lastExternalClearanceReference = null;
+        $this->externalObligationHistory = [];
+        $this->externalObligationDiscrepancyId = '';
+        $this->externalObligationRequestId = (string) Str::uuid();
+        $this->externalObligationCurrency = 'PKR';
+        $this->externalObligationAmount = '';
+        $this->externalObligationReason = '';
+        $this->externalObligationDecisionTarget = '';
+        $this->externalObligationDecision = 'approved';
+        $this->externalObligationDecisionReason = '';
+        $this->lastExternalObligationReference = null;
         $this->externalIntakeLoanId = '';
         $this->externalIntakeRequestId = (string)Str::uuid();
         $this->externalIntakeFile = null;
@@ -1122,6 +1147,14 @@ final class HallInventory extends Page
             config('inventory_controls.external_borrowed_intake_enabled'))
             $this->externalDiscrepancyHistory = app(
                 \App\Services\HallInventoryExternalBorrowedDiscrepancyService::class
+            )->recent($actor,$this->companyId,$this->hallId);
+        $this->externalObligationHistory = [];
+        if(config('inventory_controls.external_in_loss_obligation_enabled') &&
+            config('inventory_controls.external_borrowed_discrepancy_enabled') &&
+            config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled'))
+            $this->externalObligationHistory = app(
+                \App\Services\HallInventoryExternalInLossObligationService::class
             )->recent($actor,$this->companyId,$this->hallId);
         $this->externalCleanReceipts=[];
         if(config('inventory_controls.external_borrowed_clean_closure_enabled')) {
@@ -2004,7 +2037,109 @@ final class HallInventory extends Page
         $this->reloadLoanHistory();
     }
 
+    public function startExternalObligation(string $discrepancyId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_in_loss_obligation_enabled') &&
+            config('inventory_controls.external_borrowed_discrepancy_enabled') &&
+            config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled') &&
+            $this->canIndependentlyAcceptExternalBorrowing(),403);
+        $row=collect($this->externalDiscrepancyHistory)->first(
+            fn($d):bool=>$d['id']===$discrepancyId && $d['decision']==='substantiated' &&
+                $d['reportedBy']!==(int)$actor->getKey()
+        );
+        abort_unless($row!==null,403);
+        abort_if(collect($this->externalObligationHistory)
+            ->contains(fn($o):bool=>$o['discrepancyId']===$discrepancyId),403);
+        $this->externalObligationDiscrepancyId=$discrepancyId;
+        $this->externalObligationRequestId=(string)Str::uuid();
+        $this->externalObligationCurrency='PKR';
+        $this->externalObligationAmount='';
+        $this->externalObligationReason='';
+        $this->lastExternalObligationReference=null;
+    }
 
+    public function submitExternalObligation():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_in_loss_obligation_enabled') &&
+            config('inventory_controls.external_borrowed_discrepancy_enabled') &&
+            config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled') &&
+            $this->canIndependentlyAcceptExternalBorrowing() &&
+            $this->externalObligationDiscrepancyId!=='',403);
+        $this->validate([
+            'externalObligationCurrency'=>'required|string|size:3|regex:/^[A-Z]{3}$/',
+            'externalObligationAmount'=>'required|string|regex:/^[1-9][0-9]{0,11}$/',
+            'externalObligationReason'=>'required|string|min:10|max:500',
+        ]);
+        $amount=(int)$this->externalObligationAmount;
+        if($amount<1||$amount>100000000000)
+            throw ValidationException::withMessages([
+                'externalObligationAmount'=>'Amount must be positive integer minor units within the approved cap.'
+            ]);
+        try {
+            $this->lastExternalObligationReference=app(
+                \App\Services\HallInventoryExternalInLossObligationService::class
+            )->propose($actor,$this->companyId,$this->hallId,
+                $this->externalObligationDiscrepancyId,$this->externalObligationRequestId,
+                $this->externalObligationCurrency,$amount,$this->externalObligationReason);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['externalObligationReason'=>$e->getMessage()]);
+        }
+        $this->externalObligationDiscrepancyId='';
+        $this->externalObligationRequestId=(string)Str::uuid();
+        $this->externalObligationAmount='';
+        $this->externalObligationReason='';
+        $this->reloadLoanHistory();
+    }
+
+    public function startExternalObligationReview(string $obligationId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_in_loss_obligation_enabled') &&
+            config('inventory_controls.external_borrowed_discrepancy_enabled') &&
+            config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled') &&
+            $this->canIndependentlyAcceptExternalBorrowing(),403);
+        $row=collect($this->externalObligationHistory)->first(
+            fn($o):bool=>$o['id']===$obligationId && $o['decision']===null &&
+                $o['proposedBy']!==(int)$actor->getKey()
+        );
+        abort_unless($row!==null,403);
+        $this->externalObligationDecisionTarget=$obligationId;
+        $this->externalObligationDecision='approved';
+        $this->externalObligationDecisionReason='';
+    }
+
+    public function submitExternalObligationReview():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_in_loss_obligation_enabled') &&
+            config('inventory_controls.external_borrowed_discrepancy_enabled') &&
+            config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled') &&
+            $this->canIndependentlyAcceptExternalBorrowing() &&
+            $this->externalObligationDecisionTarget!=='',403);
+        $this->validate([
+            'externalObligationDecision'=>'required|in:approved,rejected,disputed',
+            'externalObligationDecisionReason'=>'required|string|min:10|max:500',
+        ]);
+        try {
+            $this->lastExternalObligationReference=app(
+                \App\Services\HallInventoryExternalInLossObligationService::class
+            )->decide($actor,$this->companyId,$this->hallId,
+                $this->externalObligationDecisionTarget,(string)Str::uuid(),
+                $this->externalObligationDecision,$this->externalObligationDecisionReason);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['externalObligationDecision'=>$e->getMessage()]);
+        }
+        $this->externalObligationDecisionTarget='';
+        $this->externalObligationDecision='approved';
+        $this->externalObligationDecisionReason='';
+        $this->reloadLoanHistory();
+    }
 
     public function canCloseExternalOutClean():bool
     {

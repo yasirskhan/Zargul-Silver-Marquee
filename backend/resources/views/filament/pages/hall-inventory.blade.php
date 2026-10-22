@@ -1757,6 +1757,24 @@
                                         <button type="button" wire:click="startExternalDiscrepancyReview('{{ $partnerDiscrepancy['id'] }}')"
                                             class="rounded-lg border px-3 py-2">Independently review partner discrepancy</button>
                                     @endif
+                                    @php($partnerObligation = collect($externalObligationHistory)->firstWhere('discrepancyId', $partnerDiscrepancy['id']))
+                                    @if($partnerObligation)
+                                        <p class="font-medium">PROVISIONAL PARTNER LOSS OBLIGATION — {{ $partnerObligation['currency'] }} {{ $partnerObligation['amountMinor'] }} minor units, basis {{ $partnerObligation['quantityBasis'] }} units — {{ $partnerObligation['decision'] === null ? 'INDEPENDENT REVIEW PENDING' : strtoupper($partnerObligation['decision']) }}</p>
+                                        <p>Provisional internal position only; not an invoice, journal, payment, settlement or loan closure.</p>
+                                        @if($partnerObligation['decision'] === null &&
+                                            $partnerObligation['proposedBy'] !== (int)auth()->id() &&
+                                            config('inventory_controls.external_in_loss_obligation_enabled') &&
+                                            $this->canIndependentlyAcceptExternalBorrowing())
+                                            <button type="button" wire:click="startExternalObligationReview('{{ $partnerObligation['id'] }}')"
+                                                class="rounded-lg border px-3 py-2">Independently review partner loss obligation</button>
+                                        @endif
+                                    @elseif($partnerDiscrepancy['decision'] === 'substantiated' &&
+                                        $partnerDiscrepancy['reportedBy'] !== (int)auth()->id() &&
+                                        config('inventory_controls.external_in_loss_obligation_enabled') &&
+                                        $this->canIndependentlyAcceptExternalBorrowing())
+                                        <button type="button" wire:click="startExternalObligation('{{ $partnerDiscrepancy['id'] }}')"
+                                            class="rounded-lg border px-3 py-2">Propose provisional partner loss obligation</button>
+                                    @endif
                                 @elseif(!$returnBatch['confirmed'] && $returnBatch['dispatchedBy'] !== (int)auth()->id() &&
                                     config('inventory_controls.external_borrowed_discrepancy_enabled') &&
                                     $this->canIndependentlyAcceptExternalBorrowing())
@@ -1879,6 +1897,53 @@
                         <button type="button" wire:click="submitExternalDiscrepancyReview"
                             class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">Record independent partner discrepancy review</button>
                     </section>
+                @endif
+                @if(config('inventory_controls.external_in_loss_obligation_enabled') && $externalObligationDiscrepancyId !== '')
+                    <section class="rounded-xl border p-4 space-y-3" aria-label="Propose provisional partner loss obligation">
+                        <h3 class="font-semibold">Propose provisional partner loss obligation</h3>
+                        <p class="text-sm">Discrepancy {{ $externalObligationDiscrepancyId }}. Enter a manual amount only for the partner-reported missing and damaged units. This is not an invoice, journal, payment or settlement.</p>
+                        <label class="block text-sm">Currency (ISO 4217)
+                            <input type="text" maxlength="3" wire:model="externalObligationCurrency"
+                                class="w-full rounded-lg border p-2 text-gray-900">
+                        </label>
+                        <label class="block text-sm">Amount in minor units
+                            <input type="number" min="1" step="1" wire:model="externalObligationAmount"
+                                class="w-full rounded-lg border p-2 text-gray-900">
+                        </label>
+                        <label class="block text-sm">Reason
+                            <textarea wire:model="externalObligationReason" rows="2"
+                                class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                        </label>
+                        @error('externalObligationCurrency') <p role="alert">{{ $message }}</p> @enderror
+                        @error('externalObligationAmount') <p role="alert">{{ $message }}</p> @enderror
+                        @error('externalObligationReason') <p role="alert">{{ $message }}</p> @enderror
+                        <button type="button" wire:click="submitExternalObligation"
+                            class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">Propose provisional partner loss obligation</button>
+                    </section>
+                @endif
+                @if(config('inventory_controls.external_in_loss_obligation_enabled') && $externalObligationDecisionTarget !== '')
+                    <section class="rounded-xl border p-4 space-y-3" aria-label="Independent partner loss obligation review">
+                        <h3 class="font-semibold">Independently review partner loss obligation</h3>
+                        <p class="text-sm">Obligation {{ $externalObligationDecisionTarget }}. A different current owner/admin decides the provisional amount. Approval never posts money, recognises a receivable/payable journal or settles the loan.</p>
+                        <label class="block text-sm">Decision
+                            <select wire:model="externalObligationDecision" class="w-full rounded-lg border p-2 text-gray-900">
+                                <option value="approved">Approve provisional partner loss position</option>
+                                <option value="rejected">Reject</option>
+                                <option value="disputed">Disputed</option>
+                            </select>
+                        </label>
+                        <label class="block text-sm">Independent review reason
+                            <textarea wire:model="externalObligationDecisionReason" rows="2"
+                                class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                        </label>
+                        @error('externalObligationDecision') <p role="alert">{{ $message }}</p> @enderror
+                        @error('externalObligationDecisionReason') <p role="alert">{{ $message }}</p> @enderror
+                        <button type="button" wire:click="submitExternalObligationReview"
+                            class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">Record independent partner loss obligation decision</button>
+                    </section>
+                @endif
+                @if($lastExternalObligationReference)
+                    <p role="status">Provisional partner loss obligation {{ $lastExternalObligationReference }} recorded. No invoice, journal, payment, settlement or closure was posted.</p>
                 @endif
                 @if($lastExternalClearanceReference)
                     <p role="status">Partner-confirmed receipt clearance {{ $lastExternalClearanceReference }} posted. Borrowed transit, stock, money and loan closure are otherwise unchanged.</p>

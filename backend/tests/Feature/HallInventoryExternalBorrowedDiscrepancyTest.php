@@ -380,5 +380,33 @@ final class HallInventoryExternalBorrowedDiscrepancyTest extends TestCase
         }catch(QueryException){}
         $this->assertSame(1,DB::table('hall_inventory_external_in_loss_obligations')->count());
         $this->assertSame(0,DB::table('hall_inventory_external_in_clean_closures')->count());
+
+        $this->be($reviewer);
+        Livewire::test(HallInventory::class)
+            ->set('hallId',$hall->id)
+            ->assertSee('Propose provisional partner loss obligation')
+            ->call('startExternalObligation',$secondDiscrepancy)->assertHasNoErrors()
+            ->set('externalObligationCurrency','PKR')
+            ->set('externalObligationAmount','25000')
+            ->set('externalObligationReason','Partner-signed second batch missing unit grounds this provisional obligation.')
+            ->call('submitExternalObligation')->assertHasNoErrors()
+            ->assertSee('PROVISIONAL PARTNER LOSS OBLIGATION');
+        $secondObligation=DB::table('hall_inventory_external_in_loss_obligations')
+            ->where('discrepancy_id',$secondDiscrepancy)->first();
+        $this->assertNotNull($secondObligation);
+        $this->assertSame(1,(int)$secondObligation->quantity_basis);
+        $this->assertSame(25000,(int)$secondObligation->amount_minor);
+        Livewire::test(HallInventory::class)
+            ->set('hallId',$hall->id)
+            ->call('startExternalObligationReview',$secondObligation->id)->assertForbidden();
+        $this->be($approver);
+        Livewire::test(HallInventory::class)
+            ->set('hallId',$hall->id)
+            ->assertSee('Independently review partner loss obligation')
+            ->call('startExternalObligationReview',$secondObligation->id)->assertHasNoErrors()
+            ->set('externalObligationDecision','approved')
+            ->set('externalObligationDecisionReason','Independent owner accepts the provisional second-batch position.')
+            ->call('submitExternalObligationReview')->assertHasNoErrors()
+            ->assertSee('basis 1 units — APPROVED');
     }
 }
