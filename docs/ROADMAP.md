@@ -199,3 +199,6 @@ Independent original-hall Owner/Admin closeout now has a dedicated company-scope
 
 ## Phase 12 INTERNAL exact original-loan joined finding verified 244d4eaf
 - [39703264721](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39703264721) six SUCCESS including real PostgreSQL and authenticated browser. Borrower/lender signed per-item findings are immutable scoped review evidence only; no source physical retirement, money, or final certificate. Further signed original borrower proof access hardening is additive/CI PENDING. Physical return reconciliation and financial/abnormal closure still OPEN. Production inventory and finance OFF.
+
+## Phase12 original loan subsequent witnessed returns safety follow-on
+- Prepared immutable original-loan return-aware physical history, marks historically confirmed findings stale when actual later good/damaged returns reduce current open count. Exact receipt/acceptance joins; no shared destination catalog aggregate treated as per-loan. New signed original loan regression exercises ten good returns against stale three-missing finding. CI PENDING; unchanged production OFF.

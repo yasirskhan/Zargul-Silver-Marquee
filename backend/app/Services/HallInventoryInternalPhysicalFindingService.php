@@ -232,6 +232,42 @@ final class HallInventoryInternalPhysicalFindingService {
             ->where('id',$loanId)->where('direction','internal')
             ->where($source?'lending_hall_id':'borrowing_hall_id',$hall)->first();
         if (!$loan)throw new AuthorizationException('Original loan finding history denied.');
+        // Recompute current physical custody exclusively from this ORIGINAL
+        // dispatch and independently accepted return batches. History remains
+        // immutable even if a later witnessed return changes open quantity.
+        $dispatch=DB::table('hall_inventory_loan_dispatches')
+            ->where('company_id',$company)->where('loan_id',$loanId)->first(['id']);
+        if(!$dispatch)throw new ConflictHttpException('Original physical handover is missing.');
+        $original=DB::table('hall_inventory_loan_dispatch_lines')
+            ->where('company_id',$company)->where('dispatch_id',$dispatch->id)
+            ->pluck('quantity','item_id');
+        $accepted=DB::table('hall_inventory_internal_loan_return_acceptance_lines as al')
+            ->join('hall_inventory_internal_loan_return_acceptances as a',function($j):void {
+                $j->on('a.company_id','=','al.company_id')->on('a.id','=','al.acceptance_id');
+            })->join('hall_inventory_internal_loan_return_batches as batch',function($j):void {
+                $j->on('batch.company_id','=','a.company_id')->on('batch.id','=','a.return_batch_id');
+            })->where('al.company_id',$company)->where('batch.loan_id',$loanId)
+            ->select('al.source_item_id')->selectRaw('SUM(al.good_quantity) AS good')
+            ->selectRaw('SUM(al.damaged_quantity) AS damaged')
+            ->groupBy('al.source_item_id')->get()->keyBy('source_item_id');
+        $inTransit=DB::table('hall_inventory_internal_loan_return_lines as rl')
+            ->join('hall_inventory_internal_loan_return_batches as batch',function($j):void {
+                $j->on('batch.company_id','=','rl.company_id')->on('batch.id','=','rl.return_batch_id');
+            })->leftJoin('hall_inventory_internal_loan_return_acceptances as a',function($j):void {
+                $j->on('a.company_id','=','batch.company_id')->on('a.return_batch_id','=','batch.id');
+            })->where('rl.company_id',$company)->where('batch.loan_id',$loanId)
+            ->whereNull('a.id')->select('rl.source_item_id')
+            ->selectRaw('SUM(rl.quantity) AS pending')
+            ->groupBy('rl.source_item_id')->pluck('pending','source_item_id');
+        $open=[];
+        foreach($original as $item=>$quantity){
+            $a=$accepted->get((string)$item);
+            $remaining=(int)$quantity-(int)($a->good??0)-(int)($a->damaged??0)
+                -(int)($inTransit[$item]??0);
+            if($remaining<0)
+                throw new ConflictHttpException('Original loan physical return exceeds immutable dispatch.');
+            $open[(string)$item]=$remaining;
+        }
         return DB::table('hall_inventory_internal_physical_findings as f')
             ->leftJoin('hall_inventory_internal_physical_finding_decisions as d',function($j):void {
                 $j->on('d.company_id','=','f.company_id')->on('d.finding_id','=','f.id');
@@ -240,7 +276,9 @@ final class HallInventoryInternalPhysicalFindingService {
             ->get(['f.id','f.source_item_id','f.kind','f.quantity','f.borrower_statement_id',
                 'f.source_incident_id','f.source_proof_path','f.source_proof_sha256',
                 'f.source_proof_size','f.proposed_by','d.decision','d.decided_by'])
-            ->map(function($row):array {
+            ->map(function($row)use($open):array {
+                if(!array_key_exists((string)$row->source_item_id,$open))
+                    throw new ConflictHttpException('Finding is not on original physical dispatch.');
                 $this->checkedProof((string)$row->source_proof_path,
                     (string)$row->source_proof_sha256,(int)$row->source_proof_size);
                 return ['id'=>(string)$row->id,'itemId'=>(string)$row->source_item_id,
@@ -249,7 +287,11 @@ final class HallInventoryInternalPhysicalFindingService {
                     'sourceIncidentId'=>(string)$row->source_incident_id,
                     'sha256'=>(string)$row->source_proof_sha256,
                     'proposedBy'=>(int)$row->proposed_by,'decision'=>$row->decision,
-                    'decidedBy'=>$row->decided_by,'physicalReturnRecorded'=>false,
+                    'decidedBy'=>$row->decided_by,
+                    'currentPhysicalOutstanding'=>$open[(string)$row->source_item_id],
+                    'historicalFindingStillFullyOutstanding'=>
+                        $open[(string)$row->source_item_id]>=(int)$row->quantity,
+                    'physicalReturnRecorded'=>false,
                     'stockRetired'=>false,'moneyPosted'=>false,'finalClosure'=>false];
             })->all();
     }

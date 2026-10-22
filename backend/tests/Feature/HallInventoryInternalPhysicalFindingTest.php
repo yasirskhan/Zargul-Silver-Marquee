@@ -182,6 +182,41 @@ class HallInventoryInternalPhysicalFindingTest extends TestCase {
         $this->assertSame(12,(int)DB::table('hall_inventory_positions')
             ->where('hall_id',$source->id)->where('item_id',$item)->value('owned_on_loan'));
     }
+    public function test_later_independently_accepted_good_returns_block_stale_physical_finding_confirmation():void {
+        $f=$this->fixture();extract($f);
+        config()->set('inventory_controls.internal_physical_finding_enabled',true);
+        $svc=app(HallInventoryInternalPhysicalFindingService::class);
+        $id=(string)Str::uuid();
+        $this->assertSame($id,$svc->propose($admin,$company->id,$source->id,$loan,
+            $statement,$incident,$id,'Witnessed source item remains unreturned pending physical checks.',$this->pdf()));
+        $this->be($manager);
+        $batch=(string)Str::uuid();
+        app(\App\Services\HallInventoryInternalLoanReturnService::class)->send(
+            $manager,$company->id,$loan,$batch,[$item=>10],[$mapped=>1],$this->pdf());
+        // Shipment is IN TRANSIT. A lender cannot treat it as a
+        // separately witnessed good return or as missing retirement.
+        $this->be($owner);
+        $accept=(string)Str::uuid();
+        app(\App\Services\HallInventoryInternalLoanReturnAcceptanceService::class)->accept(
+            $owner,$company->id,$batch,$accept,[$item=>['good'=>10,'damaged'=>0]],
+            [$item=>1],[$mapped=>2],$this->pdf());
+        $this->assertSame(2,(int)DB::table('hall_inventory_positions')
+            ->where('company_id',$company->id)->where('hall_id',$source->id)
+            ->where('item_id',$item)->value('owned_on_loan'));
+        $live=$svc->history($owner,$company->id,$source->id,$loan,true);
+        $this->assertSame(2,$live[0]['currentPhysicalOutstanding']);
+        $this->assertFalse($live[0]['historicalFindingStillFullyOutstanding']);
+        try {
+            $svc->decide($owner,$company->id,$source->id,$id,(string)Str::uuid(),
+                'confirmed_outstanding','Do not confirm historical three-unit discrepancy after ten actual good returns.');
+            $this->fail('A stale unreturned finding was confirmed after true witnessed returns reduced open custody.');
+        }catch(ConflictHttpException){}
+        $this->assertSame(0,DB::table('hall_inventory_internal_physical_finding_decisions')
+            ->where('company_id',$company->id)->count());
+        $this->assertSame(0,DB::table('finance_journals')->count());
+        $this->assertSame(0,DB::table('hall_inventory_nonclean_final_closures')->count());
+    }
+
     public function test_unrelated_loan_or_forged_source_hall_cannot_use_original_signatures():void {
         $f=$this->fixture();extract($f);
         config()->set('inventory_controls.internal_physical_finding_enabled',true);

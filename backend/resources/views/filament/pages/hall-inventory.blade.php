@@ -1906,6 +1906,11 @@
                                     <article wire:key="physical-finding-{{ $finding['id'] }}" class="rounded-lg border p-2 text-sm">
                                         <p>Finding {{ $finding['id'] }}: {{ $finding['kind'] }} {{ $finding['quantity'] }} original item {{ $finding['itemId'] }}</p>
                                         <p>{{ $finding['decision'] ?? 'INDEPENDENT REVIEW PENDING' }}. Signed source proof SHA256 {{ $finding['sha256'] }}. Stock and money unchanged.</p>
+                                        <p>Original-loan physical units currently open (not independently accepted good/damaged or merely in-transit): {{ $finding['currentPhysicalOutstanding'] }}.
+                                            @unless($finding['historicalFindingStillFullyOutstanding'])
+                                                Historical discrepancy evidence is STALE after later physical return activity. New reconciliation and independent review required; do not charge or close from this finding.
+                                            @endunless
+                                        </p>
                                         <button type="button" wire:click="downloadInternalPhysicalFindingProof('{{ $finding['id'] }}')" class="rounded border px-2 py-1">Private source evidence (audited)</button>
                                     </article>
                                 @endforeach
