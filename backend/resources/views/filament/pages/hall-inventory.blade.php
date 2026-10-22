@@ -2236,6 +2236,24 @@
                                                 <button type="button" wire:click="startInternalObligationReview('{{ $internalObligation['id'] }}')"
                                                     class="rounded border px-3 py-2">Independently review internal loss obligation</button>
                                             @endif
+                                            @if($internalObligation['decision'] === 'approved')
+                                                @php($internalSettlement = collect($internalSettlementHistory)->firstWhere('obligationId', $internalObligation['id']))
+                                                @if($internalSettlement)
+                                                    <p class="font-medium">INTERNAL SETTLEMENT EVIDENCE — {{ $internalSettlement['currency'] }} {{ $internalSettlement['amountMinor'] }} minor units, {{ strtoupper($internalSettlement['method']) }} {{ $internalSettlement['reference'] }} paid {{ $internalSettlement['paidOn'] }} — {{ $internalSettlement['decision'] === null ? 'INDEPENDENT REVIEW PENDING' : strtoupper($internalSettlement['decision']) }}</p>
+                                                    <p>Private proof SHA256 {{ $internalSettlement['proofSha256'] }}. Evidence only; no journal, cash mutation by this layer, stock retirement or closure.</p>
+                                                    @if($internalSettlement['decision'] === null &&
+                                                        $internalSettlement['recordedBy'] !== (int)auth()->id() &&
+                                                        config('inventory_controls.internal_loss_settlement_enabled') &&
+                                                        $this->canReviewInternalDiscrepancy())
+                                                        <button type="button" wire:click="startInternalSettlementReview('{{ $internalSettlement['id'] }}')"
+                                                            class="rounded border px-3 py-2">Independently verify internal settlement</button>
+                                                    @endif
+                                                @elseif(config('inventory_controls.internal_loss_settlement_enabled') &&
+                                                    $this->canReviewInternalDiscrepancy())
+                                                    <button type="button" wire:click="startInternalSettlement('{{ $internalObligation['id'] }}')"
+                                                        class="rounded border px-3 py-2">Record internal settlement evidence</button>
+                                                @endif
+                                            @endif
                                         @elseif(($finding['decision'] ?? null) === 'confirmed_outstanding' &&
                                             !($finding['supersededByIndependentCorrection'] ?? false) &&
                                             config('inventory_controls.internal_loss_obligation_enabled') &&
@@ -2283,6 +2301,61 @@
                                         @error('internalObligationDecisionReason') <p role="alert">{{ $message }}</p> @enderror
                                         <button type="button" wire:click="submitInternalObligationReview" class="rounded bg-emerald-800 px-4 py-2 text-white">Record independent internal loss obligation decision</button>
                                     </section>
+                                @endif
+                                @if(config('inventory_controls.internal_loss_settlement_enabled') && $internalSettlementObligationId !== '')
+                                    <section aria-label="Record internal settlement evidence">
+                                        <h4 class="font-semibold">Record private internal settlement evidence</h4>
+                                        <p class="text-sm">Obligation {{ $internalSettlementObligationId }}. Evidence only; no journal, cash mutation by this layer, stock retirement or closure.</p>
+                                        <label>Currency (ISO 4217)
+                                            <input type="text" maxlength="3" wire:model="internalSettlementCurrency" class="w-full rounded border p-2">
+                                        </label>
+                                        <label>Amount in minor units
+                                            <input type="number" min="1" step="1" wire:model="internalSettlementAmount" class="w-full rounded border p-2">
+                                        </label>
+                                        <label>Method
+                                            <select wire:model="internalSettlementMethod" class="w-full rounded border p-2">
+                                                <option value="bank">Bank transfer</option>
+                                                <option value="cash">Cash</option>
+                                            </select>
+                                        </label>
+                                        <label>Reference
+                                            <input type="text" maxlength="100" wire:model="internalSettlementReference" class="w-full rounded border p-2">
+                                        </label>
+                                        <label>Paid on
+                                            <input type="date" wire:model="internalSettlementPaidOn" class="w-full rounded border p-2">
+                                        </label>
+                                        <label>Private proof (PDF/JPEG/PNG)
+                                            <input type="file" wire:model="internalSettlementFile" accept=".pdf,.jpg,.jpeg,.png" class="w-full rounded border p-2">
+                                        </label>
+                                        @error('internalSettlementAmount') <p role="alert">{{ $message }}</p> @enderror
+                                        @error('internalSettlementCurrency') <p role="alert">{{ $message }}</p> @enderror
+                                        @error('internalSettlementMethod') <p role="alert">{{ $message }}</p> @enderror
+                                        @error('internalSettlementReference') <p role="alert">{{ $message }}</p> @enderror
+                                        @error('internalSettlementPaidOn') <p role="alert">{{ $message }}</p> @enderror
+                                        @error('internalSettlementFile') <p role="alert">{{ $message }}</p> @enderror
+                                        <button type="button" wire:click="submitInternalSettlement" class="rounded bg-emerald-800 px-4 py-2 text-white">Record internal settlement evidence</button>
+                                    </section>
+                                @endif
+                                @if(config('inventory_controls.internal_loss_settlement_enabled') && $internalSettlementReviewTarget !== '')
+                                    <section aria-label="Independently verify internal settlement">
+                                        <h4 class="font-semibold">Independently verify internal settlement</h4>
+                                        <p class="text-sm">Settlement {{ $internalSettlementReviewTarget }}. A different source owner/admin verifies the private evidence; no journal or cash mutation by this layer.</p>
+                                        <label>Decision
+                                            <select wire:model="internalSettlementReviewDecision" class="w-full rounded border p-2">
+                                                <option value="verified">Verify settlement evidence</option>
+                                                <option value="rejected">Reject</option>
+                                            </select>
+                                        </label>
+                                        <label>Independent review reason
+                                            <textarea wire:model="internalSettlementReviewReason" rows="2" class="w-full rounded border p-2"></textarea>
+                                        </label>
+                                        @error('internalSettlementReviewDecision') <p role="alert">{{ $message }}</p> @enderror
+                                        @error('internalSettlementReviewReason') <p role="alert">{{ $message }}</p> @enderror
+                                        <button type="button" wire:click="submitInternalSettlementReview" class="rounded bg-emerald-800 px-4 py-2 text-white">Record independent internal settlement review</button>
+                                    </section>
+                                @endif
+                                @if($lastInternalSettlementReference)
+                                    <p role="status">Internal settlement reference {{ $lastInternalSettlementReference }} recorded. No journal, cash mutation by this layer, stock retirement or closure was posted.</p>
                                 @endif
                                 @if($lastInternalObligationReference)
                                     <p role="status">Internal loss obligation {{ $lastInternalObligationReference }} recorded. No journal, cash, stock retirement or closure was posted.</p>

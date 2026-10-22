@@ -436,5 +436,13 @@ class HallInventoryInternalPhysicalFindingTest extends TestCase {
             ->where('company_id',$company->id)->where('hall_id',$source->id)
             ->where('item_id',$item)->value('owned_on_loan'));
         $this->assertSame(0,DB::table('hall_inventory_internal_loan_closures')->count());
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->be($owner);
+        Livewire::test(HallInventory::class)
+            ->set('companyId',$company->id)->set('hallId',$source->id)
+            ->call('startInternalDiscrepancyReview',$loan)->assertHasNoErrors()
+            ->assertSee('INTERNAL SETTLEMENT EVIDENCE')
+            ->assertSee('BANK-INTERNAL-1')
+            ->assertSee('VERIFIED');
     }
 }

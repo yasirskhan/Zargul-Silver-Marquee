@@ -335,6 +335,24 @@ final class HallInventory extends Page
     #[Locked]
     public ?string $lastInternalObligationReference = null;
     #[Locked]
+    public array $internalSettlementHistory = [];
+    #[Locked]
+    public string $internalSettlementObligationId = '';
+    #[Locked]
+    public string $internalSettlementRequestId = '';
+    public string $internalSettlementAmount = '';
+    public string $internalSettlementCurrency = 'PKR';
+    public string $internalSettlementMethod = 'bank';
+    public string $internalSettlementReference = '';
+    public string $internalSettlementPaidOn = '';
+    public $internalSettlementFile = null;
+    #[Locked]
+    public string $internalSettlementReviewTarget = '';
+    public string $internalSettlementReviewDecision = 'verified';
+    public string $internalSettlementReviewReason = '';
+    #[Locked]
+    public ?string $lastInternalSettlementReference = null;
+    #[Locked]
     public string $physicalCorrectionId = '';
     #[Locked]
     public string $physicalCorrectionReviewId = '';
@@ -707,6 +725,17 @@ final class HallInventory extends Page
         $this->internalObligationDecision='approved';
         $this->internalObligationDecisionReason='';
         $this->lastInternalObligationReference=null;
+        $this->internalSettlementHistory=[];
+        $this->internalSettlementObligationId='';
+        $this->internalSettlementRequestId=(string)Str::uuid();
+        $this->internalSettlementAmount='';
+        $this->internalSettlementReference='';
+        $this->internalSettlementPaidOn='';
+        $this->internalSettlementFile=null;
+        $this->internalSettlementReviewTarget='';
+        $this->internalSettlementReviewDecision='verified';
+        $this->internalSettlementReviewReason='';
+        $this->lastInternalSettlementReference=null;
         $this->physicalFindingFile=null;
         $this->physicalFindingStatementId='';
         $this->physicalFindingIncidentId='';
@@ -2748,6 +2777,16 @@ final class HallInventory extends Page
         $this->discrepancyDecisionId=(string)Str::uuid();
         $this->physicalFindingId=(string)Str::uuid();
         $this->physicalFindingDecisionId=(string)Str::uuid();
+        $this->internalSettlementObligationId='';
+        $this->internalSettlementRequestId=(string)Str::uuid();
+        $this->internalSettlementAmount='';
+        $this->internalSettlementReference='';
+        $this->internalSettlementPaidOn='';
+        $this->internalSettlementFile=null;
+        $this->internalSettlementReviewTarget='';
+        $this->internalSettlementReviewDecision='verified';
+        $this->internalSettlementReviewReason='';
+        $this->lastInternalSettlementReference=null;
         $this->physicalFindingFile=null;
         if(config('inventory_controls.internal_physical_finding_enabled')) {
             $this->physicalFindingIncidents=app(\App\Services\HallInventoryLoanIncidentDecisionService::class)
@@ -2760,11 +2799,16 @@ final class HallInventory extends Page
                 ? app(\App\Services\HallInventoryInternalLossObligationService::class)
                     ->recent($actor,$this->companyId,$this->hallId)
                 : [];
+            $this->internalSettlementHistory=config('inventory_controls.internal_loss_settlement_enabled')
+                ? app(\App\Services\HallInventoryInternalLossSettlementService::class)
+                    ->recent($actor,$this->companyId,$this->hallId)
+                : [];
         }else {
             $this->physicalFindingIncidents=[];
             $this->physicalFindingHistory=[];
             $this->physicalCorrectionHistory=[];
             $this->internalObligationHistory=[];
+            $this->internalSettlementHistory=[];
         }
     }
     public function startInternalObligation(string $findingId):void {
@@ -2786,6 +2830,16 @@ final class HallInventory extends Page
         $this->internalObligationAmount='';
         $this->internalObligationReason='';
         $this->lastInternalObligationReference=null;
+        $this->internalSettlementObligationId='';
+        $this->internalSettlementRequestId=(string)Str::uuid();
+        $this->internalSettlementAmount='';
+        $this->internalSettlementReference='';
+        $this->internalSettlementPaidOn='';
+        $this->internalSettlementFile=null;
+        $this->internalSettlementReviewTarget='';
+        $this->internalSettlementReviewDecision='verified';
+        $this->internalSettlementReviewReason='';
+        $this->lastInternalSettlementReference=null;
     }
     public function submitInternalObligation():void {
         $actor=$this->authorizeSelection();
@@ -2861,6 +2915,112 @@ final class HallInventory extends Page
     private function reloadInternalObligationHistory(User $actor):void {
         $this->internalObligationHistory=config('inventory_controls.internal_loss_obligation_enabled')
             ? app(\App\Services\HallInventoryInternalLossObligationService::class)
+                ->recent($actor,$this->companyId,$this->hallId)
+            : [];
+    }
+    public function startInternalSettlement(string $obligationId):void {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.internal_loss_settlement_enabled') &&
+            config('inventory_controls.internal_loss_obligation_enabled') &&
+            config('inventory_controls.internal_physical_finding_enabled') &&
+            $this->discrepancyLoanId!=='' && $this->canReviewInternalDiscrepancy(),403);
+        $obligation=collect($this->internalObligationHistory)->first(
+            fn($o):bool=>$o['id']===$obligationId && $o['decision']==='approved'
+        );
+        abort_unless($obligation!==null,403);
+        abort_if(collect($this->internalSettlementHistory)
+            ->contains(fn($s):bool=>$s['obligationId']===$obligationId),403);
+        $this->internalSettlementObligationId=$obligationId;
+        $this->internalSettlementRequestId=(string)Str::uuid();
+        $this->internalSettlementAmount=(string)$obligation['amountMinor'];
+        $this->internalSettlementCurrency=$obligation['currency'];
+        $this->internalSettlementMethod='bank';
+        $this->internalSettlementReference='';
+        $this->internalSettlementPaidOn=now('UTC')->toDateString();
+        $this->internalSettlementFile=null;
+        $this->lastInternalSettlementReference=null;
+    }
+    public function submitInternalSettlement():void {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.internal_loss_settlement_enabled') &&
+            config('inventory_controls.internal_loss_obligation_enabled') &&
+            config('inventory_controls.internal_physical_finding_enabled') &&
+            $this->discrepancyLoanId!=='' && $this->canReviewInternalDiscrepancy() &&
+            $this->internalSettlementObligationId!=='',403);
+        $this->validate([
+            'internalSettlementAmount'=>'required|string|regex:/^[1-9][0-9]{0,11}$/',
+            'internalSettlementCurrency'=>'required|string|size:3|regex:/^[A-Z]{3}$/',
+            'internalSettlementMethod'=>'required|in:cash,bank',
+            'internalSettlementReference'=>'required|string|min:3|max:100',
+            'internalSettlementPaidOn'=>'required|date_format:Y-m-d',
+            'internalSettlementFile'=>'required|file|max:5120|mimes:jpg,jpeg,png,pdf',
+        ]);
+        try {
+            $this->lastInternalSettlementReference=app(
+                \App\Services\HallInventoryInternalLossSettlementService::class
+            )->record($actor,$this->companyId,$this->hallId,
+                $this->internalSettlementObligationId,$this->internalSettlementRequestId,
+                (int)$this->internalSettlementAmount,$this->internalSettlementCurrency,
+                $this->internalSettlementMethod,$this->internalSettlementReference,
+                $this->internalSettlementPaidOn,$this->internalSettlementFile);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages([
+                'internalSettlementReference'=>$e->getMessage()
+            ]);
+        }
+        $this->internalSettlementObligationId='';
+        $this->internalSettlementRequestId=(string)Str::uuid();
+        $this->internalSettlementAmount='';
+        $this->internalSettlementReference='';
+        $this->internalSettlementPaidOn='';
+        $this->internalSettlementFile=null;
+        $this->reloadInternalSettlementHistory($actor);
+    }
+    public function startInternalSettlementReview(string $settlementId):void {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.internal_loss_settlement_enabled') &&
+            config('inventory_controls.internal_loss_obligation_enabled') &&
+            config('inventory_controls.internal_physical_finding_enabled') &&
+            $this->discrepancyLoanId!=='' && $this->canReviewInternalDiscrepancy(),403);
+        $row=collect($this->internalSettlementHistory)->first(
+            fn($s):bool=>$s['id']===$settlementId && $s['decision']===null &&
+                $s['recordedBy']!==(int)$actor->getKey()
+        );
+        abort_unless($row!==null,403);
+        $this->internalSettlementReviewTarget=$settlementId;
+        $this->internalSettlementReviewDecision='verified';
+        $this->internalSettlementReviewReason='';
+    }
+    public function submitInternalSettlementReview():void {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.internal_loss_settlement_enabled') &&
+            config('inventory_controls.internal_loss_obligation_enabled') &&
+            config('inventory_controls.internal_physical_finding_enabled') &&
+            $this->discrepancyLoanId!=='' && $this->canReviewInternalDiscrepancy() &&
+            $this->internalSettlementReviewTarget!=='',403);
+        $this->validate([
+            'internalSettlementReviewDecision'=>'required|in:verified,rejected',
+            'internalSettlementReviewReason'=>'required|string|min:10|max:500',
+        ]);
+        try {
+            $this->lastInternalSettlementReference=app(
+                \App\Services\HallInventoryInternalLossSettlementService::class
+            )->review($actor,$this->companyId,$this->hallId,
+                $this->internalSettlementReviewTarget,(string)Str::uuid(),
+                $this->internalSettlementReviewDecision,$this->internalSettlementReviewReason);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages([
+                'internalSettlementReviewReason'=>$e->getMessage()
+            ]);
+        }
+        $this->internalSettlementReviewTarget='';
+        $this->internalSettlementReviewDecision='verified';
+        $this->internalSettlementReviewReason='';
+        $this->reloadInternalSettlementHistory($actor);
+    }
+    private function reloadInternalSettlementHistory(User $actor):void {
+        $this->internalSettlementHistory=config('inventory_controls.internal_loss_settlement_enabled')
+            ? app(\App\Services\HallInventoryInternalLossSettlementService::class)
                 ->recent($actor,$this->companyId,$this->hallId)
             : [];
     }
