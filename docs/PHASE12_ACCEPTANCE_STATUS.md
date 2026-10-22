@@ -1,5 +1,13 @@
 # Phase 12 acceptance status (2026-10-22 UTC)
 
+## Technical hardening verification (2026-10-22)
+- Source `c2c61caa2ec8aa927f1021fbf1acc2bc0854f0cc` CI [39852568710](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39852568710): all six SUCCESS. Same-catalog original INTERNAL multi-loan physical conservation, company IAC numbering lock, occupied/corrupt/missing private certificate retries.
+- Source `f88babb56c2d5e59705c1001f83d365a3e65b201` CI [39853153415](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39853153415): all six SUCCESS. Irreversible close checks original borrower/source signed proof and settlement hashes; synthetic DB-insert failure rolls back stock, PDF and audit; exact safe retry.
+- **Phase 12 technical acceptance is PARTIAL and overall status stays OPEN / BLOCKED**: no comprehensive every-flow synchronized stress matrix, interrupted real storage outage, staging backup/restore access, full inventory browser/operator walkthrough, independent security/monitoring signoff or explicit production release.
+- The detailed 59-requirement code/source/UI/test inventory and residual gates are in `docs/PHASE12_FINAL_ACCEPTANCE_REPORT.md`. Older register labels reconciled as source-present without granting operational acceptance.
+- All inventory and finance production flags remain OFF. Phase 13 not promoted.
+
+
 Status: **OPEN — NOT ACCEPTED. All production inventory and finance switches remain OFF.**
 Branch: `chatgpt/phase0-foundation`. This register is evidence of verified source and open gates, not a production release.
 
