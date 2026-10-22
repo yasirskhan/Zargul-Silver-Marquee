@@ -66,6 +66,11 @@ final class HallInventoryInternalLoanReturnService
                 ->where('id',$loanId)->lockForUpdate()->first();
             if (!$draft||$draft->direction!=='internal')
                 throw new ConflictHttpException('Return requires original internal loan.');
+            if (DB::table('hall_inventory_internal_loan_closures')
+                    ->where('company_id',$companyId)->where('loan_id',$loanId)->exists() ||
+                DB::table('hall_inventory_nonclean_final_closures')
+                    ->where('company_id',$companyId)->where('loan_id',$loanId)->exists())
+                throw new ConflictHttpException('Finalized original loan cannot ship additional returns.');
             $ids=[$draft->lending_hall_id,$draft->borrowing_hall_id];
             sort($ids,SORT_STRING);
             $halls=Hall::query()->where('company_id',$companyId)->whereIn('id',$ids)

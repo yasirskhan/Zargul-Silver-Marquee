@@ -47,3 +47,6 @@ Before claiming automated session recovery works, verify that the scheduled exec
 - Retired maximum-length normal Chat: https://chatgpt.com/c/6ad84c8c-ca60-83e9-a05b-782fd6a675e5. Superseded, do not resume as a writer.
 - Replacement is this normal Chat; its canonical conversation URL was not exposed through available GitHub tools and browser integration failed to initialize, so UNKNOWN. The supervising Chat must fill exact real URL when visible, never invent it. No second repository writer/source edits were reported.
 - Verified original fcdcc5d GitHub Actions 39698916554 SIX SUCCESS, new original-loan physical finding 244d4eaf GitHub Actions 39703264721 SIX SUCCESS. Current replacement proceeds under expected_sha force=false. This note is not a distributed write lock.
+
+## Replacement worker URL
+- Current normal Chat: https://chatgpt.com/c/6ad95d2c-d8e4-83e9-a7da-2ecc38f3f0a6. Only Zargul authorized branch, one writer. Historical fcd report superseded by 4078c572 all-six-green.

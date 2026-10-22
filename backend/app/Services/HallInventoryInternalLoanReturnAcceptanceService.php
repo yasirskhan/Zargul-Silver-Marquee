@@ -81,6 +81,11 @@ final class HallInventoryInternalLoanReturnAcceptanceService
                 $draft->lending_hall_id!==$batch->source_hall_id||
                 $draft->borrowing_hall_id!==$batch->destination_hall_id)
                 throw new ConflictHttpException('Return batch source/destination mismatched original draft.');
+            if (DB::table('hall_inventory_internal_loan_closures')
+                    ->where('company_id',$companyId)->where('loan_id',$draft->id)->exists() ||
+                DB::table('hall_inventory_nonclean_final_closures')
+                    ->where('company_id',$companyId)->where('loan_id',$draft->id)->exists())
+                throw new ConflictHttpException('Finalized original loan cannot accept additional returns.');
             $hallIds=[$draft->lending_hall_id,$draft->borrowing_hall_id];
             sort($hallIds,SORT_STRING);
             $halls=Hall::query()->where('company_id',$companyId)

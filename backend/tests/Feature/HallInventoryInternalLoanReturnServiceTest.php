@@ -586,6 +586,44 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
             $this->travelBack();
         }
 
+        // Synthetic immutable final record isolates a closed-loan race:
+        // neither a later borrower shipment nor replayed source acceptance
+        // may modify stock after a final numbered receipt exists.
+        DB::table('hall_inventory_internal_loan_closures')->insert([
+            'id'=>(string)Str::uuid(),'company_id'=>$company->id,
+            'loan_id'=>$loan,'source_hall_id'=>$src->id,
+            'receipt_number'=>99000001,
+            'reconciliation_sha256'=>str_repeat('a',64),
+            'pdf_sha256'=>str_repeat('b',64),'pdf_size'=>1,
+            'pdf_storage_path'=>'private/test-only/finalized',
+            'closed_by'=>$owner->getKey()
+        ]);
+        $srcBefore=DB::table('hall_inventory_positions')
+            ->where('hall_id',$src->id)->where('item_id',$srcItem)->first();
+        $dstBefore=DB::table('hall_inventory_positions')
+            ->where('hall_id',$dest->id)->where('item_id',$dstItem)->first();
+        $movementsBefore=DB::table('hall_inventory_movement_events')->count();
+        $this->be($receiver);
+        try {
+            app(HallInventoryInternalLoanReturnService::class)->send(
+                $receiver,$company->id,$loan,(string)Str::uuid(),
+                [$srcItem=>1],[$dstItem=>(int)$dstBefore->revision],$pdf());
+            $this->fail('A finalized original loan accepted a new physical return shipment.');
+        } catch (ConflictHttpException) {}
+        $this->be($owner);
+        try {
+            $acceptor->accept($owner,$company->id,$first,$acceptance,
+                [$srcItem=>['good'=>3,'damaged'=>1]],
+                [$srcItem=>(int)$srcBefore->revision],
+                [$dstItem=>(int)$dstBefore->revision],$pdf());
+            $this->fail('A finalized original loan allowed source return acceptance replay.');
+        } catch (ConflictHttpException) {}
+        $this->assertSame($movementsBefore,DB::table('hall_inventory_movement_events')->count());
+        $this->assertSame((int)$srcBefore->revision,(int)DB::table('hall_inventory_positions')
+            ->where('hall_id',$src->id)->where('item_id',$srcItem)->value('revision'));
+        $this->assertSame((int)$dstBefore->revision,(int)DB::table('hall_inventory_positions')
+            ->where('hall_id',$dest->id)->where('item_id',$dstItem)->value('revision'));
+
         // A loaded owner panel must recheck membership after revocation,
         // regardless of previously cached company/hall and custody state.
         Filament::setCurrentPanel(Filament::getPanel('admin'));
