@@ -30,7 +30,7 @@ Verified in this continuation or earlier on the branch:
 ### Open INTERNAL gates
 
 1. ~~Owner/manager UI for proposing and independently deciding the internal obligation.~~ **VERIFIED** at `f76bde7` / CI 39787096473 six.
-2. An explicit accounting/owner decision for the internal settlement direction and inter-hall ledger accounts (ADR required before posting money).
+2. An explicit accounting/owner decision for the internal settlement direction and inter-hall ledger accounts. **ADR-0009 is PROPOSED and PENDING** (Option A no company-level journal, Option B inter-hall ledger, Option C defer); no journal is posted.
 3. ~~Verified settlement, balanced journal and immutable reversal for that decision.~~ Settlement evidence and independent verification are **VERIFIED** at `695d5bd` (backend) and `ef326a4` (Owner UI), CI 39791495105/39797843118 six; balanced journal/reversal remain OPEN pending the accounting ADR.
 4. Authorized physical write-off of confirmed unreturned owned-on-loan units only after financial settlement, plus a numbered immutable abnormal final PDF. Read-only readiness is **VERIFIED** at `303975e` / CI 39803376087 six and explicitly reports this write-off/certificate as unreleased.
 5. Real multi-loan concurrency, backup/restore and security acceptance for the complete internal abnormal lifecycle.

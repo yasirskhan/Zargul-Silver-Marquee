@@ -241,4 +241,5 @@ Independent original-hall Owner/Admin closeout now has a dedicated company-scope
 
 ## Phase 12 acceptance status register (2026-10-22)
 - Consolidated verified evidence and exact open gates in docs/PHASE12_ACCEPTANCE_STATUS.md. External-borrowed evidence through closure is verified; INTERNAL abnormal obligation is a backend foundation with UI, accounting decision, settlement/ledger, write-off and numbered certificate OPEN. Operator/security/restore acceptance remains external. Phase 12 stays OPEN and Phase 13 is not promoted; all production flags OFF.
+- ADR-0009 (internal abnormal settlement accounting) is PROPOSED and PENDING owner choice: Option A no company-level journal, Option B inter-hall ledger with new accounts, or Option C defer. No journal is posted.
 - OPEN: Owner UI for the provisional obligation, verified cash/bank payment-out settlement and reversal, non-clean external-in closure, INTERNAL abnormal financial/closure, and operator/restore/security acceptance. All production flags remain OFF.
