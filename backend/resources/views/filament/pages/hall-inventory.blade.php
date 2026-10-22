@@ -2225,9 +2225,68 @@
                                                 Historical discrepancy evidence is STALE after later physical return activity. New reconciliation and independent review required; do not charge or close from this finding.
                                             @endunless
                                         </p>
+                                        @php($internalObligation = collect($internalObligationHistory)->firstWhere('findingId', $finding['id']))
+                                        @if($internalObligation)
+                                            <p class="font-medium">INTERNAL PROVISIONAL LOSS OBLIGATION — {{ $internalObligation['currency'] }} {{ $internalObligation['amountMinor'] }} minor units, basis {{ $internalObligation['quantityBasis'] }} — {{ $internalObligation['decision'] === null ? 'INDEPENDENT REVIEW PENDING' : strtoupper($internalObligation['decision']) }}</p>
+                                            <p>Provisional internal position only; no journal, money, stock retirement or closure is posted.</p>
+                                            @if($internalObligation['decision'] === null &&
+                                                $internalObligation['proposedBy'] !== (int)auth()->id() &&
+                                                config('inventory_controls.internal_loss_obligation_enabled') &&
+                                                $this->canReviewInternalDiscrepancy())
+                                                <button type="button" wire:click="startInternalObligationReview('{{ $internalObligation['id'] }}')"
+                                                    class="rounded border px-3 py-2">Independently review internal loss obligation</button>
+                                            @endif
+                                        @elseif(($finding['decision'] ?? null) === 'confirmed_outstanding' &&
+                                            !($finding['supersededByIndependentCorrection'] ?? false) &&
+                                            config('inventory_controls.internal_loss_obligation_enabled') &&
+                                            $this->canReviewInternalDiscrepancy())
+                                            <button type="button" wire:click="startInternalObligation('{{ $finding['id'] }}')"
+                                                class="rounded border px-3 py-2">Propose internal loss obligation</button>
+                                        @endif
                                         <button type="button" wire:click="downloadInternalPhysicalFindingProof('{{ $finding['id'] }}')" class="rounded border px-2 py-1">Private source evidence (audited)</button>
                                     </article>
                                 @endforeach
+                                @if(config('inventory_controls.internal_loss_obligation_enabled') && $internalObligationFindingId !== '')
+                                    <section aria-label="Propose internal loss obligation">
+                                        <h4 class="font-semibold">Propose internal abnormal loss obligation</h4>
+                                        <p class="text-sm">Finding {{ $internalObligationFindingId }}. Manual amount only; provisional position without money or stock retirement.</p>
+                                        <label>Currency (ISO 4217)
+                                            <input type="text" maxlength="3" wire:model="internalObligationCurrency" class="w-full rounded border p-2">
+                                        </label>
+                                        <label>Amount in minor units
+                                            <input type="number" min="1" step="1" wire:model="internalObligationAmount" class="w-full rounded border p-2">
+                                        </label>
+                                        <label>Reason
+                                            <textarea wire:model="internalObligationReason" rows="2" class="w-full rounded border p-2"></textarea>
+                                        </label>
+                                        @error('internalObligationCurrency') <p role="alert">{{ $message }}</p> @enderror
+                                        @error('internalObligationAmount') <p role="alert">{{ $message }}</p> @enderror
+                                        @error('internalObligationReason') <p role="alert">{{ $message }}</p> @enderror
+                                        <button type="button" wire:click="submitInternalObligation" class="rounded bg-emerald-800 px-4 py-2 text-white">Propose internal loss obligation</button>
+                                    </section>
+                                @endif
+                                @if(config('inventory_controls.internal_loss_obligation_enabled') && $internalObligationDecisionTarget !== '')
+                                    <section aria-label="Independently review internal loss obligation">
+                                        <h4 class="font-semibold">Independently review internal loss obligation</h4>
+                                        <p class="text-sm">Obligation {{ $internalObligationDecisionTarget }}. A different source owner/admin decides the provisional amount; no journal or money is posted.</p>
+                                        <label>Decision
+                                            <select wire:model="internalObligationDecision" class="w-full rounded border p-2">
+                                                <option value="approved">Approve provisional internal loss position</option>
+                                                <option value="rejected">Reject</option>
+                                                <option value="disputed">Disputed</option>
+                                            </select>
+                                        </label>
+                                        <label>Independent review reason
+                                            <textarea wire:model="internalObligationDecisionReason" rows="2" class="w-full rounded border p-2"></textarea>
+                                        </label>
+                                        @error('internalObligationDecision') <p role="alert">{{ $message }}</p> @enderror
+                                        @error('internalObligationDecisionReason') <p role="alert">{{ $message }}</p> @enderror
+                                        <button type="button" wire:click="submitInternalObligationReview" class="rounded bg-emerald-800 px-4 py-2 text-white">Record independent internal loss obligation decision</button>
+                                    </section>
+                                @endif
+                                @if($lastInternalObligationReference)
+                                    <p role="status">Internal loss obligation {{ $lastInternalObligationReference }} recorded. No journal, cash, stock retirement or closure was posted.</p>
+                                @endif
                                 @if(count($discrepancyLines)===0 && $this->canReviewInternalDiscrepancy())
                                     <label>Corroborated borrower signed original-loan statement
                                         <select wire:model="physicalFindingStatementId" class="w-full rounded border p-2">

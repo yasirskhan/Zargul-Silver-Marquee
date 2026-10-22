@@ -320,6 +320,21 @@ final class HallInventory extends Page
     #[Locked]
     public array $physicalCorrectionHistory = [];
     #[Locked]
+    public array $internalObligationHistory = [];
+    #[Locked]
+    public string $internalObligationFindingId = '';
+    #[Locked]
+    public string $internalObligationRequestId = '';
+    public string $internalObligationCurrency = 'PKR';
+    public string $internalObligationAmount = '';
+    public string $internalObligationReason = '';
+    #[Locked]
+    public string $internalObligationDecisionTarget = '';
+    public string $internalObligationDecision = 'approved';
+    public string $internalObligationDecisionReason = '';
+    #[Locked]
+    public ?string $lastInternalObligationReference = null;
+    #[Locked]
     public string $physicalCorrectionId = '';
     #[Locked]
     public string $physicalCorrectionReviewId = '';
@@ -683,6 +698,15 @@ final class HallInventory extends Page
         $this->physicalFindingIncidents=[];
         $this->physicalFindingId=(string)Str::uuid();
         $this->physicalFindingDecisionId=(string)Str::uuid();
+        $this->internalObligationHistory=[];
+        $this->internalObligationFindingId='';
+        $this->internalObligationRequestId=(string)Str::uuid();
+        $this->internalObligationAmount='';
+        $this->internalObligationReason='';
+        $this->internalObligationDecisionTarget='';
+        $this->internalObligationDecision='approved';
+        $this->internalObligationDecisionReason='';
+        $this->lastInternalObligationReference=null;
         $this->physicalFindingFile=null;
         $this->physicalFindingStatementId='';
         $this->physicalFindingIncidentId='';
@@ -2732,11 +2756,113 @@ final class HallInventory extends Page
                 ->history($actor,$this->companyId,$this->hallId,$loanId,true);
             $this->physicalCorrectionHistory=app(\App\Services\HallInventoryInternalFindingCorrectionService::class)
                 ->history($actor,$this->companyId,$this->hallId,$loanId);
+            $this->internalObligationHistory=config('inventory_controls.internal_loss_obligation_enabled')
+                ? app(\App\Services\HallInventoryInternalLossObligationService::class)
+                    ->recent($actor,$this->companyId,$this->hallId)
+                : [];
         }else {
             $this->physicalFindingIncidents=[];
             $this->physicalFindingHistory=[];
             $this->physicalCorrectionHistory=[];
+            $this->internalObligationHistory=[];
         }
+    }
+    public function startInternalObligation(string $findingId):void {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.internal_loss_obligation_enabled') &&
+            config('inventory_controls.internal_physical_finding_enabled') &&
+            $this->discrepancyLoanId!=='' && $this->canReviewInternalDiscrepancy(),403);
+        $finding=collect($this->physicalFindingHistory)->first(
+            fn($f):bool=>$f['id']===$findingId &&
+                ($f['decision']??null)==='confirmed_outstanding' &&
+                !($f['supersededByIndependentCorrection']??false)
+        );
+        abort_unless($finding!==null,403);
+        abort_if(collect($this->internalObligationHistory)
+            ->contains(fn($o):bool=>$o['findingId']===$findingId),403);
+        $this->internalObligationFindingId=$findingId;
+        $this->internalObligationRequestId=(string)Str::uuid();
+        $this->internalObligationCurrency='PKR';
+        $this->internalObligationAmount='';
+        $this->internalObligationReason='';
+        $this->lastInternalObligationReference=null;
+    }
+    public function submitInternalObligation():void {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.internal_loss_obligation_enabled') &&
+            config('inventory_controls.internal_physical_finding_enabled') &&
+            $this->discrepancyLoanId!=='' && $this->canReviewInternalDiscrepancy() &&
+            $this->internalObligationFindingId!=='',403);
+        $this->validate([
+            'internalObligationCurrency'=>'required|string|size:3|regex:/^[A-Z]{3}$/',
+            'internalObligationAmount'=>'required|string|regex:/^[1-9][0-9]{0,11}$/',
+            'internalObligationReason'=>'required|string|min:10|max:500',
+        ]);
+        $amount=(int)$this->internalObligationAmount;
+        if($amount<1||$amount>100000000000)
+            throw ValidationException::withMessages([
+                'internalObligationAmount'=>'Amount must be positive integer minor units within the approved cap.'
+            ]);
+        try {
+            $this->lastInternalObligationReference=app(
+                \App\Services\HallInventoryInternalLossObligationService::class
+            )->propose($actor,$this->companyId,$this->hallId,
+                $this->internalObligationFindingId,$this->internalObligationRequestId,
+                $this->internalObligationCurrency,$amount,$this->internalObligationReason);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['internalObligationReason'=>$e->getMessage()]);
+        }
+        $this->internalObligationFindingId='';
+        $this->internalObligationRequestId=(string)Str::uuid();
+        $this->internalObligationAmount='';
+        $this->internalObligationReason='';
+        $this->reloadInternalObligationHistory($actor);
+    }
+    public function startInternalObligationReview(string $obligationId):void {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.internal_loss_obligation_enabled') &&
+            config('inventory_controls.internal_physical_finding_enabled') &&
+            $this->discrepancyLoanId!=='' && $this->canReviewInternalDiscrepancy(),403);
+        $row=collect($this->internalObligationHistory)->first(
+            fn($o):bool=>$o['id']===$obligationId && $o['decision']===null &&
+                $o['proposedBy']!==(int)$actor->getKey()
+        );
+        abort_unless($row!==null,403);
+        $this->internalObligationDecisionTarget=$obligationId;
+        $this->internalObligationDecision='approved';
+        $this->internalObligationDecisionReason='';
+    }
+    public function submitInternalObligationReview():void {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.internal_loss_obligation_enabled') &&
+            config('inventory_controls.internal_physical_finding_enabled') &&
+            $this->discrepancyLoanId!=='' && $this->canReviewInternalDiscrepancy() &&
+            $this->internalObligationDecisionTarget!=='',403);
+        $this->validate([
+            'internalObligationDecision'=>'required|in:approved,rejected,disputed',
+            'internalObligationDecisionReason'=>'required|string|min:10|max:500',
+        ]);
+        try {
+            $this->lastInternalObligationReference=app(
+                \App\Services\HallInventoryInternalLossObligationService::class
+            )->decide($actor,$this->companyId,$this->hallId,
+                $this->internalObligationDecisionTarget,(string)Str::uuid(),
+                $this->internalObligationDecision,$this->internalObligationDecisionReason);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages([
+                'internalObligationDecisionReason'=>$e->getMessage()
+            ]);
+        }
+        $this->internalObligationDecisionTarget='';
+        $this->internalObligationDecision='approved';
+        $this->internalObligationDecisionReason='';
+        $this->reloadInternalObligationHistory($actor);
+    }
+    private function reloadInternalObligationHistory(User $actor):void {
+        $this->internalObligationHistory=config('inventory_controls.internal_loss_obligation_enabled')
+            ? app(\App\Services\HallInventoryInternalLossObligationService::class)
+                ->recent($actor,$this->companyId,$this->hallId)
+            : [];
     }
     public function decideInternalDiscrepancy():void {
         $actor=$this->authorizeSelection();
