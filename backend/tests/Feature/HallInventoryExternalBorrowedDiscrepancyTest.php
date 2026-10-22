@@ -679,6 +679,47 @@ final class HallInventoryExternalBorrowedDiscrepancyTest extends TestCase
         }catch(ConflictHttpException){}
         $journalsBefore=DB::table('finance_journals')->count();
         $sharedClosureId=(string)Str::uuid();
+        $sharedKey='private/hall-external-in-nonclean/'.$company->id.'/'.$sharedLoan.'/'.$sharedClosureId.'.pdf';
+        $preFailureAudit=DB::table('audit_events')->where('company_id',$company->id)->count();
+        $preFailureMoves=DB::table('hall_inventory_movement_events')->where('company_id',$company->id)
+            ->where('event_kind','writeoff_borrowed_transit')->count();
+        // Real PostgreSQL failure raised AFTER the second PDF has been written.
+        // Inventory, certificate and immutable audit must rollback atomically;
+        // the same exact request is recoverable after the fault is removed.
+        DB::unprepared("CREATE FUNCTION phase12_encl_injected_failure() RETURNS trigger AS $
+            BEGIN RAISE EXCEPTION 'phase12 injected ENCL certificate failure'; END;
+            $ LANGUAGE plpgsql");
+        DB::statement('CREATE TRIGGER phase12_encl_injected_failure BEFORE INSERT ON
+            hall_inventory_external_in_nonclean_closures FOR EACH ROW
+            EXECUTE FUNCTION phase12_encl_injected_failure()');
+        try {
+            try {
+                $closureService->close($approver,$company->id,$hall->id,$sharedLoan,$sharedClosureId);
+                $this->fail('Injected PostgreSQL ENCL failure was silently ignored.');
+            }catch(QueryException $e) {
+                $this->assertStringContainsString('phase12 injected ENCL certificate failure',$e->getMessage());
+            }
+        }finally {
+            DB::statement('DROP TRIGGER phase12_encl_injected_failure ON hall_inventory_external_in_nonclean_closures');
+            DB::statement('DROP FUNCTION phase12_encl_injected_failure()');
+        }
+        $this->assertFalse(Storage::disk('local')->exists($sharedKey));
+        $this->assertSame(1,(int)DB::table('hall_inventory_positions')
+            ->where('item_id',$closureItem)->sum('borrowed_transit'));
+        $this->assertSame($preFailureMoves,DB::table('hall_inventory_movement_events')
+            ->where('company_id',$company->id)->where('event_kind','writeoff_borrowed_transit')->count());
+        $this->assertSame($preFailureAudit,DB::table('audit_events')
+            ->where('company_id',$company->id)->count());
+        $this->assertSame(1,DB::table('hall_inventory_external_in_nonclean_closures')
+            ->where('company_id',$company->id)->count());
+        // Occupied final key also fails closed rather than rewriting evidence.
+        Storage::disk('local')->put($sharedKey,'staged incomplete ENCL proof');
+        try {
+            $closureService->close($approver,$company->id,$hall->id,$sharedLoan,$sharedClosureId);
+            $this->fail('Occupied ENCL private PDF key was overwritten.');
+        }catch(ConflictHttpException){}
+        $this->assertSame('staged incomplete ENCL proof',Storage::disk('local')->get($sharedKey));
+        Storage::disk('local')->delete($sharedKey);
         $this->assertSame('ENCL-2',$closureService->close($approver,$company->id,$hall->id,
             $sharedLoan,$sharedClosureId)['serialNumber']);
         $this->assertSame('ENCL-2',$closureService->close($approver,$company->id,$hall->id,
