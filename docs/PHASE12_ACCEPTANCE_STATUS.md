@@ -32,7 +32,7 @@ Verified in this continuation or earlier on the branch:
 1. ~~Owner/manager UI for proposing and independently deciding the internal obligation.~~ **VERIFIED** at `f76bde7` / CI 39787096473 six.
 2. ~~An explicit accounting/owner decision for the internal settlement direction and inter-hall ledger accounts.~~ **ADR-0009 ACCEPTED: Option A** (2026-10-22). No company-level journal; the settlement is an evidence-backed inter-hall allocation.
 3. ~~Verified settlement, balanced journal and immutable reversal for that decision.~~ Settlement evidence and independent verification are **VERIFIED** at `695d5bd` (backend) and `ef326a4` (Owner UI), CI 39791495105/39797843118 six. Under Option A no company journal is required.
-4. ~~Authorized physical write-off of confirmed unreturned owned-on-loan units only after financial settlement, plus a numbered immutable abnormal final PDF.~~ Backend authorization/write-off/certificate is **VERIFIED** at `84ff55f` / CI 39818374871 six; **Owner UI for authorization/closure and certificate download remains OPEN**.
+4. ~~Authorized physical write-off of confirmed unreturned owned-on-loan units only after financial settlement, plus a numbered immutable abnormal final PDF.~~ Backend authorization/write-off/certificate is **VERIFIED** at `84ff55f` and the Owner UI/private certificate download at `96099f1`, CI 39818374871/39821644051 six. Operator acceptance remains OPEN.
 5. Real multi-loan concurrency, backup/restore and security acceptance for the complete internal abnormal lifecycle.
 
 ## Cross-cutting Phase 12 open gates
