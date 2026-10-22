@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\HallInventoryCatalogService;
 use App\Services\HallInventoryExternalBorrowedDiscrepancyClearanceService;
 use App\Services\HallInventoryExternalInLossObligationService;
+use App\Services\HallInventoryExternalInLossSettlementService;
 use App\Services\HallInventoryExternalBorrowedDiscrepancyService;
 use App\Services\HallInventoryExternalBorrowedIntakeService;
 use App\Services\HallInventoryExternalBorrowedReturnService;
@@ -408,5 +409,59 @@ final class HallInventoryExternalBorrowedDiscrepancyTest extends TestCase
             ->set('externalObligationDecisionReason','Independent owner accepts the provisional second-batch position.')
             ->call('submitExternalObligationReview')->assertHasNoErrors()
             ->assertSee('basis 1 units — APPROVED');
+
+        config()->set('inventory_controls.external_in_loss_settlement_enabled',true);
+        $settlements=app(HallInventoryExternalInLossSettlementService::class);
+        $payment=static fn()=>UploadedFile::fake()->createWithContent(
+            'partner-payment.pdf',"%PDF-1.4\nPartner bank transfer receipt\n%%EOF");
+        $this->be($reviewer);
+        try {
+            $settlements->record($reviewer,$company->id,$hall->id,$firstObligation,
+                (string)Str::uuid(),60000,'PKR','bank','BANK-OVER','2026-10-22',$payment());
+            $this->fail('Payment evidence exceeded the independently approved obligation.');
+        }catch(ConflictHttpException){}
+        try {
+            $settlements->record($reviewer,$company->id,$hall->id,$firstObligation,
+                (string)Str::uuid(),40000,'USD','bank','BANK-CURRENCY','2026-10-22',$payment());
+            $this->fail('Payment evidence accepted a currency different from the obligation.');
+        }catch(ConflictHttpException){}
+        $settlementId=(string)Str::uuid();
+        $this->assertSame($settlementId,$settlements->record($reviewer,$company->id,$hall->id,
+            $firstObligation,$settlementId,40000,'PKR','bank','BANK-2026-001',
+            '2026-10-22',$payment()));
+        $row=DB::table('hall_inventory_external_in_loss_settlements')
+            ->where('id',$settlementId)->first();
+        $this->assertSame(40000,(int)$row->amount_minor);
+        $this->assertSame('PKR',$row->currency);
+        $this->assertSame(0,DB::table('finance_journals')->count());
+        $this->assertSame(2,(int)DB::table('hall_inventory_positions')->sum('borrowed_transit'));
+        try {
+            $settlements->review($reviewer,$company->id,$hall->id,$settlementId,
+                (string)Str::uuid(),'verified','Payment recorder cannot verify their own evidence.');
+            $this->fail('Partner payment recorder self-verified.');
+        }catch(AuthorizationException){}
+        $this->be($approver);
+        $reviewId=(string)Str::uuid();
+        $this->assertSame($reviewId,$settlements->review($approver,$company->id,$hall->id,
+            $settlementId,$reviewId,'verified',
+            'Independent owner verified the bank reference and signed partner receipt.'));
+        $this->assertSame($reviewId,$settlements->review($approver,$company->id,$hall->id,
+            $settlementId,$reviewId,'verified',
+            'Independent owner verified the bank reference and signed partner receipt.'));
+        try {
+            $settlements->review($approver,$company->id,$hall->id,$settlementId,
+                (string)Str::uuid(),'rejected','Conflicting replay attempts to reverse the verified payment.');
+            $this->fail('Partner payment review was mutable through replay.');
+        }catch(ConflictHttpException){}
+        $history=collect($settlements->recent($approver,$company->id,$hall->id))
+            ->firstWhere('id',$settlementId);
+        $this->assertNotNull($history);
+        $this->assertSame('verified',$history['decision']);
+        $this->assertSame(40000,$history['amountMinor']);
+        $this->assertSame('BANK-2026-001',$history['paymentReference']);
+        $this->assertSame(0,DB::table('finance_journals')->count());
+        $this->assertSame(0,(int)DB::table('hall_inventory_positions')->sum('owned_usable'));
+        $this->assertSame(2,(int)DB::table('hall_inventory_positions')->sum('borrowed_transit'));
+        $this->assertSame(0,DB::table('hall_inventory_external_in_clean_closures')->count());
     }
 }

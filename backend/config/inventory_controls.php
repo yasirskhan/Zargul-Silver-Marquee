@@ -69,6 +69,9 @@ return [
     // Provisional external-in partner loss obligation and independent decision.
     // No invoice, payable journal, payment, stock write-off or closure. OFF.
     'external_in_loss_obligation_enabled' => (bool) env('VENUE_INVENTORY_EXTERNAL_IN_LOSS_OBLIGATION_ENABLED', false),
+    // Private partner payment evidence and independent verification only; no
+    // journal, cash mutation, settlement or closure. OFF.
+    'external_in_loss_settlement_enabled' => (bool) env('VENUE_INVENTORY_EXTERNAL_IN_LOSS_SETTLEMENT_ENABLED', false),
     // Owner-only, all-partner-receipts-verified physical closeout PDF. OFF.
     'external_borrowed_clean_closure_enabled' => (bool) env('VENUE_INVENTORY_EXTERNAL_BORROWED_CLEAN_CLOSURE_ENABLED', false),
     // Independently reviewed opening count posting; OFF until physical
