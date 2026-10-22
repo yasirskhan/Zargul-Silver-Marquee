@@ -9,6 +9,7 @@ use App\Models\HallAssignment;
 use App\Models\User;
 use App\Services\HallInventoryCatalogService;
 use App\Services\HallInventoryExternalBorrowedDiscrepancyClearanceService;
+use App\Services\HallInventoryExternalInLossObligationService;
 use App\Services\HallInventoryExternalBorrowedDiscrepancyService;
 use App\Services\HallInventoryExternalBorrowedIntakeService;
 use App\Services\HallInventoryExternalBorrowedReturnService;
@@ -47,7 +48,10 @@ final class HallInventoryExternalBorrowedDiscrepancyTest extends TestCase
             'email'=>'discrepancy-owner@example.test','password'=>'test-only']);
         $reviewer=User::create(['name'=>'Independent Discrepancy Reviewer',
             'email'=>'discrepancy-reviewer@example.test','password'=>'test-only']);
-        foreach([[$drafter,'manager'],[$handler,'manager'],[$owner,'owner'],[$reviewer,'owner']] as [$u,$role]) {
+        $approver=User::create(['name'=>'Independent Obligation Approver',
+            'email'=>'obligation-approver@example.test','password'=>'test-only']);
+        foreach([[$drafter,'manager'],[$handler,'manager'],[$owner,'owner'],
+            [$reviewer,'owner'],[$approver,'owner']] as [$u,$role]) {
             $u->markEmailAsVerified();
             $m=CompanyMembership::create(['company_id'=>$company->id,'user_id'=>$u->id,'role'=>$role]);
             if($role==='manager')HallAssignment::create([
@@ -318,6 +322,63 @@ final class HallInventoryExternalBorrowedDiscrepancyTest extends TestCase
         $this->assertSame(4,$custody['stillOutstanding']);
         $this->assertSame(2,$custody['partnerReportedMissing']);
         $this->assertFalse($custody['allPhysicalReturnsConfirmed']);
+        $this->assertSame(0,DB::table('hall_inventory_external_in_clean_closures')->count());
+
+        config()->set('inventory_controls.external_in_loss_obligation_enabled',true);
+        $obligations=app(HallInventoryExternalInLossObligationService::class);
+        $this->be($reviewer);
+        $firstObligation=(string)Str::uuid();
+        $this->assertSame($firstObligation,$obligations->propose($reviewer,$company->id,$hall->id,
+            $discrepancyId,$firstObligation,'PKR',50000,
+            'Partner-signed one missing and one damaged panel grounds this provisional obligation.'));
+        $row=DB::table('hall_inventory_external_in_loss_obligations')
+            ->where('id',$firstObligation)->first();
+        $this->assertSame(2,(int)$row->quantity_basis);
+        $this->assertSame(50000,(int)$row->amount_minor);
+        $this->assertSame('PKR',$row->currency);
+        $this->assertSame(0,DB::table('finance_journals')->count());
+        $this->assertSame(2,(int)DB::table('hall_inventory_positions')->sum('borrowed_transit'));
+        try {
+            $obligations->decide($reviewer,$company->id,$hall->id,$firstObligation,
+                (string)Str::uuid(),'approved','Proposer must not approve their own obligation.');
+            $this->fail('External-in obligation proposer self-approved.');
+        }catch(AuthorizationException){}
+        $this->be($owner);
+        try {
+            $obligations->decide($owner,$company->id,$hall->id,$firstObligation,
+                (string)Str::uuid(),'approved','Discrepancy recorder must not approve the obligation.');
+            $this->fail('Discrepancy recorder approved the partner obligation.');
+        }catch(AuthorizationException){}
+        $this->be($approver);
+        $obligationDecision=(string)Str::uuid();
+        $this->assertSame($obligationDecision,$obligations->decide($approver,$company->id,$hall->id,
+            $firstObligation,$obligationDecision,'approved',
+            'Independent owner accepts the provisional partner loss position without payment.'));
+        $this->assertSame($obligationDecision,$obligations->decide($approver,$company->id,$hall->id,
+            $firstObligation,$obligationDecision,'approved',
+            'Independent owner accepts the provisional partner loss position without payment.'));
+        try {
+            $obligations->decide($approver,$company->id,$hall->id,$firstObligation,
+                (string)Str::uuid(),'rejected','Conflicting replay attempts to reverse the approved obligation.');
+            $this->fail('External-in obligation decision was mutable through replay.');
+        }catch(ConflictHttpException){}
+        $history=collect($obligations->recent($approver,$company->id,$hall->id))
+            ->firstWhere('id',$firstObligation);
+        $this->assertNotNull($history);
+        $this->assertSame('approved',$history['decision']);
+        $this->assertSame(2,$history['quantityBasis']);
+        $this->assertSame(50000,$history['amountMinor']);
+        $this->assertSame(0,DB::table('finance_journals')->count());
+        $this->assertSame(0,(int)DB::table('hall_inventory_positions')->sum('owned_usable'));
+        $this->assertSame(2,(int)DB::table('hall_inventory_positions')->sum('borrowed_transit'));
+        try {
+            DB::transaction(function()use($firstObligation):void {
+                DB::table('hall_inventory_external_in_loss_obligations')
+                    ->where('id',$firstObligation)->delete();
+            });
+            $this->fail('Provisional external-in obligation was deletable.');
+        }catch(QueryException){}
+        $this->assertSame(1,DB::table('hall_inventory_external_in_loss_obligations')->count());
         $this->assertSame(0,DB::table('hall_inventory_external_in_clean_closures')->count());
     }
 }
