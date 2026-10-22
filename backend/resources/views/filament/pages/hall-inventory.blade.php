@@ -1708,6 +1708,30 @@
                                         <li>{{ $line['itemId'] }} — {{ $line['quantity'] }} units shipped</li>
                                     @endforeach
                                 </ul>
+                                @php($partnerDiscrepancy = collect($externalDiscrepancyHistory)->firstWhere('batchId', $returnBatch['batchId']))
+                                @if($partnerDiscrepancy)
+                                    <p class="font-medium">PARTNER-SIGNED SHORT/DAMAGED COUNT — {{ $partnerDiscrepancy['decision'] === null ? 'INDEPENDENT REVIEW PENDING' : strtoupper(str_replace('_', ' ', $partnerDiscrepancy['decision'])) }}</p>
+                                    <ul class="list-inside list-disc">
+                                        @foreach($partnerDiscrepancy['lines'] as $line)
+                                            <li>{{ $line['itemId'] }} — shipped {{ $line['shippedQuantity'] }},
+                                                partner received {{ $line['receivedQuantity'] }},
+                                                damaged {{ $line['damagedQuantity'] }},
+                                                missing {{ $line['missingQuantity'] }}</li>
+                                        @endforeach
+                                    </ul>
+                                    <p>Borrowed transit remains UNRECONCILED. No stock is retired, no money, liability or final closure is recorded.</p>
+                                    @if($partnerDiscrepancy['decision'] === null &&
+                                        $partnerDiscrepancy['reportedBy'] !== (int)auth()->id() &&
+                                        $this->canIndependentlyAcceptExternalBorrowing())
+                                        <button type="button" wire:click="startExternalDiscrepancyReview('{{ $partnerDiscrepancy['id'] }}')"
+                                            class="rounded-lg border px-3 py-2">Independently review partner discrepancy</button>
+                                    @endif
+                                @elseif(!$returnBatch['confirmed'] && $returnBatch['dispatchedBy'] !== (int)auth()->id() &&
+                                    config('inventory_controls.external_borrowed_discrepancy_enabled') &&
+                                    $this->canIndependentlyAcceptExternalBorrowing())
+                                    <button type="button" wire:click="startExternalDiscrepancy('{{ $returnBatch['batchId'] }}')"
+                                        class="rounded-lg border px-3 py-2">Record partner short/damaged count</button>
+                                @endif
                                 @if(!$returnBatch['confirmed'] && $returnBatch['dispatchedBy']!==(int)auth()->id() &&
                                     $this->canIndependentlyAcceptExternalBorrowing())
                                     <button type="button" wire:click="startExternalReturnConfirmation('{{ $returnBatch['batchId'] }}')"
@@ -1766,6 +1790,67 @@
                         <button type="button" wire:click="submitExternalReturnConfirmation"
                             class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">Confirm independently counted partner receipt</button>
                     </section>
+                @endif
+                @if(config('inventory_controls.external_borrowed_discrepancy_enabled') && $externalDiscrepancyBatchId !== '')
+                    <section class="rounded-xl border p-4 space-y-3" aria-label="Partner short or damaged return count">
+                        <h3 class="font-semibold">Record partner short or damaged return count</h3>
+                        <p class="text-sm">Batch {{ $externalDiscrepancyBatchId }}. Enter only the counts written on the partner's signed document. Every unit stays in borrowed transit until a separate resolution; no money, liability, stock retirement or closure is posted.</p>
+                        @foreach($externalReturnHistory as $returnBatch)
+                            @if($returnBatch['batchId']===$externalDiscrepancyBatchId)
+                                @foreach($returnBatch['lines'] as $line)
+                                    <div wire:key="ext-discrepancy-{{ $line['itemId'] }}" class="rounded-lg border p-2">
+                                        <p>Item {{ $line['itemId'] }} — {{ $line['quantity'] }} units shipped</p>
+                                        <label class="block text-sm">Partner received (including damaged)
+                                            <input type="number" min="0" max="{{ $line['quantity'] }}" step="1"
+                                                wire:model="externalDiscrepancyReceived.{{ $line['itemId'] }}"
+                                                class="w-full rounded-lg border p-2 text-gray-900">
+                                        </label>
+                                        <label class="block text-sm">Damaged within the received units
+                                            <input type="number" min="0" max="{{ $line['quantity'] }}" step="1"
+                                                wire:model="externalDiscrepancyDamaged.{{ $line['itemId'] }}"
+                                                class="w-full rounded-lg border p-2 text-gray-900">
+                                        </label>
+                                    </div>
+                                @endforeach
+                            @endif
+                        @endforeach
+                        <label class="block text-sm">Reason and partner document reference
+                            <textarea wire:model="externalDiscrepancyReason" rows="2"
+                                class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                        </label>
+                        <label class="block text-sm">Partner-signed short/damaged document (PDF/photo, up to 5 MB)
+                            <input type="file" wire:model="externalDiscrepancyFile" accept=".pdf,.jpg,.jpeg,.png"
+                                class="w-full rounded-lg border p-2"></label>
+                        @error('externalDiscrepancyReason') <p role="alert">{{ $message }}</p> @enderror
+                        @error('externalDiscrepancyFile') <p role="alert">{{ $message }}</p> @enderror
+                        @error('externalDiscrepancyReceived') <p role="alert">{{ $message }}</p> @enderror
+                        <button type="button" wire:click="submitExternalDiscrepancy"
+                            class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">Record signed partner discrepancy</button>
+                    </section>
+                @endif
+                @if(config('inventory_controls.external_borrowed_discrepancy_enabled') && $externalDiscrepancyDecisionTarget !== '')
+                    <section class="rounded-xl border p-4 space-y-3" aria-label="Independent partner discrepancy review">
+                        <h3 class="font-semibold">Independently review partner short/damaged evidence</h3>
+                        <p class="text-sm">Discrepancy {{ $externalDiscrepancyDecisionTarget }}. A different current owner/admin decides only the documentary finding. Substantiation does NOT clear borrowed transit, retire stock, create a payable, post money or close the loan.</p>
+                        <label class="block text-sm">Decision
+                            <select wire:model="externalDiscrepancyDecision" class="w-full rounded-lg border p-2 text-gray-900">
+                                <option value="substantiated">Substantiated partner short/damaged count</option>
+                                <option value="requires_more_evidence">Requires more evidence</option>
+                                <option value="rejected">Rejected</option>
+                            </select>
+                        </label>
+                        <label class="block text-sm">Independent review reason
+                            <textarea wire:model="externalDiscrepancyDecisionReason" rows="2"
+                                class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                        </label>
+                        @error('externalDiscrepancyDecision') <p role="alert">{{ $message }}</p> @enderror
+                        @error('externalDiscrepancyDecisionReason') <p role="alert">{{ $message }}</p> @enderror
+                        <button type="button" wire:click="submitExternalDiscrepancyReview"
+                            class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">Record independent partner discrepancy review</button>
+                    </section>
+                @endif
+                @if($lastExternalDiscrepancyReference)
+                    <p role="status">Signed partner discrepancy reference: {{ $lastExternalDiscrepancyReference }}. Borrowed transit, stock, money and loan closure are unchanged.</p>
                 @endif
                 @if($lastExternalReturnReference)
                     <p role="status">External return custody reference: {{ $lastExternalReturnReference }}. No financial entry or loan closure was posted.</p>

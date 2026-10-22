@@ -60,6 +60,9 @@ return [
     'external_borrowed_intake_enabled' => (bool) env('VENUE_INVENTORY_EXTERNAL_BORROWED_INTAKE_ENABLED', false),
     // Witnessed partial partner returns and independently verified partner receipt; OFF.
     'external_borrowed_return_enabled' => (bool) env('VENUE_INVENTORY_EXTERNAL_BORROWED_RETURN_ENABLED', false),
+    // Partner-signed short/damaged return counts with independent documentary
+    // review only. Never clears transit, posts money or closes a loan. OFF.
+    'external_borrowed_discrepancy_enabled' => (bool) env('VENUE_INVENTORY_EXTERNAL_BORROWED_DISCREPANCY_ENABLED', false),
     // Owner-only, all-partner-receipts-verified physical closeout PDF. OFF.
     'external_borrowed_clean_closure_enabled' => (bool) env('VENUE_INVENTORY_EXTERNAL_BORROWED_CLEAN_CLOSURE_ENABLED', false),
     // Independently reviewed opening count posting; OFF until physical

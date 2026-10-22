@@ -203,6 +203,22 @@ final class HallInventory extends Page
     public $externalConfirmFile = null;
     #[Locked]
     public ?string $lastExternalReturnReference = null;
+    #[Locked]
+    public array $externalDiscrepancyHistory = [];
+    #[Locked]
+    public string $externalDiscrepancyBatchId = '';
+    #[Locked]
+    public string $externalDiscrepancyRequestId = '';
+    public array $externalDiscrepancyReceived = [];
+    public array $externalDiscrepancyDamaged = [];
+    public string $externalDiscrepancyReason = '';
+    public $externalDiscrepancyFile = null;
+    #[Locked]
+    public string $externalDiscrepancyDecisionTarget = '';
+    public string $externalDiscrepancyDecision = 'substantiated';
+    public string $externalDiscrepancyDecisionReason = '';
+    #[Locked]
+    public ?string $lastExternalDiscrepancyReference = null;
 
     #[Locked]
     public string $loanDispatchLoanId = '';
@@ -767,6 +783,17 @@ final class HallInventory extends Page
         $this->externalConfirmCounts = [];
         $this->externalConfirmFile = null;
         $this->lastExternalReturnReference = null;
+        $this->externalDiscrepancyHistory = [];
+        $this->externalDiscrepancyBatchId = '';
+        $this->externalDiscrepancyRequestId = (string) Str::uuid();
+        $this->externalDiscrepancyReceived = [];
+        $this->externalDiscrepancyDamaged = [];
+        $this->externalDiscrepancyReason = '';
+        $this->externalDiscrepancyFile = null;
+        $this->externalDiscrepancyDecisionTarget = '';
+        $this->externalDiscrepancyDecision = 'substantiated';
+        $this->externalDiscrepancyDecisionReason = '';
+        $this->lastExternalDiscrepancyReference = null;
         $this->externalIntakeLoanId = '';
         $this->externalIntakeRequestId = (string)Str::uuid();
         $this->externalIntakeFile = null;
@@ -1086,6 +1113,13 @@ final class HallInventory extends Page
             config('inventory_controls.external_borrowed_intake_enabled'))
             $this->externalReturnHistory = app(\App\Services\HallInventoryExternalBorrowedReturnService::class)
                 ->recent($actor,$this->companyId,$this->hallId);
+        $this->externalDiscrepancyHistory = [];
+        if(config('inventory_controls.external_borrowed_discrepancy_enabled') &&
+            config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled'))
+            $this->externalDiscrepancyHistory = app(
+                \App\Services\HallInventoryExternalBorrowedDiscrepancyService::class
+            )->recent($actor,$this->companyId,$this->hallId);
         $this->externalCleanReceipts=[];
         if(config('inventory_controls.external_borrowed_clean_closure_enabled')) {
             $hall=Hall::query()->where('company_id',$this->companyId)
@@ -1825,6 +1859,126 @@ final class HallInventory extends Page
         $this->externalConfirmRequestId=(string)Str::uuid();
         $this->externalConfirmCounts=[];
         $this->externalConfirmFile=null;
+        $this->reloadLoanHistory();
+    }
+
+    /** Record partner short/damaged counts. Evidence only: no transit clearing, money or closure. */
+    public function startExternalDiscrepancy(string $batchId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_borrowed_discrepancy_enabled') &&
+            config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled') &&
+            $this->canIndependentlyAcceptExternalBorrowing(),403);
+        $batch=collect(app(\App\Services\HallInventoryExternalBorrowedReturnService::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($b):bool=>$b['batchId']===$batchId && !$b['confirmed'] &&
+                $b['dispatchedBy']!==(int)$actor->getKey());
+        abort_unless($batch!==null,403);
+        abort_if(collect($this->externalDiscrepancyHistory)
+            ->contains(fn($d):bool=>$d['batchId']===$batchId),403);
+        $this->externalDiscrepancyBatchId=$batchId;
+        $this->externalDiscrepancyRequestId=(string)Str::uuid();
+        $this->externalDiscrepancyReceived=[];
+        $this->externalDiscrepancyDamaged=[];
+        foreach($batch['lines'] as $line) {
+            $this->externalDiscrepancyReceived[$line['itemId']]=(string)$line['quantity'];
+            $this->externalDiscrepancyDamaged[$line['itemId']]='0';
+        }
+        $this->externalDiscrepancyReason='';
+        $this->externalDiscrepancyFile=null;
+        $this->lastExternalDiscrepancyReference=null;
+    }
+
+    public function submitExternalDiscrepancy():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_borrowed_discrepancy_enabled') &&
+            config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled') &&
+            $this->canIndependentlyAcceptExternalBorrowing(),403);
+        $this->validate([
+            'externalDiscrepancyReason'=>'required|string|min:10|max:500',
+            'externalDiscrepancyFile'=>'required|file|max:5120|mimes:jpg,jpeg,png,pdf',
+        ]);
+        $batch=collect(app(\App\Services\HallInventoryExternalBorrowedReturnService::class)
+            ->recent($actor,$this->companyId,$this->hallId))
+            ->first(fn($b):bool=>$b['batchId']===$this->externalDiscrepancyBatchId &&
+                !$b['confirmed'] && $b['dispatchedBy']!==(int)$actor->getKey());
+        abort_unless($batch!==null,403);
+        $counts=[];
+        foreach($batch['lines'] as $line) {
+            $received=$this->externalDiscrepancyReceived[$line['itemId']]??null;
+            $damaged=$this->externalDiscrepancyDamaged[$line['itemId']]??null;
+            if(!is_string($received)||!preg_match('/\A(0|[1-9][0-9]{0,8})\z/D',$received)||
+                !is_string($damaged)||!preg_match('/\A(0|[1-9][0-9]{0,8})\z/D',$damaged)||
+                (int)$received>100000000||(int)$damaged>100000000)
+                throw ValidationException::withMessages([
+                    'externalDiscrepancyReceived'=>'Enter every partner received and damaged whole-unit count.'
+                ]);
+            $counts[$line['itemId']]=[
+                'received'=>(int)$received,'damaged'=>(int)$damaged,
+            ];
+        }
+        try {
+            $this->lastExternalDiscrepancyReference=app(
+                \App\Services\HallInventoryExternalBorrowedDiscrepancyService::class
+            )->report($actor,$this->companyId,$this->hallId,$batch['batchId'],
+                $this->externalDiscrepancyRequestId,$counts,
+                $this->externalDiscrepancyReason,$this->externalDiscrepancyFile);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['externalDiscrepancyReceived'=>$e->getMessage()]);
+        }
+        $this->externalDiscrepancyBatchId='';
+        $this->externalDiscrepancyRequestId=(string)Str::uuid();
+        $this->externalDiscrepancyReceived=[];
+        $this->externalDiscrepancyDamaged=[];
+        $this->externalDiscrepancyReason='';
+        $this->externalDiscrepancyFile=null;
+        $this->reloadLoanHistory();
+    }
+
+    public function startExternalDiscrepancyReview(string $discrepancyId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_borrowed_discrepancy_enabled') &&
+            config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled') &&
+            $this->canIndependentlyAcceptExternalBorrowing(),403);
+        $row=collect($this->externalDiscrepancyHistory)->first(
+            fn($d):bool=>$d['id']===$discrepancyId && $d['decision']===null &&
+                $d['reportedBy']!==(int)$actor->getKey()
+        );
+        abort_unless($row!==null,403);
+        $this->externalDiscrepancyDecisionTarget=$discrepancyId;
+        $this->externalDiscrepancyDecision='substantiated';
+        $this->externalDiscrepancyDecisionReason='';
+    }
+
+    public function submitExternalDiscrepancyReview():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_borrowed_discrepancy_enabled') &&
+            config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled') &&
+            $this->canIndependentlyAcceptExternalBorrowing() &&
+            $this->externalDiscrepancyDecisionTarget!=='',403);
+        $this->validate([
+            'externalDiscrepancyDecision'=>'required|in:substantiated,rejected,requires_more_evidence',
+            'externalDiscrepancyDecisionReason'=>'required|string|min:10|max:500',
+        ]);
+        try {
+            $this->lastExternalDiscrepancyReference=app(
+                \App\Services\HallInventoryExternalBorrowedDiscrepancyService::class
+            )->decide($actor,$this->companyId,$this->hallId,
+                $this->externalDiscrepancyDecisionTarget,(string)Str::uuid(),
+                $this->externalDiscrepancyDecision,$this->externalDiscrepancyDecisionReason);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['externalDiscrepancyDecision'=>$e->getMessage()]);
+        }
+        $this->externalDiscrepancyDecisionTarget='';
+        $this->externalDiscrepancyDecision='substantiated';
+        $this->externalDiscrepancyDecisionReason='';
         $this->reloadLoanHistory();
     }
 

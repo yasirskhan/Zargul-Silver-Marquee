@@ -215,6 +215,13 @@ final class HallInventoryExternalBorrowedReturnService {
                 (int)$loan->created_by===(int)$actor->getKey())
                 throw new AuthorizationException('Different current owner/admin must verify partner receipt.');
             $this->verifiedFile($batch);
+            $discrepancy=DB::table('hall_inventory_external_in_discrepancies as d')
+                ->leftJoin('hall_inventory_external_in_discrepancy_decisions as x',function($j):void {
+                    $j->on('x.company_id','=','d.company_id')->on('x.discrepancy_id','=','d.id');
+                })->where('d.company_id',$companyId)->where('d.batch_id',$batchId)
+                ->first(['d.id','x.decision']);
+            if($discrepancy && ($discrepancy->decision===null||$discrepancy->decision!=='rejected'))
+                throw new ConflictHttpException('Signed partner short/damaged count requires separate resolution before exact receipt confirmation.');
             $old=DB::table('hall_inventory_external_in_return_confirmations')
                 ->where('company_id',$companyId)->where('batch_id',$batchId)->first();
             if($old) {
