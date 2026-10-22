@@ -149,8 +149,10 @@ final class HallInventoryInternalDispatchContentionTest extends TestCase
         $this->assertSame(0,DB::table('finance_journals')->count());
         $this->assertFalse(Storage::disk('local')->exists(
             'private/hall-loan-handover/'.$company->id.'/'.$loanB.'/'.$dispatchB));
+        // The forked child may clean up inherited temporary upload handles
+        // when exiting. Replay using a fresh identically signed fake upload.
         $this->assertSame($dispatchA,$service->dispatch($dispatcher,$company->id,
-            $loanA,$dispatchA,[$item=>0],$proofA));
+            $loanA,$dispatchA,[$item=>0],$this->proof()));
         $this->assertSame(1,DB::table('hall_inventory_movement_events')
             ->where('event_kind','dispatch_owned_loan')->count());
     }
