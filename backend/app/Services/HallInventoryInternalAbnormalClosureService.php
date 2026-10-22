@@ -47,6 +47,43 @@ final class HallInventoryInternalAbnormalClosureService
         return $rows->reject(fn($r):bool=>DB::table('hall_inventory_internal_finding_corrections')
             ->where('company_id',$companyId)->where('finding_id',$r->id)->exists())->values()->all();
     }
+
+    /**
+     * Per-original-loan physical custody is not the aggregate hall position:
+     * other live loans may legitimately share the same catalog item.
+     * Fail closed on transit, inconsistent immutable returns or missing proof.
+     */
+    private function exactLoanWriteoff(User $actor,string $companyId,string $sourceHallId,
+        string $loanId,array $findings):array {
+        $lines=app(HallInventoryInternalLoanReturnReview::class)
+            ->abnormalSourceLines($actor,$companyId,$sourceHallId,$loanId);
+        if($lines===[])throw new ConflictHttpException('Original loan physical custody is absent.');
+        $confirmed=[];
+        foreach($findings as $finding) {
+            $item=(string)$finding->source_item_id;
+            $confirmed[$item]=($confirmed[$item]??0)+(int)$finding->quantity;
+        }
+        $outstanding=0;
+        foreach($lines as $line) {
+            $item=(string)$line['itemId'];
+            $remaining=(int)$line['notReturned']+(int)$line['unresolved'];
+            if((bool)$line['integrityWarning']||(int)$line['inTransit']!==0||
+                $remaining<0||(int)$line['unsettledPhysical']!==$remaining||
+                ($confirmed[$item]??0)!==$remaining)
+                throw new ConflictHttpException('Confirmed findings must exactly cover this original loan, without pending transit.');
+            $outstanding+=$remaining;
+            unset($confirmed[$item]);
+        }
+        if($confirmed!==[]||$outstanding<1)
+            throw new ConflictHttpException('Confirmed write-off has unbound or zero original-loan units.');
+        $byItem=[];
+        foreach($findings as $finding) {
+            $item=(string)$finding->source_item_id;
+            $byItem[$item]=($byItem[$item]??0)+(int)$finding->quantity;
+        }
+        ksort($byItem,SORT_STRING);
+        return $byItem;
+    }
     private function commercial(string $companyId,string $loanId):array {
         $obligations=DB::table('hall_inventory_internal_loss_obligations as o')
             ->join('hall_inventory_internal_loss_obligation_decisions as d',function($j):void {
@@ -85,13 +122,14 @@ final class HallInventoryInternalAbnormalClosureService
                 throw new AuthorizationException('Current source-hall owner/admin required.');
             $findings=$this->findings($companyId,$sourceHallId,$loanId);
             if($findings===[])throw new ConflictHttpException('No confirmed physical findings support a write-off.');
-            $authorized=(int)array_sum(array_map(static fn($f):int=>(int)$f->quantity,$findings));
-            $items=DB::table('hall_inventory_loan_draft_lines')->where('company_id',$companyId)
-                ->where('loan_id',$loanId)->pluck('item_id')->unique()->values()->all();
-            $outstanding=(int)DB::table('hall_inventory_positions')->where('company_id',$companyId)
-                ->where('hall_id',$sourceHallId)->whereIn('item_id',$items)->sum('owned_on_loan');
-            if($authorized<1||$outstanding!==$authorized)
-                throw new ConflictHttpException('Every outstanding owned unit must be covered by confirmed findings.');
+            $byItem=$this->exactLoanWriteoff($actor,$companyId,$sourceHallId,$loanId,$findings);
+            $authorized=(int)array_sum($byItem);
+            $positions=DB::table('hall_inventory_positions')->where('company_id',$companyId)
+                ->where('hall_id',$sourceHallId)->whereIn('item_id',array_keys($byItem))
+                ->get(['item_id','owned_on_loan'])->keyBy('item_id');
+            foreach($byItem as $itemId=>$quantity)
+                if(!$positions->has($itemId)||(int)$positions[$itemId]->owned_on_loan<$quantity)
+                    throw new ConflictHttpException('Original loan write-off exceeds physically posted source custody.');
             $commercial=$this->commercial($companyId,$loanId);
             if($commercial['obligations']->isEmpty()||count($commercial['currencies'])!==1)
                 throw new ConflictHttpException('One independently approved obligation currency is required.');
@@ -146,6 +184,10 @@ final class HallInventoryInternalAbnormalClosureService
         foreach([$companyId,$sourceHallId,$loanId,$closureId] as $id)
             if(!Str::isUuid($id))throw new InvalidArgumentException('Exact closure UUIDs required.');
         return DB::transaction(function()use($actor,$companyId,$sourceHallId,$loanId,$closureId):array {
+            // Company row serializes the IAC number across *different* source halls.
+            $company=DB::table('companies')->where('id',$companyId)
+                ->where('is_active',true)->lockForUpdate()->first();
+            if(!$company)throw new AuthorizationException('Inactive company cannot close an original loan.');
             $loan=DB::table('hall_inventory_loan_drafts')->where('company_id',$companyId)
                 ->where('id',$loanId)->lockForUpdate()->first();
             if(!$loan||$loan->direction!=='internal'||(string)$loan->lending_hall_id!==$sourceHallId)
@@ -167,14 +209,14 @@ final class HallInventoryInternalAbnormalClosureService
                 ->where('company_id',$companyId)->where('loan_id',$loanId)->lockForUpdate()->first();
             if(!$authorization)throw new ConflictHttpException('No independent write-off authorization exists.');
             $findings=$this->findings($companyId,$sourceHallId,$loanId);
-            $byItem=[];
-            foreach($findings as $f)$byItem[(string)$f->source_item_id]=
-                ($byItem[(string)$f->source_item_id]??0)+(int)$f->quantity;
+            $byItem=$this->exactLoanWriteoff($actor,$companyId,$sourceHallId,$loanId,$findings);
+            if(array_sum($byItem)!==(int)$authorization->authorized_quantity)
+                throw new ConflictHttpException('Approved write-off no longer matches original custody.');
             foreach($byItem as $itemId=>$quantity) {
                 $position=DB::table('hall_inventory_positions')->where('company_id',$companyId)
                     ->where('hall_id',$sourceHallId)->where('item_id',$itemId)->lockForUpdate()->first();
-                if(!$position||(int)$position->owned_on_loan!==$quantity)
-                    throw new ConflictHttpException('Outstanding custody no longer equals the authorized write-off.');
+                if(!$position||(int)$position->owned_on_loan<$quantity)
+                    throw new ConflictHttpException('Original loan write-off exceeds current shared source custody.');
                 $before=$this->state($position);
                 $after=$this->transition->apply($before,'writeoff_owned_on_loan',$quantity);
                 $revision=(int)$position->revision;
@@ -197,12 +239,6 @@ final class HallInventoryInternalAbnormalClosureService
                     'actor_id'=>$actor->getKey()
                 ]);
             }
-            $allItems=DB::table('hall_inventory_loan_draft_lines')->where('company_id',$companyId)
-                ->where('loan_id',$loanId)->pluck('item_id')->unique()->values()->all();
-            $remaining=(int)DB::table('hall_inventory_positions')->where('company_id',$companyId)
-                ->where('hall_id',$sourceHallId)->whereIn('item_id',$allItems)
-                ->sum('owned_on_loan');
-            if($remaining!==0)throw new ConflictHttpException('Owned-on-loan custody remains after write-off.');
             $commercial=$this->commercial($companyId,$loanId);
             $currency=(string)($commercial['currencies'][0]??'');
             $serialSeq=((int)DB::table('hall_inventory_internal_abnormal_closures')
@@ -270,13 +306,14 @@ final class HallInventoryInternalAbnormalClosureService
             'closedBy'=>(int)$row->closed_by,'closedAt'=>(string)$row->created_at,
             'journalPosted'=>false];
     }
-    private function verifyPdf(object $row):void {
+    private function verifyPdf(object $row):string {
         $disk=Storage::disk('local');
         if(!$disk->exists((string)$row->pdf_path))throw new ConflictHttpException('Closure PDF is missing.');
         $bytes=$disk->get((string)$row->pdf_path);
         if(!is_string($bytes)||strlen($bytes)!==(int)$row->pdf_size||
             !hash_equals((string)$row->pdf_sha256,hash('sha256',$bytes)))
             throw new ConflictHttpException('Closure PDF integrity verification failed.');
+        return $bytes;
     }
     public function download(User $actor,string $companyId,string $sourceHallId,
         string $closureId):array {
@@ -289,8 +326,8 @@ final class HallInventoryInternalAbnormalClosureService
             ->where('company_id',$companyId)->where('source_hall_id',$sourceHallId)
             ->where('id',$closureId)->first();
         if(!$row)throw new ConflictHttpException('Internal abnormal certificate was not found.');
-        $this->verifyPdf($row);
-        return ['bytes'=>Storage::disk('local')->get((string)$row->pdf_path),
+        $bytes=$this->verifyPdf($row);
+        return ['bytes'=>$bytes,
             'mime'=>'application/pdf',
             'name'=>'internal-abnormal-'.$row->serial_number.'.pdf'];
     }

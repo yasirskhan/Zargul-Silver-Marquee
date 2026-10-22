@@ -19,7 +19,8 @@ use App\Services\HallInventoryLoanIncidentDecisionService;
 use App\Services\HallInventoryLoanIncidentService;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -29,7 +30,11 @@ use Tests\TestCase;
 
 /** ADR-0009 Option A: authorized write-off and numbered certificate, no company journal. */
 class HallInventoryInternalAbnormalClosureTest extends TestCase {
-    use RefreshDatabase;
+    use DatabaseMigrations;
+    protected function tearDown():void {
+        try { DB::statement('TRUNCATE TABLE companies, users RESTART IDENTITY CASCADE'); }
+        finally { parent::tearDown(); }
+    }
     private function pdf():UploadedFile {
         return UploadedFile::fake()->createWithContent('internal-abnormal.pdf',
             "%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF");
@@ -63,7 +68,7 @@ class HallInventoryInternalAbnormalClosureTest extends TestCase {
         $catalog->create($owner,$company->id,$borrower->id,$mapped,'Closure test tray','Furniture','piece',1,'Internal mapped fixture');
         DB::table('hall_inventory_positions')->insert([
             'id'=>(string)Str::uuid(),'company_id'=>$company->id,'hall_id'=>$source->id,
-            'item_id'=>$item,'owned_usable'=>1,'revision'=>0,'created_at'=>now(),'updated_at'=>now()
+            'item_id'=>$item,'owned_usable'=>2,'revision'=>0,'created_at'=>now(),'updated_at'=>now()
         ]);
         $loan=(string)Str::uuid();
         app(HallInventoryLoanDraftService::class)->create($owner,$company->id,$loan,'internal',
@@ -74,6 +79,22 @@ class HallInventoryInternalAbnormalClosureTest extends TestCase {
         $this->be($manager);
         app(HallInventoryInternalLoanReceiptService::class)->receive($manager,$company->id,$loan,
             (string)Str::uuid(),[$item=>$mapped],[$mapped=>0],$this->pdf());
+        // A different live original loan uses the same company/hall/catalog
+        // position. Retiring this loan must not retire the second loan's unit.
+        $secondLoan=(string)Str::uuid();
+        $this->be($owner);
+        app(HallInventoryLoanDraftService::class)->create($owner,$company->id,$secondLoan,'internal',
+            $source->id,$borrower->id,[['itemId'=>$item,'quantity'=>1]],'2027-12-30',
+            'Independent overlapping original loan fixture');
+        $this->be($admin);
+        app(HallInventoryInternalLoanDispatchService::class)->dispatch($admin,$company->id,$secondLoan,
+            (string)Str::uuid(),[$item=>1],$this->pdf());
+        $this->be($manager);
+        app(HallInventoryInternalLoanReceiptService::class)->receive($manager,$company->id,$secondLoan,
+            (string)Str::uuid(),[$item=>$mapped],[$mapped=>1],$this->pdf());
+        $this->assertSame(2,(int)DB::table('hall_inventory_positions')
+            ->where('company_id',$company->id)->where('hall_id',$source->id)
+            ->where('item_id',$item)->value('owned_on_loan'));
         $statement=(string)Str::uuid();
         app(HallInventoryInternalDiscrepancyService::class)->submit($manager,$company->id,
             $borrower->id,$loan,$item,$statement,'missing',1,
@@ -113,15 +134,57 @@ class HallInventoryInternalAbnormalClosureTest extends TestCase {
         $this->be($authorizer);
         $this->assertSame($authorization,$service->authorize($authorizer,$company->id,$source->id,
             $loan,$authorization,'Independent authorization to write off the confirmed missing unit.'));
-        $this->assertSame(1,(int)DB::table('hall_inventory_positions')
+        $this->assertSame(2,(int)DB::table('hall_inventory_positions')
             ->where('company_id',$company->id)->where('hall_id',$source->id)
             ->where('item_id',$item)->value('owned_on_loan'));
         $closureId=(string)Str::uuid();
+        $certificatePath='private/hall-internal-abnormal/'.$company->id.'/'.$loan.'/'.$closureId.'.pdf';
+        // Two live, independently committed PostgreSQL connections: holding
+        // the company serial allocator must block issuance *before* write-off.
+        config(['database.connections.iac_second_pgsql'=>config('database.connections.pgsql')]);
+        DB::purge('iac_second_pgsql');
+        $other=DB::connection('iac_second_pgsql');
+        $this->assertNotSame(DB::connection()->getPdo(),$other->getPdo());
+        $other->beginTransaction();
+        try {
+            $this->assertNotNull($other->table('companies')->where('id',$company->id)
+                ->lockForUpdate()->first(['id']));
+            DB::statement("SET lock_timeout = '300ms'");
+            try {
+                $service->close($authorizer,$company->id,$source->id,$loan,$closureId);
+                $this->fail('IAC issuance bypassed independent company numbering lock.');
+            }catch(QueryException $e) {
+                $this->assertStringContainsString('lock timeout',strtolower($e->getMessage()));
+            }
+            $this->assertSame(0,$other->table('hall_inventory_internal_abnormal_closures')
+                ->where('company_id',$company->id)->count());
+            $this->assertSame(2,(int)$other->table('hall_inventory_positions')
+                ->where('company_id',$company->id)->where('hall_id',$source->id)
+                ->where('item_id',$item)->value('owned_on_loan'));
+            $this->assertFalse(Storage::disk('local')->exists($certificatePath));
+        }finally{
+            DB::statement('SET lock_timeout TO DEFAULT');
+            $other->rollBack();
+            DB::disconnect('iac_second_pgsql');
+        }
+        // Occupied immutable storage key refuses issuance, leaves positions
+        // untouched and allows an exact retry after the obstruction is removed.
+        Storage::disk('local')->put($certificatePath,'occupied by failed issuance');
+        try {
+            $service->close($authorizer,$company->id,$source->id,$loan,$closureId);
+            $this->fail('Occupied certificate key was overwritten.');
+        }catch(\Symfony\Component\HttpKernel\Exception\ConflictHttpException){}
+        $this->assertSame(0,DB::table('hall_inventory_internal_abnormal_closures')->count());
+        $this->assertSame(2,(int)DB::table('hall_inventory_positions')
+            ->where('company_id',$company->id)->where('hall_id',$source->id)
+            ->where('item_id',$item)->value('owned_on_loan'));
+        $this->assertSame('occupied by failed issuance',Storage::disk('local')->get($certificatePath));
+        Storage::disk('local')->delete($certificatePath);
         $closed=$service->close($authorizer,$company->id,$source->id,$loan,$closureId);
         $this->assertSame('IAC-1',$closed['serialNumber']);
         $this->assertSame(1,$closed['writeoffQuantity']);
         $this->assertSame(1000,$closed['amountMinor']);
-        $this->assertSame(0,(int)DB::table('hall_inventory_positions')
+        $this->assertSame(1,(int)DB::table('hall_inventory_positions')
             ->where('company_id',$company->id)->where('hall_id',$source->id)
             ->where('item_id',$item)->value('owned_on_loan'));
         $this->assertSame(0,(int)DB::table('hall_inventory_positions')
@@ -132,6 +195,23 @@ class HallInventoryInternalAbnormalClosureTest extends TestCase {
             '/'.$loan.'/'.$closureId.'.pdf');
         $this->assertStringStartsWith('%PDF-1.4',$pdf);
         $this->assertSame(hash('sha256',$pdf),$closed['pdfSha256']);
+        // Missing/corrupt final proof must never be silently reissued or
+        // served as valid immutable evidence.
+        Storage::disk('local')->put($certificatePath,'corrupted');
+        try {
+            $service->close($authorizer,$company->id,$source->id,$loan,$closureId);
+            $this->fail('Corrupted certificate was treated as an idempotent success.');
+        }catch(\Symfony\Component\HttpKernel\Exception\ConflictHttpException){}
+        try {
+            $service->download($authorizer,$company->id,$source->id,$closureId);
+            $this->fail('Corrupted certificate downloaded.');
+        }catch(\Symfony\Component\HttpKernel\Exception\ConflictHttpException){}
+        Storage::disk('local')->delete($certificatePath);
+        try {
+            $service->close($authorizer,$company->id,$source->id,$loan,$closureId);
+            $this->fail('Missing certificate was silently reminted.');
+        }catch(\Symfony\Component\HttpKernel\Exception\ConflictHttpException){}
+        Storage::disk('local')->put($certificatePath,$pdf);
         $this->assertSame($closed['serialNumber'],$service->close($authorizer,$company->id,
             $source->id,$loan,$closureId)['serialNumber']);
         try {
