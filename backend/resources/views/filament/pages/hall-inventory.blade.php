@@ -2030,11 +2030,21 @@
                                         <li>{{ $line['name'] }} — {{ $line['sentQuantity'] }} {{ $line['unit'] }}
                                             @if($line['goodQuantity'] !== null)
                                                 (good {{ $line['goodQuantity'] }}, damaged {{ $line['damagedQuantity'] }},
-                                                unresolved {{ $line['unresolvedQuantity'] }}; not loan closure)
+                                                originally unresolved {{ $line['unresolvedQuantity'] }},
+                                                 later independently received good {{ $line['lateGood'] }}, damaged {{ $line['lateDamaged'] }},
+                                                 still unresolved {{ $line['remainingUnresolved'] }}; not loan closure)
                                             @else
                                                 (source count pending)
                                             @endif
                                         </li>
+                                        @if(config('inventory_controls.internal_late_return_enabled') &&
+                                            $batch['accepted'] && ($line['remainingUnresolved']??0)>0)
+                                            <li><button type="button"
+                                                wire:click="startLatePhysicalReturn('{{ $batch['batchId'] }}','{{ $line['sourceItemId'] }}')"
+                                                class="rounded-lg border px-3 py-2 text-sm">
+                                                Record separately witnessed later physical arrival
+                                            </button></li>
+                                        @endif
                                     @endforeach
                                 </ul>
                                 @if(!$batch['accepted'])
@@ -2078,6 +2088,34 @@
                             Accept observed good/damaged return quantities
                         </button>
                     </section>
+                @endif
+                @if(config('inventory_controls.internal_late_return_enabled') && $lateReturnBatchId!=='')
+                    <section class="space-y-3 rounded-xl border p-4" aria-label="Later original loan physical count">
+                        <h3 class="font-semibold">Later independently witnessed physical arrival</h3>
+                        <p>Original batch {{ $lateReturnBatchId }}, original source item {{ $lateReturnItemId }}.
+                        Record only actual newly observed physical units. No testimony-only credit, stock retirement, payment or automatic closure.</p>
+                        <label class="block text-sm">Newly observed good
+                            <input type="number" min="0" wire:model="lateReturnGood"
+                                class="w-full rounded-lg border p-2 text-gray-900">
+                        </label>
+                        <label class="block text-sm">Newly observed damaged
+                            <input type="number" min="0" wire:model="lateReturnDamaged"
+                                class="w-full rounded-lg border p-2 text-gray-900">
+                        </label>
+                        <label class="block text-sm">New signed physical arrival PDF/photo
+                            <input type="file" wire:model="lateReturnFile" accept=".pdf,.jpg,.jpeg,.png"
+                                class="w-full rounded-lg border p-2">
+                        </label>
+                        @error('lateReturnGood') <p role="alert">{{ $message }}</p> @enderror
+                        @error('lateReturnFile') <p role="alert">{{ $message }}</p> @enderror
+                        <button type="button" wire:click="submitLatePhysicalReturn"
+                            class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">
+                            Post separately witnessed physical return
+                        </button>
+                    </section>
+                @endif
+                @if($lastLateReturnId)
+                    <p role="status">Additional immutable witnessed physical receipt {{ $lastLateReturnId }} recorded, without financial posting or closure.</p>
                 @endif
                 @if($lastReturnAcceptanceId)
                     <p role="status" class="rounded-lg bg-amber-100 p-3 text-sm text-amber-900">

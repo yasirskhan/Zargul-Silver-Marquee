@@ -20,6 +20,8 @@ return [
     'loan_returns_enabled' => (bool) env('VENUE_INVENTORY_LOAN_RETURNS_ENABLED', false),
     // Owner/admin independent physical return condition acceptance (default OFF).
     'loan_return_acceptance_enabled' => (bool) env('VENUE_INVENTORY_LOAN_RETURN_ACCEPTANCE_ENABLED', false),
+    // Independent signed later physical discovery within an already reviewed return batch. OFF.
+    'internal_late_return_enabled' => (bool) env('VENUE_INVENTORY_INTERNAL_LATE_RETURN_ENABLED', false),
     // Immutable staff incident reporting only. Financial settlement remains separately gated.
     'internal_discrepancy_enabled' => (bool) env('VENUE_INVENTORY_INTERNAL_DISCREPANCY_ENABLED', false),
     // Original per-loan borrower + lender signed proof, independently reviewed; never physical/financial clearing.

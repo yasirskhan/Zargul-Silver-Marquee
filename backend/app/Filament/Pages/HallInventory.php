@@ -293,6 +293,17 @@ final class HallInventory extends Page
     public $returnAcceptanceFile = null;
     #[Locked]
     public ?string $lastReturnAcceptanceId = null;
+    #[Locked]
+    public string $lateReturnBatchId = '';
+    #[Locked]
+    public string $lateReturnItemId = '';
+    #[Locked]
+    public string $lateReturnRequestId = '';
+    public string $lateReturnGood = '';
+    public string $lateReturnDamaged = '';
+    public $lateReturnFile = null;
+    #[Locked]
+    public ?string $lastLateReturnId = null;
 
     #[Locked]
     public string $incidentLoanId = '';
@@ -716,6 +727,13 @@ final class HallInventory extends Page
         $this->returnConditionDamaged = [];
         $this->returnAcceptanceFile = null;
         $this->lastReturnAcceptanceId = null;
+        $this->lateReturnBatchId='';
+        $this->lateReturnItemId='';
+        $this->lateReturnRequestId=(string)Str::uuid();
+        $this->lateReturnGood='';
+        $this->lateReturnDamaged='';
+        $this->lateReturnFile=null;
+        $this->lastLateReturnId=null;
 
         $this->externalOutLoanId = '';
         $this->externalOutRequestId = (string)Str::uuid();
@@ -2485,6 +2503,59 @@ final class HallInventory extends Page
         $this->returnConditionGood=[];
         $this->returnConditionDamaged=[];
         $this->returnAcceptanceFile=null;
+        $this->reloadLoanHistory();
+    }
+
+    public function startLatePhysicalReturn(string $batchId,string $itemId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.internal_late_return_enabled'),403);
+        $batch=collect(app(HallInventoryInternalLoanReturnReview::class)->sourceBatches(
+            $actor,$this->companyId,$this->hallId))
+            ->first(fn($b)=>$b['batchId']===$batchId&&$b['accepted']);
+        $line=$batch?collect($batch['lines'])->first(fn($l)=>
+            $l['sourceItemId']===$itemId&&$l['remainingUnresolved']>0):null;
+        abort_unless($line!==null,403);
+        $this->lateReturnBatchId=$batchId;
+        $this->lateReturnItemId=$itemId;
+        $this->lateReturnRequestId=(string)Str::uuid();
+        $this->lateReturnGood='';$this->lateReturnDamaged='';$this->lateReturnFile=null;
+        $this->lastLateReturnId=null;
+    }
+
+    public function submitLatePhysicalReturn():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.internal_late_return_enabled'),403);
+        $this->validate(['lateReturnFile'=>'required|file|max:5120|mimes:jpg,jpeg,png,pdf']);
+        foreach([$this->lateReturnGood,$this->lateReturnDamaged] as $count)
+            if(!preg_match('/\A[0-9]{1,9}\z/D',$count))
+                throw ValidationException::withMessages(['lateReturnGood'=>'Enter two actual nonnegative physical counts.']);
+        $batch=collect(app(HallInventoryInternalLoanReturnReview::class)->sourceBatches(
+            $actor,$this->companyId,$this->hallId))
+            ->first(fn($b)=>$b['batchId']===$this->lateReturnBatchId&&$b['accepted']);
+        $line=$batch?collect($batch['lines'])->first(fn($l)=>
+            $l['sourceItemId']===$this->lateReturnItemId&&$l['remainingUnresolved']>0):null;
+        abort_unless($line!==null,403);
+        $src=DB::table('hall_inventory_positions')->where('company_id',$this->companyId)
+            ->where('hall_id',$this->hallId)->where('item_id',$this->lateReturnItemId)
+            ->first(['revision']);
+        $dst=DB::table('hall_inventory_positions')->where('company_id',$this->companyId)
+            ->where('hall_id',$batch['destinationHallId'])
+            ->where('item_id',$line['destinationItemId'])->first(['revision']);
+        if(!$src||!$dst)abort(409);
+        try {
+            $this->lastLateReturnId=app(\App\Services\HallInventoryInternalLateReturnService::class)
+                ->record($actor,$this->companyId,$this->lateReturnBatchId,
+                    $this->lateReturnRequestId,$this->lateReturnItemId,
+                    (int)$this->lateReturnGood,(int)$this->lateReturnDamaged,
+                    (int)$src->revision,(int)$dst->revision,$this->lateReturnFile);
+        }catch(InvalidArgumentException|ConflictHttpException $e){
+            throw ValidationException::withMessages(['lateReturnGood'=>$e->getMessage()]);
+        }
+        $this->lateReturnBatchId='';$this->lateReturnItemId='';
+        $this->lateReturnRequestId=(string)Str::uuid();
+        $this->lateReturnGood='';$this->lateReturnDamaged='';$this->lateReturnFile=null;
         $this->reloadLoanHistory();
     }
 

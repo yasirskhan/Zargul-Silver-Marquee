@@ -88,8 +88,14 @@ final class HallInventoryCleanLoanClosureService
                     ->selectRaw('COALESCE(SUM(al.damaged_quantity),0) as damaged')
                     ->selectRaw('COALESCE(SUM(al.unresolved_quantity),0) as unresolved')
                     ->first();
-                if((int)($return->good??0)!==(int)$line->quantity||
-                    (int)($return->damaged??0)!==0||(int)($return->unresolved??0)!==0)
+                $later=DB::table('hall_inventory_internal_late_returns')
+                    ->where('company_id',$companyId)->where('loan_id',$loanId)
+                    ->where('source_item_id',$item)
+                    ->selectRaw('COALESCE(SUM(good_quantity),0) as good')
+                    ->selectRaw('COALESCE(SUM(damaged_quantity),0) as damaged')->first();
+                if((int)($return->good??0)+(int)($later->good??0)!==(int)$line->quantity||
+                    (int)($return->damaged??0)+(int)($later->damaged??0)!==0||
+                    (int)($return->unresolved??0)-(int)($later->good??0)-(int)($later->damaged??0)!==0)
                     throw new ConflictHttpException('Not every loan unit was independently received back in good condition.');
                 $final[]=['itemId'=>$item,'quantity'=>(int)$line->quantity];
             }
@@ -102,7 +108,19 @@ final class HallInventoryCleanLoanClosureService
                 ->where('b.company_id',$companyId)->where('b.loan_id',$loanId)
                 ->whereNull('a.id')->exists())
                 throw new ConflictHttpException('An in-transit return still lacks source acknowledgment.');
-            $fingerprint=hash('sha256',json_encode([$companyId,$loanId,$final],JSON_THROW_ON_ERROR));
+            $laterProofs=DB::table('hall_inventory_internal_late_returns')
+                ->where('company_id',$companyId)->where('loan_id',$loanId)->get();
+            foreach($laterProofs as $laterProof) {
+                $disk=Storage::disk('local');
+                if(!$disk->exists((string)$laterProof->evidence_storage_path))
+                    throw new ConflictHttpException('Later physical source proof missing.');
+                $bytes=$disk->get((string)$laterProof->evidence_storage_path);
+                if(!is_string($bytes)||strlen($bytes)!==(int)$laterProof->evidence_size||
+                    !hash_equals((string)$laterProof->evidence_sha256,hash('sha256',$bytes)))
+                    throw new ConflictHttpException('Later witnessed return proof failed integrity check.');
+            }
+            $fingerprint=hash('sha256',json_encode([$companyId,$loanId,$final,
+                $laterProofs->map(fn($p)=>[$p->id,$p->evidence_sha256])->all()],JSON_THROW_ON_ERROR));
             $number=(int)DB::table('hall_inventory_internal_loan_closures')
                 ->where('company_id',$companyId)->max('receipt_number')+1;
             $bytes=$this->renderReceiptPdf($companyId,$loanId,$number,$fingerprint,$final);

@@ -133,6 +133,24 @@ final class HallInventoryInternalLoanReturnReview
             }
         }
 
+        $lateRows=DB::table('hall_inventory_internal_late_returns')
+            ->where('company_id',$companyId)->whereIn('return_batch_id',$rows->pluck('id')->all())
+            ->get();
+        $late=[];
+        foreach($lateRows as $lateRow) {
+            $path=(string)$lateRow->evidence_storage_path;
+            if(!str_starts_with($path,'private/hall-internal-late-return/'.$companyId.'/')||
+                !$disk->exists($path))
+                throw new ConflictHttpException('Signed later physical discovery evidence is missing.');
+            $bytes=$disk->get($path);
+            if(!is_string($bytes)||strlen($bytes)!==(int)$lateRow->evidence_size||
+                !hash_equals((string)$lateRow->evidence_sha256,hash('sha256',$bytes)))
+                throw new ConflictHttpException('Later physical discovery proof failed integrity verification.');
+            $key=$lateRow->return_batch_id.'/'.$lateRow->source_item_id;
+            $late[$key]['good']=($late[$key]['good']??0)+(int)$lateRow->good_quantity;
+            $late[$key]['damaged']=($late[$key]['damaged']??0)+(int)$lateRow->damaged_quantity;
+        }
+
         $all=DB::table('hall_inventory_internal_loan_return_lines as l')
             ->join('hall_inventory_internal_loan_return_batches as batch',function($j):void {
                 $j->on('batch.company_id','=','l.company_id')
@@ -169,7 +187,7 @@ final class HallInventoryInternalLoanReturnReview
                 : 'IN_TRANSIT_SOURCE_ACK_PENDING',
             'accepted'=>$batch->acceptance_id!==null,
             'lines'=>($all->get($batch->id)??collect())->map(
-                static fn($line):array=>[
+                fn($line):array=>[
                     'sourceItemId'=>(string)$line->source_item_id,
                     'destinationItemId'=>(string)$line->item_id,
                     'name'=>(string)$line->item_name_snapshot,
@@ -177,7 +195,13 @@ final class HallInventoryInternalLoanReturnReview
                     'sentQuantity'=>(int)$line->quantity,
                     'goodQuantity'=>$line->good_quantity===null?null:(int)$line->good_quantity,
                     'damagedQuantity'=>$line->damaged_quantity===null?null:(int)$line->damaged_quantity,
-                    'unresolvedQuantity'=>$line->unresolved_quantity===null?null:(int)$line->unresolved_quantity
+                    'unresolvedQuantity'=>$line->unresolved_quantity===null?null:(int)$line->unresolved_quantity,
+                    'lateGood'=>(int)($late[$batch->id.'/'.$line->source_item_id]['good']??0),
+                    'lateDamaged'=>(int)($late[$batch->id.'/'.$line->source_item_id]['damaged']??0),
+                    'remainingUnresolved'=>$line->unresolved_quantity===null?null:
+                        (int)$line->unresolved_quantity-
+                        (int)($late[$batch->id.'/'.$line->source_item_id]['good']??0)-
+                        (int)($late[$batch->id.'/'.$line->source_item_id]['damaged']??0)
                 ])->all()
         ])->all();
     }
@@ -219,6 +243,11 @@ final class HallInventoryInternalLoanReturnReview
             ->selectRaw('SUM(l.damaged_quantity) as damaged')
             ->selectRaw('SUM(l.unresolved_quantity) as unresolved')
             ->groupBy('l.source_item_id')->get()->keyBy('source_item_id');
+        $later=DB::table('hall_inventory_internal_late_returns')
+            ->where('company_id',$companyId)->where('loan_id',$loanId)
+            ->select('source_item_id')->selectRaw('SUM(good_quantity) as good')
+            ->selectRaw('SUM(damaged_quantity) as damaged')
+            ->groupBy('source_item_id')->get()->keyBy('source_item_id');
         $pending=DB::table('hall_inventory_internal_loan_return_lines as l')
             ->join('hall_inventory_internal_loan_return_batches as b',function($j):void {
                 $j->on('b.company_id','=','l.company_id')->on('b.id','=','l.return_batch_id');
@@ -286,12 +315,15 @@ final class HallInventoryInternalLoanReturnReview
         $result=[];
         foreach($lines as $line) {
             $id=(string)$line->item_id;$total=(int)$line->quantity;
-            $a=$returned->get($id);$good=(int)($a->good??0);
-            $damaged=(int)($a->damaged??0);$unresolved=(int)($a->unresolved??0);
+            $a=$returned->get($id);$follow=$later->get($id);
+            $lateGood=(int)($follow->good??0);$lateDamaged=(int)($follow->damaged??0);
+            $good=(int)($a->good??0)+$lateGood;
+            $damaged=(int)($a->damaged??0)+$lateDamaged;
+            $unresolved=(int)($a->unresolved??0)-$lateGood-$lateDamaged;
             $inTransit=(int)($pending[$id]??0);
             $notSent=$total-$good-$damaged-$unresolved-$inTransit;
             $retiredDamage=(int)($retired[$id]??0);
-            $integrityWarning=$notSent<0||$retiredDamage>$damaged;
+            $integrityWarning=$notSent<0||$unresolved<0||$retiredDamage>$damaged;
             $map=$mapped->get($id);
             $destBook=$map?$destinationPositions->get((string)$map->item_id):null;
             if(!$destBook)
