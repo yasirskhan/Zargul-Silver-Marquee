@@ -260,6 +260,8 @@ final class HallInventory extends Page
     public ?string $lastExternalSettlementReversalReference = null;
     #[Locked]
     public ?array $externalInReadiness = null;
+    #[Locked]
+    public ?array $externalInClosure = null;
 
     #[Locked]
     public string $loanDispatchLoanId = '';
@@ -862,6 +864,7 @@ final class HallInventory extends Page
         $this->externalSettlementReversalReason = '';
         $this->lastExternalSettlementReversalReference = null;
         $this->externalInReadiness = null;
+        $this->externalInClosure = null;
         $this->externalIntakeLoanId = '';
         $this->externalIntakeRequestId = (string)Str::uuid();
         $this->externalIntakeFile = null;
@@ -2374,6 +2377,28 @@ final class HallInventory extends Page
         }catch(InvalidArgumentException|ConflictHttpException $e) {
             throw ValidationException::withMessages(['externalInReadiness'=>$e->getMessage()]);
         }
+    }
+
+    public function issueExternalInNoncleanClosure(string $loanId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_in_nonclean_closure_enabled') &&
+            config('inventory_controls.external_in_loss_settlement_enabled') &&
+            config('inventory_controls.external_in_loss_obligation_enabled') &&
+            config('inventory_controls.external_borrowed_discrepancy_enabled') &&
+            config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled') &&
+            config('finance_controls.posting_enabled') &&
+            $this->canIndependentlyAcceptExternalBorrowing(),403);
+        try {
+            $this->externalInClosure=app(
+                \App\Services\HallInventoryExternalInNoncleanClosureService::class
+            )->close($actor,$this->companyId,$this->hallId,$loanId,(string)Str::uuid());
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['externalInReadiness'=>$e->getMessage()]);
+        }
+        $this->externalInReadiness=null;
+        $this->reloadLoanHistory();
     }
 
     public function canCloseExternalOutClean():bool

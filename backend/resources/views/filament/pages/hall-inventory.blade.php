@@ -811,8 +811,16 @@
                                                 @endforeach
                                             </ul>
                                         @endif
+                                        @if($externalInReadiness['ready'])
+                                            <button type="button" wire:click="issueExternalInNoncleanClosure('{{ $loan['id'] }}')"
+                                                class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">Issue non-clean final closure</button>
+                                        @endif
                                         <p class="text-xs">Read-only assessment; no stock, money, closure or final certificate is posted.</p>
                                     @endif
+                                @endif
+                                @if(($externalInClosure['loanId'] ?? null)===$loan['id'])
+                                    <p class="font-medium">EXTERNAL BORROWED NON-CLEAN FINAL CLOSURE {{ $externalInClosure['serialNumber'] }} — {{ $externalInClosure['currency'] }} {{ $externalInClosure['amountMinor'] }} minor units, missing {{ $externalInClosure['missingQuantity'] }}, damaged {{ $externalInClosure['damagedQuantity'] }}.</p>
+                                    <p>Numbered immutable private PDF (SHA256 {{ $externalInClosure['pdfSha256'] }}). No owned stock retirement and no cash mutation by this certificate.</p>
                                 @endif
                                 <p>Source: {{ $loan['lendingHallName'] ?? $loan['externalPartnerName'] ?? 'Not assigned' }}.
                                    Destination: {{ $loan['borrowingHallName'] ?? $loan['externalPartnerName'] ?? 'Not assigned' }}.</p>

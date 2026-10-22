@@ -32,6 +32,7 @@ final class HallInventoryPositionTransition
         'restore_owned_usable' => ['ownedDamaged', 'ownedUsable'],
         'writeoff_owned_on_loan' => ['ownedOnLoan', null],
         'writeoff_owned_damaged' => ['ownedDamaged', null],
+        'writeoff_borrowed_transit' => ['borrowedTransit', null],
     ];
 
     /** @param array<string,int> $position

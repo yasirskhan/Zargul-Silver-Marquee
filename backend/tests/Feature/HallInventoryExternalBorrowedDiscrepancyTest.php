@@ -12,6 +12,7 @@ use App\Services\HallInventoryExternalBorrowedDiscrepancyClearanceService;
 use App\Services\HallInventoryExternalInLossObligationService;
 use App\Services\HallInventoryExternalInLossSettlementService;
 use App\Services\HallInventoryExternalInNoncleanReadinessService;
+use App\Services\HallInventoryExternalInNoncleanClosureService;
 use App\Services\HallInventoryExternalBorrowedDiscrepancyService;
 use App\Services\HallInventoryExternalBorrowedIntakeService;
 use App\Services\HallInventoryExternalBorrowedReturnService;
@@ -547,5 +548,86 @@ final class HallInventoryExternalBorrowedDiscrepancyTest extends TestCase
             ->assertSee('Check non-clean closure readiness')
             ->call('checkExternalInClosureReadiness',$loan)->assertHasNoErrors()
             ->assertSee('NON-CLEAN CLOSURE READINESS: BLOCKED');
+
+        config()->set('inventory_controls.external_in_nonclean_closure_enabled',true);
+        $this->be($drafter);
+        $closureItem=(string)Str::uuid();
+        $catalog->create($drafter,$company->id,$hall->id,$closureItem,'Closure test display',
+            'Closure test catalog','piece',1,'Non-clean closure fixture');
+        $closureLoan=(string)Str::uuid();
+        app(HallInventoryLoanDraftService::class)->create($drafter,$company->id,$closureLoan,
+            'external_in',null,$hall->id,[['itemId'=>$closureItem,'quantity'=>5]],
+            '2027-12-31','Non-clean closure fixture','Closure Partner','Signed counterparty');
+        $this->be($handler);
+        $closureReceipt=(string)Str::uuid();
+        app(HallInventoryExternalBorrowedIntakeService::class)->record(
+            $handler,$company->id,$hall->id,$closureLoan,$closureReceipt,
+            $signed('closure-intake.pdf','closure-intake'),[$closureItem=>5]);
+        $this->be($owner);
+        app(HallInventoryExternalBorrowedIntakeService::class)->accept(
+            $owner,$company->id,$hall->id,$closureLoan,(string)Str::uuid());
+        $this->be($handler);
+        $closureBatch=(string)Str::uuid();
+        $returns->dispatch($handler,$company->id,$hall->id,$closureLoan,$closureBatch,
+            [$closureItem=>5],$signed('closure-return.pdf','closure-return'));
+        $this->be($owner);
+        $closureDiscrepancy=(string)Str::uuid();
+        $discrimination->report($owner,$company->id,$hall->id,$closureBatch,$closureDiscrepancy,
+            [$closureItem=>['received'=>4,'damaged'=>0]],
+            'Partner received four of five closure test units.',
+            $signed('closure-short.pdf','closure-short'));
+        $this->be($reviewer);
+        $discrimination->decide($reviewer,$company->id,$hall->id,$closureDiscrepancy,
+            (string)Str::uuid(),'substantiated','Independent review confirms the closure shortfall.');
+        $clearance->clear($reviewer,$company->id,$hall->id,$closureDiscrepancy,
+            (string)Str::uuid());
+        $closureObligation=(string)Str::uuid();
+        $obligations->propose($reviewer,$company->id,$hall->id,$closureDiscrepancy,
+            $closureObligation,'PKR',1000,
+            'Settled missing unit grounds the final non-clean closure obligation.');
+        $this->be($approver);
+        $obligations->decide($approver,$company->id,$hall->id,$closureObligation,
+            (string)Str::uuid(),'approved','Independent approval of the final closure obligation.');
+        $this->be($reviewer);
+        $closureSettlement=(string)Str::uuid();
+        $settlements->record($reviewer,$company->id,$hall->id,$closureObligation,
+            $closureSettlement,1000,'PKR','bank','BANK-CLOSURE-1','2026-10-22',
+            UploadedFile::fake()->createWithContent('closure-payment.pdf',
+                "%PDF-1.4\nclosure payment\n%%EOF"));
+        $this->be($approver);
+        $settlements->review($approver,$company->id,$hall->id,$closureSettlement,
+            (string)Str::uuid(),'verified',
+            'Independent verification of the final closure payment.');
+        $ready=app(HallInventoryExternalInNoncleanReadinessService::class)
+            ->assess($approver,$company->id,$hall->id,$closureLoan);
+        $this->assertTrue($ready['ready']);
+        Livewire::test(HallInventory::class)
+            ->set('hallId',$hall->id)
+            ->call('checkExternalInClosureReadiness',$closureLoan)
+            ->assertSee('NON-CLEAN CLOSURE READINESS: READY')
+            ->assertSee('Issue non-clean final closure')
+            ->call('issueExternalInNoncleanClosure',$closureLoan)->assertHasNoErrors()
+            ->assertSee('EXTERNAL BORROWED NON-CLEAN FINAL CLOSURE ENCL-1');
+        $closureRow=DB::table('hall_inventory_external_in_nonclean_closures')
+            ->where('loan_id',$closureLoan)->first();
+        $this->assertNotNull($closureRow);
+        $this->assertSame(1,(int)$closureRow->missing_quantity);
+        $this->assertSame(1000,(int)$closureRow->amount_minor);
+        $this->assertSame(0,(int)DB::table('hall_inventory_positions')
+            ->where('item_id',$closureItem)->sum('borrowed_transit'));
+        $this->assertSame(0,(int)DB::table('hall_inventory_positions')
+            ->where('item_id',$closureItem)->sum('owned_usable'));
+        $pdf=Storage::disk('local')->get('private/hall-external-in-nonclean/'.$company->id.
+            '/'.$closureLoan.'/'.$closureRow->id.'.pdf');
+        $this->assertStringStartsWith('%PDF-1.4',$pdf);
+        $this->assertSame(hash('sha256',$pdf),$closureRow->pdf_sha256);
+        $closureService=app(HallInventoryExternalInNoncleanClosureService::class);
+        $this->assertSame('ENCL-1',$closureService->close($approver,$company->id,$hall->id,
+            $closureLoan,(string)$closureRow->id)['serialNumber']);
+        try {
+            $closureService->close($approver,$company->id,$hall->id,
+                $closureLoan,(string)Str::uuid());
+            $this->fail('Non-clean closure was mutable through a second identifier.');
+        }catch(ConflictHttpException){}
     }
 }
