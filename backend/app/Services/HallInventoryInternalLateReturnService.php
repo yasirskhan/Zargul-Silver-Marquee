@@ -102,6 +102,9 @@ final class HallInventoryInternalLateReturnService
                 if(!is_string($oldBytes)||strlen($oldBytes)!==(int)$old->evidence_size||
                     !hash_equals((string)$old->evidence_sha256,hash('sha256',$oldBytes)))
                     throw new ConflictHttpException('Previously signed discovery proof has changed.');
+                // Even an identical request ID cannot excuse a forged or
+                // missing original double-entry custody movement on replay.
+                self::verifyRecordedProof($old);
                 return $id;
             }
             $previous=DB::table('hall_inventory_internal_late_returns')

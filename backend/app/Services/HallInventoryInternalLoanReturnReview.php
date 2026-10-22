@@ -170,6 +170,16 @@ final class HallInventoryInternalLoanReturnReview
                 'l.quantity','d.item_name_snapshot','d.unit_snapshot',
                 'al.good_quantity','al.damaged_quantity','al.unresolved_quantity'])
             ->groupBy('return_batch_id');
+        foreach($rows as $batch) {
+            foreach($all->get($batch->id)??collect() as $line) {
+                $key=$batch->id.'/'.$line->source_item_id;
+                $verifiedLate=(int)($late[$key]['good']??0)+
+                    (int)($late[$key]['damaged']??0);
+                if($verifiedLate>0&&($line->unresolved_quantity===null||
+                    $verifiedLate>(int)$line->unresolved_quantity))
+                    throw new ConflictHttpException('Later physical movements exceed original unresolved signed count.');
+            }
+        }
         return $rows->map(fn($batch):array=>[
             'batchId'=>(string)$batch->id,
             'loanId'=>(string)$batch->loan_id,

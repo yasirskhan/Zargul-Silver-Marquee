@@ -172,6 +172,10 @@ class HallInventoryInternalLateReturnTest extends TestCase
         $disk=Storage::disk('local');$original=$disk->get($row->evidence_storage_path);
         $disk->put($row->evidence_storage_path,'tampered');
         try {
+            $svc->record($admin,$company->id,$batch,$id,$item,1,0,3,3,$this->proof());
+            $this->fail('Identical UUID retried against tampered original private bytes.');
+        }catch(ConflictHttpException) {}
+        try {
             app(HallInventoryInternalLoanReturnReview::class)
                 ->sourceBatches($admin,$company->id,$source->id);
             $this->fail('Tampered late return evidence displayed as trusted physical custody.');
