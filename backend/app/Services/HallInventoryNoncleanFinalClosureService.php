@@ -118,8 +118,16 @@ final class HallInventoryNoncleanFinalClosureService
             // The company FOR UPDATE lock serializes all normal NCL writers.
             if($disk->exists($storagePath))
                 throw new ConflictHttpException('Immutable numbered document storage key already exists.');
-            if(!$disk->put($storagePath,$pdf))
-                throw new ConflictHttpException('Numbered final document storage failed.');
+            // Reject interrupted, truncated or falsely successful certificate
+            // storage before committing immutable numbering and financial evidence.
+            try {
+                if(!$disk->put($storagePath,$pdf))
+                    throw new ConflictHttpException('Numbered final document storage failed.');
+                $stored=$disk->get($storagePath);
+                if(!is_string($stored)||strlen($stored)!==strlen($pdf)||
+                    !hash_equals(hash('sha256',$pdf),hash('sha256',$stored)))
+                    throw new ConflictHttpException('Numbered certificate was partially stored or corrupted.');
+            }catch(\Throwable $e){$disk->delete($storagePath);throw $e;}
             try {
                 DB::table('hall_inventory_nonclean_final_closures')->insert([
                     'id'=>$id,'company_id'=>$companyId,'hall_id'=>$hallId,'loan_id'=>$loanId,

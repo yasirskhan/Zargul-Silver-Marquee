@@ -186,7 +186,16 @@ final class HallInventoryExternalInNoncleanClosureService
             $path='private/hall-external-in-nonclean/'.$companyId.'/'.$loanId.'/'.$closureId.'.pdf';
             $disk=Storage::disk('local');
             if($disk->exists($path))throw new ConflictHttpException('Closure PDF storage key already occupied.');
-            if(!$disk->put($path,$pdf))throw new ConflictHttpException('Closure PDF could not be stored.');
+            // Reject interrupted, truncated or falsely successful certificate
+            // storage before committing immutable numbering and financial evidence.
+            try {
+                if(!$disk->put($path,$pdf))
+                    throw new ConflictHttpException('Closure PDF could not be stored.');
+                $stored=$disk->get($path);
+                if(!is_string($stored)||strlen($stored)!==strlen($pdf)||
+                    !hash_equals(hash('sha256',$pdf),hash('sha256',$stored)))
+                    throw new ConflictHttpException('Numbered certificate was partially stored or corrupted.');
+            }catch(\Throwable $e){$disk->delete($path);throw $e;}
             try {
                 DB::table('hall_inventory_external_in_nonclean_closures')->insert([
                     'id'=>$closureId,'company_id'=>$companyId,'hall_id'=>$hallId,

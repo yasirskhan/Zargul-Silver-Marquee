@@ -176,8 +176,16 @@ final class HallInventoryExternalOutCleanClosureService {
             $disk=Storage::disk('local');
             if($disk->exists($key))
                 throw new ConflictHttpException('Immutable outside-owned receipt identifier already occupies private storage.');
-            if(!$disk->put($key,$pdf))
-                throw new ConflictHttpException('Immutable outside owned clean PDF storage failed.');
+            // Reject interrupted, truncated or falsely successful certificate
+            // storage before committing immutable numbering and financial evidence.
+            try {
+                if(!$disk->put($key,$pdf))
+                    throw new ConflictHttpException('Immutable outside owned clean PDF storage failed.');
+                $stored=$disk->get($key);
+                if(!is_string($stored)||strlen($stored)!==strlen($pdf)||
+                    !hash_equals(hash('sha256',$pdf),hash('sha256',$stored)))
+                    throw new ConflictHttpException('Numbered certificate was partially stored or corrupted.');
+            }catch(\Throwable $e){$disk->delete($key);throw $e;}
             try{
                 DB::table('hall_inventory_external_out_clean_closures')->insert([
                     'id'=>$closureId,'company_id'=>$companyId,'loan_id'=>$loanId,
