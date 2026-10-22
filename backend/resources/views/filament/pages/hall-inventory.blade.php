@@ -1897,6 +1897,65 @@
                             <input wire:model="discrepancyReviewReason" aria-label="Independent review reason" placeholder="Independent review reason">
                             <button type="button" wire:click="decideInternalDiscrepancy">Record independent source review</button>
                         @endif
+                        @if(config('inventory_controls.internal_physical_finding_enabled'))
+                            <div class="space-y-2 rounded-lg border p-3" aria-label="Independent original-loan physical findings">
+                                <h4 class="font-semibold">Original loan physical discrepancy findings</h4>
+                                <p class="text-sm">Signed borrower statement and separately substantiated lender incident must agree on the same original loan, item, missing/disputed kind and exact quantity. Confirmed findings keep outstanding physical custody OPEN. They are not returns, stock write-offs, financial admissions, settlements or final receipts.</p>
+                                @foreach($physicalFindingHistory as $finding)
+                                    <article wire:key="physical-finding-{{ $finding['id'] }}" class="rounded-lg border p-2 text-sm">
+                                        <p>Finding {{ $finding['id'] }}: {{ $finding['kind'] }} {{ $finding['quantity'] }} original item {{ $finding['itemId'] }}</p>
+                                        <p>{{ $finding['decision'] ?? 'INDEPENDENT REVIEW PENDING' }}. Signed source proof SHA256 {{ $finding['sha256'] }}. Stock and money unchanged.</p>
+                                        <button type="button" wire:click="downloadInternalPhysicalFindingProof('{{ $finding['id'] }}')" class="rounded border px-2 py-1">Private source evidence (audited)</button>
+                                    </article>
+                                @endforeach
+                                @if(count($discrepancyLines)===0 && $this->canReviewInternalDiscrepancy())
+                                    <label>Corroborated borrower signed original-loan statement
+                                        <select wire:model="physicalFindingStatementId" class="w-full rounded border p-2">
+                                            <option value="">Choose signed borrower statement</option>
+                                            @foreach($discrepancyHistory as $statement)
+                                                @if($statement['decision']==='corroborated')
+                                                    <option value="{{ $statement['id'] }}">{{ $statement['id'] }}: {{ $statement['kind'] }} {{ $statement['quantity'] }} item {{ $statement['itemId'] }}</option>
+                                                @endif
+                                            @endforeach
+                                        </select>
+                                    </label>
+                                    <label>Independently substantiated original source incident
+                                        <select wire:model="physicalFindingIncidentId" class="w-full rounded border p-2">
+                                            <option value="">Choose independently reviewed lender incident</option>
+                                            @foreach($physicalFindingIncidents as $incident)
+                                                @if($incident['decision']==='substantiated' && in_array($incident['kind'],['missing','dispute'],true))
+                                                    <option value="{{ $incident['reportId'] }}">{{ $incident['reportId'] }}: {{ $incident['kind'] }} {{ $incident['quantity'] }} item {{ $incident['itemId'] }}</option>
+                                                @endif
+                                            @endforeach
+                                        </select>
+                                    </label>
+                                    <label>Source physical investigation reason <textarea wire:model="physicalFindingReason" class="w-full rounded border p-2"></textarea></label>
+                                    <label>Signed source PDF/photo <input type="file" wire:model="physicalFindingFile" accept=".pdf,.jpg,.jpeg,.png"></label>
+                                    <button type="button" wire:click="submitInternalPhysicalFinding" class="rounded border px-3 py-2">File original-loan source physical proof for independent review</button>
+                                    @error('physicalFindingFile') <p role="alert">{{ $message }}</p> @enderror
+                                    <label>Independent decision on a pending physical finding
+                                        <select wire:model="physicalFindingDecisionTargetId" class="w-full rounded border p-2">
+                                            <option value="">Choose pending finding</option>
+                                            @foreach($physicalFindingHistory as $finding)
+                                                @if($finding['decision']===null)
+                                                    <option value="{{ $finding['id'] }}">{{ $finding['id'] }}: {{ $finding['kind'] }} {{ $finding['quantity'] }}</option>
+                                                @endif
+                                            @endforeach
+                                        </select>
+                                    </label>
+                                    <label>Decision
+                                        <select wire:model="physicalFindingDecision" class="w-full rounded border p-2">
+                                            <option value="requires_more_evidence">More physical evidence required</option>
+                                            <option value="confirmed_outstanding">Corroborated unreturned units, custody still OPEN</option>
+                                            <option value="rejected">Reject physical finding</option>
+                                        </select>
+                                    </label>
+                                    <label>Independent physical reviewer reason <textarea wire:model="physicalFindingDecisionReason" class="w-full rounded border p-2"></textarea></label>
+                                    <button type="button" wire:click="decideInternalPhysicalFinding" class="rounded border px-3 py-2">Record immutable source review</button>
+                                    @error('physicalFindingDecisionReason') <p role="alert">{{ $message }}</p> @enderror
+                                @endif
+                            </div>
+                        @endif
                     </section>
                 @endif
                 @if($lastReturnBatchId)

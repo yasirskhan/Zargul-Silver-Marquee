@@ -1,18 +1,19 @@
-# Zargul VenueDesk HAFZATECH — Phase 12 active INTERNAL borrower proof checkpoint
-Observed 2026-10-22 UTC. Repository yasirskhan/Zargul-Silver-Marquee, ONLY chatgpt/phase0-foundation.
-This worker: https://chatgpt.com/c/6ad84c8c-ca60-83e9-a05b-782fd6a675e5
-Read AGENTS.md, ENTIRE handoff, docs/SESSION_CONTROL.md, live branch and latest CI, specs/registers/source/tests before new change.
+# Zargul VenueDesk HAFZATECH — Phase 12 INTERNAL joint physical finding checkpoint
+Observed 2026-10-22 UTC. ONLY yasirskhan/Zargul-Silver-Marquee branch chatgpt/phase0-foundation.
+Retired worker: https://chatgpt.com/c/6ad84c8c-ca60-83e9-a05b-782fd6a675e5 (maximum-length, ended). Replacement THIS normal Chat URL not exposed by connector/runtime; supervisor must insert actual URL into docs/SESSION_CONTROL.md once observed; do not invent it.
+Read AGENTS.md, entire concise handoff, docs/SESSION_CONTROL.md, current specs/registers/source and verified exact HEAD/job list. Archive prior handoff verbatim: docs/AI_HANDOFF_ARCHIVE_2026-10-22_fcdcc5d.md.
 
-## Verified hosted checkpoints / six jobs
-- Earlier 495903b315f7514a5ab048f0be5928b57d703a19 run39682074643 SIX SUCCESS; original INTERNAL lender physical damage retirement, source missing testimony and independent review, mapped destination ITEM aggregate (not signed per-loan evidence), no cash.
-- Intervening `6e191380` borrower signed statement original loan default-off implementation, `c12c6316` release-gate test, `4f6968c8` exact tenant/statement FK, `fd83b391` source UI separate clean close gate, `d0b1af7b230d2a448c5738dc7680aa95412706d4` [39695935832](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39695935832) SIX SUCCESS. Earlier candidate failures 39694692345 and others repaired by d0b1; historical red remains red.
-- `8970278bd59da30a08a28bbcfd82971f628e358a` [39698470691](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39698470691) newest implementation: signed private borrower statement HISTORY verifies actual immutable size/hash; source owner review lock ordered loan before statement. Verify exact run all six before claiming green.
-## Next source successor
-- Real regression for original borrower signed proof tampering on authorized history: rejects corrupted file, restores original and reads once, conserves original on-loan stock and no finance. Check successor exact SHA and all-six CI, fix failures. Prior handoff verbatim at docs/AI_HANDOFF_ARCHIVE_2026-10-22_d0b1af7b.md.
-- Then implement per-loan independently corroborated borrower/lender physical discrepancy resolution, exact quantity evidence and separate financial obligation/settlement with existing approvals. Do not count aggregate item positions as signed per-loan acknowledgment. Don't retire unreturned stock or manufacture borrower payment.
-## Phase12 OPEN
-- Signed testimony and an independent finding are NOT signed physical return, borrower financial admission, cash, final closure or numbered PDF. INTERNAL missing/disputed physical resolution, true finance/settlement, and abnormal final closure OPEN. EXTERNAL_IN partner short/damage/disputed returns and closure OPEN.
-- Operator acceptance/staging physical cases, backup/restore, independent security and production release still EXTERNALLY BLOCKED. Inventory/finance production switches OFF; no Phase13 until all Phase12 acceptance, then continue whole approved roadmap.
-## Rules/docs
-- Current docs PROJECT_MASTER_SPEC.md; COMMERCIAL_PRODUCT_EXPANSION.md; INVENTORY_IMPLEMENTATION_PLAN.md; PHASE12_FINANCIAL_CLAIM_SCOPE.md; ROADMAP.md; FEATURE_REGISTER.csv; ISSUE_AND_BUG_REGISTER.md; DEVELOPMENT_PROTOCOL.md; QUALITY_AND_BUG_REMEDIATION_POLICY.md. Preserve website/CMS, booking, finance, Telegram/staff/audit, HAFZATECH.
-- One writer normal Chat, no Work/main/new branch/force push/property-platform; expected_sha force=false. Required jobs prototype-checks, central-postgres, licensing-postgres, laravel-postgres, editor-browser-e2e, authenticated-panel-e2e.
+## Verified original HEAD
+- fcdcc5d75417013557e899e79f69686a9ab77f35 GitHub Actions 39698916554 ALL SIX SUCCESS: prototype-checks, central-postgres, licensing-postgres, laravel-postgres, editor-browser-e2e, authenticated-panel-e2e. Prior 8970278b run39698470691 all six success.
+- Original signed borrower statement/history integrity, independent source review, lock order, original source incident/testimony, independent damage retirement existed. Aggregate borrower item book is NOT signed per-loan proof.
+
+## Current substantial candidate: VERIFY exact new SHA!
+- New default-OFF gate internal_physical_finding_enabled, original-loan composite-FK scoped physical missing/dispute finding and independent immutable decision migration.
+- Requires corroborated signed borrower statement and substantiated independent lender incident, EXACT source item, loan, kind and quantity; signed lender source PDF/photo 5 MiB SHA256 private checked on every read and decision; current scope/roles and separate lender investigator/reviewer. Reject over-allocation against not-returned+unresolved per-loan counts, preserve source owned_on_loan and borrower custody, no finance/journal or final close.
+- Filament source owner review, signed PDF/photo proposal, decision, borrower/source history, permission-checked audited private download and new real PostgreSQL/Livewire test. Entire new code must pass hosted six jobs. No local PHP/Postgres execution claimed.
+- NOTE: Because a finding is still evidence only, this batch does NOT resolve custody, authorize write-off, collect money, or issue abnormal numbered receipt. Further action includes amended/reversal flow, return-after-finding recalculation and concurrency/operator evidence.
+
+## Next work
+- Verify exact new SHA on six hosted jobs, inspect real failures and repair without weakening tests. Recheck branch HEAD before writes; expected_sha force=false, single writer.
+- Build return/partial reconciliation against findings, independent authorized financial obligation/settlement for INTERNAL, full abnormal final closure after true physical/finance reconciliation and numbered immutable PDF. EXTERNAL_IN partner short/damage/dispute reconciliation OPEN. Operator UAT, backup/restore, security and production release BLOCKED EXTERNAL.
+- Update ROADMAP, FEATURE_REGISTER, ISSUE_AND_BUG_REGISTER with evidence; continue substantive implementation while within actual limits. All production switches remain OFF; Phase12 remains OPEN. Once all approved phase acceptance passes, continue next approved phase without prompt.

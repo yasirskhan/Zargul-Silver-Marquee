@@ -244,6 +244,21 @@ final class HallInventory extends Page
     public string $discrepancyReviewDecision = 'requires_more_evidence';
     public string $discrepancyReviewReason = '';
     #[Locked]
+    public array $physicalFindingHistory = [];
+    #[Locked]
+    public array $physicalFindingIncidents = [];
+    #[Locked]
+    public string $physicalFindingId = '';
+    #[Locked]
+    public string $physicalFindingDecisionId = '';
+    public string $physicalFindingStatementId = '';
+    public string $physicalFindingIncidentId = '';
+    public string $physicalFindingReason = '';
+    public $physicalFindingFile = null;
+    public string $physicalFindingDecisionTargetId = '';
+    public string $physicalFindingDecision = 'requires_more_evidence';
+    public string $physicalFindingDecisionReason = '';
+    #[Locked]
     public string $returnLoanId = '';
     #[Locked]
     public string $returnBatchId = '';
@@ -582,6 +597,16 @@ final class HallInventory extends Page
         $this->discrepancyRequestId=(string)Str::uuid();
         $this->discrepancyDecisionId=(string)Str::uuid();
         $this->discrepancyFile=null;
+        $this->physicalFindingHistory=[];
+        $this->physicalFindingIncidents=[];
+        $this->physicalFindingId=(string)Str::uuid();
+        $this->physicalFindingDecisionId=(string)Str::uuid();
+        $this->physicalFindingFile=null;
+        $this->physicalFindingStatementId='';
+        $this->physicalFindingIncidentId='';
+        $this->physicalFindingReason='';
+        $this->physicalFindingDecisionTargetId='';
+        $this->physicalFindingDecisionReason='';
         $this->incidentLoanId = '';
         $this->internalDamageWriteoffs=[];
         $this->internalDamageEligible=[];
@@ -2044,6 +2069,10 @@ final class HallInventory extends Page
         $this->discrepancyRequestId=(string)Str::uuid();
         $this->discrepancyHistory=app(\App\Services\HallInventoryInternalDiscrepancyService::class)
             ->history($actor,$this->companyId,$this->hallId,$loanId,false);
+        $this->physicalFindingIncidents=[];
+        $this->physicalFindingHistory=config('inventory_controls.internal_physical_finding_enabled')
+            ? app(\App\Services\HallInventoryInternalPhysicalFindingService::class)
+                ->history($actor,$this->companyId,$this->hallId,$loanId,false) : [];
     }
     public function submitInternalDiscrepancy():void {
         $actor=$this->authorizeSelection();
@@ -2084,6 +2113,18 @@ final class HallInventory extends Page
         $this->discrepancyHistory=app(\App\Services\HallInventoryInternalDiscrepancyService::class)
             ->history($actor,$this->companyId,$this->hallId,$loanId,true);
         $this->discrepancyDecisionId=(string)Str::uuid();
+        $this->physicalFindingId=(string)Str::uuid();
+        $this->physicalFindingDecisionId=(string)Str::uuid();
+        $this->physicalFindingFile=null;
+        if(config('inventory_controls.internal_physical_finding_enabled')) {
+            $this->physicalFindingIncidents=app(\App\Services\HallInventoryLoanIncidentDecisionService::class)
+                ->reviews($actor,$this->companyId,$this->hallId,$loanId);
+            $this->physicalFindingHistory=app(\App\Services\HallInventoryInternalPhysicalFindingService::class)
+                ->history($actor,$this->companyId,$this->hallId,$loanId,true);
+        }else {
+            $this->physicalFindingIncidents=[];
+            $this->physicalFindingHistory=[];
+        }
     }
     public function decideInternalDiscrepancy():void {
         $actor=$this->authorizeSelection();
@@ -2099,6 +2140,88 @@ final class HallInventory extends Page
         $this->discrepancyHistory=app(\App\Services\HallInventoryInternalDiscrepancyService::class)
             ->history($actor,$this->companyId,$this->hallId,$this->discrepancyLoanId,true);
         $this->discrepancyDecisionId=(string)Str::uuid();
+    }
+
+
+    /** Lending-hall owner/admin submits source signed physical proof bound to exact original borrower statement and incident. */
+    public function submitInternalPhysicalFinding():void {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canReviewInternalDiscrepancy() &&
+            config('inventory_controls.internal_physical_finding_enabled') &&
+            $this->discrepancyLoanId!=='',403);
+        $this->validate([
+            'physicalFindingStatementId'=>'required|uuid',
+            'physicalFindingIncidentId'=>'required|uuid',
+            'physicalFindingReason'=>'required|string|min:10|max:500',
+            'physicalFindingFile'=>'required|file|max:5120|mimes:jpg,jpeg,png,pdf'
+        ]);
+        $statements=app(\App\Services\HallInventoryInternalDiscrepancyService::class)
+            ->history($actor,$this->companyId,$this->hallId,$this->discrepancyLoanId,true);
+        $incidents=app(\App\Services\HallInventoryLoanIncidentDecisionService::class)
+            ->reviews($actor,$this->companyId,$this->hallId,$this->discrepancyLoanId);
+        abort_unless(collect($statements)->contains(fn($row):bool=>
+            $row['id']===$this->physicalFindingStatementId && $row['decision']==='corroborated') &&
+            collect($incidents)->contains(fn($row):bool=>
+                $row['reportId']===$this->physicalFindingIncidentId && $row['decision']==='substantiated'),403);
+        try {
+            app(\App\Services\HallInventoryInternalPhysicalFindingService::class)->propose(
+                $actor,$this->companyId,$this->hallId,$this->discrepancyLoanId,
+                $this->physicalFindingStatementId,$this->physicalFindingIncidentId,
+                $this->physicalFindingId,$this->physicalFindingReason,$this->physicalFindingFile);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['physicalFindingFile'=>$e->getMessage()]);
+        }
+        $this->physicalFindingHistory=app(\App\Services\HallInventoryInternalPhysicalFindingService::class)
+            ->history($actor,$this->companyId,$this->hallId,$this->discrepancyLoanId,true);
+        $this->physicalFindingId=(string)Str::uuid();
+        $this->physicalFindingFile=null;
+        $this->physicalFindingReason='';
+        $this->physicalFindingStatementId='';
+        $this->physicalFindingIncidentId='';
+    }
+    public function decideInternalPhysicalFinding():void {
+        $actor=$this->authorizeSelection();
+        abort_unless($this->canReviewInternalDiscrepancy() &&
+            config('inventory_controls.internal_physical_finding_enabled') &&
+            $this->discrepancyLoanId!=='',403);
+        $this->validate([
+            'physicalFindingDecisionTargetId'=>'required|uuid',
+            'physicalFindingDecision'=>'required|in:confirmed_outstanding,rejected,requires_more_evidence',
+            'physicalFindingDecisionReason'=>'required|string|min:10|max:500'
+        ]);
+        $history=app(\App\Services\HallInventoryInternalPhysicalFindingService::class)
+            ->history($actor,$this->companyId,$this->hallId,$this->discrepancyLoanId,true);
+        abort_unless(collect($history)->contains(fn($r):bool=>
+            $r['id']===$this->physicalFindingDecisionTargetId && $r['decision']===null),403);
+        try {
+            app(\App\Services\HallInventoryInternalPhysicalFindingService::class)->decide(
+                $actor,$this->companyId,$this->hallId,$this->physicalFindingDecisionTargetId,
+                $this->physicalFindingDecisionId,$this->physicalFindingDecision,
+                $this->physicalFindingDecisionReason);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['physicalFindingDecisionReason'=>$e->getMessage()]);
+        }
+        $this->physicalFindingHistory=app(\App\Services\HallInventoryInternalPhysicalFindingService::class)
+            ->history($actor,$this->companyId,$this->hallId,$this->discrepancyLoanId,true);
+        $this->physicalFindingDecisionId=(string)Str::uuid();
+        $this->physicalFindingDecisionTargetId='';
+        $this->physicalFindingDecisionReason='';
+    }
+    public function downloadInternalPhysicalFindingProof(string $findingId) {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.internal_physical_finding_enabled') &&
+            $this->discrepancyLoanId!=='',403);
+        $loan=DB::table('hall_inventory_loan_drafts')->where('company_id',$this->companyId)
+            ->where('id',$this->discrepancyLoanId)->where('direction','internal')->first();
+        abort_unless($loan && ($loan->lending_hall_id===$this->hallId ||
+            $loan->borrowing_hall_id===$this->hallId),403);
+        $source=$loan->lending_hall_id===$this->hallId;
+        $row=app(\App\Services\HallInventoryInternalPhysicalFindingService::class)->sourceProof(
+            $actor,$this->companyId,$this->hallId,$findingId,$source);
+        return response()->streamDownload(static function()use($row):void {
+            echo $row['bytes'];
+        },$row['name'],['Content-Type'=>$row['mime'],'Cache-Control'=>'private, no-store',
+            'Pragma'=>'no-cache','X-Content-Type-Options'=>'nosniff']);
     }
 
     public function startInternalReturn(string $loanId):void

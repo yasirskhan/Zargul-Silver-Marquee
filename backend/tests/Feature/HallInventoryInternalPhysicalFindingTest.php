@@ -1,0 +1,203 @@
+<?php
+namespace Tests\Feature;
+
+use App\Filament\Pages\HallInventory;
+use App\Models\Company;
+use App\Models\CompanyMembership;
+use App\Models\Hall;
+use App\Models\HallAssignment;
+use App\Models\User;
+use App\Services\HallInventoryCatalogService;
+use App\Services\HallInventoryInternalDiscrepancyService;
+use App\Services\HallInventoryInternalPhysicalFindingService;
+use App\Services\HallInventoryInternalLoanDispatchService;
+use App\Services\HallInventoryInternalLoanReceiptService;
+use App\Services\HallInventoryLoanDraftService;
+use App\Services\HallInventoryLoanIncidentService;
+use App\Services\HallInventoryLoanIncidentDecisionService;
+use Filament\Facades\Filament;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Livewire\Livewire;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+use Tests\TestCase;
+
+/** Signed two-hall original-loan evidence never itself moves custody or money. */
+class HallInventoryInternalPhysicalFindingTest extends TestCase {
+    use RefreshDatabase;
+    private function pdf():UploadedFile {
+        return UploadedFile::fake()->createWithContent('signed-evidence.pdf',
+            "%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF");
+    }
+    private function fixture():array {
+        Storage::fake('local');
+        $company=Company::create(['name'=>'Original loan source proof','slug'=>'original-loan-source-proof']);
+        $source=Hall::create(['company_id'=>$company->id,'name'=>'Source evidence hall','slug'=>'source-evidence-hall','capacity'=>100]);
+        $borrower=Hall::create(['company_id'=>$company->id,'name'=>'Borrower evidence hall','slug'=>'borrower-evidence-hall','capacity'=>100]);
+        $owner=User::create(['name'=>'Source original owner','email'=>'original-source-owner@example.test','password'=>'test-only']);
+        $admin=User::create(['name'=>'Independent source reviewer','email'=>'original-source-admin@example.test','password'=>'test-only']);
+        $manager=User::create(['name'=>'Signed loan borrower','email'=>'original-loan-borrower@example.test','password'=>'test-only']);
+        foreach([[$owner,'owner'],[$admin,'admin'],[$manager,'manager']] as [$u,$role]) {
+            $u->markEmailAsVerified();
+            $member=CompanyMembership::create(['company_id'=>$company->id,'user_id'=>$u->id,'role'=>$role]);
+            if($role==='manager')HallAssignment::create(['company_id'=>$company->id,'hall_id'=>$borrower->id,'membership_id'=>$member->id]);
+        }
+        foreach(['catalog_enabled','loan_drafts_enabled','loan_dispatch_enabled','loan_receipt_enabled',
+            'loan_returns_enabled','loan_return_acceptance_enabled','loan_incidents_enabled',
+            'loan_incident_reviews_enabled','internal_discrepancy_enabled'] as $key)
+            config()->set('inventory_controls.'.$key,true);
+        $this->be($owner);
+        $item=(string)Str::uuid();$mapped=(string)Str::uuid();
+        $catalog=app(HallInventoryCatalogService::class);
+        $catalog->create($owner,$company->id,$source->id,$item,
+            'Physical source proof tray','Furniture','piece',1,'Signed original source catalog');
+        $catalog->create($owner,$company->id,$borrower->id,$mapped,
+            'Physical source proof tray','Furniture','piece',1,'Signed mapped borrower catalog');
+        DB::table('hall_inventory_positions')->insert([
+            'id'=>(string)Str::uuid(),'company_id'=>$company->id,'hall_id'=>$source->id,
+            'item_id'=>$item,'owned_usable'=>30,'revision'=>0,'created_at'=>now(),'updated_at'=>now()
+        ]);
+        $loan=(string)Str::uuid();
+        app(HallInventoryLoanDraftService::class)->create($owner,$company->id,$loan,
+            'internal',$source->id,$borrower->id,[['itemId'=>$item,'quantity'=>12]],
+            '2027-12-30','Signed cross-hall physical discrepancy test');
+        $this->be($admin);
+        app(HallInventoryInternalLoanDispatchService::class)->dispatch(
+            $admin,$company->id,$loan,(string)Str::uuid(),[$item=>0],$this->pdf());
+        $this->be($manager);
+        app(HallInventoryInternalLoanReceiptService::class)->receive(
+            $manager,$company->id,$loan,(string)Str::uuid(),[$item=>$mapped],[$mapped=>0],$this->pdf());
+        $statement=(string)Str::uuid();
+        app(HallInventoryInternalDiscrepancyService::class)->submit(
+            $manager,$company->id,$borrower->id,$loan,$item,$statement,'missing',3,
+            'Three source trays are physically unaccounted for.', $this->pdf());
+        $this->be($owner);
+        app(HallInventoryInternalDiscrepancyService::class)->review(
+            $owner,$company->id,$source->id,$statement,(string)Str::uuid(),
+            'corroborated','Original borrower signed statement independently corroborated.');
+        $incident=(string)Str::uuid();
+        app(HallInventoryLoanIncidentService::class)->report(
+            $owner,$company->id,$loan,$incident,$item,'missing',3,
+            'Three trays unreturned in original lending hall.');
+        $this->be($admin);
+        app(HallInventoryLoanIncidentDecisionService::class)->decide(
+            $admin,$company->id,$incident,(string)Str::uuid(),'substantiated',
+            'Original lending hall confirms three physically unreturned trays.');
+        return compact('company','source','borrower','owner','admin','manager','item','mapped','loan','statement','incident');
+    }
+    public function test_correlated_proofs_are_immutable_private_independently_reviewed_and_do_not_clear_physical_stock():void {
+        $f=$this->fixture();extract($f);
+        $service=app(HallInventoryInternalPhysicalFindingService::class);
+        $finding=(string)Str::uuid();
+        try {
+            $service->propose($admin,$company->id,$source->id,$loan,$statement,$incident,
+                $finding,'Independent source physical count supports discrepancy.',$this->pdf());
+            $this->fail('Default-OFF new reconciliation flag was bypassed.');
+        }catch(ConflictHttpException){}
+        config()->set('inventory_controls.internal_physical_finding_enabled',true);
+        $this->assertSame($finding,$service->propose($admin,$company->id,$source->id,
+            $loan,$statement,$incident,$finding,
+            'Independent source physical count supports discrepancy.',$this->pdf()));
+        $this->assertSame($finding,$service->propose($admin,$company->id,$source->id,
+            $loan,$statement,$incident,$finding,
+            'Independent source physical count supports discrepancy.',$this->pdf()));
+        try {
+            $service->propose($admin,$company->id,$source->id,$loan,$statement,$incident,
+                $finding,'Forged changed source physical statement must fail.',$this->pdf());
+            $this->fail('Conflicting retry changed immutable original evidence.');
+        }catch(ConflictHttpException){}
+        $row=DB::table('hall_inventory_internal_physical_findings')->where('id',$finding)->first();
+        $this->assertSame(12,(int)$row->outstanding_snapshot);
+        $this->assertSame(3,(int)$row->quantity);
+        $this->assertSame(1,DB::table('hall_inventory_internal_physical_findings')->count());
+        try {
+            $service->propose($admin,$company->id,$source->id,$loan,$statement,$incident,
+                (string)Str::uuid(),'Second identical physical claim must not allocate.',$this->pdf());
+            $this->fail('Duplicate source incident reused.');
+        }catch(\Illuminate\Database\QueryException|ConflictHttpException){}
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Livewire::test(HallInventory::class)->set('companyId',$company->id)
+            ->set('hallId',$source->id)->call('startInternalDiscrepancyReview',$loan)
+            ->assertHasNoErrors()->assertSee('Original loan physical discrepancy findings')
+            ->assertSee($finding);
+        try {
+            $service->decide($admin,$company->id,$source->id,$finding,(string)Str::uuid(),
+                'confirmed_outstanding','Self-decision must be prohibited.');
+            $this->fail('Independent physical finding self approval allowed.');
+        }catch(AuthorizationException){}
+        $this->be($owner);
+        $decision=(string)Str::uuid();$reason='Exact signed independent borrower and lender proof corroborates unreturned custody.';
+        $this->assertSame($decision,$service->decide($owner,$company->id,$source->id,
+            $finding,$decision,'confirmed_outstanding',$reason));
+        $this->assertSame($decision,$service->decide($owner,$company->id,$source->id,
+            $finding,$decision,'confirmed_outstanding',$reason));
+        try {
+            $service->decide($owner,$company->id,$source->id,$finding,(string)Str::uuid(),
+                'rejected','Second decision cannot erase physical evidence.');
+            $this->fail('Duplicate decision changed immutable finding.');
+        }catch(ConflictHttpException){}
+        $this->assertSame('confirmed_outstanding',$service->history(
+            $owner,$company->id,$source->id,$loan,true)[0]['decision']);
+        $result=$service->sourceProof($owner,$company->id,$source->id,$finding,true);
+        $this->assertSame('application/pdf',$result['mime']);
+        $this->assertSame(1,DB::table('audit_events')->where('action',
+            'hall_inventory.internal_physical_finding_source_proof_read')->count());
+        $this->assertSame(12,(int)DB::table('hall_inventory_positions')
+            ->where('company_id',$company->id)->where('hall_id',$source->id)
+            ->where('item_id',$item)->value('owned_on_loan'));
+        $this->assertSame(0,DB::table('finance_journals')->count());
+        $this->assertSame(0,DB::table('hall_inventory_internal_loan_closures')->count());
+        $this->assertSame(0,DB::table('hall_inventory_nonclean_final_closures')->count());
+        $this->be($manager);
+        $this->assertCount(1,$service->history($manager,$company->id,$borrower->id,$loan,false));
+        $this->assertSame($result['bytes'],$service->sourceProof(
+            $manager,$company->id,$borrower->id,$finding,false)['bytes']);
+        try {
+            $service->sourceProof($manager,$company->id,$source->id,$finding,true);
+            $this->fail('Borrowing-hall manager read lender private source scope.');
+        }catch(AuthorizationException){}
+        DB::table('company_memberships')->where('company_id',$company->id)
+            ->where('user_id',$manager->id)->update(['is_active'=>false]);
+        try {
+            $service->history($manager,$company->id,$borrower->id,$loan,false);
+            $this->fail('Revoked borrower continued reading original proof.');
+        }catch(AuthorizationException){}
+        $this->be($owner);
+        $disk=Storage::disk('local');$bytes=$disk->get($row->source_proof_path);
+        $disk->put($row->source_proof_path,'tampered source file');
+        try {
+            $service->history($owner,$company->id,$source->id,$loan,true);
+            $this->fail('Tampered source proof was accepted.');
+        }catch(ConflictHttpException){}
+        try {
+            $service->sourceProof($owner,$company->id,$source->id,$finding,true);
+            $this->fail('Tampered source proof was downloaded.');
+        }catch(ConflictHttpException){}
+        $disk->put($row->source_proof_path,$bytes);
+        $this->assertCount(1,$service->history($owner,$company->id,$source->id,$loan,true));
+        $this->assertSame(12,(int)DB::table('hall_inventory_positions')
+            ->where('hall_id',$source->id)->where('item_id',$item)->value('owned_on_loan'));
+    }
+    public function test_unrelated_loan_or_forged_source_hall_cannot_use_original_signatures():void {
+        $f=$this->fixture();extract($f);
+        config()->set('inventory_controls.internal_physical_finding_enabled',true);
+        $service=app(HallInventoryInternalPhysicalFindingService::class);
+        try {
+            $service->propose($admin,$company->id,$source->id,(string)Str::uuid(),
+                $statement,$incident,(string)Str::uuid(),
+                'Cannot reuse other original loan evidence.',$this->pdf());
+            $this->fail('Cross-loan original evidence accepted.');
+        }catch(AuthorizationException|ConflictHttpException){}
+        try {
+            $service->propose($admin,$company->id,$borrower->id,$loan,
+                $statement,$incident,(string)Str::uuid(),
+                'Borrowing hall cannot forge original source witness.',$this->pdf());
+            $this->fail('Forged originating source hall accepted.');
+        }catch(AuthorizationException){}
+        $this->assertSame(0,DB::table('hall_inventory_internal_physical_findings')->count());
+    }
+}

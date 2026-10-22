@@ -193,3 +193,6 @@ Independent original-hall Owner/Admin closeout now has a dedicated company-scope
 ## Phase 12 internal original borrower statement & independent review (2026-10-21)
 - Verified previous `495903b3` CI39682074643 six SUCCESS: destination book only aggregate, never testimony.
 - Successor: default-OFF actual signed borrowing manager original-loan missing/dispute evidence, per-original loan/item evidence SHA256, immutable independent source-hall decision, Filament actions, retry/isolation tests. Its own CI pending at publication. Financial obligation, cash, physical stock removal and final abnormal closure deliberately remain blocked. Pilot/restore/security approval pending.
+
+## Phase 12 original INTERNAL jointly witnessed missing/disputed physical finding
+- New source candidate builds immutable per-original-loan signed borrower + substantiated lender incident matching, source signed proof, independent second source reviewer, bounded unreconciled physical quantity and private authorized evidence access, audit and Livewire controls. Confirmation is ONLY a physical finding, not return, write-off, settlement or closure. Production gate OFF; six-job exact SHA and staged physical/retry/operator testing required. EXTERNAL_IN and finance/abnormal close OPEN.
