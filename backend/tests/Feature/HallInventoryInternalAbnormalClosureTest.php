@@ -277,5 +277,21 @@ class HallInventoryInternalAbnormalClosureTest extends TestCase {
             ->set('companyId',$company->id)->set('hallId',$source->id)
             ->call('startInternalDiscrepancyReview',$loan)
             ->assertSee('INTERNAL ABNORMAL FINAL CERTIFICATE IAC-1');
+        $before=DB::table('audit_events')->where('company_id',$company->id)
+            ->where('action','hall_inventory.internal_abnormal_certificate_downloaded')->count();
+        $download=$service->download($authorizer,$company->id,$source->id,$closureId);
+        $this->assertSame($pdf,$download['bytes']);
+        $this->assertSame($before+1,DB::table('audit_events')->where('company_id',$company->id)
+            ->where('action','hall_inventory.internal_abnormal_certificate_downloaded')->count());
+        // A formerly authorized signer retains their immutable issued record,
+        // but immediately loses all read rights after membership revocation.
+        CompanyMembership::query()->where('company_id',$company->id)
+            ->where('user_id',$authorizer->id)->update(['is_active'=>false]);
+        try {
+            $service->download($authorizer,$company->id,$source->id,$closureId);
+            $this->fail('Revoked owner membership downloaded the private final certificate.');
+        }catch(AuthorizationException){}
+        $this->assertSame($before+1,DB::table('audit_events')->where('company_id',$company->id)
+            ->where('action','hall_inventory.internal_abnormal_certificate_downloaded')->count());
     }
 }

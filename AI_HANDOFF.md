@@ -14,6 +14,8 @@ Read root AGENTS.md, this complete handoff, docs/SESSION_CONTROL.md, docs/PHASE1
 - Historical red `4102245` run 39814057345 and `0ea2488` run 39816746101 repaired by `84ff55f` run 39818374871 six SUCCESS; original failed executions remain red.
 - Owner-approved ADR-0009 Option A, no company-level cash journal for internal settlement. NCL / ENCL / IAC core code flows implemented and tested, production flags OFF.
 
+- Next additive security repair: scoped immutable certificate-download read event and revoked-owner denial, with source and regression in this report's successor commit; require own exact SHA six-job CI.
+
 ## Current Phase 12 status
 **OPEN / BLOCKED.** All 59 Phase 12 register IDs have code, test and current acceptance disposition in docs/PHASE12_FINAL_ACCEPTANCE_REPORT.md. New run f88 green verifies its covered synthetic code/tests, not real staging or full multi-flow stress. No release switches enabled. Phase 13 not promoted.
 

@@ -360,6 +360,11 @@ final class HallInventoryInternalAbnormalClosureService
             ->where('id',$closureId)->first();
         if(!$row)throw new ConflictHttpException('Internal abnormal certificate was not found.');
         $bytes=$this->verifyPdf($row);
+        // Private financial/stock certificate reads are meaningful access
+        // events. Audit the integrity-verified original *before* releasing it.
+        $this->audit($actor,$companyId,'certificate_downloaded',$closureId,
+            (string)$row->loan_id,['serialNumber'=>(string)$row->serial_number,
+                'verifiedSha256'=>(string)$row->pdf_sha256]);
         return ['bytes'=>$bytes,
             'mime'=>'application/pdf',
             'name'=>'internal-abnormal-'.$row->serial_number.'.pdf'];
