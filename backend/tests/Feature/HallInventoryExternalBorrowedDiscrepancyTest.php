@@ -745,6 +745,13 @@ final class HallInventoryExternalBorrowedDiscrepancyTest extends TestCase
             $this->assertStringContainsString('immutable final closure',$e->getMessage());
         }
         $this->be($owner);
+        // Exact old signed discrepancy replay is still permitted after
+        // closure: it must return unchanged immutable evidence, not add data.
+        $this->assertSame($sharedDiscrepancy,$discrimination->report(
+            $owner,$company->id,$hall->id,$sharedBatch,$sharedDiscrepancy,
+            [$closureItem=>['received'=>2,'damaged'=>0]],
+            'Partner independently received two of three units on second loan.',
+            $signed('second-short.pdf','second-short')));
         try {
             $discrimination->report($owner,$company->id,$hall->id,$sharedBatch,
                 (string)Str::uuid(),[$closureItem=>['received'=>2,'damaged'=>0]],
