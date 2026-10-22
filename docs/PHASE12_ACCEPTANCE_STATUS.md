@@ -31,7 +31,7 @@ Verified in this continuation or earlier on the branch:
 
 1. ~~Owner/manager UI for proposing and independently deciding the internal obligation.~~ **VERIFIED** at `f76bde7` / CI 39787096473 six.
 2. An explicit accounting/owner decision for the internal settlement direction and inter-hall ledger accounts (ADR required before posting money).
-3. Verified settlement, balanced journal and immutable reversal for that decision.
+3. ~~Verified settlement, balanced journal and immutable reversal for that decision.~~ Settlement evidence and independent verification are **VERIFIED** at `695d5bd` / CI 39791495105 six; balanced journal/reversal remain OPEN pending the accounting ADR.
 4. Authorized physical write-off of confirmed unreturned owned-on-loan units only after financial settlement, plus a numbered immutable abnormal final PDF.
 5. Real multi-loan concurrency, backup/restore and security acceptance for the complete internal abnormal lifecycle.
 
