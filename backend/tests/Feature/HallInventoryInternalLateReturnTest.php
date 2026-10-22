@@ -102,10 +102,11 @@ class HallInventoryInternalLateReturnTest extends TestCase
             $this->fail('Stale source stock revision accepted.');
         }catch(ConflictHttpException) {}
         Filament::setCurrentPanel(Filament::getPanel('admin'));
-        Livewire::test(HallInventory::class)->set('companyId',$company->id)
+        $screen=Livewire::test(HallInventory::class)->set('companyId',$company->id)
             ->set('hallId',$source->id)
             ->call('startLatePhysicalReturn',$batch,$item)->assertHasNoErrors()
             ->assertSee('Later independently witnessed physical arrival');
+        $id=$screen->get('lateReturnRequestId');
         $blocked=(string)Str::uuid();
         $blockedKey='private/hall-internal-late-return/'.$company->id.'/'.$batch.'/'.$blocked;
         Storage::disk('local')->put($blockedKey,'preexisting independent private evidence');
@@ -116,7 +117,10 @@ class HallInventoryInternalLateReturnTest extends TestCase
         $this->assertSame('preexisting independent private evidence',Storage::disk('local')->get($blockedKey));
         $this->assertSame(0,DB::table('hall_inventory_internal_late_returns')->count());
         Storage::disk('local')->delete($blockedKey);
-        $this->assertSame($id,$svc->record($admin,$company->id,$batch,$id,$item,1,0,3,3,$this->proof()));
+        $screen->set('lateReturnGood','1')->set('lateReturnDamaged','0')
+            ->set('lateReturnFile',$this->proof())->call('submitLatePhysicalReturn')
+            ->assertHasNoErrors();
+        $this->assertSame($id,(string)DB::table('hall_inventory_internal_late_returns')->value('id'));
         $this->assertSame($id,$svc->record($admin,$company->id,$batch,$id,$item,1,0,3,3,$this->proof()));
         try {
             $svc->record($admin,$company->id,$batch,$id,$item,0,1,4,4,$this->proof());
