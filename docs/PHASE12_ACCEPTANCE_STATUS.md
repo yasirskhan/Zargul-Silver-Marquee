@@ -42,6 +42,15 @@ Verified in this continuation or earlier on the branch:
 - Backup/restore, monitoring/alerting and security signoff.
 - Explicit production release approval. No production flag may be enabled by this register.
 
+## Final code-complete checkpoint (`a655fca`, 2026-10-22)
+
+- EXTERNAL_IN lifecycle is verified end-to-end: signed short/damaged evidence, reconciliation, partner-confirmed clearance, approved obligation, verified payment evidence, balanced gated ledger/reversal, readiness and `ENCL-<n>` numbered non-clean closure.
+- INTERNAL abnormal lifecycle is verified end-to-end: joint findings/corrections, late returns, approved obligation, verified settlement evidence, Option A authorized write-off, `IAC-<n>` numbered certificate and Owner UI/download.
+- All production inventory and finance flags remain **OFF**; no money, cash or unconfirmed stock was fabricated or retired.
+- Residual code/hardening: two-connection multi-loan concurrency, storage failure/restore behavior and a final feature-by-feature regression sweep.
+- Residual external gates: real operator/manager walkthrough, backup/restore drill, security signoff and explicit production release approval.
+- Phase 13 remains **not promoted** and Phase 14 not started until the above acceptance is evidenced.
+
 ## Phase discipline
 
 Phase 12 is **OPEN**; Phase 13 is **not promoted** and Phase 14 is not started. The verified source above is code-level evidence only. Operator, security, restore and financial-accounting signoffs are external and have not been fabricated.
