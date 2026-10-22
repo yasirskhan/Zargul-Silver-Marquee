@@ -686,9 +686,12 @@ final class HallInventoryExternalBorrowedDiscrepancyTest extends TestCase
         // Real PostgreSQL failure raised AFTER the second PDF has been written.
         // Inventory, certificate and immutable audit must rollback atomically;
         // the same exact request is recoverable after the fault is removed.
-        DB::unprepared("CREATE FUNCTION phase12_encl_injected_failure() RETURNS trigger AS $
-            BEGIN RAISE EXCEPTION 'phase12 injected ENCL certificate failure'; END;
-            $ LANGUAGE plpgsql");
+        DB::unprepared(<<<'SQL'
+CREATE FUNCTION phase12_encl_injected_failure() RETURNS trigger AS $encl$
+BEGIN RAISE EXCEPTION 'phase12 injected ENCL certificate failure'; END;
+$encl$ LANGUAGE plpgsql
+SQL
+        );
         DB::statement('CREATE TRIGGER phase12_encl_injected_failure BEFORE INSERT ON
             hall_inventory_external_in_nonclean_closures FOR EACH ROW
             EXECUTE FUNCTION phase12_encl_injected_failure()');
