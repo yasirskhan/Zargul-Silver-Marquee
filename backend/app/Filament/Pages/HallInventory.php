@@ -258,6 +258,8 @@ final class HallInventory extends Page
     public string $externalSettlementReversalReason = '';
     #[Locked]
     public ?string $lastExternalSettlementReversalReference = null;
+    #[Locked]
+    public ?array $externalInReadiness = null;
 
     #[Locked]
     public string $loanDispatchLoanId = '';
@@ -859,6 +861,7 @@ final class HallInventory extends Page
         $this->externalSettlementReversalTarget = '';
         $this->externalSettlementReversalReason = '';
         $this->lastExternalSettlementReversalReference = null;
+        $this->externalInReadiness = null;
         $this->externalIntakeLoanId = '';
         $this->externalIntakeRequestId = (string)Str::uuid();
         $this->externalIntakeFile = null;
@@ -2353,6 +2356,24 @@ final class HallInventory extends Page
         $this->externalSettlementReversalTarget='';
         $this->externalSettlementReversalReason='';
         $this->reloadLoanHistory();
+    }
+
+    public function checkExternalInClosureReadiness(string $loanId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_in_loss_settlement_enabled') &&
+            config('inventory_controls.external_in_loss_obligation_enabled') &&
+            config('inventory_controls.external_borrowed_discrepancy_enabled') &&
+            config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled') &&
+            $this->canIndependentlyAcceptExternalBorrowing(),403);
+        try {
+            $this->externalInReadiness=app(
+                \App\Services\HallInventoryExternalInNoncleanReadinessService::class
+            )->assess($actor,$this->companyId,$this->hallId,$loanId);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['externalInReadiness'=>$e->getMessage()]);
+        }
     }
 
     public function canCloseExternalOutClean():bool

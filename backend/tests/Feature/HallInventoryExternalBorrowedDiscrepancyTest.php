@@ -11,6 +11,7 @@ use App\Services\HallInventoryCatalogService;
 use App\Services\HallInventoryExternalBorrowedDiscrepancyClearanceService;
 use App\Services\HallInventoryExternalInLossObligationService;
 use App\Services\HallInventoryExternalInLossSettlementService;
+use App\Services\HallInventoryExternalInNoncleanReadinessService;
 use App\Services\HallInventoryExternalBorrowedDiscrepancyService;
 use App\Services\HallInventoryExternalBorrowedIntakeService;
 use App\Services\HallInventoryExternalBorrowedReturnService;
@@ -527,5 +528,22 @@ final class HallInventoryExternalBorrowedDiscrepancyTest extends TestCase
         $this->assertSame(0,(int)DB::table('hall_inventory_positions')->sum('owned_usable'));
         $this->assertSame(2,(int)DB::table('hall_inventory_positions')->sum('borrowed_transit'));
         $this->assertSame(0,DB::table('hall_inventory_external_in_clean_closures')->count());
+
+        $this->be($approver);
+        $readiness=app(HallInventoryExternalInNoncleanReadinessService::class)
+            ->assess($approver,$company->id,$hall->id,$loan);
+        $this->assertFalse($readiness['ready']);
+        $this->assertSame(0,$readiness['physicalUnitsAtHall']);
+        $this->assertSame(2,$readiness['missingInTransit']);
+        $this->assertSame(2,$readiness['partnerReportedMissing']);
+        $this->assertSame(0,$readiness['pendingDiscrepancies']);
+        $this->assertSame(2,$readiness['unsettledObligations']);
+        $this->assertFalse($readiness['verifiedLedgerPosted']);
+        $this->assertNotEmpty($readiness['blockers']);
+        Livewire::test(HallInventory::class)
+            ->set('hallId',$hall->id)
+            ->assertSee('Check non-clean closure readiness')
+            ->call('checkExternalInClosureReadiness',$loan)->assertHasNoErrors()
+            ->assertSee('NON-CLEAN CLOSURE READINESS: BLOCKED');
     }
 }

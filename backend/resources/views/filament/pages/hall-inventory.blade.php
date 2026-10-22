@@ -792,6 +792,28 @@
                                         @endif
                                     @endif
                                 @endif
+                                @if($loan['direction']==='external_in' && $loan['borrowingHallId']===$hallId &&
+                                    config('inventory_controls.external_in_loss_settlement_enabled') &&
+                                    config('inventory_controls.external_in_loss_obligation_enabled') &&
+                                    $this->canIndependentlyAcceptExternalBorrowing())
+                                    <button type="button" wire:click="checkExternalInClosureReadiness('{{ $loan['id'] }}')"
+                                        class="rounded-lg border px-3 py-2">Check non-clean closure readiness</button>
+                                    @if(($externalInReadiness['loanId'] ?? null)===$loan['id'])
+                                        <p class="font-medium">NON-CLEAN CLOSURE READINESS: {{ $externalInReadiness['ready'] ? 'READY' : 'BLOCKED' }} —
+                                            physical at hall {{ $externalInReadiness['physicalUnitsAtHall'] }},
+                                            missing in transit {{ $externalInReadiness['missingInTransit'] }},
+                                            partner-reported missing {{ $externalInReadiness['partnerReportedMissing'] }},
+                                            unsettled obligations {{ $externalInReadiness['unsettledObligations'] }}.</p>
+                                        @if(!empty($externalInReadiness['blockers']))
+                                            <ul class="list-inside list-disc text-sm">
+                                                @foreach($externalInReadiness['blockers'] as $blocker)
+                                                    <li>{{ $blocker }}</li>
+                                                @endforeach
+                                            </ul>
+                                        @endif
+                                        <p class="text-xs">Read-only assessment; no stock, money, closure or final certificate is posted.</p>
+                                    @endif
+                                @endif
                                 <p>Source: {{ $loan['lendingHallName'] ?? $loan['externalPartnerName'] ?? 'Not assigned' }}.
                                    Destination: {{ $loan['borrowingHallName'] ?? $loan['externalPartnerName'] ?? 'Not assigned' }}.</p>
                                 <ul class="list-inside list-disc">
