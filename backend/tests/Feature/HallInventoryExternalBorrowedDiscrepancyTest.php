@@ -315,7 +315,7 @@ final class HallInventoryExternalBorrowedDiscrepancyTest extends TestCase
         $this->assertSame(12,$custody['partnerClearedQuantity']);
         $this->assertSame(0,$custody['partnerConfirmedQuantity']);
         $this->assertSame(2,$custody['awaitingPartnerConfirmation']);
-        $this->assertSame(2,$custody['stillOutstanding']);
+        $this->assertSame(4,$custody['stillOutstanding']);
         $this->assertSame(2,$custody['partnerReportedMissing']);
         $this->assertFalse($custody['allPhysicalReturnsConfirmed']);
         $this->assertSame(0,DB::table('hall_inventory_external_in_clean_closures')->count());

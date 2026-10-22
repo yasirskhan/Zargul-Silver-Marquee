@@ -81,9 +81,9 @@ SQL);
     public function down():void {
         if(DB::table('hall_inventory_external_in_discrepancy_clearances')->exists())
             throw new RuntimeException('Immutable partner receipt clearances cannot be rolled back.');
-        DB::statement('DROP FUNCTION IF EXISTS venuedesk_guard_external_clearance_line()');
         Schema::dropIfExists('hall_inventory_external_in_discrepancy_clearance_lines');
         Schema::dropIfExists('hall_inventory_external_in_discrepancy_clearances');
+        DB::statement('DROP FUNCTION IF EXISTS venuedesk_guard_external_clearance_line()');
         Schema::table('hall_inventory_external_in_discrepancy_decisions',function(Blueprint $t):void {
             $t->dropUnique('ext_in_discrepancy_decision_scope');
         });
