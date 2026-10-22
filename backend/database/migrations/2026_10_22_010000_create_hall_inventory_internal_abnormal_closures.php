@@ -20,10 +20,10 @@ return new class extends Migration {
             $t->timestampTz('created_at')->useCurrent();
             $t->unique(['company_id','loan_id'],'internal_abnormal_one_authorization');
             $t->unique(['company_id','id'],'internal_abnormal_authorization_identity');
-            $t->foreign(['company_id','source_hall_id'])->references(['company_id','id'])
-                ->on('halls')->restrictOnDelete();
-            $t->foreign(['company_id','borrowing_hall_id'])->references(['company_id','id'])
-                ->on('halls')->restrictOnDelete();
+            $t->foreign(['company_id','source_hall_id'],'internal_abnormal_auth_source_fk')
+                ->references(['company_id','id'])->on('halls')->restrictOnDelete();
+            $t->foreign(['company_id','borrowing_hall_id'],'internal_abnormal_auth_borrow_fk')
+                ->references(['company_id','id'])->on('halls')->restrictOnDelete();
         });
         Schema::create('hall_inventory_internal_abnormal_closures',function(Blueprint $t):void {
             $t->uuid('id')->primary();
@@ -44,8 +44,8 @@ return new class extends Migration {
             $t->foreign(['company_id','authorization_id'],'internal_abnormal_authorization_fk')
                 ->references(['company_id','id'])
                 ->on('hall_inventory_internal_abnormal_writeoff_authorizations')->restrictOnDelete();
-            $t->foreign(['company_id','source_hall_id'])->references(['company_id','id'])
-                ->on('halls')->restrictOnDelete();
+            $t->foreign(['company_id','source_hall_id'],'internal_abnormal_close_source_fk')
+                ->references(['company_id','id'])->on('halls')->restrictOnDelete();
         });
         DB::statement("ALTER TABLE hall_inventory_internal_abnormal_writeoff_authorizations
             ADD CONSTRAINT internal_abnormal_authorization_valid CHECK (
