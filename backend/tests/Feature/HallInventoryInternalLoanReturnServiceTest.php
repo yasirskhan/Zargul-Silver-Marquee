@@ -157,6 +157,7 @@ class HallInventoryInternalLoanReturnServiceTest extends TestCase
             $this->fail('Tampered source storage allowed idempotent replay.');
         }catch(ConflictHttpException){}
         $disk->put($path,$original);
+        $this->be($owner);
         $this->assertCount(1,$signed->history($owner,$company->id,$src->id,$loan,true));
         $this->be($receiver);
         $this->assertSame($original,$signed->proof(
