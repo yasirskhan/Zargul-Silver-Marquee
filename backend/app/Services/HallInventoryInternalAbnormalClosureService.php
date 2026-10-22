@@ -48,6 +48,18 @@ final class HallInventoryInternalAbnormalClosureService
             ->where('company_id',$companyId)->where('finding_id',$r->id)->exists())->values()->all();
     }
 
+
+    private function verifyPrivateProof(object $record,string $pathField,string $sizeField,
+        string $digestField):void {
+        $path=(string)$record->{$pathField};
+        $storage=Storage::disk('local');
+        if(!$storage->exists($path))
+            throw new ConflictHttpException('Original signed inventory or financial evidence is missing.');
+        $bytes=$storage->get($path);
+        if(!is_string($bytes)||strlen($bytes)!==(int)$record->{$sizeField}||
+            !hash_equals((string)$record->{$digestField},hash('sha256',$bytes)))
+            throw new ConflictHttpException('Original signed inventory or financial evidence is corrupted.');
+    }
     /**
      * Per-original-loan physical custody is not the aggregate hall position:
      * other live loans may legitimately share the same catalog item.
@@ -57,6 +69,21 @@ final class HallInventoryInternalAbnormalClosureService
         string $loanId,array $findings):array {
         $lines=app(HallInventoryInternalLoanReturnReview::class)
             ->abnormalSourceLines($actor,$companyId,$sourceHallId,$loanId);
+        // Re-check original independent signatures before any irreversible
+        // write-off; a once-reviewed but subsequently missing file is not proof.
+        app(HallInventoryInternalDiscrepancyService::class)
+            ->history($actor,$companyId,$sourceHallId,$loanId,true);
+        app(HallInventoryInternalPhysicalFindingService::class)
+            ->history($actor,$companyId,$sourceHallId,$loanId,true);
+        foreach([
+            ['hall_inventory_loan_dispatches','loan_id'],
+            ['hall_inventory_internal_loan_receipts','loan_id']
+        ] as [$table,$loanKey]) {
+            $signed=DB::table($table)->where('company_id',$companyId)
+                ->where($loanKey,$loanId)->first();
+            if(!$signed)throw new ConflictHttpException('Original independently signed loan evidence is absent.');
+            $this->verifyPrivateProof($signed,'evidence_storage_path','evidence_size','evidence_sha256');
+        }
         if($lines===[])throw new ConflictHttpException('Original loan physical custody is absent.');
         $confirmed=[];
         foreach($findings as $finding) {
@@ -92,12 +119,18 @@ final class HallInventoryInternalAbnormalClosureService
             ->where('d.decision','approved')->get(['o.id','o.currency','o.amount_minor']);
         $currencies=array_values(array_unique($obligations->pluck('currency')->all()));
         $settled=0;
-        if($obligations->isNotEmpty())
-            $settled=(int)DB::table('hall_inventory_internal_loss_settlements as s')
+        if($obligations->isNotEmpty()) {
+            $verified=DB::table('hall_inventory_internal_loss_settlements as s')
                 ->join('hall_inventory_internal_loss_settlement_reviews as r',function($j):void {
                     $j->on('r.company_id','=','s.company_id')->on('r.settlement_id','=','s.id');
                 })->where('s.company_id',$companyId)->whereIn('s.obligation_id',$obligations->pluck('id'))
-                ->where('r.decision','verified')->sum('s.amount_minor');
+                ->where('r.decision','verified')
+                ->get(['s.amount_minor','s.proof_path','s.proof_sha256','s.proof_size']);
+            foreach($verified as $s) {
+                $this->verifyPrivateProof($s,'proof_path','proof_size','proof_sha256');
+                $settled+=(int)$s->amount_minor;
+            }
+        }
         return ['obligations'=>$obligations,'currencies'=>$currencies,
             'amount'=>(int)$obligations->sum('amount_minor'),'settled'=>$settled];
     }

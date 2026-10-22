@@ -167,6 +167,54 @@ class HallInventoryInternalAbnormalClosureTest extends TestCase {
             $other->rollBack();
             DB::disconnect('iac_second_pgsql');
         }
+        // Signed borrower, independent source and reviewed settlement bytes
+        // must still match their immutable hashes at final authorization.
+        foreach([
+            ['hall_inventory_internal_physical_findings','source_proof_path'],
+            ['hall_inventory_internal_discrepancy_statements','evidence_storage_path'],
+            ['hall_inventory_internal_loss_settlements','proof_path']
+        ] as [$table,$pathColumn]) {
+            $row=DB::table($table)->where('company_id',$company->id)->first();
+            $path=(string)$row->{$pathColumn};
+            $original=Storage::disk('local')->get($path);
+            Storage::disk('local')->put($path,'corrupted signed evidence');
+            try {
+                $service->close($authorizer,$company->id,$source->id,$loan,$closureId);
+                $this->fail('Irreversible closeout ignored corrupted original evidence.');
+            }catch(\Symfony\Component\HttpKernel\Exception\ConflictHttpException){}
+            $this->assertSame(0,DB::table('hall_inventory_internal_abnormal_closures')->count());
+            $this->assertSame(2,(int)DB::table('hall_inventory_positions')
+                ->where('company_id',$company->id)->where('hall_id',$source->id)
+                ->where('item_id',$item)->value('owned_on_loan'));
+            Storage::disk('local')->put($path,$original);
+        }
+        // Force a real PostgreSQL failure *after* PDF storage, then check
+        // rolled-back positions, cleared orphan and same-ID recovery.
+        DB::unprepared("CREATE FUNCTION phase12_iac_injected_failure() RETURNS trigger AS $$
+            BEGIN RAISE EXCEPTION 'phase12 injected certificate insert failure'; END;
+            $$ LANGUAGE plpgsql");
+        DB::statement('CREATE TRIGGER phase12_iac_injected_failure BEFORE INSERT ON
+            hall_inventory_internal_abnormal_closures FOR EACH ROW
+            EXECUTE FUNCTION phase12_iac_injected_failure()');
+        $auditBefore=DB::table('audit_events')->where('company_id',$company->id)->count();
+        try {
+            try {
+                $service->close($authorizer,$company->id,$source->id,$loan,$closureId);
+                $this->fail('PostgreSQL injected certificate transaction failure was ignored.');
+            }catch(QueryException $e) {
+                $this->assertStringContainsString('phase12 injected certificate insert failure',$e->getMessage());
+            }
+        }finally {
+            DB::statement('DROP TRIGGER phase12_iac_injected_failure ON hall_inventory_internal_abnormal_closures');
+            DB::statement('DROP FUNCTION phase12_iac_injected_failure()');
+        }
+        $this->assertSame($auditBefore,DB::table('audit_events')
+            ->where('company_id',$company->id)->count());
+        $this->assertSame(0,DB::table('hall_inventory_internal_abnormal_closures')->count());
+        $this->assertFalse(Storage::disk('local')->exists($certificatePath));
+        $this->assertSame(2,(int)DB::table('hall_inventory_positions')
+            ->where('company_id',$company->id)->where('hall_id',$source->id)
+            ->where('item_id',$item)->value('owned_on_loan'));
         // Occupied immutable storage key refuses issuance, leaves positions
         // untouched and allows an exact retry after the obstruction is removed.
         Storage::disk('local')->put($certificatePath,'occupied by failed issuance');
