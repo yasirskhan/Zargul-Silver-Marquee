@@ -77,7 +77,7 @@ final class HallInventoryExternalInLossSettlementService
             $bytes,$size,$sha,$disk,$key):string {
             $ref=DB::table('hall_inventory_external_in_loss_obligations')
                 ->where('company_id',$companyId)->where('hall_id',$hallId)
-                ->where('id',$obligationId)->first(['loan_id','amount_minor','currency','decision_id']);
+                ->where('id',$obligationId)->first(['loan_id','amount_minor','currency']);
             if(!$ref)throw new AuthorizationException('External-in loss obligation is outside this hall.');
             $loan=DB::table('hall_inventory_loan_drafts')->where('company_id',$companyId)
                 ->where('id',$ref->loan_id)->lockForUpdate()->first();
@@ -95,7 +95,7 @@ final class HallInventoryExternalInLossSettlementService
             if(!$obligation)throw new ConflictHttpException('External-in loss obligation was not found.');
             $decision=DB::table('hall_inventory_external_in_loss_obligation_decisions')
                 ->where('company_id',$companyId)->where('obligation_id',$obligationId)
-                ->where('id',$obligation->decision_id)->first();
+                ->where('decision','approved')->first();
             if(!$decision||$decision->decision!=='approved')
                 throw new ConflictHttpException('Only an independently approved obligation may receive payment evidence.');
             if($currency!==(string)$obligation->currency)
@@ -123,7 +123,7 @@ final class HallInventoryExternalInLossSettlementService
                 DB::table('hall_inventory_external_in_loss_settlements')->insert([
                     'id'=>$settlementId,'company_id'=>$companyId,'hall_id'=>$hallId,
                     'loan_id'=>$loan->id,'obligation_id'=>$obligationId,
-                    'decision_id'=>$obligation->decision_id,'amount_minor'=>$amountMinor,
+                    'decision_id'=>$decision->id,'amount_minor'=>$amountMinor,
                     'currency'=>$currency,'method'=>$method,'payment_reference'=>$paymentReference,
                     'paid_at'=>$paidAt,'evidence_sha256'=>$sha,'evidence_size'=>$size,
                     'evidence_storage_path'=>$key,'fingerprint'=>$fingerprint,
