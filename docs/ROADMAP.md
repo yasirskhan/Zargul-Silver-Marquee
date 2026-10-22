@@ -205,3 +205,9 @@ Independent original-hall Owner/Admin closeout now has a dedicated company-scope
 
 ## Phase 12 immutable INTERNAL physical finding correction (source candidate)
 - Historical confirmed source findings never silently edited or overwritten. Signed source PDF/photo amendment proposal requires an independent THIRD current source owner/admin and append-only exact FK-bound review. Approved correction supersedes documentary finding, but cannot clear physical original-loan custody, create cash/debt, waive debt or issue final receipt. Current live return ledger is separately shown. Include PostgreSQL two-connection loan lock and actual Livewire UI. New exact SHA all-six CI required; production OFF.
+
+
+## Phase 12 original INTERNAL late physically witnessed arrival (2026-10-22, verification pending)
+- Source batch e6b7f47: separate independent source Owner/Admin witnessed proof for newly located units that remained unresolved in an earlier reviewed internal return batch. Never silently change the original acceptance or turn a documentary correction into physical stock; one exactly bound source item per event, quantity under immutable original unresolved cap, source owned-on-loan / borrowed transit dual-sided CAS, private SHA256 evidence and immutable audit, default-OFF Livewire UI. Exact GitHub run 39716255948 must reach all six SUCCESS before verified.
+- Follow-on caea98a1 is only a detached prepared candidate until successfully fast-forward published, then requires its own six-job exact SHA. It checks each new physical return record's full immutable movement provenance and prior-proof integrity, including forgery regression.
+- Phase 12 is OPEN. Missing separate INTERNAL abnormal liability and settlement, final independently signed abnormal original-loan number/PDF, EXTERNAL_IN missing/damage/dispute disposition and financial treatment, full security/restore/operator acceptance. Do not promote Phase 13 or enable production inventory/finance flags.
