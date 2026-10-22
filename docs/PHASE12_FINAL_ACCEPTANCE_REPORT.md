@@ -6,6 +6,33 @@
 ## Scope and source of truth
 Audited all **59** Phase 12 requirement identifiers in `docs/FEATURE_REGISTER.csv` against the actual inventory services, Filament owner/manager UI, PostgreSQL migrations and backend regression suite visible at the technical code SHA below. Older register statuses such as `Approved not implemented`, `PREPARED`, or `CI PENDING` are historical labels and do not negate subsequently published files. The updated feature register records that code is present, **not** that external acceptance has occurred. The register's detailed acceptance criteria and legacy historical evidence are preserved. Tests passing alone cannot prove partner reality or production-readiness.
 
+## Certification execution delta: current Phase 12 source after baseline (2026-10-22 UTC)
+
+**TECHNICALLY VERIFIED, historical baseline only:** branch source `bff74d56603894520d114d7d4101bdd797684321`, GitHub Actions [39855875423](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39855875423), all six required jobs SUCCESS. This does not certify newer repair commits or operational approval.
+
+**PUBLISHED, EXACT-SHA CI NOT YET CONFIRMED GREEN:** current technical repair series below. Do not mark any new test/repair PASSED until all six hosted jobs succeed at a SHA containing that change.
+
+| Published commit | Technical change / retained regression | Hosted CI checkpoint / disposition at documentation |
+| --- | --- | --- |
+| `72ce5a7c` | IAC two-process original-loan replay: explicit company lock wait, one certificate, one owned-stock write-off, one audit | [39864125672](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39864125672) **FAILED**, PostgreSQL fork/socket test harness and independent browser APT installation |
+| `a44cd460` | Preserve both actual Playwright browser suites while isolating optional Microsoft apt feed returning HTTP 403 | [39864380250](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39864380250): five non-backend jobs SUCCESS; backend FAILED on prior IAC fork test |
+| `a7e31037` | ENCL original private-PDF download returns exactly SHA256-verified bytes, writes immutable read audit, denies tampering/revoked membership | [39864708433](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39864708433): five non-backend jobs SUCCESS, backend FAILED on prior IAC fork test |
+| `806d8453` | Two independent PostgreSQL processes dispatch separate eligible loans competing for last unit; one stock movement expected | [39864937087](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39864937087) **FAILED**, test harness/fork and temporary upload replay issues |
+| `e98cf1c5` | Internal dispatch private signed upload: occupied key denial, failed/truncated upload cleanup, hash+size proof before movement | [39865228754](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39865228754) **FAILED** on earlier forked IAC test and temporary upload replay |
+| `a10f891a` | ENCL readiness based on original accepted/returned/cleared custody, not aggregate shared catalog position; two-loan ENCL-1/ENCL-2 stock conservation test | [39865666325](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39865666325) launched, exact result must be checked |
+| `14b25405` | Correct inherited PostgreSQL connection opened just before `pcntl_fork`; move purge after snapshot queries | [39866106246](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39866106246) launched, exact result must be checked |
+| `13a56a6f` | ENCL trigger-injected PostgreSQL certificate failure, PDF orphan rollback, occupied-key protection and exact-key recovery | [39866376821](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39866376821) launched, exact result must be checked |
+| `2cb28908` | Guard post-ENCL returns, partner discrepancy and settlement reversal under original loan lock, with denied-mutation regression | [39866613531](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39866613531) launched, exact result must be checked |
+| `81804e17` | Replace fork-inherited, deleted temporary upload on idempotent dispatch replay with freshly generated identical signed file | [39866712893](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39866712893) launched, exact result must be checked |
+
+**Failed-run preservation:** Microsoft hosted Ubuntu apt `packages.microsoft.com` returned HTTP 403 on 39864125672 `authenticated-panel-e2e`. The replacement step has produced actual green browser jobs; do not erase the original browser failure. PostgreSQL backend at 39864125672, 39864380250, 39864708433 exhibited `fwrite(): Broken pipe` / `no connection to the server` in a fork harness; subsequent run 39865228754 also exposed invalid temporary upload during retry after child exit. Harness repairs are commits `14b25405` and `81804e17`. These are **not yet certified repaired by a full green exact-SHA workflow** at the time of this entry.
+
+**Operator acceptance pending:** completed synthetic source and regressed unit/integration coverage cannot validate the actual hall operator experience, signatures, real cash/bank settlement, externally controlled staging storage or independent security decisions.
+
+**BLOCKED EXTERNAL:** staging object-store outage, interrupted network transfer and **staging PostgreSQL + document-store backup/restore** require separately authorized infrastructure access and signed restore logs. Required evidence: exact test environment/operator, UTC execution times, backup identifiers, database PITR or snapshot recovery point, original/restored row and certificate counts, PDF SHA256 comparisons, RPO/RTO measurements, failure injection protocol, screenshots/logs, security/network approval and restoration signoff. Without those artifacts, these gates are not PASSED.
+
+**PRODUCTION NOT APPROVED:** Phase 12 OPEN. No inventory/finance release switches enabled and no Phase 13 promotion. All 59 approved feature IDs retain their earlier source/UI/permission/audit evidence mapping; new technical tests cover additional races and recovery but do not waive remaining synchronized interleavings or operator signoff.
+
 ## Exact technical verification checkpoints
 1. **Code-hardening source:** `f88babb56c2d5e59705c1001f83d365a3e65b201`, [hosted workflow 39853153415](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39853153415), all six jobs SUCCESS.
 2. **Immediately preceding hardening source:** `c2c61caa2ec8aa927f1021fbf1acc2bc0854f0cc`, [workflow 39852568710](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39852568710), all six jobs SUCCESS.
