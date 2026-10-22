@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up():void {
         DB::statement('ALTER TABLE finance_journals DROP CONSTRAINT finance_journal_type');
+        DB::statement('ALTER TABLE finance_journals ALTER COLUMN entry_type TYPE varchar(32)');
         DB::statement("ALTER TABLE finance_journals ADD CONSTRAINT finance_journal_type
             CHECK (entry_type IN ('opening_cash','reversal','customer_deposit',
                 'inventory_recovery','inventory_partner_payment'))");
@@ -63,5 +64,6 @@ return new class extends Migration {
         DB::statement('ALTER TABLE finance_journals DROP CONSTRAINT finance_journal_type');
         DB::statement("ALTER TABLE finance_journals ADD CONSTRAINT finance_journal_type
             CHECK (entry_type IN ('opening_cash','reversal','customer_deposit','inventory_recovery'))");
+        DB::statement('ALTER TABLE finance_journals ALTER COLUMN entry_type TYPE varchar(24)');
     }
 };
