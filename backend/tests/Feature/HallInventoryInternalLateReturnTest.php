@@ -142,6 +142,23 @@ class HallInventoryInternalLateReturnTest extends TestCase
         $this->assertSame(0,DB::table('hall_inventory_internal_loan_closures')->count());
         $this->assertSame(0,DB::table('hall_inventory_nonclean_final_closures')->count());
         $row=DB::table('hall_inventory_internal_late_returns')->first();
+        $proof=app(HallInventoryInternalLateReturnService::class)->privateProof(
+            $admin,$company->id,$source->id,$id);
+        $this->assertSame('application/pdf',$proof['mime']);
+        $this->assertSame(1,DB::table('audit_events')->where('action',
+            'hall_inventory.internal_late_original_physical_proof_read')->count());
+        Livewire::test(HallInventory::class)->set('companyId',$company->id)
+            ->set('hallId',$source->id)->call('downloadLatePhysicalReturnProof',$id)
+            ->assertHasNoErrors();
+        $this->assertSame(2,DB::table('audit_events')->where('action',
+            'hall_inventory.internal_late_original_physical_proof_read')->count());
+        $this->be($manager);
+        try {
+            app(HallInventoryInternalLateReturnService::class)->privateProof(
+                $manager,$company->id,$source->id,$id);
+            $this->fail('Borrower could download private original-lending-hall proof.');
+        }catch(AuthorizationException) {}
+        $this->be($admin);
         $disk=Storage::disk('local');$original=$disk->get($row->evidence_storage_path);
         $disk->put($row->evidence_storage_path,'tampered');
         try {

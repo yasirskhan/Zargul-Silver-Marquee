@@ -193,6 +193,43 @@ final class HallInventoryInternalLateReturnService
         },3);
     }
 
+    /** Original lending-hall only audited private PDF/photo access. */
+    public function privateProof(User $actor,string $company,string $hall,string $id):array
+    {
+        foreach(['loan_drafts_enabled','loan_returns_enabled',
+            'loan_return_acceptance_enabled','internal_late_return_enabled'] as $flag)
+            if(!config('inventory_controls.'.$flag))
+                throw new ConflictHttpException('Later original physical evidence is not released.');
+        foreach([$company,$hall,$id] as $value)
+            if(!Str::isUuid($value))throw new InvalidArgumentException('Exact private physical proof UUID required.');
+        $source=Hall::query()->where('company_id',$company)->where('id',$hall)
+            ->where('is_active',true)->first();
+        if(!$source||!Auth::check()||(int)Auth::id()!==(int)$actor->getKey()||
+            !$this->access->canConfigureHall($actor,$source))
+            throw new AuthorizationException('Current original source Owner/Admin required for private receipt.');
+        $row=DB::table('hall_inventory_internal_late_returns')
+            ->where('company_id',$company)->where('source_hall_id',$hall)
+            ->where('id',$id)->first();
+        if(!$row)throw new AuthorizationException('Original private later receipt is outside this hall.');
+        self::verifyRecordedProof($row);
+        $bytes=Storage::disk('local')->get((string)$row->evidence_storage_path);
+        $mime=(new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
+        if(!in_array($mime,['application/pdf','image/png','image/jpeg'],true))
+            throw new ConflictHttpException('Stored signed late receipt content type failed verification.');
+        DB::table('audit_events')->insert([
+            'id'=>(string)Str::uuid(),'company_id'=>$company,'actor_id'=>$actor->getKey(),
+            'action'=>'hall_inventory.internal_late_original_physical_proof_read',
+            'entity_type'=>'hall_inventory_internal_late_return','entity_id'=>$id,
+            'before_values'=>json_encode([],JSON_THROW_ON_ERROR),
+            'after_values'=>json_encode(['loanId'=>$row->loan_id,
+                'batchId'=>$row->return_batch_id,'sha256'=>$row->evidence_sha256],JSON_THROW_ON_ERROR),
+            'context'=>json_encode(['hallId'=>$hall,'privateRead'=>true],JSON_THROW_ON_ERROR)
+        ]);
+        return ['bytes'=>$bytes,'mime'=>$mime,
+            'name'=>'internal-later-physical-receipt-'.$id.
+                ($mime==='application/pdf'?'.pdf':($mime==='image/png'?'.png':'.jpg'))];
+    }
+
     /** Fail closed on documentary or movement tampering before another posting or ledger read. */
     public static function verifyRecordedProof(object $row):void
     {

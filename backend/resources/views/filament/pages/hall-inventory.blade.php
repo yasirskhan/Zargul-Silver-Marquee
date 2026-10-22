@@ -2037,6 +2037,14 @@
                                                 (source count pending)
                                             @endif
                                         </li>
+                                        @if(config('inventory_controls.internal_late_return_enabled'))
+                                            @foreach(($line['lateProofIds']??[]) as $lateProofId)
+                                                <li><button type="button" wire:click="downloadLatePhysicalReturnProof('{{ $lateProofId }}')"
+                                                    class="rounded-lg border px-3 py-2 text-sm">
+                                                    Download audited separately witnessed later receipt {{ $lateProofId }}
+                                                </button></li>
+                                            @endforeach
+                                        @endif
                                         @if(config('inventory_controls.internal_late_return_enabled') &&
                                             $batch['accepted'] && ($line['remainingUnresolved']??0)>0)
                                             <li><button type="button"

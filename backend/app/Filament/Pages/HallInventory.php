@@ -2506,6 +2506,18 @@ final class HallInventory extends Page
         $this->reloadLoanHistory();
     }
 
+    public function downloadLatePhysicalReturnProof(string $receiptId)
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.internal_late_return_enabled'),403);
+        $row=app(\App\Services\HallInventoryInternalLateReturnService::class)
+            ->privateProof($actor,$this->companyId,$this->hallId,$receiptId);
+        return response()->streamDownload(static function()use($row):void {
+            echo $row['bytes'];
+        },$row['name'],['Content-Type'=>$row['mime'],'Cache-Control'=>'private, no-store',
+            'Pragma'=>'no-cache','X-Content-Type-Options'=>'nosniff']);
+    }
+
     public function startLatePhysicalReturn(string $batchId,string $itemId):void
     {
         $actor=$this->authorizeSelection();

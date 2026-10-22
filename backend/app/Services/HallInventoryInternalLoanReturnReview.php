@@ -140,6 +140,7 @@ final class HallInventoryInternalLoanReturnReview
         foreach($lateRows as $lateRow) {
             HallInventoryInternalLateReturnService::verifyRecordedProof($lateRow);
             $key=$lateRow->return_batch_id.'/'.$lateRow->source_item_id;
+            $late[$key]['ids'][]=(string)$lateRow->id;
             $late[$key]['good']=($late[$key]['good']??0)+(int)$lateRow->good_quantity;
             $late[$key]['damaged']=($late[$key]['damaged']??0)+(int)$lateRow->damaged_quantity;
         }
@@ -189,6 +190,7 @@ final class HallInventoryInternalLoanReturnReview
                     'goodQuantity'=>$line->good_quantity===null?null:(int)$line->good_quantity,
                     'damagedQuantity'=>$line->damaged_quantity===null?null:(int)$line->damaged_quantity,
                     'unresolvedQuantity'=>$line->unresolved_quantity===null?null:(int)$line->unresolved_quantity,
+                    'lateProofIds'=>$late[$batch->id.'/'.$line->source_item_id]['ids']??[],
                     'lateGood'=>(int)($late[$batch->id.'/'.$line->source_item_id]['good']??0),
                     'lateDamaged'=>(int)($late[$batch->id.'/'.$line->source_item_id]['damaged']??0),
                     'remainingUnresolved'=>$line->unresolved_quantity===null?null:
