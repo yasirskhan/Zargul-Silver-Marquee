@@ -236,11 +236,25 @@ final class HallInventoryExternalInNoncleanClosureService
         $row=DB::table('hall_inventory_external_in_nonclean_closures')
             ->where('company_id',$companyId)->where('hall_id',$hallId)->where('id',$closureId)->first();
         if(!$row)throw new ConflictHttpException('Closure PDF was not found.');
-        $this->verifyPdf($row);
-        return ['bytes'=>Storage::disk('local')->get((string)$row->pdf_path),
+        // Audit a single hash-verified immutable document read. Never verify
+        // one set of bytes and then return a second unchecked disk read.
+        $bytes=$this->verifyPdf($row);
+        DB::table('audit_events')->insert([
+            'id'=>(string)Str::uuid(),'company_id'=>$companyId,
+            'actor_id'=>$actor->getKey(),
+            'action'=>'hall_inventory.external_in_nonclean_certificate_downloaded',
+            'entity_type'=>'hall_inventory_external_in_nonclean_closure',
+            'entity_id'=>$closureId,
+            'before_values'=>json_encode([],JSON_THROW_ON_ERROR),
+            'after_values'=>json_encode(['serialNumber'=>(string)$row->serial_number,
+                'verifiedSha256'=>(string)$row->pdf_sha256],JSON_THROW_ON_ERROR),
+            'context'=>json_encode(['loanId'=>(string)$row->loan_id,
+                'hallId'=>$hallId],JSON_THROW_ON_ERROR)
+        ]);
+        return ['bytes'=>$bytes,
             'mime'=>'application/pdf','name'=>'external-in-nonclean-'.$row->serial_number.'.pdf'];
     }
-    private function verifyPdf(object $row):void {
+    private function verifyPdf(object $row):string {
         $disk=Storage::disk('local');
         if(!$disk->exists((string)$row->pdf_path))
             throw new ConflictHttpException('Closure PDF is missing.');
@@ -248,5 +262,6 @@ final class HallInventoryExternalInNoncleanClosureService
         if(!is_string($bytes)||strlen($bytes)!==(int)$row->pdf_size||
             !hash_equals((string)$row->pdf_sha256,hash('sha256',$bytes)))
             throw new ConflictHttpException('Closure PDF integrity verification failed.');
+        return $bytes;
     }
 }

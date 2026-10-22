@@ -629,5 +629,30 @@ final class HallInventoryExternalBorrowedDiscrepancyTest extends TestCase
                 $closureLoan,(string)Str::uuid());
             $this->fail('Non-clean closure was mutable through a second identifier.');
         }catch(ConflictHttpException){}
+        $auditAction='hall_inventory.external_in_nonclean_certificate_downloaded';
+        $beforeDownloads=DB::table('audit_events')->where('company_id',$company->id)
+            ->where('action',$auditAction)->count();
+        $download=$closureService->download($approver,$company->id,$hall->id,(string)$closureRow->id);
+        $this->assertSame($pdf,$download['bytes']);
+        $this->assertSame('application/pdf',$download['mime']);
+        $this->assertSame($beforeDownloads+1,DB::table('audit_events')
+            ->where('company_id',$company->id)->where('action',$auditAction)->count());
+        $pdfPath=(string)$closureRow->pdf_path;
+        Storage::disk('local')->put($pdfPath,'tampered final certificate');
+        try {
+            $closureService->download($approver,$company->id,$hall->id,(string)$closureRow->id);
+            $this->fail('Tampered final ENCL PDF was downloaded.');
+        }catch(ConflictHttpException){}
+        Storage::disk('local')->put($pdfPath,$pdf);
+        $this->assertSame($beforeDownloads+1,DB::table('audit_events')
+            ->where('company_id',$company->id)->where('action',$auditAction)->count());
+        CompanyMembership::query()->where('company_id',$company->id)
+            ->where('user_id',$approver->id)->update(['is_active'=>false]);
+        try {
+            $closureService->download($approver,$company->id,$hall->id,(string)$closureRow->id);
+            $this->fail('Revoked owner accessed the ENCL private final certificate.');
+        }catch(AuthorizationException){}
+        $this->assertSame($beforeDownloads+1,DB::table('audit_events')
+            ->where('company_id',$company->id)->where('action',$auditAction)->count());
     }
 }
