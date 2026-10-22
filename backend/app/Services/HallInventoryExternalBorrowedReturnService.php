@@ -134,7 +134,7 @@ final class HallInventoryExternalBorrowedReturnService {
                 ->where('company_id',$companyId)->where('loan_id',$loanId)->exists()||
                 DB::table('hall_inventory_external_in_nonclean_closures')
                     ->where('company_id',$companyId)->where('loan_id',$loanId)->exists())
-                throw new ConflictHttpException('This partner borrowed loan already has an immutable final closure.');
+                throw new ConflictHttpException('This partner borrowed loan is already independently closed by an immutable final closure.');
             $accepted=DB::table('hall_inventory_external_in_acceptance_lines')
                 ->where('company_id',$companyId)->where('acceptance_id',$accept->id)
                 ->where('hall_id',$hallId)->whereIn('item_id',array_keys($quantities))
