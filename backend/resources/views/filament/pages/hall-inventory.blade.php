@@ -780,7 +780,13 @@
                                             @if($loan['externalReturnReconciliation']['partnerDiscrepancyPending'] ?? false)
                                                 Independent documentary review is still pending.
                                             @endif
-                                            Borrowed transit remains UNRECONCILED; this evidence does not retire stock, create a liability, post money or close the loan.</p>
+                                    @if(($loan['externalReturnReconciliation']['partnerClearedQuantity'] ?? 0) > 0)
+                                        <p>Partner-confirmed receipt cleared {{ $loan['externalReturnReconciliation']['partnerClearedQuantity'] }} units from borrowed transit;
+                                            {{ $loan['externalReturnReconciliation']['partnerReportedMissing'] }} missing remain in transit.
+                                            This does not retire stock, create a liability, post money or close the loan.</p>
+                                    @else
+                                        <p>Borrowed transit remains UNRECONCILED; this evidence does not retire stock, create a liability, post money or close the loan.</p>
+                                    @endif
                                         @if($loan['externalReturnReconciliation']['partnerDiscrepancyIntegrityWarning'] ?? false)
                                             <p role="alert">Partner-signed discrepancy quantities exceed or do not match the exact shipped lines. Do not settle or close this loan.</p>
                                         @endif
@@ -1733,7 +1739,18 @@
                                                 missing {{ $line['missingQuantity'] }}</li>
                                         @endforeach
                                     </ul>
-                                    <p>Borrowed transit remains UNRECONCILED. No stock is retired, no money, liability or final closure is recorded.</p>
+                                    @if($partnerDiscrepancy['transitCleared'])
+                                        <p>PARTNER-CONFIRMED RECEIPT POSTED — received units cleared from borrowed transit; missing units remain unresolved. No money, liability, stock retirement or closure is recorded.</p>
+                                    @elseif($partnerDiscrepancy['decision'] === 'substantiated' &&
+                                        $partnerDiscrepancy['reportedBy'] !== (int)auth()->id() &&
+                                        config('inventory_controls.external_borrowed_discrepancy_clearance_enabled') &&
+                                        $this->canIndependentlyAcceptExternalBorrowing())
+                                        <p>Borrowed transit remains UNRECONCILED. Post ONLY the independently confirmed partner-received units; missing units stay in transit. No money or closure is recorded.</p>
+                                        <button type="button" wire:click="clearExternalDiscrepancy('{{ $partnerDiscrepancy['id'] }}')"
+                                            class="rounded-lg border px-3 py-2">Post partner-confirmed receipt</button>
+                                    @else
+                                        <p>Borrowed transit remains UNRECONCILED. No stock is retired, no money, liability or final closure is recorded.</p>
+                                    @endif
                                     @if($partnerDiscrepancy['decision'] === null &&
                                         $partnerDiscrepancy['reportedBy'] !== (int)auth()->id() &&
                                         $this->canIndependentlyAcceptExternalBorrowing())
@@ -1862,6 +1879,9 @@
                         <button type="button" wire:click="submitExternalDiscrepancyReview"
                             class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">Record independent partner discrepancy review</button>
                     </section>
+                @endif
+                @if($lastExternalClearanceReference)
+                    <p role="status">Partner-confirmed receipt clearance {{ $lastExternalClearanceReference }} posted. Borrowed transit, stock, money and loan closure are otherwise unchanged.</p>
                 @endif
                 @if($lastExternalDiscrepancyReference)
                     <p role="status">Signed partner discrepancy reference: {{ $lastExternalDiscrepancyReference }}. Borrowed transit, stock, money and loan closure are unchanged.</p>

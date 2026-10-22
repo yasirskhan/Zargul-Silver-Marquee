@@ -63,6 +63,9 @@ return [
     // Partner-signed short/damaged return counts with independent documentary
     // review only. Never clears transit, posts money or closes a loan. OFF.
     'external_borrowed_discrepancy_enabled' => (bool) env('VENUE_INVENTORY_EXTERNAL_BORROWED_DISCREPANCY_ENABLED', false),
+    // After independent substantiation, clear ONLY partner-received units from
+    // borrowed transit; missing units remain. No money or closure. OFF.
+    'external_borrowed_discrepancy_clearance_enabled' => (bool) env('VENUE_INVENTORY_EXTERNAL_BORROWED_DISCREPANCY_CLEARANCE_ENABLED', false),
     // Owner-only, all-partner-receipts-verified physical closeout PDF. OFF.
     'external_borrowed_clean_closure_enabled' => (bool) env('VENUE_INVENTORY_EXTERNAL_BORROWED_CLEAN_CLOSURE_ENABLED', false),
     // Independently reviewed opening count posting; OFF until physical

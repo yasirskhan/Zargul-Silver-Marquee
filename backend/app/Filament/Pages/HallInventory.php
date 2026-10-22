@@ -219,6 +219,8 @@ final class HallInventory extends Page
     public string $externalDiscrepancyDecisionReason = '';
     #[Locked]
     public ?string $lastExternalDiscrepancyReference = null;
+    #[Locked]
+    public ?string $lastExternalClearanceReference = null;
 
     #[Locked]
     public string $loanDispatchLoanId = '';
@@ -794,6 +796,7 @@ final class HallInventory extends Page
         $this->externalDiscrepancyDecision = 'substantiated';
         $this->externalDiscrepancyDecisionReason = '';
         $this->lastExternalDiscrepancyReference = null;
+        $this->lastExternalClearanceReference = null;
         $this->externalIntakeLoanId = '';
         $this->externalIntakeRequestId = (string)Str::uuid();
         $this->externalIntakeFile = null;
@@ -1979,6 +1982,25 @@ final class HallInventory extends Page
         $this->externalDiscrepancyDecisionTarget='';
         $this->externalDiscrepancyDecision='substantiated';
         $this->externalDiscrepancyDecisionReason='';
+        $this->reloadLoanHistory();
+    }
+
+    /** Clear exactly the independently substantiated partner-received units from borrowed transit. */
+    public function clearExternalDiscrepancy(string $discrepancyId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_borrowed_discrepancy_clearance_enabled') &&
+            config('inventory_controls.external_borrowed_discrepancy_enabled') &&
+            config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled') &&
+            $this->canIndependentlyAcceptExternalBorrowing(),403);
+        try {
+            $this->lastExternalClearanceReference=app(
+                \App\Services\HallInventoryExternalBorrowedDiscrepancyClearanceService::class
+            )->clear($actor,$this->companyId,$this->hallId,$discrepancyId,(string)Str::uuid());
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages(['externalDiscrepancyReceived'=>$e->getMessage()]);
+        }
         $this->reloadLoanHistory();
     }
 

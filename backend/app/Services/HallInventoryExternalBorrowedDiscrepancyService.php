@@ -234,11 +234,13 @@ final class HallInventoryExternalBorrowedDiscrepancyService
         $rows=DB::table('hall_inventory_external_in_discrepancies as d')
             ->leftJoin('hall_inventory_external_in_discrepancy_decisions as x',function($j):void {
                 $j->on('x.company_id','=','d.company_id')->on('x.discrepancy_id','=','d.id');
+            })->leftJoin('hall_inventory_external_in_discrepancy_clearances as c',function($j):void {
+                $j->on('c.company_id','=','d.company_id')->on('c.discrepancy_id','=','d.id');
             })->where('d.company_id',$companyId)->where('d.hall_id',$hallId)
             ->orderByDesc('d.created_at')->orderByDesc('d.id')->limit(40)
             ->get(['d.id','d.batch_id','d.loan_id','d.reason','d.reported_by',
                 'd.evidence_sha256','d.created_at','x.decision','x.reason as review_reason',
-                'x.decided_by']);
+                'x.decided_by','c.id as clearance_id','c.cleared_by','c.created_at as cleared_at']);
         if($rows->isEmpty())return [];
         $lines=DB::table('hall_inventory_external_in_discrepancy_lines')
             ->where('company_id',$companyId)->whereIn('discrepancy_id',$rows->pluck('id')->all())
@@ -263,6 +265,8 @@ final class HallInventoryExternalBorrowedDiscrepancyService
                 'totalReceived'=>array_sum(array_column($items,'receivedQuantity')),
                 'totalDamaged'=>array_sum(array_column($items,'damagedQuantity')),
                 'totalMissing'=>array_sum(array_column($items,'missingQuantity')),
+                'transitCleared'=>$row->clearance_id!==null,
+                'clearedBy'=>$row->cleared_by,'clearedAt'=>$row->cleared_at,
                 'stockCleared'=>false,'moneyPosted'=>false,'loanClosed'=>false,
             ];
         })->all();

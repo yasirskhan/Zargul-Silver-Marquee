@@ -8,6 +8,7 @@ use App\Models\Hall;
 use App\Models\HallAssignment;
 use App\Models\User;
 use App\Services\HallInventoryCatalogService;
+use App\Services\HallInventoryExternalBorrowedDiscrepancyClearanceService;
 use App\Services\HallInventoryExternalBorrowedDiscrepancyService;
 use App\Services\HallInventoryExternalBorrowedIntakeService;
 use App\Services\HallInventoryExternalBorrowedReturnService;
@@ -273,6 +274,50 @@ final class HallInventoryExternalBorrowedDiscrepancyTest extends TestCase
         $this->assertSame(14,(int)DB::table('hall_inventory_positions')->sum('borrowed_transit'));
         $this->assertSame(0,(int)DB::table('hall_inventory_positions')->sum('owned_usable'));
         $this->assertSame(0,DB::table('finance_journals')->count());
+        $this->assertSame(0,DB::table('hall_inventory_external_in_clean_closures')->count());
+
+        config()->set('inventory_controls.external_borrowed_discrepancy_clearance_enabled',true);
+        Livewire::test(HallInventory::class)
+            ->set('hallId',$hall->id)
+            ->assertSee('Post partner-confirmed receipt')
+            ->call('clearExternalDiscrepancy',$discrepancyId)->assertHasNoErrors()
+            ->assertSee('PARTNER-CONFIRMED RECEIPT POSTED');
+        $this->assertSame(5,(int)DB::table('hall_inventory_positions')->sum('borrowed_transit'));
+
+        $clearance=app(HallInventoryExternalBorrowedDiscrepancyClearanceService::class);
+        $this->be($owner);
+        try {
+            $clearance->clear($owner,$company->id,$hall->id,$secondDiscrepancy,(string)Str::uuid());
+            $this->fail('Partner-count recorder posted their own physical clearance.');
+        }catch(AuthorizationException){}
+        $this->be($handler);
+        try {
+            $clearance->clear($handler,$company->id,$hall->id,$secondDiscrepancy,(string)Str::uuid());
+            $this->fail('Return dispatcher posted the partner receipt clearance.');
+        }catch(AuthorizationException){}
+        $this->be($reviewer);
+        $secondClear=(string)Str::uuid();
+        $this->assertSame($secondClear,$clearance->clear($reviewer,$company->id,$hall->id,
+            $secondDiscrepancy,$secondClear));
+        $this->assertSame($secondClear,$clearance->clear($reviewer,$company->id,$hall->id,
+            $secondDiscrepancy,$secondClear));
+        try {
+            $clearance->clear($reviewer,$company->id,$hall->id,
+                $secondDiscrepancy,(string)Str::uuid());
+            $this->fail('Partner receipt clearance was mutable through a second identifier.');
+        }catch(ConflictHttpException){}
+        $this->assertSame(2,(int)DB::table('hall_inventory_positions')->sum('borrowed_transit'));
+        $this->assertSame(0,(int)DB::table('hall_inventory_positions')->sum('owned_usable'));
+        $this->assertSame(0,DB::table('finance_journals')->count());
+        $read=collect(app(HallInventoryLoanDraftReview::class)
+            ->recent($reviewer,$company->id,$hall->id))->firstWhere('id',$loan);
+        $custody=$read['externalReturnReconciliation'];
+        $this->assertSame(12,$custody['partnerClearedQuantity']);
+        $this->assertSame(0,$custody['partnerConfirmedQuantity']);
+        $this->assertSame(2,$custody['awaitingPartnerConfirmation']);
+        $this->assertSame(2,$custody['stillOutstanding']);
+        $this->assertSame(2,$custody['partnerReportedMissing']);
+        $this->assertFalse($custody['allPhysicalReturnsConfirmed']);
         $this->assertSame(0,DB::table('hall_inventory_external_in_clean_closures')->count());
     }
 }

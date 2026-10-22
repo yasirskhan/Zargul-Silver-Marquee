@@ -229,10 +229,16 @@ final class HallInventoryLoanDraftReview
             ->where('b.company_id',$companyId)->whereIn('b.loan_id',$loanIds)
             ->select(['b.loan_id','l.item_id'])->selectRaw('SUM(l.quantity) AS quantity')
             ->groupBy('b.loan_id','l.item_id')->get()->groupBy('loan_id');
-        // Partner-signed short/damaged counts (pending or independently
-        // substantiated) are read-only custody evidence. Rejected counts are
-        // excluded. They never imply a cleared transit balance, liability,
-        // journal, payment, stock retirement or closure.
+        $externalCleared=DB::table('hall_inventory_external_in_discrepancy_clearances as c')
+            ->join('hall_inventory_external_in_discrepancy_clearance_lines as l',function($j):void {
+                $j->on('l.company_id','=','c.company_id')->on('l.clearance_id','=','c.id');
+            })
+            ->where('c.company_id',$companyId)->whereIn('c.loan_id',$loanIds)
+            ->select(['c.loan_id','l.item_id'])->selectRaw('SUM(l.quantity) AS quantity')
+            ->groupBy('c.loan_id','l.item_id')->get()->groupBy('loan_id');
+        // Partner-signed counts (pending or substantiated) are read-only
+        // custody evidence; rejected counts are excluded. They never imply a
+        // liability, journal, payment, stock retirement or closure.
         $externalDiscrepancy=DB::table('hall_inventory_external_in_discrepancies as d')
             ->join('hall_inventory_external_in_discrepancy_lines as l',function($j):void {
                 $j->on('l.company_id','=','d.company_id')->on('l.discrepancy_id','=','d.id');
@@ -258,8 +264,8 @@ final class HallInventoryLoanDraftReview
 
         return $drafts->map(static function ($draft) use ($lines,$hallId,$received,$returns,
             $physicalCounts,$externalOutCounts,$externalOutReceived,$externalOutReviewed,
-            $externalAccepted,$externalSent,$externalConfirmed,$externalDiscrepancy,
-            $externalDiscrepancyPending):array {
+            $externalAccepted,$externalSent,$externalConfirmed,$externalCleared,
+            $externalDiscrepancy,$externalDiscrepancyPending):array {
             $receiptCount=(int)($received->get($draft->id)??0);
             $draftLines=$lines->get($draft->id)??collect();
             $actualCounts=($physicalCounts->get($draft->id)??collect())
@@ -354,13 +360,19 @@ final class HallInventoryLoanDraftReview
                     $discrepancyIntegrity=true;
                 $partnerPending=((int)$externalDiscrepancyPending->get($draft->id,0))>0;
                 if($partnerPending)$partnerDiscrepancy=true;
+                $clearedCount=0;
+                foreach(($externalCleared->get($draft->id)??collect()) as $clearedRow)
+                    $clearedCount+=(int)$clearedRow->quantity;
+                if($clearedCount>$sentCount||$clearedCount>$partnerReceived)
+                    $integrity=true;
                 $externalReconciliation=[
                     'acceptedQuantity'=>$acceptedCount,
                     'shippedQuantity'=>$sentCount,
                     'partnerConfirmedQuantity'=>$confirmedCount,
+                    'partnerClearedQuantity'=>$clearedCount,
                     'stillAtHall'=>max(0,$acceptedCount-$sentCount),
-                    'awaitingPartnerConfirmation'=>max(0,$sentCount-$confirmedCount),
-                    'stillOutstanding'=>max(0,$acceptedCount-$confirmedCount),
+                    'awaitingPartnerConfirmation'=>max(0,$sentCount-$confirmedCount-$clearedCount),
+                    'stillOutstanding'=>max(0,$acceptedCount-$confirmedCount-$clearedCount),
                     'partnerReportedShipped'=>$partnerShipped,
                     'partnerReportedReceived'=>$partnerReceived,
                     'partnerReportedDamaged'=>$partnerDamaged,
@@ -370,7 +382,8 @@ final class HallInventoryLoanDraftReview
                     'partnerDiscrepancyIntegrityWarning'=>$discrepancyIntegrity,
                     'integrityWarning'=>$integrity,
                     'allPhysicalReturnsConfirmed'=>!$integrity && $acceptedCount>0 &&
-                        $acceptedCount===$confirmedCount,
+                        $acceptedCount===$confirmedCount+$clearedCount &&
+                        $partnerDamaged===0 && !$partnerPending,
                     'financiallySettled'=>false,
                     'loanClosed'=>$draft->external_clean_closure_id!==null,
                 ];
