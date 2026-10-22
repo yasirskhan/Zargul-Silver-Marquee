@@ -154,4 +154,75 @@ class HallInventoryInternalLoanDispatchServiceTest extends TestCase
         $this->assertSame(2,DB::table('hall_inventory_movement_events')->count());
         $this->assertSame(0,DB::table('finance_journals')->count());
     }
+    public function test_interrupted_private_dispatch_upload_rolls_back_and_removes_partial_bytes():void
+    {
+        Storage::fake('local');
+        $realDisk=Storage::disk('local');
+        $company=Company::create(['name'=>'Failed Handover Storage','slug'=>'failed-handover-storage']);
+        $source=Hall::create(['company_id'=>$company->id,
+            'name'=>'Failed Source','slug'=>'failed-source','capacity'=>80]);
+        $destination=Hall::create(['company_id'=>$company->id,
+            'name'=>'Failed Destination','slug'=>'failed-destination','capacity'=>80]);
+        $creator=User::create(['name'=>'Failed Upload Drafter',
+            'email'=>'failed-upload-drafter@example.test','password'=>'test-only']);
+        $dispatcher=User::create(['name'=>'Failed Upload Dispatcher',
+            'email'=>'failed-upload-dispatcher@example.test','password'=>'test-only']);
+        foreach([[$creator,'owner'],[$dispatcher,'admin']] as [$actor,$role]) {
+            $actor->markEmailAsVerified();
+            CompanyMembership::create(['company_id'=>$company->id,'user_id'=>$actor->id,'role'=>$role]);
+        }
+        config()->set('inventory_controls.loan_drafts_enabled',true);
+        config()->set('inventory_controls.loan_dispatch_enabled',true);
+        $item=(string)Str::uuid();
+        $this->be($creator);
+        app(HallInventoryCatalogService::class)->create($creator,$company->id,$source->id,
+            $item,'Interrupted upload tray','Furniture','piece',1,'Retry safety test');
+        DB::table('hall_inventory_positions')->insert([
+            'id'=>(string)Str::uuid(),'company_id'=>$company->id,'hall_id'=>$source->id,
+            'item_id'=>$item,'owned_usable'=>1,'revision'=>0,
+            'created_at'=>now(),'updated_at'=>now()
+        ]);
+        $loan=(string)Str::uuid();$dispatch=(string)Str::uuid();
+        app(HallInventoryLoanDraftService::class)->create($creator,$company->id,$loan,
+            'internal',$source->id,$destination->id,[['itemId'=>$item,'quantity'=>1]],
+            '2027-06-10','Signed proof upload failure fixture');
+        $proof=UploadedFile::fake()->createWithContent('handover.pdf',
+            "%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF");
+        $path='private/hall-loan-handover/'.$company->id.'/'.$loan.'/'.$dispatch;
+        $attempt=0;
+        $disk=\Mockery::mock(\Illuminate\Filesystem\FilesystemAdapter::class);
+        $disk->shouldReceive('exists')->twice()->with($path)
+            ->andReturnUsing(fn()=> $realDisk->exists($path));
+        $disk->shouldReceive('put')->twice()->with($path,\Mockery::type('string'))
+            ->andReturnUsing(function($key,$bytes)use($realDisk,&$attempt):bool {
+                $attempt++;
+                // First adapter reports false after writing; second lies
+                // about success after writing incomplete bytes.
+                $realDisk->put($key,substr($bytes,0,12));
+                return $attempt===2;
+            });
+        $disk->shouldReceive('get')->once()->with($path)
+            ->andReturnUsing(fn($key)=>$realDisk->get($key));
+        $disk->shouldReceive('delete')->twice()->with($path)
+            ->andReturnUsing(fn($key)=>$realDisk->delete($key));
+        Storage::shouldReceive('disk')->with('local')->andReturn($disk);
+        $this->be($dispatcher);
+        $service=app(HallInventoryInternalLoanDispatchService::class);
+        for($i=0;$i<2;$i++) {
+            try {
+                $service->dispatch($dispatcher,$company->id,$loan,$dispatch,[$item=>0],$proof);
+                $this->fail('Interrupted or truncated signed proof posted inventory.');
+            }catch(ConflictHttpException){}
+            $this->assertFalse($realDisk->exists($path));
+            $this->assertSame(0,DB::table('hall_inventory_loan_dispatches')->count());
+            $this->assertSame(0,DB::table('hall_inventory_loan_dispatch_lines')->count());
+            $this->assertSame(0,DB::table('hall_inventory_movement_events')->count());
+            $this->assertSame(0,DB::table('audit_events')
+                ->where('action','hall_inventory.internal_loan_source_dispatched')->count());
+            $this->assertSame(1,(int)DB::table('hall_inventory_positions')
+                ->where('item_id',$item)->value('owned_usable'));
+            $this->assertSame(0,DB::table('finance_journals')->count());
+        }
+    }
+
 }

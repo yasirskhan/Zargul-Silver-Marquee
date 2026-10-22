@@ -108,8 +108,21 @@ final class HallInventoryInternalLoanDispatchService
                 }
                 $positions[$line->item_id]=$pos;
             }
-            if(!$storage->put($key,file_get_contents($evidence->getRealPath()))) {
-                throw new ConflictHttpException('Private handover attachment storage failed.');
+            // Private signed proof must never be overwritten or partially
+            // persisted while a failed request rolls back its inventory.
+            if($storage->exists($key))
+                throw new ConflictHttpException('Private handover attachment key is already occupied.');
+            try {
+                $sourceBytes=file_get_contents($evidence->getRealPath());
+                if(!is_string($sourceBytes)||!$storage->put($key,$sourceBytes))
+                    throw new ConflictHttpException('Private handover attachment storage failed.');
+                $stored=$storage->get($key);
+                if(!is_string($stored)||strlen($stored)!==$size||
+                    !hash_equals($sha,hash('sha256',$stored)))
+                    throw new ConflictHttpException('Private handover attachment was interrupted or corrupted.');
+            } catch(\Throwable $e) {
+                $storage->delete($key);
+                throw $e;
             }
             try {
                 DB::table('hall_inventory_loan_dispatches')->insert([
