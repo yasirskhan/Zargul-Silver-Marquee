@@ -1779,6 +1779,13 @@
                                                 <button type="button" wire:click="startExternalSettlementReview('{{ $partnerSettlement['id'] }}')"
                                                     class="rounded-lg border px-3 py-2">Independently verify partner payment evidence</button>
                                             @endif
+                                            @if(($partnerSettlement['journalPosted'] ?? false) && !($partnerSettlement['reversed'] ?? false) &&
+                                                $partnerSettlement['reviewedBy'] !== (int)auth()->id() &&
+                                                config('finance_controls.posting_enabled') &&
+                                                $this->canIndependentlyAcceptExternalBorrowing())
+                                                <button type="button" wire:click="startExternalSettlementReversal('{{ $partnerSettlement['id'] }}')"
+                                                    class="rounded-lg border px-3 py-2">Reverse verified partner payment</button>
+                                            @endif
                                         @elseif($partnerObligation['decision'] === 'approved' &&
                                             config('inventory_controls.external_in_loss_settlement_enabled') &&
                                             $this->canIndependentlyAcceptExternalBorrowing())
@@ -2013,8 +2020,24 @@
                             class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">Record independent partner payment review</button>
                     </section>
                 @endif
+                @if(config('inventory_controls.external_in_loss_settlement_enabled') && $externalSettlementReversalTarget !== '')
+                    <section class="rounded-xl border p-4 space-y-3" aria-label="Reverse verified partner payment">
+                        <h3 class="font-semibold">Reverse verified partner payment</h3>
+                        <p class="text-sm">Settlement {{ $externalSettlementReversalTarget }}. A different current owner/admin posts a balanced immutable reversal that swaps the original partner-payment ledger lines. Cash, settlement and closure remain unchanged.</p>
+                        <label class="block text-sm">Reversal reason
+                            <textarea wire:model="externalSettlementReversalReason" rows="2"
+                                class="w-full rounded-lg border p-2 text-gray-900"></textarea>
+                        </label>
+                        @error('externalSettlementReversalReason') <p role="alert">{{ $message }}</p> @enderror
+                        <button type="button" wire:click="submitExternalSettlementReversal"
+                            class="rounded-lg bg-emerald-800 px-4 py-2 text-sm text-white">Post immutable partner payment reversal</button>
+                    </section>
+                @endif
+                @if($lastExternalSettlementReversalReference)
+                    <p role="status">Partner payment reversal {{ $lastExternalSettlementReversalReference }} posted. Cash, settlement and closure remain unchanged.</p>
+                @endif
                 @if($lastExternalSettlementReference)
-                    <p role="status">Partner payment evidence {{ $lastExternalSettlementReference }} recorded. No journal, cash mutation, settlement or closure was posted.</p>
+                    <p role="status">Partner payment evidence {{ $lastExternalSettlementReference }} recorded. Any ledger posting or reversal follows the company finance gate.</p>
                 @endif
                 @if($lastExternalObligationReference)
                     <p role="status">Provisional partner loss obligation {{ $lastExternalObligationReference }} recorded. No invoice, journal, payment, settlement or closure was posted.</p>

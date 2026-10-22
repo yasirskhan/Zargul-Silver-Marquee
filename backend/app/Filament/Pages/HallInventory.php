@@ -253,6 +253,11 @@ final class HallInventory extends Page
     public string $externalSettlementReviewReason = '';
     #[Locked]
     public ?string $lastExternalSettlementReference = null;
+    #[Locked]
+    public string $externalSettlementReversalTarget = '';
+    public string $externalSettlementReversalReason = '';
+    #[Locked]
+    public ?string $lastExternalSettlementReversalReference = null;
 
     #[Locked]
     public string $loanDispatchLoanId = '';
@@ -851,6 +856,9 @@ final class HallInventory extends Page
         $this->externalSettlementReviewDecision = 'verified';
         $this->externalSettlementReviewReason = '';
         $this->lastExternalSettlementReference = null;
+        $this->externalSettlementReversalTarget = '';
+        $this->externalSettlementReversalReason = '';
+        $this->lastExternalSettlementReversalReference = null;
         $this->externalIntakeLoanId = '';
         $this->externalIntakeRequestId = (string)Str::uuid();
         $this->externalIntakeFile = null;
@@ -2294,6 +2302,56 @@ final class HallInventory extends Page
         $this->externalSettlementReviewTarget='';
         $this->externalSettlementReviewDecision='verified';
         $this->externalSettlementReviewReason='';
+        $this->reloadLoanHistory();
+    }
+
+    public function startExternalSettlementReversal(string $settlementId):void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_in_loss_settlement_enabled') &&
+            config('inventory_controls.external_in_loss_obligation_enabled') &&
+            config('inventory_controls.external_borrowed_discrepancy_enabled') &&
+            config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled') &&
+            config('finance_controls.posting_enabled') &&
+            $this->canIndependentlyAcceptExternalBorrowing(),403);
+        $row=collect($this->externalSettlementHistory)->first(
+            fn($s):bool=>$s['id']===$settlementId && ($s['journalPosted']??false) &&
+                !($s['reversed']??false) &&
+                $s['reviewedBy']!==(int)$actor->getKey()
+        );
+        abort_unless($row!==null,403);
+        $this->externalSettlementReversalTarget=$settlementId;
+        $this->externalSettlementReversalReason='';
+    }
+
+    public function submitExternalSettlementReversal():void
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_in_loss_settlement_enabled') &&
+            config('inventory_controls.external_in_loss_obligation_enabled') &&
+            config('inventory_controls.external_borrowed_discrepancy_enabled') &&
+            config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled') &&
+            config('finance_controls.posting_enabled') &&
+            $this->canIndependentlyAcceptExternalBorrowing() &&
+            $this->externalSettlementReversalTarget!=='',403);
+        $this->validate([
+            'externalSettlementReversalReason'=>'required|string|min:15|max:500',
+        ]);
+        try {
+            $this->lastExternalSettlementReversalReference=app(
+                \App\Services\HallInventoryExternalInLossSettlementService::class
+            )->reverse($actor,$this->companyId,$this->hallId,
+                $this->externalSettlementReversalTarget,(string)Str::uuid(),
+                $this->externalSettlementReversalReason);
+        }catch(InvalidArgumentException|ConflictHttpException $e) {
+            throw ValidationException::withMessages([
+                'externalSettlementReversalReason'=>$e->getMessage()
+            ]);
+        }
+        $this->externalSettlementReversalTarget='';
+        $this->externalSettlementReversalReason='';
         $this->reloadLoanHistory();
     }
 
