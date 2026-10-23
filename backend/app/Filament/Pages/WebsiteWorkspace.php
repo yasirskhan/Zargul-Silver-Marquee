@@ -735,6 +735,68 @@ final class WebsiteWorkspace extends Page
         array_splice($columns, $to, 0, $moved);
     }
 
+    /**
+     * Add an approved typed content block to the chosen draft column.
+     * No arbitrary HTML, cross-page asset references or public mutations.
+     */
+    public function addColumnBlock(int $sectionIndex, int $columnIndex, string $type): void
+    {
+        $this->authorizeSelectedPage('update');
+        $defaults = [
+            'text' => ['title' => 'New column text', 'body' => ''],
+            'cta' => ['title' => 'Plan your event', 'body' => '', 'buttonLabel' => 'Contact us', 'buttonHref' => '/contact'],
+        ];
+        $blocks = $this->sections[$sectionIndex]['columns'][$columnIndex]['blocks'] ?? null;
+        abort_unless(($this->sections[$sectionIndex]['type'] ?? null) === 'columns'
+            && isset($defaults[$type]) && is_array($blocks) && array_is_list($blocks)
+            && count($blocks) < 20, 422);
+        $this->sections[$sectionIndex]['columns'][$columnIndex]['blocks'][] = [
+            'id' => 'block_'.Str::random(16),
+            'type' => $type,
+            'data' => $defaults[$type],
+        ];
+    }
+
+    /**
+     * Move an existing typed block within or between columns. Only bounded
+     * indices are accepted; block identity, text and media references stay intact.
+     */
+    public function moveColumnBlock(int $sectionIndex, int $fromColumn, int $blockIndex,
+        int $toColumn, int $toIndex): void
+    {
+        $this->authorizeSelectedPage('update');
+        abort_unless(($this->sections[$sectionIndex]['type'] ?? null) === 'columns'
+            && is_array($this->sections[$sectionIndex]['columns'] ?? null), 422);
+        $columns = &$this->sections[$sectionIndex]['columns'];
+        $source = $columns[$fromColumn]['blocks'] ?? null;
+        $destination = $columns[$toColumn]['blocks'] ?? null;
+        abort_unless(is_array($source) && array_is_list($source)
+            && is_array($destination) && array_is_list($destination)
+            && $blockIndex >= 0 && $blockIndex < count($source)
+            && $toIndex >= 0 && $toIndex <= count($destination)
+            && ($fromColumn === $toColumn || count($destination) < 20), 422);
+        if ($fromColumn === $toColumn && ($blockIndex === $toIndex
+            || $blockIndex + 1 === $toIndex)) {
+            return;
+        }
+        $moved = array_splice($columns[$fromColumn]['blocks'], $blockIndex, 1);
+        if ($fromColumn === $toColumn && $toIndex > $blockIndex) {
+            $toIndex--;
+        }
+        array_splice($columns[$toColumn]['blocks'], $toIndex, 0, $moved);
+    }
+
+    /** Removing an unsaved draft block never changes the published snapshot. */
+    public function removeColumnBlock(int $sectionIndex, int $columnIndex, int $blockIndex): void
+    {
+        $this->authorizeSelectedPage('update');
+        $blocks = $this->sections[$sectionIndex]['columns'][$columnIndex]['blocks'] ?? null;
+        abort_unless(($this->sections[$sectionIndex]['type'] ?? null) === 'columns'
+            && is_array($blocks) && array_is_list($blocks)
+            && $blockIndex >= 0 && $blockIndex < count($blocks), 422);
+        array_splice($this->sections[$sectionIndex]['columns'][$columnIndex]['blocks'], $blockIndex, 1);
+    }
+
     public function removeSection(int $index): void
     {
         $this->authorizeSelectedPage('update');

@@ -400,16 +400,42 @@
                                                     @disabled(($column['mobileOrder'] ?? count($section['columns'])) >= count($section['columns']))
                                                     class="rounded border px-2 py-1 text-sm">Phone later</button>
                                             </div>
+                                            <div class="flex flex-wrap gap-2" aria-label="Add content to desktop column {{ $columnIndex + 1 }}">
+                                                <button type="button" wire:click="addColumnBlock({{ $index }}, {{ $columnIndex }}, 'text')"
+                                                    @disabled(count($column['blocks'] ?? []) >= 20) class="rounded border px-2 py-1 text-sm">+ Text block</button>
+                                                <button type="button" wire:click="addColumnBlock({{ $index }}, {{ $columnIndex }}, 'cta')"
+                                                    @disabled(count($column['blocks'] ?? []) >= 20) class="rounded border px-2 py-1 text-sm">+ Call-to-action block</button>
+                                            </div>
                                             @foreach (($column['blocks'] ?? []) as $blockIndex => $block)
-                                                @foreach (($block['data'] ?? []) as $field => $value)
-                                                    @if (is_string($value) && ! in_array($field, ['imageId'], true))
-                                                        <label class="block space-y-1">
-                                                            <span class="text-sm">{{ \Illuminate\Support\Str::headline($field) }}</span>
-                                                            <textarea wire:model="sections.{{ $index }}.columns.{{ $columnIndex }}.blocks.{{ $blockIndex }}.data.{{ $field }}"
-                                                                rows="2" maxlength="5000" class="w-full rounded border p-2 text-gray-900"></textarea>
-                                                        </label>
-                                                    @endif
-                                                @endforeach
+                                                <div wire:key="nested-block-{{ $block['id'] ?? $blockIndex }}"
+                                                    class="space-y-2 rounded-lg border p-3" aria-label="Content block {{ $blockIndex + 1 }} in column {{ $columnIndex + 1 }}">
+                                                    <div class="flex flex-wrap items-center gap-2">
+                                                        <p class="font-medium text-sm">{{ \Illuminate\Support\Str::headline($block['type'] ?? 'text') }} block {{ $blockIndex + 1 }}</p>
+                                                        <button type="button" wire:click="moveColumnBlock({{ $index }}, {{ $columnIndex }}, {{ $blockIndex }}, {{ $columnIndex }}, {{ $blockIndex - 1 }})"
+                                                            @disabled($blockIndex === 0) class="rounded border px-2 py-1 text-sm">Move block up</button>
+                                                        <button type="button" wire:click="moveColumnBlock({{ $index }}, {{ $columnIndex }}, {{ $blockIndex }}, {{ $columnIndex }}, {{ $blockIndex + 2 }})"
+                                                            @disabled($blockIndex === count($column['blocks']) - 1) class="rounded border px-2 py-1 text-sm">Move block down</button>
+                                                        @if($columnIndex > 0)
+                                                            <button type="button" wire:click="moveColumnBlock({{ $index }}, {{ $columnIndex }}, {{ $blockIndex }}, {{ $columnIndex - 1 }}, {{ count($section['columns'][$columnIndex - 1]['blocks'] ?? []) }})"
+                                                                @disabled(count($section['columns'][$columnIndex - 1]['blocks'] ?? []) >= 20) class="rounded border px-2 py-1 text-sm">Move block left</button>
+                                                        @endif
+                                                        @if($columnIndex < count($section['columns']) - 1)
+                                                            <button type="button" wire:click="moveColumnBlock({{ $index }}, {{ $columnIndex }}, {{ $blockIndex }}, {{ $columnIndex + 1 }}, {{ count($section['columns'][$columnIndex + 1]['blocks'] ?? []) }})"
+                                                                @disabled(count($section['columns'][$columnIndex + 1]['blocks'] ?? []) >= 20) class="rounded border px-2 py-1 text-sm">Move block right</button>
+                                                        @endif
+                                                        <button type="button" wire:click="removeColumnBlock({{ $index }}, {{ $columnIndex }}, {{ $blockIndex }})"
+                                                            wire:confirm="Remove this block from the draft?" class="rounded border px-2 py-1 text-sm">Remove block</button>
+                                                    </div>
+                                                    @foreach (($block['data'] ?? []) as $field => $value)
+                                                        @if (is_string($value) && ! in_array($field, ['imageId'], true))
+                                                            <label class="block space-y-1">
+                                                                <span class="text-sm">{{ \Illuminate\Support\Str::headline($field) }}</span>
+                                                                <textarea wire:model="sections.{{ $index }}.columns.{{ $columnIndex }}.blocks.{{ $blockIndex }}.data.{{ $field }}"
+                                                                    rows="2" maxlength="5000" class="w-full rounded border p-2 text-gray-900"></textarea>
+                                                            </label>
+                                                        @endif
+                                                    @endforeach
+                                                </div>
                                             @endforeach
                                         </div>
                                     @endforeach

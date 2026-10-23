@@ -54,6 +54,46 @@ class WebsiteWorkspaceLayoutTest extends TestCase
         $this->assertSame(1, DB::table('audit_events')->where('action', 'website.draft_saved')->count());
     }
 
+    public function test_editor_moves_typed_blocks_between_columns_without_rewriting_published_page(): void
+    {
+        $company = Company::create(['name' => 'Builder', 'slug' => 'builder']);
+        $owner = User::create(['name' => 'Owner', 'email' => 'column-blocks@example.test',
+            'password' => 'test-only']);
+        $owner->markEmailAsVerified();
+        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $owner->id, 'role' => 'owner']);
+        $website = (string) Str::uuid();
+        $page = (string) Str::uuid();
+        DB::table('websites')->insert(['id' => $website, 'company_id' => $company->id, 'name' => 'Builder']);
+        DB::table('site_pages')->insert(['id' => $page, 'company_id' => $company->id,
+            'website_id' => $website, 'slug' => '/', 'title' => 'Home']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->be($owner);
+
+        $editor = Livewire::test(WebsiteWorkspace::class)
+            ->call('addColumns', 2)
+            ->call('addColumnBlock', 0, 0, 'cta')
+            ->set('sections.0.columns.0.blocks.1.data.title', 'Book the marquee')
+            ->call('moveColumnBlock', 0, 0, 1, 1, 1)
+            ->call('moveColumnBlock', 0, 1, 1, 1, 0)
+            ->call('removeColumnBlock', 0, 0, 0)
+            ->assertHasNoErrors();
+        $sections = $editor->get('sections');
+        $this->assertSame([], $sections[0]['columns'][0]['blocks']);
+        $this->assertSame('Book the marquee', $sections[0]['columns'][1]['blocks'][0]['data']['title']);
+        $this->assertSame('cta', $sections[0]['columns'][1]['blocks'][0]['type']);
+        $this->assertSame([6, 6], array_column($sections[0]['columns'], 'widthDesktop'));
+        $this->assertSame([1, 2], array_column($sections[0]['columns'], 'mobileOrder'));
+
+        $this->assertSame(0, DB::table('site_page_revisions')->where('page_id', $page)->count());
+        $editor->set('reason', 'Save independently arranged typed column blocks')
+            ->call('saveDraft')->assertHasNoErrors();
+        $saved = json_decode(DB::table('site_page_revisions')->where('page_id', $page)
+            ->value('content'), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame($sections, $saved['sections']);
+        $this->assertNull(DB::table('site_pages')->where('id', $page)->value('published_revision_id'));
+        $this->assertSame(1, DB::table('audit_events')->where('action', 'website.draft_saved')->count());
+    }
+
     public function test_two_column_section_can_move_as_a_whole_before_text(): void
     {
         $company = Company::create(['name' => 'Second', 'slug' => 'second']);

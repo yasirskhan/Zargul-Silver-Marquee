@@ -1,9 +1,9 @@
 # Development Roadmap
 
-## Phase 0 — FOUNDATION (in progress)
+## Phase 0 — FOUNDATION (code complete; operator release separate)
 Establish dedicated repo, approved spec, requirement register, AI handoff, CI, explicit separation from property-platform; import and label proof-of-concept interfaces. CI verification is required before marking complete.
 
-## Phase 0.5 — Website CMS architecture + editor usability (new approved scope)
+## Phase 0.5 — Website CMS architecture + editor usability (implementation in progress)
 Formalize owner-configurable website design, typed safe sections and columns, publishing/audit/access policy and page/version/storage model. Test pure layout/revision helpers, then build a practical visual editor integrated into VenueDesk. Owner can move text, images, sections, columns and mobile stacking. Keep business price and booking constraints on backend. See docs/WEBSITE_CMS_DESIGN.md.
 
 ## Phase 1 — Secure server foundation
@@ -61,7 +61,7 @@ Owner-selectable structural themes and company/hall profile; exact guest-count p
 ## Phase 11 — Provider payments and complete finance (approved, not implemented)
 Tenant-owned JazzCash/Easypaisa/Raast manual QR and approved APIs; optional unified gateway; named bank/wallet ledgers; independent verification; cash two-signature evidence, owner/staff custody and transfer confirmation; individual manager spend ceilings; vendor/payroll/utilities and reporting.
 
-## Phase 12 — Hall inventory and multi-item loans (approved, not implemented)
+## Phase 12 — Hall inventory and multi-item loans (historical scope baseline; guarded source now implemented)
 Hall-owned inventory catalog and stock movements, inline item entry, monthly/quarterly/post-event audits, minimum levels, immutable discrepancy review, independent internal and outside-establishment multiple-item loans, count/return/condition evidence, partial receipts, automatic closure ONLY on independently confirmed full match, numbered PDF and hall reports. Initial draft-only catalog, physical counts, multi-item requests and bounded authorized read-only review of saved loan drafts and physical count evidence are implementation foundations, release gates OFF; actual witnessed dispatch/acceptance, inventory balance verification and reconciliation, returns and completion receipts remain NOT implemented/released. Preserve booking/finance gates.
 
 
