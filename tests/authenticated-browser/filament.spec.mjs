@@ -309,6 +309,11 @@ test('real operations MFA grants only assigned-hall search and planning on mobil
     }
   }
 
+  // A real MFA-authenticated operations user has no Inventory page role.
+  // The server must deny the route, not merely hide a sidebar link.
+  const deniedInventory = await page.goto('/admin/hall-inventory');
+  expect([403, 404]).toContain(deniedInventory?.status());
+  await expect(page.locator('[aria-label="Inventory workflow navigator"]')).toHaveCount(0);
   await page.goto('/admin/internal-search');
   await expect(page.getByText('Private role-scoped reference search')).toBeVisible();
   await page.waitForFunction(() => Boolean(window.Livewire?.all?.().length), null, { timeout: 30_000 });
