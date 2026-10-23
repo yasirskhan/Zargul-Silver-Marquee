@@ -617,4 +617,124 @@ final class HallInventoryExternalInConcurrentClosureTest extends TestCase
         $this->assertSame((int)$closed['pdfSize'],strlen($pdf));
     }
 
+
+    /**
+     * Revoking the authenticated final issuer DURING an original-loan lock
+     * wait must not grandfather cached permissions. Separate PostgreSQL
+     * backends and committed memberships distinguish real revocation from
+     * stale fake-identity requests.
+     */
+    public function test_revoked_issuer_waiting_on_pg_company_lock_cannot_issue_encl():void {
+        Storage::fake('local');
+        foreach([
+            'catalog_enabled','loan_drafts_enabled',
+            'external_borrowed_intake_enabled','external_borrowed_return_enabled',
+            'external_borrowed_discrepancy_enabled',
+            'external_borrowed_discrepancy_clearance_enabled',
+            'external_in_loss_obligation_enabled','external_in_loss_settlement_enabled',
+            'external_in_nonclean_closure_enabled'
+        ] as $name)config()->set('inventory_controls.'.$name,true);
+        config()->set('finance_controls.posting_enabled',true);
+        $company=Company::create(['name'=>'ENCL Revoked Issuer Company',
+            'slug'=>'encl-revoked-issuer-company']);
+        $hall=Hall::create(['company_id'=>$company->id,'name'=>'ENCL Revoked Issuer Hall',
+            'slug'=>'encl-revoked-issuer-hall','capacity'=>100]);
+        $people=[];
+        foreach([['drafter','manager'],['handler','manager'],['owner','owner'],
+            ['reviewer','owner'],['approver','owner']] as [$name,$role]) {
+            $actor=User::create(['name'=>'ENCL revoke '.$name,
+                'email'=>'encl-revoke-'.$name.'@example.test','password'=>'test-only']);
+            $actor->markEmailAsVerified();
+            $membership=CompanyMembership::create(['company_id'=>$company->id,
+                'user_id'=>$actor->id,'role'=>$role]);
+            if($role==='manager')HallAssignment::create([
+                'company_id'=>$company->id,'hall_id'=>$hall->id,'membership_id'=>$membership->id]);
+            $people[$name]=$actor;
+        }
+        ['drafter'=>$drafter,'handler'=>$handler,'owner'=>$owner,
+            'reviewer'=>$reviewer,'approver'=>$approver]=$people;
+        $item=$this->id();
+        $this->be($drafter);
+        app(HallInventoryCatalogService::class)->create($drafter,$company->id,$hall->id,
+            $item,'Original physical proof item','External partner','piece',1,
+            'Issuer revoked while serial allocation waits for company');
+        $loan=$this->readyOriginal($company,$hall,$item,6,
+            $drafter,$handler,$owner,$reviewer,$approver);
+        $this->be($approver);
+        $closureId=$this->id();
+        $this->assertTrue(function_exists('pcntl_fork'));
+        $pair=stream_socket_pair(STREAM_PF_UNIX,STREAM_SOCK_STREAM,0);
+        $this->assertIsArray($pair);
+        [$parentSocket,$childSocket]=$pair;
+        $resultFile=tempnam(sys_get_temp_dir(),'encl-revoked-issuer-');
+        $this->assertNotFalse($resultFile);
+        DB::purge();
+        $pid=pcntl_fork();
+        $this->assertNotSame(-1,$pid);
+        if($pid===0) {
+            fclose($parentSocket);DB::purge();
+            try {
+                $backendPid=(int)DB::selectOne('SELECT pg_backend_pid() AS pid')->pid;
+                fwrite($childSocket,"ready:".$backendPid."\n");
+                fgets($childSocket);
+                app(HallInventoryExternalInNoncleanClosureService::class)
+                    ->close($approver,$company->id,$hall->id,$loan,$closureId);
+                file_put_contents($resultFile,json_encode(['unexpected'=>'revoked issuer closed'],JSON_THROW_ON_ERROR));
+            }catch(\Illuminate\Auth\Access\AuthorizationException $e) {
+                file_put_contents($resultFile,json_encode(['denied'=>$e->getMessage()],JSON_THROW_ON_ERROR));
+            }catch(\Throwable $e) {
+                file_put_contents($resultFile,json_encode(['unexpected'=>get_class($e),
+                    'message'=>$e->getMessage()],JSON_THROW_ON_ERROR));
+            }
+            fclose($childSocket);exit(0);
+        }
+        fclose($childSocket);
+        $parentError=null;
+        DB::beginTransaction();
+        try {
+            $this->assertNotNull(DB::table('companies')->where('id',$company->id)
+                ->lockForUpdate()->first(['id']));
+            stream_set_timeout($parentSocket,15);
+            $ready=(string)fgets($parentSocket);
+            $this->assertMatchesRegularExpression('/^ready:[0-9]+$/',trim($ready));
+            fwrite($parentSocket,"go\n");
+            $childBackendPid=(int)substr(trim($ready),6);
+            $wait=false;
+            for($i=0;$i<100;$i++) {
+                if(DB::table('pg_stat_activity')->where('pid',$childBackendPid)
+                    ->value('wait_event_type')==='Lock'){$wait=true;break;}
+                usleep(100000);
+            }
+            $this->assertTrue($wait,'Final issuer did not block on separate live PG company lock.');
+            $this->assertSame(1,DB::table('company_memberships')
+                ->where('company_id',$company->id)->where('user_id',$approver->id)
+                ->where('is_active',true)->update(['is_active'=>false,'updated_at'=>now()]));
+            DB::commit();
+        }catch(\Throwable $e) {
+            DB::rollBack();$parentError=$e;
+        }finally {
+            fclose($parentSocket);
+            pcntl_waitpid($pid,$status);
+        }
+        if($parentError!==null)throw $parentError;
+        $this->assertTrue(pcntl_wifexited($status));
+        $child=json_decode((string)file_get_contents($resultFile),true,512,JSON_THROW_ON_ERROR);
+        unlink($resultFile);
+        $this->assertArrayHasKey('denied',$child,json_encode($child));
+        $this->assertSame(0,DB::table('hall_inventory_external_in_nonclean_closures')
+            ->where('company_id',$company->id)->count());
+        $this->assertSame(0,DB::table('hall_inventory_movement_events')
+            ->where('company_id',$company->id)->where('item_id',$item)
+            ->where('event_kind','writeoff_borrowed_transit')->count());
+        $this->assertSame(1,(int)DB::table('hall_inventory_positions')
+            ->where('company_id',$company->id)->where('hall_id',$hall->id)
+            ->where('item_id',$item)->value('borrowed_transit'));
+        $this->assertSame(1,DB::table('finance_journals')->where('company_id',$company->id)->count());
+        $this->assertSame(0,DB::table('audit_events')
+            ->where('company_id',$company->id)
+            ->where('action','hall_inventory.external_in_nonclean_closed')->count());
+        $this->assertFalse(Storage::disk('local')->exists(
+            'private/hall-external-in-nonclean/'.$company->id.'/'.$loan.'/'.$closureId.'.pdf'));
+    }
+
 }
