@@ -2,10 +2,18 @@
 
 ## Verified authenticated browser increments (2026-10-23 UTC)
 
+### Later source and CI repair
+
+- `ceea883c` run `39939171665`, `005d01c8` run `39940207005`, and doc commit `0b4d78ad` run `39940541154`: each **5 passed, authenticated-panel-e2e failed** at original source incident review. Real browser trace and screenshot showed `Invalid inventory incident review.`, due to an uninitialized `incidentDecisionId` on fresh Owner mount. The true backend reject remained in place; no test bypass.
+- `0f3ea8ad9a7b48a667b02284205d9816b32c60df` run [39979941350](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39979941350): **SIX SUCCESS**. Real Livewire initial-mount UUID fix, explicit 10-field regression, full 15-chair incident/physical finding/ADR-0009 settlement/independent physical write-off/numbered IAC test. Stock and money are separate; NO company internal journal.
+- `fac8148fe2458b8ab383b5b23cba25a17707fcb3` run [39980948744](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39980948744): **PENDING at this evidence snapshot**. Real authenticated private PDF download bytes SHA256 and both Owner final book positions; must verify all six.
+- Real public staging TLS/MFA deployment, physically signed third-party proof, bank/source confirmation, private volume/PostgreSQL coordinated restore, owner/security signoffs remain **BLOCKED EXTERNAL**. Phase 12 OPEN, production OFF, no Phase 13.
+
+
 - `387008d3b42991984644e587f9bb936765f9eea9`, run [39926249796](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39926249796): **ALL SIX SUCCESS**. Exact original INTERNAL loan/return UUID visible queue/accepted physical 80 good, 5 damaged, 15 remaining on-loan.
 - `42ff341c0d295d81d911747a4846090188c76000`, run [39938110650](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39938110650): **ALL SIX SUCCESS**. Real CI Owner/Manager signed 15 missing statement and separate source Owner corroboration; no fake stock movement or company journal.
-- `ceea883c758bac6e9e8f10744e1ec3266e8ba899`, run [39939171665](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39939171665): **CI IN PROGRESS AT THIS SNAPSHOT**. Original lender incident, second/third original source Owner evidence decision and physical finding browser proof. Pending cannot be accepted.
-- `005d01c8aed922c9d57972659843120c4b2a37ee`, run [39940207005](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39940207005): **CI IN PROGRESS AT THIS SNAPSHOT**. CI-only ADR-0009 provisional obligation/independent review, synthetic private settlement/independent verification, uninvolved write-off approval and immutable numbered IAC/browser readiness, without company journal. Not verified until all six green.
+- `ceea883c` / run 39939171665: **FAILED historical browser; fixed by 0f3ea8ad**. See repair above.
+- `005d01c8` / run 39940207005: **FAILED historical browser; fixed by 0f3ea8ad**. See repair above.
 - External HTTPS staging UAT, private independent witness signatures, proof/payment verification, bank reconciliation, coordinated real PG/document-store restore, TLS/security signoff and Owner release approval remain **BLOCKED EXTERNAL**. CI synthetic PDF and MFA roles are not real operator acceptance. Phase12 OPEN / production flags OFF / no Phase13.
 
 ## Live certification and staging-access reconciliation (2026-10-23 UTC)
