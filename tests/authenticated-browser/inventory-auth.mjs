@@ -13,35 +13,68 @@ function isAuthenticated(url){
  return p.startsWith('/admin')&& !['/admin/login','/admin/multi-factor-authentication','/admin/password-reset']
  .some(x=>p.startsWith(x));
 }
+// CI intentionally preserves the application's real login/MFA rate limiter.
+// A sequential authenticated suite can exhaust the IP allowance; wait for
+// the actual server retry notice rather than weakening or bypassing security.
+async function respectLoginThrottle(page) {
+ const notification=page.getByText(/Too many login attempts/i).first();
+ const message=String(await notification.textContent());
+ const match=message.match(/(\d+)\s+seconds?/i);
+ const seconds=match?Number(match[1]):65;
+ if(!Number.isFinite(seconds)||seconds<1||seconds>120)
+   throw new Error('Unrecognized login throttle retry window');
+ console.info('Preserving real login throttling: waiting '+seconds+'s before a fresh challenge');
+ await page.waitForTimeout((seconds+2)*1000);
+}
+async function loginOutcome(page,challenge,{seconds=15}={}) {
+ const notice=page.getByText(/Too many login attempts/i).first();
+ for(let i=0;i<seconds*4;i++){
+   if(isAuthenticated(page.url()))return 'authenticated';
+   if(await notice.isVisible())return 'throttled';
+   if(challenge && await challenge.isVisible())return 'challenge';
+   await page.waitForTimeout(250);
+ }
+ return 'unknown';
+}
 export async function inventoryLogin(browser,email,password,secret,viewport){
  const ctx=await browser.newContext({viewport});
  const page=await ctx.newPage();
  await page.goto('/admin/login');
  await page.waitForFunction(()=>Boolean(window.Livewire?.all?.().some(c=>c.el?.querySelector?.('input[type="email"]'))),null,{timeout:30000});
- await page.locator('input[type="email"]').fill(email);
- await page.getByLabel(/Password/).fill(password);
- await page.getByRole('button',{name:/sign in|log in/i}).first().click();
  const field=page.locator('input[autocomplete="one-time-code"]:visible,input[id*="code"]:visible,input[name*="code"]:visible,input[inputmode="numeric"]:visible').first();
- await expect(field).toBeVisible({timeout:30000});
- // Do not start a real TOTP submission at the end of its 30-second validity window.
- const remaining=30000-(Date.now()%30000);
- if(remaining<10000)await page.waitForTimeout(remaining+350);
- await field.fill(otp(secret));
- // Filament's six-cell TOTP challenge exposes a real "Confirm sign in"
- // button; waiting a full validity window before clicking expires the code.
- // Never bypass MFA: submit the actual challenge and demand its redirect.
- const verify=page.getByRole('button',{name:/^confirm sign in$/i});
- try {
-   if(!isAuthenticated(page.url()) && await verify.isVisible()) {
-     await expect(verify).toBeEnabled({timeout:5000});
-     if(!isAuthenticated(page.url()))await verify.click();
-   }
- } catch(error) {
-   // The button can disappear during Filament's genuine automatic redirect.
-   // Only accept this race if an authenticated panel is already displayed.
-   if(!isAuthenticated(page.url()))throw error;
+ let enteredChallenge=false;
+ for(let attempt=0;attempt<4;attempt++){
+   await page.locator('input[type="email"]').fill(email);
+   await page.getByLabel(/Password/).fill(password);
+   await page.getByRole('button',{name:/sign in|log in/i}).first().click();
+   const result=await loginOutcome(page,field);
+   if(result==='challenge'||result==='authenticated'){enteredChallenge=true;break;}
+   if(result==='throttled'){await respectLoginThrottle(page);continue;}
+   throw new Error('Real password login did not reach a challenge or authenticated panel');
  }
- await page.waitForURL(isAuthenticated,{timeout:30000});
+ if(!enteredChallenge)throw new Error('Real password authentication was repeatedly throttled');
+ const verify=page.getByRole('button',{name:/^confirm sign in$/i});
+ for(let attempt=0;attempt<4&&!isAuthenticated(page.url());attempt++){
+   await expect(field).toBeVisible({timeout:20000});
+   const remaining=30000-(Date.now()%30000);
+   if(remaining<10000)await page.waitForTimeout(remaining+350);
+   await field.fill(otp(secret));
+   try{
+     if(!isAuthenticated(page.url())){
+       await expect(verify).toBeEnabled({timeout:5000});
+       if(!isAuthenticated(page.url()))await verify.click();
+     }
+   }catch(error){
+     if(!isAuthenticated(page.url()))throw error;
+   }
+   const result=await loginOutcome(page,null,{seconds:8});
+   if(result==='authenticated')break;
+   if(result==='throttled'){await respectLoginThrottle(page);continue;}
+   // An invalid proof is a real failure. Never disable MFA or silently
+   // retry arbitrary codes, since that would hide a security regression.
+   throw new Error('MFA challenge was not accepted. Current path '+new URL(page.url()).pathname);
+ }
+ if(!isAuthenticated(page.url()))throw new Error('Actual two-factor authentication was not completed');
  await page.goto('/admin/hall-inventory');
  await expect(page.locator('[aria-label="Inventory workflow navigator"]')).toBeVisible({timeout:30000});
  await page.waitForFunction(()=>Boolean(window.Livewire?.all?.().length),null,{timeout:30000});

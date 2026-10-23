@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import {inventoryLogin,inventoryFocus,syntheticEvidence} from './inventory-auth.mjs';
 
 test('MFA Owner and separate Managers perform actual 100-chair stock, loan and partial return on desktop/mobile',async({browser})=>{
- test.setTimeout(300000);
+ test.setTimeout(600000);
  const owner=await inventoryLogin(browser,'browser-e2e-inventory-owner@example.test',
   'synthetic-inventory-owner-only','IFBEGRCFIZDUQSKK',{width:1366,height:768});
  const source=await inventoryLogin(browser,'browser-e2e-inventory-manager-a@example.test',
