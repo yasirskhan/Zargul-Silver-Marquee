@@ -54,6 +54,9 @@ class WebsiteWorkspaceMediaTest extends TestCase
             ->call('approveMedia', $asset->id)
             ->assertHasNoErrors()
             ->call('addImageFromLibrary', $asset->id)
+            ->call('addColumns', 2)
+            ->set('columnMediaSelections.1.0', $asset->id)
+            ->call('addImageToColumnFromLibrary', 1, 0)
             ->set('reason', 'Add approved image to draft')
             ->call('saveDraft')
             ->assertHasNoErrors()
@@ -65,6 +68,8 @@ class WebsiteWorkspaceMediaTest extends TestCase
             ->where('page_id', $pageId)->value('content'), true, 512, JSON_THROW_ON_ERROR);
         $this->assertSame('image', $content['sections'][0]['type']);
         $this->assertSame($asset->id, $content['sections'][0]['data']['imageId']);
+        $this->assertSame('image', $content['sections'][1]['columns'][0]['blocks'][1]['type']);
+        $this->assertSame($asset->id, $content['sections'][1]['columns'][0]['blocks'][1]['data']['imageId']);
         $this->assertNotNull(DB::table('site_pages')->where('id', $pageId)->value('published_revision_id'));
         $this->assertSame('approved', DB::table('site_media')->where('id', $asset->id)->value('status'));
         $this->assertSame(4, DB::table('audit_events')->count());

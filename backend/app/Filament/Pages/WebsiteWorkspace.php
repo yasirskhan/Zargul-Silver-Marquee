@@ -41,6 +41,9 @@ final class WebsiteWorkspace extends Page
     /** Typed sections are an editable draft working copy, never live published content. */
     public array $sections = [];
 
+    /** Unsaved, tenant-scoped library selection per draft column, never published. */
+    public array $columnMediaSelections = [];
+
     /** Unsaved owner page-level search title, never public until approved. */
     public string $pageSeoTitle = '';
 
@@ -217,6 +220,7 @@ final class WebsiteWorkspace extends Page
     {
         $this->unpublishRequestKey = (string) Str::uuid();
         $this->sections = [];
+        $this->columnMediaSelections = [];
         $this->pageSeoTitle = '';
         $this->pageSeoDescription = '';
         $this->expectedRevision = 0;
@@ -755,6 +759,34 @@ final class WebsiteWorkspace extends Page
             'type' => $type,
             'data' => $defaults[$type],
         ];
+    }
+
+    /** Insert a private library image into a draft column, never a raw URL. */
+    public function addImageToColumnFromLibrary(int $sectionIndex, int $columnIndex): void
+    {
+        [, $page] = $this->authorizeSelectedPage('update');
+        $this->checkEditorSnapshot($page);
+        $blocks = $this->sections[$sectionIndex]['columns'][$columnIndex]['blocks'] ?? null;
+        $mediaId = $this->columnMediaSelections[$sectionIndex][$columnIndex] ?? null;
+        abort_unless(($this->sections[$sectionIndex]['type'] ?? null) === 'columns'
+            && is_array($blocks) && array_is_list($blocks) && count($blocks) < 20
+            && is_string($mediaId) && Str::isUuid($mediaId), 422);
+        $asset = DB::table('site_media')
+            ->where('company_id', $page->company_id)
+            ->where('id', $mediaId)
+            ->whereIn('status', ['pending', 'approved'])
+            ->first(['id', 'alt_text']);
+        abort_unless($asset, 404);
+        $this->sections[$sectionIndex]['columns'][$columnIndex]['blocks'][] = [
+            'id' => 'block_'.Str::random(16),
+            'type' => 'image',
+            'data' => [
+                'imageId' => $asset->id,
+                'alt' => $asset->alt_text ?: 'Venue photograph',
+                'caption' => '',
+            ],
+        ];
+        $this->columnMediaSelections[$sectionIndex][$columnIndex] = '';
     }
 
     /**

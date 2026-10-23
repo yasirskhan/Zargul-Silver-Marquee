@@ -325,6 +325,7 @@
                     <button type="button" wire:click="addColumns(2)" class="rounded-lg border px-3 py-2">+ 2 columns</button>
                     <button type="button" wire:click="addColumns(3)" class="rounded-lg border px-3 py-2">+ 3 columns</button>
                 </div>
+                @php($columnImageAssets = $this->mediaForCurrentCompany())
                 @forelse ($sections as $index => $section)
                     <div wire:key="section-{{ $section['id'] ?? $index }}"
                         x-on:dragover.prevent="if ($event.dataTransfer.types.includes('application/x-venuedesk-section')) $event.dataTransfer.dropEffect = 'move'"
@@ -405,6 +406,22 @@
                                                     @disabled(count($column['blocks'] ?? []) >= 20) class="rounded border px-2 py-1 text-sm">+ Text block</button>
                                                 <button type="button" wire:click="addColumnBlock({{ $index }}, {{ $columnIndex }}, 'cta')"
                                                     @disabled(count($column['blocks'] ?? []) >= 20) class="rounded border px-2 py-1 text-sm">+ Call-to-action block</button>
+                                            </div>
+                                            <div class="flex flex-wrap items-end gap-2">
+                                                <label class="block min-w-[160px] flex-1 space-y-1">
+                                                    <span class="text-sm">Image from venue library</span>
+                                                    <select wire:model="columnMediaSelections.{{ $index }}.{{ $columnIndex }}"
+                                                        aria-label="Image for column {{ $columnIndex + 1 }}"
+                                                        class="w-full rounded border p-2 text-gray-900">
+                                                        <option value="">Select a staged or approved image</option>
+                                                        @foreach($columnImageAssets as $imageAsset)
+                                                            <option value="{{ $imageAsset->id }}">{{ $imageAsset->alt_text }} ({{ $imageAsset->status }})</option>
+                                                        @endforeach
+                                                    </select>
+                                                </label>
+                                                <button type="button" wire:click="addImageToColumnFromLibrary({{ $index }}, {{ $columnIndex }})"
+                                                    @disabled(count($column['blocks'] ?? []) >= 20 || count($columnImageAssets) === 0)
+                                                    class="rounded border px-2 py-1 text-sm">+ Library image block</button>
                                             </div>
                                             @foreach (($column['blocks'] ?? []) as $blockIndex => $block)
                                                 <div wire:key="nested-block-{{ $block['id'] ?? $blockIndex }}"

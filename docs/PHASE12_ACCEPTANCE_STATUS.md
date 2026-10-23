@@ -1,5 +1,10 @@
 # Phase 12 acceptance status (latest verified checks 2026-10-23 UTC)
 
+## Phase 12 engineering code checkpoint (2026-10-23)
+- `8e14d0c0b4e7ec973f9c4fb82d233cc554d04fc1` — [run 40018835848](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40018835848), **ALL SIX SUCCESS**. Scoped stocktake refresh, actual cross-actor purchase count/review, original hall catalog visibility and CSV, Livewire locked state preserved. Prior source `3274825a` red 39997583349; test correction `5e2d3ee7` failed backend on forbidden locked-field set, fixed `8e14d0c0`. Core registered Phase 12 code now suitable for controlled staging verification; this is not full human/real bank operator acceptance.
+- Exact 59-row matrix audit located all declared implementation paths; 40 source-tested/17 code-present legacy/2 pilot acceptance pending. Existing narrowly certified original PostgreSQL races and private certificate checks remain valid; no mandate for exhaustive synthetic repetitions.
+- **Phase 12 operational OPEN, production OFF.** Operator VPS/website testing postponed; do not claim deployment, human signoff, real payment or backup restoration.
+
 ## Verified authenticated browser increments (2026-10-23 UTC)
 
 ### Later source and CI repair
