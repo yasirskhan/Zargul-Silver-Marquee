@@ -339,6 +339,8 @@ jobs:
       # Signed owned EXTERNAL_OUT lending and separate physical condition review, CI only.
       VENUE_INVENTORY_EXTERNAL_OUT_DISPATCH_ENABLED: 'true'
       VENUE_INVENTORY_EXTERNAL_OUT_RETURN_ENABLED: 'true'
+      # CI-only purchase and monthly count evidence, not payment or stock posting.
+      VENUE_INVENTORY_PURCHASE_RECEIPTS_ENABLED: 'true'
       DB_CONNECTION: pgsql
       DB_HOST: 127.0.0.1
       DB_PORT: '5432'
