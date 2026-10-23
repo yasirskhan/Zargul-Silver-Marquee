@@ -344,7 +344,16 @@ class HallInventoryLivewireTest extends TestCase
         $this->assertNotNull($receipt);
         $this->assertSame(0,DB::table('hall_inventory_positions')->count());
         $this->assertSame(0,DB::table('finance_journals')->count());
+        // The source receiver and original requester must not be offered a
+        // misleading "independent approval" task that neither may sign.
+        Livewire::test(HallInventory::class)
+            ->assertDontSee('1 purchase receiving review(s)');
+        $this->be($manager);
+        Livewire::test(HallInventory::class)
+            ->assertDontSee('1 purchase receiving review(s)');
         $this->be($reviewer);
+        Livewire::test(HallInventory::class)
+            ->assertSee('1 purchase receiving review(s)');
         Livewire::test(HallInventory::class)
             ->assertSee('Owner/admin independent receiving review')
             ->set('reviewReceiptId',$receipt)
