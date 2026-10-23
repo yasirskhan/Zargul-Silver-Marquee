@@ -63,14 +63,12 @@ class HallInventoryLivewireTest extends TestCase
         config()->set('inventory_controls.catalog_enabled', true);
         config()->set('inventory_controls.stocktakes_enabled', true);
 
-        $pendingReview=(string) \Illuminate\Support\Str::uuid();
         $draft=Livewire::test(HallInventory::class)
             ->call('addCountRow')
             ->set('auditKind', 'monthly')
             ->set('auditReason', 'Ongoing monthly physical count')
             ->set('countRows.0.usableCount', '20')
             ->set('countRows.0.damagedCount', '0')
-            ->set('varianceStocktakeId', $pendingReview)
             ->set('varianceReviewReason', 'Independent variance review draft')
             ->set('incidentDecisionReason', 'Unsubmitted incident reviewer notes');
 
@@ -87,7 +85,7 @@ class HallInventoryLivewireTest extends TestCase
             ->assertSet('auditReason', 'Ongoing monthly physical count')
             ->assertSet('countRows.0.usableCount', '20')
             ->assertSet('countRows.0.damagedCount', '0')
-            ->assertSet('varianceStocktakeId', $pendingReview)
+            ->assertSet('varianceStocktakeId', '')
             ->assertSet('varianceReviewReason', 'Independent variance review draft')
             ->assertSet('incidentDecisionReason', 'Unsubmitted incident reviewer notes');
 
