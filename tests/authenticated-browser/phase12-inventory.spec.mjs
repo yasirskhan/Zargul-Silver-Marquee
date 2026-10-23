@@ -107,7 +107,9 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
   await returnForm.locator('input[type="number"]').first().fill('85');
   await inventoryUploadEvidence(b,returnForm.locator('input[type="file"]'),syntheticEvidence);
   await returnForm.getByRole('button',{name:'Record witnessed return shipment'}).click();
-  await expect(b.getByText('Return shipment',{exact:false}))
+  // A saved, numbered-in-this-loan return batch must be visible as the real
+  // in-transit status; generic 'Return shipment' matches unrelated buttons.
+  await expect(b.locator('p[role="status"]').filter({hasText:/Return shipment [0-9a-f-]{36} is in transit/}))
    .toBeVisible({timeout:30000});
 
   // The read-only loan queue must lead an Owner directly to the next
