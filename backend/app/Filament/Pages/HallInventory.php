@@ -659,15 +659,10 @@ final class HallInventory extends Page
             }
         }
         $this->hallId = array_key_first($this->hallOptions());
-        $this->createRequestId = (string) Str::uuid();
-        $this->countRequestId = (string) Str::uuid();
-        $this->loanRequestId = (string) Str::uuid();
-        $this->loanInlineRequestId = (string) Str::uuid();
-        $this->openingRequestId = (string) Str::uuid();
-        $this->purchaseRequestId = (string) Str::uuid();
-        $this->purchaseUploadId=(string)Str::uuid();
-        $this->receivingId=(string)Str::uuid();
-        $this->receivingReviewId=(string)Str::uuid();
+        // A fresh authenticated session must initialize every protected
+        // request/decision UUID, not only the catalog IDs. Hall switching
+        // already uses the same reset to avoid cross-hall form leakage.
+        $this->resetForms();
         $this->reloadCatalog();
     }
 

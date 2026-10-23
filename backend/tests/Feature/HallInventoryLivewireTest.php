@@ -39,6 +39,24 @@ class HallInventoryLivewireTest extends TestCase
         return [$company, $hall, $other, $manager, $membership];
     }
 
+    public function test_fresh_inventory_panel_initializes_independent_review_request_ids(): void
+    {
+        $this->fixture();
+        config()->set('inventory_controls.catalog_enabled', true);
+        $page = Livewire::test(HallInventory::class);
+        foreach ([
+            'createRequestId', 'loanRequestId', 'incidentRequestId',
+            'incidentDecisionId', 'discrepancyRequestId', 'discrepancyDecisionId',
+            'physicalFindingId', 'physicalFindingDecisionId',
+            'internalObligationRequestId', 'internalSettlementRequestId',
+        ] as $property) {
+            $this->assertTrue(
+                \Illuminate\Support\Str::isUuid($page->get($property)),
+                $property.' must be initialized on initial mount before any hall switch.'
+            );
+        }
+    }
+
     public function test_inventory_catalog_page_hidden_by_default_and_manager_sees_only_assigned_hall(): void
     {
         [$company, $hall, $other] = $this->fixture();
