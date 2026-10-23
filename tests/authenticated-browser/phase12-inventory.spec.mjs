@@ -152,6 +152,64 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
   await expect(row).toContainText(/80\s*15\s*5/);
   await expect(o.locator('section[aria-label="Inventory at a glance"]'))
    .toContainText('Owned damaged');
+
+  // Borrower testimony is scoped to this exact original loan. It must not
+  // pretend the remaining 15 chairs were physically returned or paid for.
+  await inventoryFocus(b,'Borrow / lend');
+  await incoming.getByRole('button',{name:'Refresh requests'}).click();
+  const borrowingLoan=incoming.locator('article')
+    .filter({hasText:`Reference: ${originalLoanId}.`});
+  await expect(borrowingLoan).toHaveCount(1);
+  await borrowingLoan.getByRole('button',{
+    name:'File signed borrowing-hall missing/dispute statement'
+  }).click();
+  const borrowerStatement=b.locator('section[aria-label="Signed internal discrepancy evidence"]');
+  await expect(borrowerStatement).toBeVisible({timeout:30000});
+  await expect(borrowerStatement).toContainText(`Loan ${originalLoanId}`);
+  await borrowerStatement.getByRole('combobox',{name:'Original discrepancy item'})
+    .selectOption({index:1});
+  await borrowerStatement.getByRole('combobox',{name:'Discrepancy kind'}).selectOption('missing');
+  await borrowerStatement.getByRole('spinbutton',{name:'Claimed discrepancy quantity'}).fill('15');
+  await borrowerStatement.getByRole('textbox',{name:'Signed statement reason'})
+    .fill('15 chairs remain physically missing after witnessed 85-chair return shipment');
+  await inventoryUploadEvidence(b,borrowerStatement.locator('input[type="file"]'),syntheticEvidence);
+  await borrowerStatement.getByRole('button',{name:'Submit signed borrowing-hall statement'}).click();
+  const pendingStatement=borrowerStatement.locator('p')
+    .filter({hasText:/Statement [0-9a-f-]{36} item .*15 missing.*SOURCE REVIEW PENDING/});
+  await expect(pendingStatement).toHaveCount(1);
+  await expect(pendingStatement).toBeVisible({timeout:30000});
+  const statementId=(await pendingStatement.textContent())
+    ?.match(/Statement ([0-9a-f-]{36}) item/i)?.[1];
+  expect(statementId).toMatch(/^[0-9a-f-]{36}$/i);
+
+  // A different authenticated source Owner reviews only the original signed
+  // statement. Corroboration is evidence, not a receipt, write-off or finance.
+  await inventoryFocus(o,'Borrow / lend');
+  await ownLoans.getByRole('button',{name:'Refresh requests'}).click();
+  const lendingLoan=ownLoans.locator('article')
+    .filter({hasText:`Reference: ${originalLoanId}.`});
+  await expect(lendingLoan).toHaveCount(1);
+  await lendingLoan.getByRole('button',{
+    name:'Review original borrower signed discrepancy evidence'
+  }).click();
+  const ownerStatement=o.locator('section[aria-label="Signed internal discrepancy evidence"]');
+  await expect(ownerStatement).toBeVisible({timeout:30000});
+  await expect(ownerStatement).toContainText(`Loan ${originalLoanId}`);
+  await ownerStatement.getByRole('combobox',{name:'Independent signed statement review'})
+    .selectOption(statementId);
+  await ownerStatement.getByRole('combobox',{name:'Independent discrepancy decision'})
+    .selectOption('corroborated');
+  await ownerStatement.getByRole('textbox',{name:'Independent review reason'})
+    .fill('Independent source review corroborated missing 15 chairs; no custody or payment posted');
+  await ownerStatement.getByRole('button',{name:'Record independent source review'}).click();
+  const reviewedStatement=ownerStatement.locator('p')
+    .filter({hasText:`Statement ${statementId} item`});
+  await expect(reviewedStatement).toContainText('15 missing — corroborated',{timeout:30000});
+
+  await inventoryFocus(o,'Overview');
+  await o.getByRole('button',{name:'Refresh book balances'}).click();
+  await expect(balance.locator('tbody tr').filter({hasText:'Ceremony Chairs'}))
+    .toContainText(/80\s*15\s*5/);
   // Real authenticated mobile/desktop evidence; no bypassed service or mocked screen.
   await o.screenshot({path:'test-results/phase12-inventory-desktop.png',fullPage:true});
   await b.screenshot({path:'test-results/phase12-inventory-manager-mobile.png',fullPage:true});
