@@ -1,6 +1,14 @@
 # Phase 12 acceptance status (2026-10-22 UTC)
 
-## Technical hardening verification (2026-10-22)
+## Latest Phase 12 code-test checkpoint (2026-10-23 UTC)
+
+- Verified original baseline: 32b598b21369845b167bfb0bb2010dd3da248149, GitHub Actions [39868467542](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39868467542), all six SUCCESS. New two-process original-loan ENCL issuance and historical repaired failure paths are included.
+- New cross-service PostgreSQL reversal-versus-ENCL certification source: f4e3024e7a91ae7abd76c9eb2ccd2012ac3655fd / [39893330180](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39893330180); **verify exact six jobs before labeling PASS**. A reverse-order independent race is separately prepared but not proven at this checkpoint.
+- Source tree audit of 59 Phase 12 IDs: 40 tagged HOSTED CODE TESTS PASSED, 17 CODE PRESENT, 2 SCOPE/PILOT UNACCEPTED. Detailed tier/evidence mapping in [final report](PHASE12_FINAL_ACCEPTANCE_REPORT.md). The latest CI run verifies covered test execution, not 59 complete human/browser/cross-flow certifications.
+- [Operator acceptance checklist](PHASE12_OPERATOR_ACCEPTANCE_CHECKLIST.md) is a future staging/operator execution plan only; it contains no fake signatures, bank proof, restore logs or authorization.
+- Real staging object storage fault injection and coordinated PostgreSQL/document backup/restore, partner/manager/owner signed UAT, independent security/TLS/monitoring approval and owner production release remain BLOCKED EXTERNAL. Inventory/finance release OFF. Phase 12 OPEN; Phase 13 not promoted.
+
+## Historical technical hardening verification (2026-10-22)
 - Source `c2c61caa2ec8aa927f1021fbf1acc2bc0854f0cc` CI [39852568710](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39852568710): all six SUCCESS. Same-catalog original INTERNAL multi-loan physical conservation, company IAC numbering lock, occupied/corrupt/missing private certificate retries.
 - Source `f88babb56c2d5e59705c1001f83d365a3e65b201` CI [39853153415](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39853153415): all six SUCCESS. Irreversible close checks original borrower/source signed proof and settlement hashes; synthetic DB-insert failure rolls back stock, PDF and audit; exact safe retry.
 - **Phase 12 technical acceptance is PARTIAL and overall status stays OPEN / BLOCKED**: no comprehensive every-flow synchronized stress matrix, interrupted real storage outage, staging backup/restore access, full inventory browser/operator walkthrough, independent security/monitoring signoff or explicit production release.

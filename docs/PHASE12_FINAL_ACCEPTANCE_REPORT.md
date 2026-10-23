@@ -6,11 +6,25 @@
 ## Scope and source of truth
 Audited all **59** Phase 12 requirement identifiers in `docs/FEATURE_REGISTER.csv` against the actual inventory services, Filament owner/manager UI, PostgreSQL migrations and backend regression suite visible at the technical code SHA below. Older register statuses such as `Approved not implemented`, `PREPARED`, or `CI PENDING` are historical labels and do not negate subsequently published files. The updated feature register records that code is present, **not** that external acceptance has occurred. The register's detailed acceptance criteria and legacy historical evidence are preserved. Tests passing alone cannot prove partner reality or production-readiness.
 
-## Certification execution delta: current Phase 12 source after baseline (2026-10-22 UTC)
+## Latest source-and-evidence reconciliation (2026-10-23 UTC)
 
-**TECHNICALLY VERIFIED, historical baseline only:** branch source `bff74d56603894520d114d7d4101bdd797684321`, GitHub Actions [39855875423](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39855875423), all six required jobs SUCCESS. This does not certify newer repair commits or operational approval.
+**Source-of-truth checkpoint before current certification additions:** commit 32b598b21369845b167bfb0bb2010dd3da248149 / GitHub Actions [39868467542](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39868467542), all six named jobs **SUCCESS**. This includes the published two-process independent ENCL issuance test and its predecessor recovery/failure repairs.
 
-**PUBLISHED, EXACT-SHA CI NOT YET CONFIRMED GREEN:** current technical repair series below. Do not mark any new test/repair PASSED until all six hosted jobs succeed at a SHA containing that change.
+**New cross-service certification:** source f4e3024e7a91ae7abd76c9eb2ccd2012ac3655fd adds a real two-process original-loan ENCL-versus-partner-payment-reversal test with synchronized PostgreSQL company lock, settled finance journal preservation, single stock write-off, immutable certificate and exact replay. GitHub Actions [39893330180](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39893330180) must be verified job by job; do not infer success from publication. The complementary reversal-first scenario must also pass all six exact-SHA jobs before being marked verified.
+
+**59-ID source matrix reconciliation against current repository tree:** all 59 Phase 12 entries are mapped below. **40** are explicitly labeled HOSTED CODE TESTS PASSED, **17** CODE PRESENT / LEGACY LABEL RECONCILED, and **2** CODE EXISTS / SCOPE/PILOT UNACCEPTED. Labels are evidence tiers, not acceptance determinations. The 17 and 2 must not be upgraded to fully complete technical acceptance solely because the overall test suite is green. One historical shortened migration reference in INV-012-FK was corrected to its actual checked-in filename. All other cited file basenames resolve in the source tree. Do not claim a 59/59 independently exercised end-to-end UAT from these 59 mappings.
+
+**External runbook:** [Phase 12 operational acceptance and evidence checklist](PHASE12_OPERATOR_ACCEPTANCE_CHECKLIST.md). It deliberately records NO completed UAT cases, external bank validation, live object-store outage or staging restore. Independent human/operator, security, monitoring, real partner and final Owner-release gates are BLOCKED EXTERNAL. No production flags have been turned on. Phase 12 stays OPEN; Phase 13 remains not promoted.
+
+**Still missing comprehensive technical stress:** real separate-connection tests verify selected dispatch, findings, late returns and serial issuance cases, not every permitted synchronized crossing among loan borrowing, partial return acceptance, disputed evidence/corrections, independent write-off, settlement reversal, three numbered certificate classes and role revocation. Preserve this explicit residual technical gap until a bounded case matrix and executed results genuinely close it.
+
+---
+
+## Historical certification execution delta (superseded by latest section)
+
+**HISTORICALLY TECHNICALLY VERIFIED (not current HEAD):** branch source `bff74d56603894520d114d7d4101bdd797684321`, GitHub Actions [39855875423](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39855875423), all six required jobs SUCCESS. This does not certify newer repair commits or operational approval.
+
+**HISTORICAL STATUS AT THE TIME (superseded by later exact-SHA green run):** current technical repair series below. Do not mark any new test/repair PASSED until all six hosted jobs succeed at a SHA containing that change.
 
 | Published commit | Technical change / retained regression | Hosted CI checkpoint / disposition at documentation |
 | --- | --- | --- |

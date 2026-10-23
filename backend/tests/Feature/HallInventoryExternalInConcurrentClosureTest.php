@@ -364,4 +364,142 @@ final class HallInventoryExternalInConcurrentClosureTest extends TestCase
         $this->assertSame((string)$stored->pdf_sha256,hash('sha256',$bytes));
     }
 
+
+    /**
+     * Inverse race: independently authorized reversal wins the company lock.
+     * Issuance must then re-evaluate the actual settled original loan and fail
+     * without serial, PDF, stock write-off or fabricated receipt.
+     */
+    public function test_parallel_reversal_winning_lock_prevents_stale_encl_finalization():void {
+        Storage::fake('local');
+        foreach([
+            'catalog_enabled','loan_drafts_enabled',
+            'external_borrowed_intake_enabled','external_borrowed_return_enabled',
+            'external_borrowed_discrepancy_enabled',
+            'external_borrowed_discrepancy_clearance_enabled',
+            'external_in_loss_obligation_enabled','external_in_loss_settlement_enabled',
+            'external_in_nonclean_closure_enabled'
+        ] as $name)config()->set('inventory_controls.'.$name,true);
+        config()->set('finance_controls.posting_enabled',true);
+        $company=Company::create(['name'=>'ENCL Reversal First Company',
+            'slug'=>'encl-reversal-first-company']);
+        $hall=Hall::create(['company_id'=>$company->id,'name'=>'ENCL Reversal First Hall',
+            'slug'=>'encl-reversal-first-hall','capacity'=>100]);
+        $people=[];
+        foreach([['drafter','manager'],['handler','manager'],['owner','owner'],
+            ['reviewer','owner'],['approver','owner']] as [$name,$role]) {
+            $actor=User::create(['name'=>'ENCL first '.$name,
+                'email'=>'encl-first-'.$name.'@example.test','password'=>'test-only']);
+            $actor->markEmailAsVerified();
+            $membership=CompanyMembership::create(['company_id'=>$company->id,
+                'user_id'=>$actor->id,'role'=>$role]);
+            if($role==='manager')HallAssignment::create([
+                'company_id'=>$company->id,'hall_id'=>$hall->id,'membership_id'=>$membership->id]);
+            $people[$name]=$actor;
+        }
+        ['drafter'=>$drafter,'handler'=>$handler,'owner'=>$owner,
+            'reviewer'=>$reviewer,'approver'=>$approver]=$people;
+        $item=$this->id();
+        $this->be($drafter);
+        app(HallInventoryCatalogService::class)->create($drafter,$company->id,$hall->id,
+            $item,'Borrowed reversal-first unit','External partner','piece',1,
+            'Reversal-first ENCL original loan fixture');
+        $loan=$this->readyOriginal($company,$hall,$item,4,
+            $drafter,$handler,$owner,$reviewer,$approver);
+        $settlement=(string)DB::table('hall_inventory_external_in_loss_settlements')
+            ->where('company_id',$company->id)->where('loan_id',$loan)->value('id');
+        $this->assertTrue(Str::isUuid($settlement));
+        $this->assertSame(1,DB::table('finance_journals')->where('company_id',$company->id)->count());
+        $closureId=$this->id();$reversalId=$this->id();
+        $this->be($approver);
+        $this->assertTrue(function_exists('pcntl_fork'));
+        $pair=stream_socket_pair(STREAM_PF_UNIX,STREAM_SOCK_STREAM,0);
+        $this->assertIsArray($pair);
+        [$parentSocket,$childSocket]=$pair;
+        $resultFile=tempnam(sys_get_temp_dir(),'encl-reversal-first-');
+        $this->assertNotFalse($resultFile);
+        DB::purge();
+        $pid=pcntl_fork();
+        $this->assertNotSame(-1,$pid);
+        if($pid===0) {
+            fclose($parentSocket);
+            DB::purge();
+            try {
+                $backendPid=(int)DB::selectOne('SELECT pg_backend_pid() AS pid')->pid;
+                fwrite($childSocket,"ready:".$backendPid."\n");
+                fgets($childSocket);
+                app(HallInventoryExternalInNoncleanClosureService::class)
+                    ->close($approver,$company->id,$hall->id,$loan,$closureId);
+                file_put_contents($resultFile,json_encode(['unexpected'=>'certificate issued'],JSON_THROW_ON_ERROR));
+            }catch(ConflictHttpException $e) {
+                file_put_contents($resultFile,json_encode(['rejected'=>$e->getMessage()],JSON_THROW_ON_ERROR));
+            }catch(\Throwable $e) {
+                file_put_contents($resultFile,json_encode(['unexpected'=>get_class($e),
+                    'message'=>$e->getMessage()],JSON_THROW_ON_ERROR));
+            }
+            fclose($childSocket);
+            exit(0);
+        }
+        fclose($childSocket);
+        $parentError=null;$reversed=null;
+        DB::beginTransaction();
+        try {
+            $this->assertNotNull(DB::table('companies')->where('id',$company->id)
+                ->lockForUpdate()->first(['id']));
+            stream_set_timeout($parentSocket,15);
+            $ready=(string)fgets($parentSocket);
+            $this->assertMatchesRegularExpression('/^ready:[0-9]+$/',trim($ready));
+            $backendPid=(int)substr(trim($ready),6);
+            fwrite($parentSocket,"go\n");
+            $wait=false;
+            for($i=0;$i<100;$i++) {
+                if(DB::table('pg_stat_activity')->where('pid',$backendPid)
+                    ->value('wait_event_type')==='Lock'){$wait=true;break;}
+                usleep(100000);
+            }
+            $this->assertTrue($wait,'Issuing ENCL did not wait for original settlement reversal lock.');
+            $this->be($reviewer);
+            $reversed=app(HallInventoryExternalInLossSettlementService::class)
+                ->reverse($reviewer,$company->id,$hall->id,$settlement,$reversalId,
+                    'Independent partner payment correction approved before final certificate');
+            DB::commit();
+        }catch(\Throwable $e) {
+            DB::rollBack();$parentError=$e;
+        }finally {
+            fclose($parentSocket);
+            pcntl_waitpid($pid,$status);
+        }
+        if($parentError!==null)throw $parentError;
+        $this->assertTrue(pcntl_wifexited($status));
+        $child=json_decode((string)file_get_contents($resultFile),true,512,JSON_THROW_ON_ERROR);
+        unlink($resultFile);
+        $this->assertArrayHasKey('rejected',$child,json_encode($child));
+        $this->assertStringContainsString('Non-clean closure is blocked',$child['rejected']);
+        $this->assertSame($reversalId,$reversed);
+        $this->assertSame(0,DB::table('hall_inventory_external_in_nonclean_closures')
+            ->where('company_id',$company->id)->count());
+        $this->assertSame(1,DB::table('hall_inventory_external_in_loss_settlement_reversals')
+            ->where('company_id',$company->id)->count());
+        $this->assertSame(2,DB::table('finance_journals')->where('company_id',$company->id)->count());
+        $this->assertSame(4,DB::table('finance_journal_lines')->where('company_id',$company->id)->count());
+        $this->assertSame(0,DB::table('hall_inventory_movement_events')
+            ->where('company_id',$company->id)->where('item_id',$item)
+            ->where('event_kind','writeoff_borrowed_transit')->count());
+        $this->assertSame(1,(int)DB::table('hall_inventory_positions')
+            ->where('company_id',$company->id)->where('hall_id',$hall->id)
+            ->where('item_id',$item)->value('borrowed_transit'));
+        $this->assertSame(0,DB::table('audit_events')
+            ->where('company_id',$company->id)
+            ->where('action','hall_inventory.external_in_nonclean_closed')->count());
+        $this->assertFalse(Storage::disk('local')->exists(
+            'private/hall-external-in-nonclean/'.$company->id.'/'.$loan.'/'.$closureId.'.pdf'));
+        $this->be($approver);
+        try {
+            app(HallInventoryExternalInNoncleanClosureService::class)
+                ->close($approver,$company->id,$hall->id,$loan,$closureId);
+            $this->fail('A reversed partner settlement allowed a stale numbered certificate.');
+        }catch(ConflictHttpException){}
+        $this->assertSame(0,DB::table('hall_inventory_external_in_nonclean_closures')->count());
+    }
+
 }

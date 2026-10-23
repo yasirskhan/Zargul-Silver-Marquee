@@ -1,23 +1,30 @@
-# Zargul Silver Marquee | Active Phase 12 certification handoff (2026-10-22 UTC)
+# Zargul Silver Marquee — Phase 12 technical certification (2026-10-23 UTC)
 
-ONLY `yasirskhan/Zargul-Silver-Marquee`, branch `chatgpt/phase0-foundation`, SAME normal Chat, one authorized writer, no main/new branches/force push/Work/property-platform/production activation.
+**Allowed:** yasirskhan/Zargul-Silver-Marquee branch chatgpt/phase0-foundation only, SAME normal Chat, ONE writer, expected_sha fast-forward force=false. Never use Work, create branches, edit main/property-platform or activate production.
 
-## Mandatory resume
-1. Recheck LIVE branch HEAD and six Actions jobs, including `laravel-postgres` full output, before any source writes. Read root `AGENTS.md`, full concise handoff, `docs/SESSION_CONTROL.md`, `docs/PHASE12_FINAL_ACCEPTANCE_REPORT.md`, current 59-ID register, specs, and relevant code/tests.
-2. **Do not mark latest code green based on the original baseline.** Last fully verified original source `bff74d56603894520d114d7d4101bdd797684321` / run [39855875423](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39855875423) six SUCCESS. Historical `f88babb5` / [39853153415](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39853153415) six SUCCESS; prior NCL two-PG-process issuance, internal finding/return locks and signed-document/DB rollback already covered. Avoid duplicating.
-3. New technical source series from `72ce5a7c` through `81804e17` published, with exact commit/run/failure/repair table in the final acceptance report. Recheck current HEAD (last observed `81804e179b35f6d14bc4fc847b700026097d5a2e` immediately before this documentation update) and any successors. At this handoff, full exact-SHA technical CI was **not confirmed green**.
-4. Historical red [39864125672](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39864125672): Microsoft apt 403 on authenticated browser; real PG IAC `fwrite Broken pipe`. Other later red backends also included fork-inherited connection and stale temporary uploaded-file issue. Repairs `a44cd460` (Playwright apt workaround without skip), `14b25405` (purge connection immediately before fork), `81804e17` (fresh identical signed proof for retry). Treat original failed runs as failed; inspect the actual *newest* backend log first.
-5. Added tested-in-source but not-yet-green coverage: two-process IAC replay+single writeoff, last-unit dispatch race+replay, interrupted/truncated private proof rollback, signed ENCL download audit/authorization, two original loans sharing one external-in catalog and ENCL-1/ENCL-2, injected ENCL DB failure/orphan/retry, post-final partner return/discrepancy/finance reversal denial.
-6. Repair every genuine failed regression and push expected-HEAD `force:false`; require all six named jobs: `laravel-postgres`, `central-postgres`, `licensing-postgres`, `prototype-checks`, `editor-browser-e2e`, `authenticated-panel-e2e`. Never skip/soften protections to turn green.
-7. Reconcile all 59 mapped Phase 12 IDs with source, UI, isolation, current permissions, evidence, audit and significant concurrency/failure tests. Update docs with exact final SHA/jobs, genuine unresolved gaps and acceptance evidence; do not mark unrun cases completed.
+## Start on every continuation
+1. Read full root AGENTS.md, this concise handoff, docs/SESSION_CONTROL.md, docs/PHASE12_FINAL_ACCEPTANCE_REPORT.md, docs/PHASE12_ACCEPTANCE_STATUS.md, 59 Phase 12 records in docs/FEATURE_REGISTER.csv, docs/INVENTORY_IMPLEMENTATION_PLAN.md, and relevant actual service/tests. Recheck LIVE branch HEAD, branch-filtered GitHub Actions runs and all six named job conclusions for **that exact SHA**; documentation can lag.
+2. Required jobs: prototype-checks, central-postgres, licensing-postgres, laravel-postgres, editor-browser-e2e, authenticated-panel-e2e. Pending/skipped/fail is not verified; read failing log and fix underlying failure first without skipping tests, weakening auth/stock/finance, or deleting immutable history.
+3. Respect one authorized writer. If branch moved, read the new diff and stop stale publication; do not recover already included source as missing. No second writer or force push.
 
-## Current acceptance gates
-- **TECHNICALLY VERIFIED:** previous baseline only, new repair series awaiting exact-SHA hosted confirmation.
-- **OPERATOR ACCEPTANCE PENDING:** real owner/admin and two distinct managers, signed source/partner handling/return/reversal scenarios, browser/mobile/role revocation cases, actual bank evidence and independent decisions.
-- **BLOCKED EXTERNAL:** authorized staging network/object-storage outage, PostgreSQL and document-store backup/restore with original/restored hash + row counts, recovery point/time, retained logs, independent security review/monitoring approval.
-- **PRODUCTION NOT APPROVED:** Phase 12 OPEN; no finance/inventory release toggles, no bank/partner certification invented, Phase 13 not started. ADR-0009 Option A internal no company-level cash journal unchanged.
+## Verified baseline and continuing work
+- **Last complete all-green before new reversal-race additions:** HEAD 32b598b21369845b167bfb0bb2010dd3da248149, GitHub Actions 39868467542, SIX SUCCESS. Covers real two-process distinct-original-loan ENCL sequence/stock conservation, IAC/NCL concurrency tests and repair series. Historical failed CI remained failed but source was repaired by the later green exact SHA.
+- **First new original-loan reverse-versus-ENCL race:** commit f4e3024e7a91ae7abd76c9eb2ccd2012ac3655fd published safely; GitHub Actions 39893330180 was IN PROGRESS when drafted. Tests closing first while a separately connected PostgreSQL backend tries partner settlement reversal, checks lock contention, issued certificate integrity, one transit write-off and no post-final reversal.
+- **Second complementary test included in the next source candidate:** independent allowed reversal acquires company lock first while another PostgreSQL process attempts ENCL. Requires actual all-six hosted CI to claim PASS; no fabricated human confirmation.
+- **Code/source matrix:** docs/PHASE12_FINAL_ACCEPTANCE_REPORT.md maps all 59 IDs; 40 explicitly labeled HOSTED CODE TESTS PASSED, 17 CODE PRESENT / LEGACY LABEL RECONCILED, 2 SCOPE/PILOT UNACCEPTED. These are NOT equivalent to 59 individually executed real UAT scenarios. One migration evidence filename was corrected. See docs/PHASE12_ACCEPTANCE_STATUS.md.
+- **Operator acceptance runbook:** docs/PHASE12_OPERATOR_ACCEPTANCE_CHECKLIST.md covers signed owner/manager/source/partner UAT, bank original proof, staging fault injection, document+PostgreSQL restore and security signoff. It is a checklist only, none performed by repository CI.
 
-## Owner's exact required actions once executable technical CI is green
-Arrange staged inventory UAT with distinct managers/source owners/partners; signed physical cases and original bank documentation; authorized infrastructure owners for staging object-store outage and joint database/document restore; independent security approver/TLS/monitoring evidence; then separate written owner acceptance and production release decision.
+## Current technical/acceptance status
+- Source flows present: INTERNAL clean/IAC, EXTERNAL_OUT EOL/NCL, EXTERNAL_IN clean/ENCL, partial returns, independent findings/disputes/corrections, write-offs, waiver/recoveries, payment proof/reversal, private PDF integrity and audit. ADR-0009 Option A internal settlement: NO company-level cash journal.
+- Selected real two-process PostgreSQL lock and serial/conservation tests pass on the baseline. Broader cross-workflow synchronized matrix remains PARTIALLY VERIFIED, not every combined borrowing/partial return/finding/write-off/reversal/serial interleaving.
+- Simulated storage integrity, partial upload, occupied-key, DB-trigger rollback/orphan cleanup tests are in hosted suite. Real staging network/object store outage, interrupted backup and **actual coordinated PostgreSQL/document restore** are not possible using this GitHub-only integration and are **BLOCKED EXTERNAL**.
+- Actual owner/admin plus two independent hall managers and external partner signed physical cases, original bank verification, independent TLS/security/monitoring, real role-revocation operator/mobile UAT and **written owner production-release decision** are BLOCKED EXTERNAL. No invented signatures, payments, operational results or backup logs.
+- Inventory and finance release toggles remain OFF. **Phase 12 OPEN / NOT ACCEPTED. Phase 13 not promoted.**
 
-The previous entire handoff is preserved verbatim at `docs/AI_HANDOFF_ARCHIVE_2026-10-22_bff74d.md`. Other historical archives and specs remain unmodified.
+## Next exact actions
+1. Verify current latest branch SHA and all six CI jobs. Fix any genuine failing backend/browser job and rerun exact new SHA before expanding.
+2. Review latest synchronized reversible-finance/ENCL race tests and remaining internal/EXTERNAL_OUT interleaving coverage, add bounded meaningful tests without repeating proven cases.
+3. Reconcile final 59-ID matrix, preserve historical failed-run notes, and write final exact SHA, run/job results and defects into report/status/handoff. Current handoff is intentionally a snapshot, not proof of its own later documentation CI.
+4. Keep operator-external gates BLOCKED until Owner, two managers, partner, infra and security personnel execute and sign the runbook. Production OFF. No Phase 13 until true Phase 12 acceptance.
+
+**Previous complete handoff preserved verbatim:** docs/AI_HANDOFF_ARCHIVE_2026-10-23_32b598b2.md. Retain earlier archives unchanged.
