@@ -96,6 +96,14 @@ final class HallInventoryExternalBorrowedIntakeTest extends TestCase
             ->assertSee('EXTERNAL PHYSICAL RECEIPT / INDEPENDENT REVIEW PENDING');
         $this->assertSame(1,DB::table('hall_inventory_external_in_receipts')->count());
         $this->assertSame(2,DB::table('hall_inventory_external_in_receipt_lines')->count());
+        // The source-hall loan read model and fresh Livewire UI must not offer
+        // independent acceptance to the actor who physically counted intake.
+        $scoped=collect(app(\App\Services\HallInventoryLoanDraftReview::class)
+            ->recent($counter,$company->id,$hall->id))->firstWhere('id',$loan);
+        $this->assertNotNull($scoped);
+        $this->assertSame((int)$counter->id,$scoped['externalReceiptReceivedBy']);
+        Livewire::test(HallInventory::class)
+            ->assertDontSee('Independently accept externally borrowed stock');
         // The Livewire form owns its own locked receipt id, distinct from the
         // identifier used for the pre-release negative request above.
         $receipt=(string)DB::table('hall_inventory_external_in_receipts')
