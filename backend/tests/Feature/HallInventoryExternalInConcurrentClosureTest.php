@@ -615,6 +615,21 @@ final class HallInventoryExternalInConcurrentClosureTest extends TestCase
         $pdf=Storage::disk('local')->get($certificatePath);
         $this->assertSame((string)$closed['pdfSha256'],hash('sha256',$pdf));
         $this->assertSame((int)$closed['pdfSize'],strlen($pdf));
+
+        // A fresh authenticated Owner session must find its actual persistent
+        // ENCL in the panel and use the audited byte-verified download, rather
+        // than relying on a transient post-issue Livewire property.
+        \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('admin'));
+        \Livewire\Livewire::test(\App\Filament\Pages\HallInventory::class)
+            ->assertSee('EXTERNAL BORROWED NON-CLEAN FINAL CLOSURE ENCL-1')
+            ->assertSee('Download immutable ENCL certificate (audited)')
+            ->call('downloadExternalInNoncleanPdf',$loan)
+            ->assertHasNoErrors();
+        $this->assertSame(1,DB::table('audit_events')
+            ->where('company_id',$company->id)
+            ->where('entity_id',$closureId)
+            ->where('action','hall_inventory.external_in_nonclean_certificate_downloaded')
+            ->count());
     }
 
 

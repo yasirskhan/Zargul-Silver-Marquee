@@ -264,6 +264,8 @@ final class HallInventory extends Page
     public ?array $externalInReadiness = null;
     #[Locked]
     public ?array $externalInClosure = null;
+    #[Locked]
+    public array $externalInClosureReceipts = [];
 
     #[Locked]
     public string $loanDispatchLoanId = '';
@@ -930,6 +932,7 @@ final class HallInventory extends Page
         $this->lastExternalSettlementReversalReference = null;
         $this->externalInReadiness = null;
         $this->externalInClosure = null;
+        $this->externalInClosureReceipts = [];
         $this->externalIntakeLoanId = '';
         $this->externalIntakeRequestId = (string)Str::uuid();
         $this->externalIntakeFile = null;
@@ -1283,6 +1286,32 @@ final class HallInventory extends Page
                     if($loan['direction']==='external_in' && $loan['borrowingHallId']===$this->hallId) {
                         $info=$service->summaryForLoan($actor,$this->companyId,$loan['id']);
                         if($info!==null)$this->externalCleanReceipts[$loan['id']]=$info;
+                    }
+                }
+            }
+        }
+        // An immutable ENCL must remain visible/downloadable after a new login
+        // or hall refresh. Only query the source-scoped service under its full
+        // default-OFF release gates; never trust a browser-provided closure ID.
+        $this->externalInClosureReceipts=[];
+        if(config('inventory_controls.external_in_nonclean_closure_enabled') &&
+            config('inventory_controls.external_in_loss_settlement_enabled') &&
+            config('inventory_controls.external_in_loss_obligation_enabled') &&
+            config('inventory_controls.external_borrowed_discrepancy_enabled') &&
+            config('inventory_controls.external_borrowed_return_enabled') &&
+            config('inventory_controls.external_borrowed_intake_enabled') &&
+            config('finance_controls.posting_enabled')) {
+            $hall=Hall::query()->where('company_id',$this->companyId)
+                ->where('id',$this->hallId)->where('is_active',true)->first();
+            if($hall && app(TenantAccess::class)->canManageHallInventory($actor,$hall)) {
+                $service=app(\App\Services\HallInventoryExternalInNoncleanClosureService::class);
+                foreach($this->loanHistory as $loan) {
+                    if($loan['direction']==='external_in' &&
+                        $loan['borrowingHallId']===$this->hallId) {
+                        $entry=$service->summaryForLoan($actor,$this->companyId,
+                            $this->hallId,$loan['id']);
+                        if($entry!==null)
+                            $this->externalInClosureReceipts[$loan['id']]=$entry;
                     }
                 }
             }
@@ -2466,6 +2495,26 @@ final class HallInventory extends Page
         }
         $this->externalInReadiness=null;
         $this->reloadLoanHistory();
+    }
+
+    /** Read back the exact persisted original ENCL, reverify PDF bytes and audit release. */
+    public function downloadExternalInNoncleanPdf(string $loanId):\Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.external_in_nonclean_closure_enabled') &&
+            config('finance_controls.posting_enabled') &&
+            $this->canIndependentlyAcceptExternalBorrowing() &&
+            Str::isUuid($loanId),403);
+        $service=app(\App\Services\HallInventoryExternalInNoncleanClosureService::class);
+        $summary=$service->summaryForLoan($actor,$this->companyId,$this->hallId,$loanId);
+        abort_unless($summary!==null && $summary['loanId']===$loanId,404);
+        $verified=$service->download($actor,$this->companyId,$this->hallId,$summary['id']);
+        return response()->streamDownload(static function()use($verified):void {
+            echo $verified['bytes'];
+        },$verified['name'],[
+            'Content-Type'=>$verified['mime'],'Cache-Control'=>'private, no-store',
+            'Pragma'=>'no-cache','X-Content-Type-Options'=>'nosniff'
+        ]);
     }
 
     public function canCloseExternalOutClean():bool
