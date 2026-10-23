@@ -27,35 +27,21 @@ export async function inventoryLogin(browser,email,password,secret,viewport){
  const remaining=30000-(Date.now()%30000);
  if(remaining<10000)await page.waitForTimeout(remaining+350);
  await field.fill(otp(secret));
- if(!isAuthenticated(page.url())){
-   // Filament sometimes auto-submits. Check briefly, then press the real MFA
-   // button while the code is still valid instead of waiting 30 seconds.
-   // Wait for the real Livewire auto-submission to finish before attempting
-   // a second MFA POST. The old 1.2 s wait could race an in-flight request,
-   // reuse its one-time code, and leave the session at an MFA challenge.
-   try {
-     await page.waitForURL(isAuthenticated,{timeout:30000});
-   } catch {
-     if(!isAuthenticated(page.url())){
-       const verify=page.getByRole('button',{name:/confirm sign in|verify|continue|sign in/i}).last();
-       // Only submit manually when the server still presents a genuine MFA
-       // verification action. Never replace MFA with a session shortcut.
-       try {
-         if(await verify.isVisible()){
-           await expect(verify).toBeEnabled({timeout:10000});
-           if(!isAuthenticated(page.url()))await verify.click();
-         } else if(!isAuthenticated(page.url())){
-           throw new Error('Real MFA did not redirect to an authenticated panel. Current page: '+new URL(page.url()).pathname);
-         }
-       } catch(error) {
-         // Navigating away removes the challenge button. That is successful
-         // only if the real authenticated panel is already available.
-         if(!isAuthenticated(page.url()))throw error;
-       }
-       await page.waitForURL(isAuthenticated,{timeout:30000});
-     }
+ // Filament's six-cell TOTP challenge exposes a real "Confirm sign in"
+ // button; waiting a full validity window before clicking expires the code.
+ // Never bypass MFA: submit the actual challenge and demand its redirect.
+ const verify=page.getByRole('button',{name:/^confirm sign in$/i});
+ try {
+   if(!isAuthenticated(page.url()) && await verify.isVisible()) {
+     await expect(verify).toBeEnabled({timeout:5000});
+     if(!isAuthenticated(page.url()))await verify.click();
    }
+ } catch(error) {
+   // The button can disappear during Filament's genuine automatic redirect.
+   // Only accept this race if an authenticated panel is already displayed.
+   if(!isAuthenticated(page.url()))throw error;
  }
+ await page.waitForURL(isAuthenticated,{timeout:30000});
  await page.goto('/admin/hall-inventory');
  await expect(page.locator('[aria-label="Inventory workflow navigator"]')).toBeVisible({timeout:30000});
  await page.waitForFunction(()=>Boolean(window.Livewire?.all?.().length),null,{timeout:30000});
