@@ -189,7 +189,41 @@
                     Minimum warnings use owned usable units only. Borrowed stock is never treated as owned.
                     Up to 100 active items are shown for the selected hall.
                 </p>
-                <div class="overflow-x-auto">
+                <div class="space-y-3 md:hidden" aria-label="Mobile hall stock balances">
+                    @forelse($positionReport as $balance)
+                        <article class="space-y-2 rounded-lg border p-3 text-sm" aria-label="Stock balance for {{ $balance['name'] }}">
+                            <h3 class="font-semibold">{{ $balance['name'] }} ({{ $balance['unit'] }})</h3>
+                            <dl class="grid grid-cols-2 gap-2">
+                                @foreach([
+                                    'Owned usable'=>'ownedUsable',
+                                    'Owned on loan'=>'ownedOnLoan',
+                                    'Owned damaged'=>'ownedDamaged',
+                                    'Borrowed usable'=>'borrowedUsable',
+                                    'Borrowed transit'=>'borrowedTransit',
+                                    'Borrowed damaged'=>'borrowedDamaged',
+                                ] as $label=>$field)
+                                    <div class="rounded border p-2">
+                                        <dt class="text-xs text-gray-600 dark:text-gray-300">{{ $label }}</dt>
+                                        <dd class="font-semibold tabular-nums">{{ $balance[$field] ?? 'Not posted' }}</dd>
+                                    </div>
+                                @endforeach
+                            </dl>
+                            <p class="text-xs">Minimum owned target: {{ $balance['minimum'] }}</p>
+                            @if($balance['status']==='BELOW_MINIMUM')
+                                <p role="status" class="font-semibold text-amber-700">LOW OWNED STOCK / REPLENISHMENT REVIEW</p>
+                            @elseif($balance['status']==='RECONCILIATION_REQUIRED')
+                                <p role="alert">BOOK INTEGRITY REVIEW REQUIRED</p>
+                            @elseif($balance['status']==='NO_POSTED_MOVEMENT')
+                                <p>Not posted — no confirmed stock movement.</p>
+                            @else
+                                <p>Posted book balance; not a fresh physical count.</p>
+                            @endif
+                        </article>
+                    @empty
+                        <p>No active catalog items for this hall.</p>
+                    @endforelse
+                </div>
+                <div class="hidden overflow-x-auto md:block">
                     <table class="w-full min-w-[950px] text-left text-sm">
                         <thead class="bg-gray-100 text-gray-900"><tr>
                             <th scope="col" class="p-2">Item</th>

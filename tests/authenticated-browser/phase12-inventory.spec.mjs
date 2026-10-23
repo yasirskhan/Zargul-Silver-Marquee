@@ -57,7 +57,7 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
   await inventoryFocus(a,'Borrow / lend');
   const loan=a.locator('section[aria-label="Multi-item internal or external borrowing request"]');
   await loan.getByRole('button',{name:'+ Add Item Row'}).click();
-  await loan.locator('select[wire\\:model="loanRows.0.itemId"]').selectOption({label:/Ceremony Chairs/});
+  await loan.locator('select[wire\\:model="loanRows.0.itemId"]').selectOption({index:1});
   await loan.locator('input[wire\\:model="loanRows.0.quantity"]').fill('100');
   await loan.locator('select[wire\\:model="loanCounterpartHallId"]')
    .selectOption({label:'Synthetic Test Hall B'});
@@ -85,7 +85,7 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
   const receipt=b.locator('section[aria-label="Confirm independent internal loan arrival"]');
   await expect(receipt).toBeVisible({timeout:30000});
   await receipt.locator('select[wire\\:model^="loanReceiptMapping."]')
-   .selectOption({label:/Ceremony Chairs/});
+   .selectOption({index:1});
   await receipt.locator('input[type="file"]').setInputFiles(syntheticEvidence);
   await receipt.getByRole('button',{name:'Confirm physically received stock'}).click();
   await expect(b.getByText('Receiving custody recorded:',{exact:false}))
