@@ -58,8 +58,29 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
         ['role'=>'owner','is_active'=>true],
     );
 
-    // These three actors and the second hall exist ONLY in the isolated
-    // authenticated-browser fixture. No production account or stock is created.
+    // Distinct source reviewers for witnessed incident, physical finding,
+    // provisional loss and settlement decisions. Testing fixture only.
+    foreach ([
+        ['b', 'MFRGGZDFMZTWQ2LK'],
+        ['c', 'KRSXG5AUMVZWK4TT'],
+    ] as [$suffix, $totpSecret]) {
+        $reviewer = \App\Models\User::query()->firstOrCreate(
+            ['email'=>'browser-e2e-inventory-owner-'.$suffix.'@example.test'],
+            ['name'=>'Synthetic Independent Inventory Owner '.strtoupper($suffix),
+             'password'=>'synthetic-inventory-owner-'.$suffix.'-only',
+             'is_active'=>true],
+        );
+        $reviewer->markEmailAsVerified();
+        $reviewer->app_authentication_secret=$totpSecret;
+        $reviewer->save();
+        \App\Models\CompanyMembership::query()->firstOrCreate(
+            ['company_id'=>$company->id,'user_id'=>$reviewer->id],
+            ['role'=>'owner','is_active'=>true],
+        );
+    }
+
+    // Three original browser actors and the second hall exist ONLY in the
+    // isolated test fixture. No production account or stock is created.
     $secondHall = \App\Models\Hall::query()->firstOrCreate(
         ['company_id'=>$company->id,'slug'=>'synthetic-hall-b'],
         ['name'=>'Synthetic Test Hall B','capacity'=>300],

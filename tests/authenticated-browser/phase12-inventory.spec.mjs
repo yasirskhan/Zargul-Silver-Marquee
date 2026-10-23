@@ -2,18 +2,22 @@ import {test,expect} from '@playwright/test';
 import {inventoryLogin,inventoryFocus,inventoryUploadEvidence,syntheticEvidence} from './inventory-auth.mjs';
 
 test('MFA Owner and separate Managers perform actual 100-chair stock, loan and partial return on desktop/mobile',async({browser})=>{
- test.setTimeout(600000);
+ test.setTimeout(900000);
  const owner=await inventoryLogin(browser,'browser-e2e-inventory-owner@example.test',
   'synthetic-inventory-owner-only','IFBEGRCFIZDUQSKK',{width:1366,height:768});
  const source=await inventoryLogin(browser,'browser-e2e-inventory-manager-a@example.test',
   'synthetic-inventory-manager-a-only','JBSWY3DPEHPK3PXP',{width:390,height:844});
  const dest=await inventoryLogin(browser,'browser-e2e-inventory-manager-b@example.test',
   'synthetic-inventory-manager-b-only','GEZDGNBVGY3TQOJQ',{width:390,height:844});
+ const reviewer=await inventoryLogin(browser,'browser-e2e-inventory-owner-b@example.test',
+  'synthetic-inventory-owner-b-only','MFRGGZDFMZTWQ2LK',{width:1280,height:800});
+ const independent=await inventoryLogin(browser,'browser-e2e-inventory-owner-c@example.test',
+  'synthetic-inventory-owner-c-only','KRSXG5AUMVZWK4TT',{width:1280,height:800});
  try {
-  const a=source.page,b=dest.page,o=owner.page;
+  const a=source.page,b=dest.page,o=owner.page,r=reviewer.page,c=independent.page;
   // A broken UI locator must fail promptly rather than exhaust the entire
   // 10-minute genuine MFA/role-change browser journey.
-  for(const page of [a,b,o])page.setDefaultTimeout(30000);
+  for(const page of [a,b,o,r,c])page.setDefaultTimeout(30000);
   await expect(a.getByRole('option',{name:'Synthetic Test Hall B'})).toHaveCount(0);
   await expect(b.getByRole('option',{name:'Synthetic Test Hall',exact:true})).toHaveCount(0);
   for(const page of [a,b]){
@@ -206,6 +210,95 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
     .filter({hasText:`Statement ${statementId} item`});
   await expect(reviewedStatement).toContainText('15 missing — corroborated',{timeout:30000});
 
+  // Original-source incident is independent evidence, not an automatic charge.
+  await inventoryFocus(o,'Borrow / lend');
+  await ownLoans.getByRole('button',{name:'Refresh requests'}).click();
+  const originLoan=ownLoans.locator('article').filter({hasText:`Reference: ${originalLoanId}.`});
+  await expect(originLoan).toHaveCount(1);
+  await originLoan.getByRole('button',{name:'Review damage, missing or disputed items'}).click();
+  const incident=o.locator('section[aria-label="Record inventory loan incident"]');
+  await expect(incident).toBeVisible({timeout:30000});
+  await expect(incident).toContainText(`Loan: ${originalLoanId}`);
+  await incident.getByRole('combobox',{name:'Source item'}).selectOption({index:1});
+  await incident.getByRole('combobox',{name:'Incident type'}).selectOption('missing');
+  await incident.getByRole('spinbutton',{name:'Affected quantity'}).fill('15');
+  await incident.getByRole('textbox',{name:/Incident explanation/})
+    .fill('Original lender observed 15 unreturned chairs after independently accepted partial return');
+  await incident.getByRole('button',{name:'Record immutable incident'}).click();
+  const savedIncident=incident.locator('p').filter({hasText:/Recorded incident: [0-9a-f-]{36}/});
+  await expect(savedIncident).toBeVisible({timeout:30000});
+  const incidentId=(await savedIncident.textContent())?.match(/Recorded incident: ([0-9a-f-]{36})/i)?.[1];
+  expect(incidentId).toMatch(/^[0-9a-f-]{36}$/i);
+
+  // Owner B did not write the lender report. The original 15 chairs remain
+  // physically outstanding, and a separate reviewer must substantiate it.
+  await inventoryFocus(r,'Borrow / lend');
+  const reviewerLoans=r.locator('[aria-label="Saved borrowing requests awaiting handover"]');
+  await reviewerLoans.getByRole('button',{name:'Refresh requests'}).click();
+  const reviewerLoan=reviewerLoans.locator('article').filter({hasText:`Reference: ${originalLoanId}.`});
+  await expect(reviewerLoan).toHaveCount(1);
+  await reviewerLoan.getByRole('button',{name:'Review damage, missing or disputed items'}).click();
+  const reviewIncident=r.locator('section[aria-label="Record inventory loan incident"]');
+  await expect(reviewIncident).toBeVisible({timeout:30000});
+  await reviewIncident.getByRole('combobox',{name:'Unreviewed incident'}).selectOption(incidentId);
+  await reviewIncident.getByRole('combobox',{name:'Evidence assessment'}).selectOption('substantiated');
+  await reviewIncident.getByRole('textbox',{name:'Review explanation'})
+    .fill('Independent Owner B substantiates only the original fifteen missing chairs');
+  await reviewIncident.getByRole('button',{name:'Record independent decision'}).click();
+  await expect(reviewIncident.locator('p').filter({hasText:`Report ${incidentId}: substantiated`}))
+    .toBeVisible({timeout:30000});
+  await expect(reviewIncident.getByRole('combobox',{name:'Unreviewed incident'})
+    .locator(`option[value="${incidentId}"]`)).toHaveCount(0);
+
+  // Owner B may investigate independently because Owner A filed the incident.
+  // The signed borrower statement and separately reviewed incident must match
+  // original loan, original source item, kind and exact missing quantity.
+  await inventoryFocus(r,'Borrow / lend');
+  await reviewerLoan.getByRole('button',{name:'Review original borrower signed discrepancy evidence'}).click();
+  const sourceEvidence=r.locator('section[aria-label="Signed internal discrepancy evidence"]');
+  await expect(sourceEvidence).toBeVisible({timeout:30000});
+  await expect(sourceEvidence).toContainText(`Loan ${originalLoanId}`);
+  const physical=sourceEvidence.locator('[aria-label="Independent original-loan physical findings"]');
+  await physical.getByRole('combobox',{name:'Corroborated borrower signed original-loan statement'})
+    .selectOption(statementId);
+  await physical.getByRole('combobox',{name:'Independently substantiated original source incident'})
+    .selectOption(incidentId);
+  await physical.getByRole('textbox',{name:'Source physical investigation reason'})
+    .fill('Independent original source reconciliation matches signed borrower and lender reports for fifteen chairs');
+  await inventoryUploadEvidence(r,physical.getByLabel('Signed source PDF/photo'),syntheticEvidence);
+  await physical.getByRole('button',{
+    name:'File original-loan source physical proof for independent review'
+  }).click();
+  const pendingFinding=physical.locator('article')
+    .filter({hasText:/Finding [0-9a-f-]{36}: missing 15 original item/});
+  await expect(pendingFinding).toHaveCount(1);
+  await expect(pendingFinding).toContainText('INDEPENDENT REVIEW PENDING',{timeout:30000});
+  const findingId=(await pendingFinding.textContent())?.match(/Finding ([0-9a-f-]{36}):/i)?.[1];
+  expect(findingId).toMatch(/^[0-9a-f-]{36}$/i);
+
+  // Owner C is distinct from source reporter A, investigator B and borrower.
+  await inventoryFocus(c,'Borrow / lend');
+  const independentLoans=c.locator('[aria-label="Saved borrowing requests awaiting handover"]');
+  await independentLoans.getByRole('button',{name:'Refresh requests'}).click();
+  const independentLoan=independentLoans.locator('article')
+    .filter({hasText:`Reference: ${originalLoanId}.`});
+  await expect(independentLoan).toHaveCount(1);
+  await independentLoan.getByRole('button',{name:'Review original borrower signed discrepancy evidence'}).click();
+  const independentEvidence=c.locator('section[aria-label="Signed internal discrepancy evidence"]');
+  await expect(independentEvidence).toBeVisible({timeout:30000});
+  const independentPhysical=independentEvidence.locator(
+    '[aria-label="Independent original-loan physical findings"]');
+  await independentPhysical.getByRole('combobox',{name:'Independent decision on a pending physical finding'})
+    .selectOption(findingId);
+  await independentPhysical.getByRole('combobox',{name:'Decision',exact:true})
+    .selectOption('confirmed_outstanding');
+  await independentPhysical.getByRole('textbox',{name:'Independent physical reviewer reason'})
+    .fill('Third owner confirms only the exact fifteen unreturned units; stock and finance remain open');
+  await independentPhysical.getByRole('button',{name:'Record immutable source review'}).click();
+  await expect(independentPhysical.locator('article')
+    .filter({hasText:`Finding ${findingId}:`})).toContainText('confirmed_outstanding',{timeout:30000});
+
+
   await inventoryFocus(o,'Overview');
   await o.getByRole('button',{name:'Refresh book balances'}).click();
   await expect(balance.locator('tbody tr').filter({hasText:'Ceremony Chairs'}))
@@ -214,6 +307,6 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
   await o.screenshot({path:'test-results/phase12-inventory-desktop.png',fullPage:true});
   await b.screenshot({path:'test-results/phase12-inventory-manager-mobile.png',fullPage:true});
  } finally {
-  await Promise.all([owner.ctx.close(),source.ctx.close(),dest.ctx.close()]);
+  await Promise.all([owner.ctx.close(),source.ctx.close(),dest.ctx.close(),reviewer.ctx.close(),independent.ctx.close()]);
  }
 });
