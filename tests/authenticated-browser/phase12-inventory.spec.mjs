@@ -11,6 +11,9 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
   'synthetic-inventory-manager-b-only','GEZDGNBVGY3TQOJQ',{width:390,height:844});
  try {
   const a=source.page,b=dest.page,o=owner.page;
+  // A broken UI locator must fail promptly rather than exhaust the entire
+  // 10-minute genuine MFA/role-change browser journey.
+  for(const page of [a,b,o])page.setDefaultTimeout(30000);
   await expect(a.getByRole('option',{name:'Synthetic Test Hall B'})).toHaveCount(0);
   await expect(b.getByRole('option',{name:'Synthetic Test Hall',exact:true})).toHaveCount(0);
   for(const page of [a,b]){
@@ -61,7 +64,7 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
   await expect(ownerOpening.getByText('ACCEPTED / BOOKED')).toBeVisible({timeout:30000});
 
   await inventoryFocus(a,'Borrow / lend');
-  const loan=a.locator('section[aria-label="Multi-item internal or external borrowing request"]');
+  const loan=a.locator('[aria-label="Multi-item internal or external borrowing request"]');
   await loan.getByRole('button',{name:'+ Add Item Row'}).click();
   await loan.locator('select[wire\\:model="loanRows.0.itemId"]').selectOption({index:1});
   await loan.locator('input[wire\\:model="loanRows.0.quantity"]').fill('100');
@@ -74,7 +77,7 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
   await expect(loan.getByText('Multi-item loan request saved:',{exact:false})).toBeVisible({timeout:30000});
 
   await inventoryFocus(o,'Borrow / lend');
-  const ownLoans=o.locator('section[aria-label="Saved borrowing requests awaiting handover"]');
+  const ownLoans=o.locator('[aria-label="Saved borrowing requests awaiting handover"]');
   await ownLoans.getByRole('button',{name:'Refresh requests'}).click();
   await ownLoans.getByRole('button',{name:'Prepare witnessed source dispatch'}).click();
   const dispatch=o.locator('section[aria-label="Independent internal source dispatch"]');
@@ -85,7 +88,7 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
    .toBeVisible({timeout:30000});
 
   await inventoryFocus(b,'Borrow / lend');
-  const incoming=b.locator('section[aria-label="Saved borrowing requests awaiting handover"]');
+  const incoming=b.locator('[aria-label="Saved borrowing requests awaiting handover"]');
   await incoming.getByRole('button',{name:'Refresh requests'}).click();
   await incoming.getByRole('button',{name:'Record independent receiving count'}).click();
   const receipt=b.locator('section[aria-label="Confirm independent internal loan arrival"]');
