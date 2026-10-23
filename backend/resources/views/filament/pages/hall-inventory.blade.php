@@ -654,7 +654,8 @@
         @endif
 
         @if(config('inventory_controls.loan_drafts_enabled'))
-            <section x-show="!focused || area === 'loans'" x-cloak id="inventory-multi-item-internal-or-external-borrowing-request"  class="space-y-4 rounded-xl border p-4" aria-label="Multi-item internal or external borrowing request">
+            <div id="inventory-multi-item-internal-or-external-borrowing-request" class="space-y-4" aria-label="Multi-item internal or external borrowing request">
+                <div x-show="!focused || area === 'loans'" x-cloak class="space-y-4 rounded-xl border p-4">
                 <h2 class="text-lg font-semibold">Borrow / lend multiple inventory items</h2>
                 <p class="text-sm text-gray-600 dark:text-gray-300">
                     Saving the request does not move inventory. Physical source dispatch,
@@ -1110,6 +1111,7 @@
                             <p class="text-sm text-gray-600 dark:text-gray-300">No loan drafts yet for this hall.</p>
                         @endforelse
                     </div>
+                </div>
                 </div>
                 @if(config('inventory_controls.loan_incidents_enabled') && $incidentLoanId !== '')
                     <section x-show="!focused || area === 'approvals'" x-cloak id="inventory-record-inventory-loan-incident"  class="space-y-3 rounded-xl border p-4" aria-label="Record inventory loan incident">
@@ -2728,7 +2730,7 @@
                         No loan completion or money settlement was inferred.
                     </p>
                 @endif
-            </section>
+            </div>
         @endif
     </div>
 </x-filament-panels::page>
