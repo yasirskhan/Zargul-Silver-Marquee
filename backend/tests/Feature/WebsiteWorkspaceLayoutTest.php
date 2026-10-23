@@ -89,7 +89,21 @@ class WebsiteWorkspaceLayoutTest extends TestCase
             ->call('saveDraft')->assertHasNoErrors();
         $saved = json_decode(DB::table('site_page_revisions')->where('page_id', $page)
             ->value('content'), true, 512, JSON_THROW_ON_ERROR);
-        $this->assertSame($sections, $saved['sections']);
+        // PHP/JSON object map key insertion order has no meaning, but the
+        // rendered section/column/block LIST order and typed values do.
+        $this->assertEquals($sections, $saved['sections']);
+        $this->assertSame(
+            array_column($sections, 'id'),
+            array_column($saved['sections'], 'id')
+        );
+        $this->assertSame(
+            array_column($sections[0]['columns'], 'id'),
+            array_column($saved['sections'][0]['columns'], 'id')
+        );
+        $this->assertSame(
+            array_column($sections[0]['columns'][1]['blocks'], 'id'),
+            array_column($saved['sections'][0]['columns'][1]['blocks'], 'id')
+        );
         $this->assertNull(DB::table('site_pages')->where('id', $page)->value('published_revision_id'));
         $this->assertSame(1, DB::table('audit_events')->where('action', 'website.draft_saved')->count());
     }
