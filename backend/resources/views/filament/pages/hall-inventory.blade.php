@@ -43,6 +43,17 @@
                     ['clean_loan_closed','external_out_clean_closed','external_clean_loan_closed'],true)));
             $overdueLoans = count(array_filter($pendingLoans,
                 fn ($loan) => (bool)($loan['overdueWithOutstandingCustody'] ?? false)));
+            // Already company/hall-authorized Livewire summaries; never broaden scope.
+            // Readiness to SEE a task is not permission to approve it.
+            $openingReviewTasks = count(array_filter($openingHistory,
+                fn ($row) => $row['movementId'] === null &&
+                    $row['requestedBy'] !== (int) \Filament\Facades\Filament::auth()->id()));
+            $purchaseReceivingTasks = count(array_filter($purchaseHistory,
+                fn ($row) => $row['receivingEvidenceId'] !== null &&
+                    $row['independentReviewId'] === null));
+            $sourceReturnTasks = count(array_filter($returnSourceHistory,
+                fn ($row) => !$row['accepted']));
+
         @endphp
         <section id="inventory-workflow-controls" aria-label="Inventory workflow navigator"
             class="space-y-3 rounded-xl border p-4">
@@ -103,6 +114,34 @@
                     ({{ $bookTotals['ownedUsable'] }} owned + {{ $bookTotals['borrowedUsable'] }} borrowed). Different inventory items are not interchangeable.</p>
             @else
                 <p role="status">Posted inventory reporting is not enabled. Catalog and physical counts are not a substitute for posted balances.</p>
+            @endif
+            @if(($this->canApproveOpening() && $openingReviewTasks > 0) ||
+                ($this->canReviewPurchaseReceiving() && $purchaseReceivingTasks > 0) ||
+                $sourceReturnTasks > 0)
+                <section aria-label="Independent inventory review tasks" class="space-y-2 rounded-lg border p-3">
+                    <h3 class="font-semibold">Independent reviews awaiting action</h3>
+                    <p class="text-xs">These are recent scoped records, not approvals. Each action still checks a distinct current authorized reviewer.</p>
+                    <div class="flex flex-wrap gap-2">
+                        @if($this->canApproveOpening() && $openingReviewTasks > 0)
+                            <button type="button" class="rounded-lg border px-3 py-2 text-sm"
+                                x-on:click="focused = true; area = 'stock'">
+                                {{ $openingReviewTasks }} opening stock count(s) to review
+                            </button>
+                        @endif
+                        @if($this->canReviewPurchaseReceiving() && $purchaseReceivingTasks > 0)
+                            <button type="button" class="rounded-lg border px-3 py-2 text-sm"
+                                x-on:click="focused = true; area = 'stock'">
+                                {{ $purchaseReceivingTasks }} purchase receiving review(s)
+                            </button>
+                        @endif
+                        @if($sourceReturnTasks > 0)
+                            <button type="button" class="rounded-lg border px-3 py-2 text-sm"
+                                x-on:click="focused = true; area = 'returns'">
+                                {{ $sourceReturnTasks }} lender return batch(es) awaiting count
+                            </button>
+                        @endif
+                    </div>
+                </section>
             @endif
             @if(config('inventory_controls.loan_drafts_enabled'))
                 <div class="space-y-2">

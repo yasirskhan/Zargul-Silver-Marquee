@@ -243,6 +243,11 @@ class HallInventoryLivewireTest extends TestCase
             ->assertSee('PENDING INDEPENDENT REVIEW')
             ->assertSee('Financial posting: NONE')
             ->assertDontSee('ACCEPTED / BOOKED');
+        // Assigned Manager can request a count but cannot impersonate an
+        // independent Owner/Admin approval queue or self-approve stock.
+        Livewire::test(HallInventory::class)
+            ->assertDontSee('opening stock count(s) to review')
+            ->assertDontSee('Independent reviews awaiting action');
         $owner=User::create(['name'=>'Reviewing Owner',
             'email'=>'opening-ui-owner@example.test','password'=>'test-only']);
         $owner->markEmailAsVerified();
@@ -250,6 +255,8 @@ class HallInventoryLivewireTest extends TestCase
             'user_id'=>$owner->id,'role'=>'owner']);
         $this->be($owner);
         Livewire::test(HallInventory::class)
+            ->assertSee('Independent reviews awaiting action')
+            ->assertSee('1 opening stock count(s) to review')
             ->assertSee('Accept verified opening stock')
             ->call('acceptOpeningRequest',$request)->assertHasNoErrors()
             ->assertSee('ACCEPTED / BOOKED');
