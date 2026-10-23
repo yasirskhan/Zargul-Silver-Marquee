@@ -84,8 +84,15 @@ test('real owner password and TOTP flow protects mobile proposal editing without
         const verify = page.getByRole('button', {
           name: /confirm sign in|verify|continue|sign in/i,
         }).last();
-        await expect(verify).toBeEnabled({ timeout: 12_000 });
-        if (!authenticated(page.url())) await verify.click();
+        // A real Filament MFA auto-submit can redirect between the URL
+        // check and locating the manual verification button. A disappearing
+        // button is success ONLY when the authenticated destination exists.
+        try {
+          await expect(verify).toBeEnabled({ timeout: 12_000 });
+          if (!authenticated(page.url())) await verify.click();
+        } catch (error) {
+          if (!authenticated(page.url())) throw error;
+        }
         await page.waitForURL(authenticated, { timeout: 30_000 });
       }
     }
@@ -288,8 +295,15 @@ test('real operations MFA grants only assigned-hall search and planning on mobil
         const verify = page.getByRole('button', {
           name: /confirm sign in|verify|continue|sign in/i,
         }).last();
-        await expect(verify).toBeEnabled({ timeout: 12_000 });
-        if (!authenticated(page.url())) await verify.click();
+        // A real Filament MFA auto-submit can redirect between the URL
+        // check and locating the manual verification button. A disappearing
+        // button is success ONLY when the authenticated destination exists.
+        try {
+          await expect(verify).toBeEnabled({ timeout: 12_000 });
+          if (!authenticated(page.url())) await verify.click();
+        } catch (error) {
+          if (!authenticated(page.url())) throw error;
+        }
         await page.waitForURL(authenticated, { timeout: 30_000 });
       }
     }
