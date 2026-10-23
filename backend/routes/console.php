@@ -89,6 +89,8 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
     foreach ([
         ['a',$hall,'JBSWY3DPEHPK3PXP','synthetic-inventory-manager-a-only'],
         ['b',$secondHall,'GEZDGNBVGY3TQOJQ','synthetic-inventory-manager-b-only'],
+        // Independent second source-hall manager for external-owned return custody.
+        ['c',$hall,'IFBEGRCFIZDUQSKL','synthetic-inventory-manager-c-only'],
     ] as [$suffix,$assignedHall,$secret,$password]) {
         $person=\App\Models\User::query()->firstOrCreate(
             ['email'=>'browser-e2e-inventory-manager-'.$suffix.'@example.test'],
