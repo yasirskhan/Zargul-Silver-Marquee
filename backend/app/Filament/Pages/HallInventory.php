@@ -62,6 +62,8 @@ final class HallInventory extends Page
     #[Locked]
     public ?string $lastVarianceReviewReference = null;
 
+    #[Locked]
+    public ?string $lastCreatedItemName = null;
     public string $itemName = '';
     public string $itemCategory = 'Crockery';
     public string $itemUnit = 'piece';
@@ -693,6 +695,7 @@ final class HallInventory extends Page
 
     private function resetForms(): void
     {
+        $this->lastCreatedItemName = null;
         $this->itemName = '';
         $this->itemCategory = 'Crockery';
         $this->itemUnit = 'piece';
@@ -1443,6 +1446,7 @@ final class HallInventory extends Page
     public function createItem(): void
     {
         $actor = $this->authorizeSelection();
+        $this->lastCreatedItemName = null;
         $this->validate([
             'itemName' => 'required|string|min:1|max:160',
             'itemCategory' => 'required|string|max:80',
@@ -1459,6 +1463,7 @@ final class HallInventory extends Page
         } catch (InvalidArgumentException|ConflictHttpException $e) {
             throw ValidationException::withMessages(['itemName' => $e->getMessage()]);
         }
+        $this->lastCreatedItemName = $this->itemName;
         $this->itemName = '';
         $this->createReason = '';
         $this->minimumQuantity = '0';

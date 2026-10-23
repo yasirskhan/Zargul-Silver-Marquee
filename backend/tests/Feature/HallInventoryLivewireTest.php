@@ -64,6 +64,9 @@ class HallInventoryLivewireTest extends TestCase
             ->set('minimumQuantity', '35')
             ->set('createReason', 'Approved hall item catalog')
             ->call('createItem')->assertHasNoErrors()
+            ->assertSee('Catalog item saved:')
+            ->assertSee('No stock or purchase was posted.')
+            ->assertSee('View in Overview')
             ->assertSee('Water Jugs')
             ->assertSee('35');
 

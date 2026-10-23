@@ -556,6 +556,14 @@
 
         <section x-show="!focused || area === 'stock'" x-cloak id="inventory-create-hall-inventory-catalog-item"  class="space-y-4 rounded-xl border p-4" aria-label="Create hall inventory catalog item">
             <h2 class="text-lg font-semibold">Add a new item to this hall</h2>
+            @if($lastCreatedItemName)
+                <div role="status" aria-live="polite" class="rounded-lg border border-emerald-700 p-3 text-sm">
+                    <strong>Catalog item saved:</strong> {{ $lastCreatedItemName }}.
+                    No stock or purchase was posted.
+                    <button type="button" x-on:click="focused = true; area = 'overview'"
+                        class="ml-2 rounded-lg border px-3 py-2 font-medium">View in Overview</button>
+                </div>
+            @endif
             <div class="grid gap-3 md:grid-cols-2">
                 <label class="block space-y-1"><span class="text-sm">Item name</span>
                     <input type="text" maxlength="160" wire:model="itemName" class="w-full rounded-lg border p-3 text-gray-900" placeholder="e.g. Water Jugs">
