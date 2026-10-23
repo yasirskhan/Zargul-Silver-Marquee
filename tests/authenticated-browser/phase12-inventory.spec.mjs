@@ -75,6 +75,10 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
    .fill('Synthetic Hall A to Hall B independent 100-chair loan');
   await loan.getByRole('button',{name:'Save borrowing request (no stock moved)'}).click();
   await expect(loan.getByText('Multi-item loan request saved:',{exact:false})).toBeVisible({timeout:30000});
+  // Keep the original database-issued loan identity through every physical step.
+  const savedLoanText=await loan.getByText('Multi-item loan request saved:',{exact:false}).textContent();
+  const originalLoanId=savedLoanText?.match(/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}/i)?.[0];
+  expect(originalLoanId).toMatch(/^[0-9a-f-]{36}$/i);
 
   await inventoryFocus(o,'Borrow / lend');
   const ownLoans=o.locator('[aria-label="Saved borrowing requests awaiting handover"]');
@@ -109,19 +113,31 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
   await returnForm.getByRole('button',{name:'Record witnessed return shipment'}).click();
   // A saved, numbered-in-this-loan return batch must be visible as the real
   // in-transit status; generic 'Return shipment' matches unrelated buttons.
-  await expect(b.locator('p[role="status"]').filter({hasText:/Return shipment [0-9a-f-]{36} is in transit/}))
-   .toBeVisible({timeout:30000});
+  const shipment=b.locator('p[role="status"]').filter({hasText:/Return shipment [0-9a-f-]{36} is in transit/});
+  await expect(shipment).toBeVisible({timeout:30000});
+  const returnBatchId=(await shipment.textContent())?.match(/Return shipment ([0-9a-f-]{36}) is in transit/i)?.[1];
+  expect(returnBatchId).toMatch(/^[0-9a-f-]{36}$/i);
 
-  // The read-only loan queue must lead an Owner directly to the next
-  // physical custody review, not back to the unrelated draft-entry form.
+  // Refresh source records. A queue containing multiple originals must not
+  // use the first next-step shortcut for an unrelated loan.
   await inventoryFocus(o,'Borrow / lend');
   await ownLoans.getByRole('button',{name:'Refresh requests'}).click();
   await inventoryFocus(o,'Overview');
-  await o.locator('section[aria-label="Inventory at a glance"]')
-    .getByRole('button',{name:'Open next loan step'}).first().click();
+  const overview=o.locator('section[aria-label="Inventory at a glance"]');
+  const nextLoanStatus=overview.locator('p').filter({hasText:`Original loan: ${originalLoanId}`});
+  await expect(nextLoanStatus).toHaveCount(1);
+  await expect(nextLoanStatus).toContainText('Source Owner/Admin: review partial return by condition');
+  const originalLoanRow=nextLoanStatus.locator('xpath=../..');
+  await originalLoanRow.getByRole('button',{name:'Open next loan step'}).click();
   const batches=o.locator('section[aria-label="Incoming physical return batches"]');
   await expect(batches).toBeVisible({timeout:30000});
-  await batches.getByRole('button',{name:'Review physically returned items'}).click();
+  const persistedBatch=batches.locator('article').filter({
+    hasText:`Loan ${originalLoanId} / return ${returnBatchId}`
+  });
+  await expect(persistedBatch).toHaveCount(1);
+  await expect(persistedBatch).toBeVisible();
+  await expect(persistedBatch).toContainText('IN TRANSIT / SOURCE ACKNOWLEDGMENT REQUIRED');
+  await persistedBatch.getByRole('button',{name:'Review physically returned items'}).click();
   const acceptance=o.locator('section[aria-label="Accept returned physical stock by condition"]');
   await expect(acceptance).toBeVisible({timeout:30000});
   await acceptance.getByRole('spinbutton',{name:'Physically good quantity'}).fill('80');
