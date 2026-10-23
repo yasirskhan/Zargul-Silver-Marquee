@@ -1,6 +1,15 @@
 # Phase 12 acceptance status (2026-10-22 UTC)
 
-## Latest Phase 12 code-test checkpoint (2026-10-23 UTC)
+## 2026-10-23 Phase 12 certification progress (code only)
+
+- **PASSED:** f4e3024e, GitHub Actions [39893330180](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39893330180), six named jobs SUCCESS. Real PostgreSQL synchronized ENCL issuance winning over approved payment reversal.
+- **PASSED:** dc221821 run [39893908049](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39893908049), all SIX SUCCESS, opposing reversal-first independent PostgreSQL lock race. **PENDING at this snapshot:** ad6ad0f3 run [39894181267](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39894181267) (irreversible ENCL source-proof read-back, missing/corrupt proof and exact recovery). Recheck actual job results. These lines are NOT an assertion that pending CI passed.
+- The ENCL final service had trusted approved SQL evidence without re-verifying original private proof bytes. Source now checks original intake, return batch, signed independent confirmation, discrepancy and payment file SHA256 and size before irreversible close. The test tampers four available original proof groups, preserving the same length, and denies original-loan finalization until restoration. This is synthetic code evidence only.
+- **PENDING at this snapshot:** b6a59a7a run [39894651469](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39894651469) tests same-loan final issuer revocation during a live PostgreSQL company lock wait, with no false certificate, stock write-off or journal on denial. All six exact-SHA jobs must pass before certification.
+- **59-ID mapping tiers remain 40 directly hosted-test labeled, 17 code present, 2 unaccepted foundations**, not 59 complete technical/UAT acceptances. See [detailed report](PHASE12_FINAL_ACCEPTANCE_REPORT.md).
+- Real independent Owner/Manager/partner UAT, bank proof, TLS/monitoring/security signoff and coordinated staging backup/document restore are BLOCKED EXTERNAL. See [operator checklist](PHASE12_OPERATOR_ACCEPTANCE_CHECKLIST.md). No production activation, no Phase 13 promotion.
+
+## Earlier Phase 12 code-test checkpoint (2026-10-23 UTC)
 
 - Verified original baseline: 32b598b21369845b167bfb0bb2010dd3da248149, GitHub Actions [39868467542](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39868467542), all six SUCCESS. New two-process original-loan ENCL issuance and historical repaired failure paths are included.
 - New cross-service PostgreSQL reversal-versus-ENCL certification source: f4e3024e7a91ae7abd76c9eb2ccd2012ac3655fd / [39893330180](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39893330180); **verify exact six jobs before labeling PASS**. A reverse-order independent race is separately prepared but not proven at this checkpoint.

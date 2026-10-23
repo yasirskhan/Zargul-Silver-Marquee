@@ -1,30 +1,28 @@
-# Zargul Silver Marquee — Phase 12 technical certification (2026-10-23 UTC)
+# Zargul Phase 12 — active exact-SHA technical certification handoff (2026-10-23 UTC)
 
-**Allowed:** yasirskhan/Zargul-Silver-Marquee branch chatgpt/phase0-foundation only, SAME normal Chat, ONE writer, expected_sha fast-forward force=false. Never use Work, create branches, edit main/property-platform or activate production.
+**ONLY** yasirskhan/Zargul-Silver-Marquee / chatgpt/phase0-foundation. Continue in same normal Chat, one repository writer, no Work, new branch, main/property-platform changes, forced updates or production activation.
 
-## Start on every continuation
-1. Read full root AGENTS.md, this concise handoff, docs/SESSION_CONTROL.md, docs/PHASE12_FINAL_ACCEPTANCE_REPORT.md, docs/PHASE12_ACCEPTANCE_STATUS.md, 59 Phase 12 records in docs/FEATURE_REGISTER.csv, docs/INVENTORY_IMPLEMENTATION_PLAN.md, and relevant actual service/tests. Recheck LIVE branch HEAD, branch-filtered GitHub Actions runs and all six named job conclusions for **that exact SHA**; documentation can lag.
-2. Required jobs: prototype-checks, central-postgres, licensing-postgres, laravel-postgres, editor-browser-e2e, authenticated-panel-e2e. Pending/skipped/fail is not verified; read failing log and fix underlying failure first without skipping tests, weakening auth/stock/finance, or deleting immutable history.
-3. Respect one authorized writer. If branch moved, read the new diff and stop stale publication; do not recover already included source as missing. No second writer or force push.
+## Restart and publication rules
+- Read root AGENTS.md, ENTIRE concise handoff, docs/SESSION_CONTROL.md, docs/PHASE12_FINAL_ACCEPTANCE_REPORT.md, docs/PHASE12_ACCEPTANCE_STATUS.md, 59 Phase 12 items in docs/FEATURE_REGISTER.csv, approved Phase 12 plans and the actual source/tests. Verify LIVE HEAD and branch-filtered Actions runs/job conclusions before editing; older notes are not authoritative.
+- Required exact-commit CI jobs: prototype-checks, central-postgres, licensing-postgres, laravel-postgres, editor-browser-e2e, authenticated-panel-e2e. All SIX must conclude SUCCESS for that SHA. If red, read the actual failing step/log, fix root cause, re-run all six without skipping/weakening any permission, audit, financial or inventory safeguards.
+- Use expected current SHA and force=false. On another author's change reconcile rather than overwrite. No second writer. Preserve prior full handoff text verbatim at docs/AI_HANDOFF_ARCHIVE_2026-10-23_dc221821.md (and earlier archives).
 
-## Verified baseline and continuing work
-- **Last complete all-green before new reversal-race additions:** HEAD 32b598b21369845b167bfb0bb2010dd3da248149, GitHub Actions 39868467542, SIX SUCCESS. Covers real two-process distinct-original-loan ENCL sequence/stock conservation, IAC/NCL concurrency tests and repair series. Historical failed CI remained failed but source was repaired by the later green exact SHA.
-- **First new original-loan reverse-versus-ENCL race:** commit f4e3024e7a91ae7abd76c9eb2ccd2012ac3655fd published safely; GitHub Actions 39893330180 was IN PROGRESS when drafted. Tests closing first while a separately connected PostgreSQL backend tries partner settlement reversal, checks lock contention, issued certificate integrity, one transit write-off and no post-final reversal.
-- **Second complementary test included in the next source candidate:** independent allowed reversal acquires company lock first while another PostgreSQL process attempts ENCL. Requires actual all-six hosted CI to claim PASS; no fabricated human confirmation.
-- **Code/source matrix:** docs/PHASE12_FINAL_ACCEPTANCE_REPORT.md maps all 59 IDs; 40 explicitly labeled HOSTED CODE TESTS PASSED, 17 CODE PRESENT / LEGACY LABEL RECONCILED, 2 SCOPE/PILOT UNACCEPTED. These are NOT equivalent to 59 individually executed real UAT scenarios. One migration evidence filename was corrected. See docs/PHASE12_ACCEPTANCE_STATUS.md.
-- **Operator acceptance runbook:** docs/PHASE12_OPERATOR_ACCEPTANCE_CHECKLIST.md covers signed owner/manager/source/partner UAT, bank original proof, staging fault injection, document+PostgreSQL restore and security signoff. It is a checklist only, none performed by repository CI.
+## Published checkpoints and actual coverage (recheck latest runs)
+- Original preceding green baseline: 32b598b21369845b167bfb0bb2010dd3da248149 / Actions 39868467542, SIX SUCCESS. Genuine two-process distinct external-in original-loan ENCL-1/ENCL-2 sequence, NCL/IAC locked numbers, internal dispatch last-unit conservation, original internal later-return and finding locks, simulated orphan-PDF/DB rollback.
+- Closure-first ENCL-versus-payment-reversal race: f4e3024e7a91ae7abd76c9eb2ccd2012ac3655fd / Actions 39893330180, SIX SUCCESS. Separate synchronized PostgreSQL processes, exact replay, one certificate/stock movement and no post-close ledger reversal.
+- Reversal-first original-loan ENCL race: dc2218217fdae31638b851f0bc9e08d7a195846d / Actions 39893908049, SIX SUCCESS. One balanced reversal means no stale ENCL serial/PDF/writeoff. Includes docs/PHASE12_OPERATOR_ACCEPTANCE_CHECKLIST.md and 59-ID reconciliation.
+- Original signed-file fail-closed source fix: ad6ad0f374d8a2d659935700d1b8c8069fdb5f31 / Actions 39894181267. Test intentionally corrupts same-length intake/return/discrepancy/payment proof and removes files, confirms no irreversible closure/stock/audit and exact retry once originals restored. **CI conclusion must be reverified**.
+- Current latest original-loan actor revocation lock race: b6a59a7ab214ae59ad57537e561ca88a16446775 / Actions 39894651469. Separate PG process waiting for serial allocation, current company membership revoked before releasing company lock; no final certificate, stock retirement or new journal. **CI conclusion must be reverified**.
+- Code matrix: 59 mapped IDs; 40 labeled HOSTED CODE TESTS PASSED, 17 CODE PRESENT/LEGACY LABEL RECONCILED, 2 CODE EXISTS/SCOPE PILOT UNACCEPTED. These are verified document tiers, not 59 independently approved UAT cases. Historical red runs remain historical; newer green repairs do not rewrite their GitHub conclusions.
 
-## Current technical/acceptance status
-- Source flows present: INTERNAL clean/IAC, EXTERNAL_OUT EOL/NCL, EXTERNAL_IN clean/ENCL, partial returns, independent findings/disputes/corrections, write-offs, waiver/recoveries, payment proof/reversal, private PDF integrity and audit. ADR-0009 Option A internal settlement: NO company-level cash journal.
-- Selected real two-process PostgreSQL lock and serial/conservation tests pass on the baseline. Broader cross-workflow synchronized matrix remains PARTIALLY VERIFIED, not every combined borrowing/partial return/finding/write-off/reversal/serial interleaving.
-- Simulated storage integrity, partial upload, occupied-key, DB-trigger rollback/orphan cleanup tests are in hosted suite. Real staging network/object store outage, interrupted backup and **actual coordinated PostgreSQL/document restore** are not possible using this GitHub-only integration and are **BLOCKED EXTERNAL**.
-- Actual owner/admin plus two independent hall managers and external partner signed physical cases, original bank verification, independent TLS/security/monitoring, real role-revocation operator/mobile UAT and **written owner production-release decision** are BLOCKED EXTERNAL. No invented signatures, payments, operational results or backup logs.
-- Inventory and finance release toggles remain OFF. **Phase 12 OPEN / NOT ACCEPTED. Phase 13 not promoted.**
+## Outstanding technical and external certification
+- Focused real synchronized PostgreSQL tests cover the committed multi-loan serials, dispatch conservation, reverse-order financial reversal/ENCL, IAC retry and revocation. The exhaustive crossing of every partial return, dispute/independent review, write-off, NCL/ENCL/IAC issuance with all other scenarios is NOT established by those selected tests. Flag PARTIAL, do not overcertify.
+- Code service fixtures cover signed source byte/hash rechecks, missing/truncated private file, occupied key, SQL injected after-document failure/orphan deletion/retry. Real staging network interruption, object-storage outage, coordinated PostgreSQL and document-store disaster restore, measured RPO/RTO and original/restored checksums are **BLOCKED EXTERNAL**.
+- Real Owner/Admin, two independent hall managers, physical witnesses/external partner signatures, original bank verification, desktop/mobile operator UAT, independent TLS/security/monitoring signoff, and explicit separate Owner production release are **BLOCKED EXTERNAL**. Checklist with evidence fields: docs/PHASE12_OPERATOR_ACCEPTANCE_CHECKLIST.md. Do not fabricate any of these.
+- Keep Phase 12 OPEN, production inventory and finance switches OFF, ADR-0009 Option A internal no company-level cash journal, Phase 13 NOT promoted. No actual bank/cash, physical inventory or partner acceptance may be inferred from CI.
 
-## Next exact actions
-1. Verify current latest branch SHA and all six CI jobs. Fix any genuine failing backend/browser job and rerun exact new SHA before expanding.
-2. Review latest synchronized reversible-finance/ENCL race tests and remaining internal/EXTERNAL_OUT interleaving coverage, add bounded meaningful tests without repeating proven cases.
-3. Reconcile final 59-ID matrix, preserve historical failed-run notes, and write final exact SHA, run/job results and defects into report/status/handoff. Current handoff is intentionally a snapshot, not proof of its own later documentation CI.
-4. Keep operator-external gates BLOCKED until Owner, two managers, partner, infra and security personnel execute and sign the runbook. Production OFF. No Phase 13 until true Phase 12 acceptance.
-
-**Previous complete handoff preserved verbatim:** docs/AI_HANDOFF_ARCHIVE_2026-10-23_32b598b2.md. Retain earlier archives unchanged.
+## Next exact action
+1. Recheck current head and Jobs 39894181267 and 39894651469. Fix any failing test/root defect first; do not claim their pending runs green.
+2. Add or validate remaining bounded stress/failure cases where genuinely missing, preserving all current fixes. Reconcile detailed feature-by-feature report with actual source evidence.
+3. Update final acceptance report/status/handoff with current exact SHA, run/job IDs and outcomes. Verify all six exact-SHA CI for the documentation-inclusive final commit.
+4. Clearly hand the blocked external checklist to Owner + managers + partner + infrastructure + independent security reviewer. No production flag activation or premature phase close.

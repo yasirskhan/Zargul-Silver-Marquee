@@ -1,5 +1,5 @@
 # Phase 12 Final Technical Acceptance Evidence and Outstanding Gates
-**Reviewed UTC date:** 2026-10-22  
+**Reviewed UTC date:** 2026-10-23  
 **Repository / restricted branch:** `yasirskhan/Zargul-Silver-Marquee` / `chatgpt/phase0-foundation`  
 **Recommendation: BLOCKED. Phase 12 remains OPEN; NOT OWNER-ACCEPTED; NO PRODUCTION RELEASE.**
 
@@ -19,6 +19,22 @@ Audited all **59** Phase 12 requirement identifiers in `docs/FEATURE_REGISTER.cs
 **Still missing comprehensive technical stress:** real separate-connection tests verify selected dispatch, findings, late returns and serial issuance cases, not every permitted synchronized crossing among loan borrowing, partial return acceptance, disputed evidence/corrections, independent write-off, settlement reversal, three numbered certificate classes and role revocation. Preserve this explicit residual technical gap until a bounded case matrix and executed results genuinely close it.
 
 ---
+
+## New targeted verification and remaining technical gaps (October 23, 2026)
+
+| Scenario and actual code | Exact source / hosted run | Technical disposition |
+| --- | --- | --- |
+| Reversal loses: independently authorized EXTERNAL_IN payment reversal races committed ENCL and must be denied after one serial and transit write-off | f4e3024e, [39893330180](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39893330180) | **PASSED all six hosted jobs**, real forked separate PostgreSQL backends |
+| Reversal wins: opposing lock order writes one balanced reversal and blocks stale ENCL without serial/stock mutation | dc221821, [39893908049](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39893908049) | **PASSED all six hosted jobs**, separate PostgreSQL backends, one balanced reversal and no stale serial |
+| Original EXTERNAL_IN source intake, return batch, optional independent partner confirmation, substantiated discrepancy and paid settlement proof: signed file length and SHA256 must still be valid at final ENCL issuance | ad6ad0f3, [39894181267](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39894181267) | New application-service check and same-length corruption/missing-file/rollback/exact retry regression; must verify six jobs before PASS |
+| NCL/IAC/ENCL distinct-loan serials, internal last-unit dispatch and late-return/finding lock tests | 32b598b2, [39868467542](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39868467542) | **PASSED** selected PostgreSQL synthetic races |
+| Every authorized cross-flow interleaving of partial return acceptance, independent dispute/approval, physical write-off, settlement reversal and all NCL/ENCL/IAC issuance types | No exhaustive synchronized case matrix produced | **PARTIALLY VERIFIED / OPEN**, not silently promoted to complete technical stress |
+| Interrupted REAL staging object-storage transfer, actual sudden outage and coordinated PostgreSQL+document restore | No authorized staging access/evidence | **BLOCKED EXTERNAL**; hosted fake-disk/SQL-injection regressions are not a substitute |
+
+Another source test, b6a59a7ab214ae59ad57537e561ca88a16446775, introduces a real two-process revoked-issuer-after-lock-wait denial test. CI [39894651469](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39894651469) must pass all six jobs for verification. The issuer may not issue a numbered certificate, retire transit or alter finance/audit after company membership is revoked during a PostgreSQL lock wait.
+
+The post-baseline source fix closes a concrete gap: the irreversible ENCL service previously trusted approval/settlement database rows without re-reading original signed files. It now checks each original-loan evidence record on its proper company/hall scope immediately before new final issuance; a missing/truncated/same-size-tampered file prevents stock write-off, receipt number, final PDF and closing audit. This does **not** prove real bank/payment or partner signature authenticity; human verification remains mandatory.
+
 
 ## Historical certification execution delta (superseded by latest section)
 
