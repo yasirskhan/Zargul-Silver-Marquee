@@ -61,6 +61,8 @@ test('real owner password and TOTP flow protects mobile proposal editing without
     'input[autocomplete="one-time-code"]:visible, input[id*="code"]:visible, input[name*="code"]:visible, input[inputmode="numeric"]:visible',
   ).first();
   await expect(code).toBeVisible({ timeout: 25_000 });
+  const remainingOwnerTotpMs = 30_000 - (Date.now() % 30_000);
+  if (remainingOwnerTotpMs < 10_000) await page.waitForTimeout(remainingOwnerTotpMs + 350);
   await code.fill(totp(fixtureSecret));
 
   // Filament may auto-submit its MFA code and navigate immediately. Never
@@ -76,13 +78,13 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   // verification click; never click a button during its disabled transition.
   if (!authenticated(page.url())) {
     try {
-      await page.waitForURL(authenticated, { timeout: 30_000 });
+      await page.waitForURL(authenticated, { timeout: 1_200 });
     } catch {
       if (!authenticated(page.url())) {
         const verify = page.getByRole('button', {
           name: /confirm sign in|verify|continue|sign in/i,
         }).last();
-        await expect(verify).toBeEnabled({ timeout: 30_000 });
+        await expect(verify).toBeEnabled({ timeout: 12_000 });
         if (!authenticated(page.url())) await verify.click();
         await page.waitForURL(authenticated, { timeout: 30_000 });
       }
@@ -269,6 +271,8 @@ test('real operations MFA grants only assigned-hall search and planning on mobil
     'input[autocomplete="one-time-code"]:visible, input[id*="code"]:visible, input[name*="code"]:visible, input[inputmode="numeric"]:visible',
   ).first();
   await expect(code).toBeVisible({ timeout: 25_000 });
+  const remainingOperationsTotpMs = 30_000 - (Date.now() % 30_000);
+  if (remainingOperationsTotpMs < 10_000) await page.waitForTimeout(remainingOperationsTotpMs + 350);
   await code.fill(totp('MFRGGZDFMZTWQ2LK'));
   const authenticated = (url) => {
     const path = new URL(url).pathname;
@@ -278,13 +282,13 @@ test('real operations MFA grants only assigned-hall search and planning on mobil
   };
   if (!authenticated(page.url())) {
     try {
-      await page.waitForURL(authenticated, { timeout: 30_000 });
+      await page.waitForURL(authenticated, { timeout: 1_200 });
     } catch {
       if (!authenticated(page.url())) {
         const verify = page.getByRole('button', {
           name: /confirm sign in|verify|continue|sign in/i,
         }).last();
-        await expect(verify).toBeEnabled({ timeout: 30_000 });
+        await expect(verify).toBeEnabled({ timeout: 12_000 });
         if (!authenticated(page.url())) await verify.click();
         await page.waitForURL(authenticated, { timeout: 30_000 });
       }

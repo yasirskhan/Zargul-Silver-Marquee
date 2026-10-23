@@ -22,14 +22,21 @@ export async function inventoryLogin(browser,email,password,secret,viewport){
  await page.getByLabel(/Password/).fill(password);
  await page.getByRole('button',{name:/sign in|log in/i}).first().click();
  const field=page.locator('input[autocomplete="one-time-code"]:visible,input[id*="code"]:visible,input[name*="code"]:visible,input[inputmode="numeric"]:visible').first();
- await expect(field).toBeVisible({timeout:30000});await field.fill(otp(secret));
+ await expect(field).toBeVisible({timeout:30000});
+ // Do not start a real TOTP submission at the end of its 30-second validity window.
+ const remaining=30000-(Date.now()%30000);
+ if(remaining<10000)await page.waitForTimeout(remaining+350);
+ await field.fill(otp(secret));
  if(!isAuthenticated(page.url())){
-   try{await page.waitForURL(isAuthenticated,{timeout:30000});}
-   catch{if(!isAuthenticated(page.url())){
-    const verify=page.getByRole('button',{name:/confirm sign in|verify|continue|sign in/i}).last();
-    await expect(verify).toBeEnabled({timeout:30000});
-    if(!isAuthenticated(page.url()))await verify.click();
-    await page.waitForURL(isAuthenticated,{timeout:30000});}}
+   // Filament sometimes auto-submits. Check briefly, then press the real MFA
+   // button while the code is still valid instead of waiting 30 seconds.
+   await page.waitForURL(isAuthenticated,{timeout:1200}).catch(()=>{});
+   if(!isAuthenticated(page.url())){
+     const verify=page.getByRole('button',{name:/confirm sign in|verify|continue|sign in/i}).last();
+     await expect(verify).toBeEnabled({timeout:12000});
+     if(!isAuthenticated(page.url()))await verify.click();
+     await page.waitForURL(isAuthenticated,{timeout:20000});
+   }
  }
  await page.goto('/admin/hall-inventory');
  await expect(page.locator('[aria-label="Inventory workflow navigator"]')).toBeVisible({timeout:30000});
