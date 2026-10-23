@@ -502,4 +502,119 @@ final class HallInventoryExternalInConcurrentClosureTest extends TestCase
         $this->assertSame(0,DB::table('hall_inventory_external_in_nonclean_closures')->count());
     }
 
+
+    /**
+     * Signed EXTERNAL_IN evidence is immutable source-of-truth at closure time.
+     * Approved SQL rows alone must not authorize irreversible custody retirement
+     * when the real stored original proof is missing or hash-corrupted.
+     */
+    public function test_encl_seals_only_hash_verified_original_documents_and_recovers_exact_retry():void {
+        Storage::fake('local');
+        foreach([
+            'catalog_enabled','loan_drafts_enabled',
+            'external_borrowed_intake_enabled','external_borrowed_return_enabled',
+            'external_borrowed_discrepancy_enabled',
+            'external_borrowed_discrepancy_clearance_enabled',
+            'external_in_loss_obligation_enabled','external_in_loss_settlement_enabled',
+            'external_in_nonclean_closure_enabled'
+        ] as $name)config()->set('inventory_controls.'.$name,true);
+        config()->set('finance_controls.posting_enabled',true);
+        $company=Company::create(['name'=>'ENCL Source Hash Company',
+            'slug'=>'encl-source-hash-company']);
+        $hall=Hall::create(['company_id'=>$company->id,'name'=>'ENCL Source Hash Hall',
+            'slug'=>'encl-source-hash-hall','capacity'=>100]);
+        $people=[];
+        foreach([['drafter','manager'],['handler','manager'],['owner','owner'],
+            ['reviewer','owner'],['approver','owner']] as [$name,$role]) {
+            $actor=User::create(['name'=>'ENCL proof '.$name,
+                'email'=>'encl-proof-'.$name.'@example.test','password'=>'test-only']);
+            $actor->markEmailAsVerified();
+            $membership=CompanyMembership::create(['company_id'=>$company->id,
+                'user_id'=>$actor->id,'role'=>$role]);
+            if($role==='manager')HallAssignment::create([
+                'company_id'=>$company->id,'hall_id'=>$hall->id,'membership_id'=>$membership->id]);
+            $people[$name]=$actor;
+        }
+        ['drafter'=>$drafter,'handler'=>$handler,'owner'=>$owner,
+            'reviewer'=>$reviewer,'approver'=>$approver]=$people;
+        $item=$this->id();
+        $this->be($drafter);
+        app(HallInventoryCatalogService::class)->create($drafter,$company->id,$hall->id,
+            $item,'Borrowed evidence unit','External partner','piece',1,
+            'Immutable original witness source certification');
+        $loan=$this->readyOriginal($company,$hall,$item,5,
+            $drafter,$handler,$owner,$reviewer,$approver);
+        $this->be($approver);
+        $closureId=$this->id();
+        $certificatePath='private/hall-external-in-nonclean/'.$company->id.'/'.$loan.'/'.$closureId.'.pdf';
+        $auditBefore=DB::table('audit_events')->where('company_id',$company->id)->count();
+        $originalPaths=[];
+        foreach([
+            'hall_inventory_external_in_receipts',
+            'hall_inventory_external_in_return_batches',
+            'hall_inventory_external_in_discrepancies',
+            'hall_inventory_external_in_loss_settlements'
+        ] as $table) {
+            $row=DB::table($table)->where('company_id',$company->id)
+                ->where('hall_id',$hall->id)->where('loan_id',$loan)
+                ->first(['evidence_storage_path','evidence_size','evidence_sha256']);
+            $this->assertNotNull($row,$table.' must contain independently signed original proof');
+            $path=(string)$row->evidence_storage_path;
+            $bytes=Storage::disk('local')->get($path);
+            $this->assertSame((int)$row->evidence_size,strlen($bytes));
+            $this->assertSame((string)$row->evidence_sha256,hash('sha256',$bytes));
+            $originalPaths[$table]=[$path,$bytes];
+        }
+        $this->assertCount(4,$originalPaths);
+        foreach($originalPaths as $kind=>[$path,$original]) {
+            foreach(['corrupt','missing'] as $fault) {
+                if($fault==='corrupt') {
+                    Storage::disk('local')->put($path,str_repeat('X',strlen($original)));
+                    $this->assertTrue(Storage::disk('local')->exists($path));
+                } else {
+                    Storage::disk('local')->delete($path);
+                    $this->assertFalse(Storage::disk('local')->exists($path));
+                }
+                try {
+                    app(HallInventoryExternalInNoncleanClosureService::class)
+                        ->close($approver,$company->id,$hall->id,$loan,$closureId);
+                    $this->fail($kind.' '.$fault.' signed proof allowed an irreversible certificate.');
+                }catch(ConflictHttpException $e) {
+                    $this->assertStringContainsString('evidence',$e->getMessage());
+                }finally {
+                    Storage::disk('local')->put($path,$original);
+                }
+                $this->assertSame(0,DB::table('hall_inventory_external_in_nonclean_closures')
+                    ->where('company_id',$company->id)->count());
+                $this->assertSame(0,DB::table('hall_inventory_movement_events')
+                    ->where('company_id',$company->id)->where('item_id',$item)
+                    ->where('event_kind','writeoff_borrowed_transit')->count());
+                $this->assertSame(1,(int)DB::table('hall_inventory_positions')
+                    ->where('company_id',$company->id)->where('hall_id',$hall->id)
+                    ->where('item_id',$item)->value('borrowed_transit'));
+                $this->assertSame(1,DB::table('finance_journals')->where('company_id',$company->id)->count());
+                $this->assertSame($auditBefore,DB::table('audit_events')
+                    ->where('company_id',$company->id)->count());
+                $this->assertFalse(Storage::disk('local')->exists($certificatePath));
+            }
+        }
+        $closed=app(HallInventoryExternalInNoncleanClosureService::class)
+            ->close($approver,$company->id,$hall->id,$loan,$closureId);
+        $this->assertSame('ENCL-1',$closed['serialNumber']);
+        $this->assertSame($closed,app(HallInventoryExternalInNoncleanClosureService::class)
+            ->close($approver,$company->id,$hall->id,$loan,$closureId));
+        $this->assertSame(1,DB::table('hall_inventory_external_in_nonclean_closures')
+            ->where('company_id',$company->id)->count());
+        $this->assertSame(1,DB::table('hall_inventory_movement_events')
+            ->where('company_id',$company->id)->where('item_id',$item)
+            ->where('event_kind','writeoff_borrowed_transit')->count());
+        $this->assertSame(0,(int)DB::table('hall_inventory_positions')
+            ->where('company_id',$company->id)->where('hall_id',$hall->id)
+            ->where('item_id',$item)->value('borrowed_transit'));
+        $this->assertSame(1,DB::table('finance_journals')->where('company_id',$company->id)->count());
+        $pdf=Storage::disk('local')->get($certificatePath);
+        $this->assertSame((string)$closed['pdfSha256'],hash('sha256',$pdf));
+        $this->assertSame((int)$closed['pdfSize'],strlen($pdf));
+    }
+
 }

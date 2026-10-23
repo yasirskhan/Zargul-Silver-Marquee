@@ -106,6 +106,57 @@ final class HallInventoryExternalInNoncleanClosureService
             'readiness'=>json_decode((string)$row->readiness,true,512,JSON_THROW_ON_ERROR),
             'moneyMoved'=>false,'ownedStockRetired'=>false];
     }
+
+    /**
+     * Final irreversible certificate issuance must inspect original stored
+     * witness bytes, not only previously recorded approval/financial rows.
+     * Each query is scoped to this original loan and physical borrowing hall:
+     * other loans can legally share the catalog and have unrelated documents.
+     */
+    private function verifyOriginalSignedEvidence(string $companyId,string $hallId,string $loanId):void {
+        $columns=['evidence_storage_path','evidence_sha256','evidence_size'];
+        $proofGroups=[
+            'physical intake'=>DB::table('hall_inventory_external_in_receipts')
+                ->where('company_id',$companyId)->where('hall_id',$hallId)
+                ->where('loan_id',$loanId)->get($columns),
+            'partner return dispatch'=>DB::table('hall_inventory_external_in_return_batches')
+                ->where('company_id',$companyId)->where('hall_id',$hallId)
+                ->where('loan_id',$loanId)->get($columns),
+            'independent partner receipt'=>DB::table('hall_inventory_external_in_return_confirmations as c')
+                ->join('hall_inventory_external_in_return_batches as b',function($j):void {
+                    $j->on('b.company_id','=','c.company_id')->on('b.id','=','c.batch_id')
+                        ->on('b.hall_id','=','c.hall_id');
+                })->where('b.company_id',$companyId)->where('b.hall_id',$hallId)
+                ->where('b.loan_id',$loanId)->get([
+                    'c.evidence_storage_path','c.evidence_sha256','c.evidence_size']),
+            'signed discrepancy'=>DB::table('hall_inventory_external_in_discrepancies')
+                ->where('company_id',$companyId)->where('hall_id',$hallId)
+                ->where('loan_id',$loanId)->get($columns),
+            'partner payment'=>DB::table('hall_inventory_external_in_loss_settlements')
+                ->where('company_id',$companyId)->where('hall_id',$hallId)
+                ->where('loan_id',$loanId)->get($columns)
+        ];
+        $disk=Storage::disk('local');
+        foreach($proofGroups as $kind=>$proofs) {
+            foreach($proofs as $proof) {
+                try {
+                    $path=(string)$proof->evidence_storage_path;
+                    if($path===''||!$disk->exists($path))
+                        throw new ConflictHttpException('Original '.$kind.' evidence is missing.');
+                    $bytes=$disk->get($path);
+                    if(!is_string($bytes)||
+                        strlen($bytes)!==(int)$proof->evidence_size||
+                        !hash_equals((string)$proof->evidence_sha256,hash('sha256',$bytes)))
+                        throw new ConflictHttpException('Original '.$kind.' signed evidence integrity failed.');
+                } catch (ConflictHttpException $e) {
+                    throw $e;
+                } catch (\Throwable $e) {
+                    throw new ConflictHttpException('Original '.$kind.' signed evidence could not be read.',$e);
+                }
+            }
+        }
+    }
+
     public function close(User $actor,string $companyId,string $hallId,string $loanId,
         string $closureId):array {
         $this->gate();
@@ -133,6 +184,7 @@ final class HallInventoryExternalInNoncleanClosureService
                 $this->verifyPdf($old);
                 return $this->summary($old);
             }
+            $this->verifyOriginalSignedEvidence($companyId,$hallId,$loanId);
             $readiness=app(HallInventoryExternalInNoncleanReadinessService::class)
                 ->assess($actor,$companyId,$hallId,$loanId);
             if(!$readiness['ready'])
