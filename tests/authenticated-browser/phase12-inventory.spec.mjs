@@ -101,8 +101,15 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
   await expect(b.getByText('Return shipment',{exact:false}))
    .toBeVisible({timeout:30000});
 
-  await inventoryFocus(o,'Handover & returns');
+  // The read-only loan queue must lead an Owner directly to the next
+  // physical custody review, not back to the unrelated draft-entry form.
+  await inventoryFocus(o,'Borrow / lend');
+  await ownLoans.getByRole('button',{name:'Refresh requests'}).click();
+  await inventoryFocus(o,'Overview');
+  await o.locator('section[aria-label="Inventory at a glance"]')
+    .getByRole('button',{name:'Open next loan step'}).first().click();
   const batches=o.locator('section[aria-label="Incoming physical return batches"]');
+  await expect(batches).toBeVisible({timeout:30000});
   await batches.getByRole('button',{name:'Review physically returned items'}).click();
   const acceptance=o.locator('section[aria-label="Accept returned physical stock by condition"]');
   await expect(acceptance).toBeVisible({timeout:30000});

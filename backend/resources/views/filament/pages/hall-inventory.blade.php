@@ -166,6 +166,19 @@
                                 'external_all_returns_physically_confirmed_finance_unsettled'=>'Reconcile remaining financial or closure obligations',
                                 default=>'Await independent dispatch / partner physical handover',
                             };
+                            // Route the next-step shortcut to the actual responsible
+                            // workflow. A link only reveals a panel; every mutation
+                            // still requires its normal server-side authorization.
+                            $nextArea = match($loan['status'] ?? 'draft_only') {
+                                'partial_return_in_transit_source_ack_pending'=>'returns',
+                                'return_acknowledged_outstanding_reconciliation_required'=>'approvals',
+                                default=>'loans',
+                            };
+                            $nextAnchor = match($nextArea) {
+                                'returns'=>'inventory-incoming-physical-return-batches',
+                                'approvals'=>'inventory-signed-internal-discrepancy-evidence',
+                                default=>'inventory-multi-item-internal-or-external-borrowing-request',
+                            };
                         @endphp
                         <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm">
                             <div>
@@ -173,7 +186,7 @@
                                 <p class="text-xs">Next: {{ $nextAction }}. Original loan: {{ $loan['id'] }}</p>
                             </div>
                             <button type="button" class="rounded-lg border px-3 py-2"
-                                x-on:click="focused = true; area = 'loans'; $nextTick(() => document.getElementById('inventory-multi-item-internal-or-external-borrowing-request')?.scrollIntoView({ behavior: 'smooth' }))">Open loan actions</button>
+                                x-on:click="focused = true; area = '{{ $nextArea }}'; $nextTick(() => document.getElementById('{{ $nextAnchor }}')?.scrollIntoView({ behavior: 'smooth' }))">Open next loan step</button>
                         </div>
                     @empty
                         <p class="text-sm">No open loans in the current hall's recent, authorized history.</p>
