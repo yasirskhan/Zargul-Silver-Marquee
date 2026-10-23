@@ -14,6 +14,18 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(TenantAccess::class);
+        // Real Playwright HTTP uploads run with APP_ENV=testing, where Livewire
+        // selects the distinct "tmp-for-tests" disk. Configure an actual
+        // private filesystem ONLY for the explicit isolated browser fixture;
+        // never change production storage or relax upload validation.
+        if ($this->app->environment('testing') && getenv('BROWSER_E2E_SEED') === '1') {
+            config()->set('filesystems.disks.tmp-for-tests', [
+                'driver' => 'local',
+                'root' => storage_path('framework/temporary-livewire-browser'),
+                'visibility' => 'private',
+                'throw' => true,
+            ]);
+        }
     }
 
     public function boot(): void
