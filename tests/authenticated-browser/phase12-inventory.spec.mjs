@@ -22,8 +22,12 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
    await cat.getByRole('spinbutton',{name:'Minimum quantity target (not current stock)'}).fill('20');
    await cat.getByRole('textbox',{name:'Reason for creating item'}).fill('Synthetic per-hall browser inventory acceptance');
    await cat.getByRole('button',{name:'Add hall item'}).click();
+   // Creation occurs in Stock & counts; its authenticated catalog is intentionally
+   // rendered in Overview. Verify the actual persisted row there, not a hidden cell.
+   await inventoryFocus(page,'Overview');
    await expect(page.locator('section[aria-label="Hall inventory item catalog"]')
     .getByText('Ceremony Chairs')).toBeVisible({timeout:30000});
+   await inventoryFocus(page,'Stock & counts');
   }
 
   const stock=a.locator('section[aria-label="Physical inventory stocktake"]');
