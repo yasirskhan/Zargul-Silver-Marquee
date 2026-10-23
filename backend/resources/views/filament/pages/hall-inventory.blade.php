@@ -1,5 +1,5 @@
 <x-filament-panels::page>
-    <div class="space-y-6">
+    <div class="space-y-6" x-data="{ focused: true, area: 'overview' }">
         <p class="text-sm text-gray-600 dark:text-gray-300">
             Hall-owned inventory catalog and witnessed physical count records.
             Creating an item does not purchase inventory or change owned stock.
@@ -25,7 +25,125 @@
             </label>
         </div>
 
-        <section class="space-y-3 rounded-xl border p-4" aria-label="Hall inventory item catalog">
+
+        {{-- This workspace is presentation-only. Server-side per-hall permission, evidence and finance gates still authorize each Livewire action. --}}
+        @php
+            $bookTotals = ['ownedUsable'=>0,'ownedOnLoan'=>0,'ownedDamaged'=>0,
+                'borrowedUsable'=>0,'borrowedTransit'=>0,'borrowedDamaged'=>0];
+            $postedLines = 0;
+            foreach ($positionReport as $balance) {
+                if (($balance['status'] ?? null)==='NO_POSTED_MOVEMENT') continue;
+                $postedLines++;
+                foreach (array_keys($bookTotals) as $field) {
+                    $bookTotals[$field] += (int)($balance[$field] ?? 0);
+                }
+            }
+            $pendingLoans = array_values(array_filter($loanHistory,
+                fn ($loan) => !in_array($loan['status'] ?? 'draft_only',
+                    ['clean_loan_closed','external_out_clean_closed','external_clean_loan_closed'],true)));
+            $overdueLoans = count(array_filter($pendingLoans,
+                fn ($loan) => (bool)($loan['overdueWithOutstandingCustody'] ?? false)));
+        @endphp
+        <section id="inventory-workflow-controls" aria-label="Inventory workflow navigator"
+            class="space-y-3 rounded-xl border p-4">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h2 class="text-lg font-semibold">Inventory workspace</h2>
+                    <p class="text-sm text-gray-600 dark:text-gray-300">
+                        Choose one task to see its actual forms. All actions still enforce your selected company, hall and independent approver permissions.
+                    </p>
+                </div>
+                <button type="button" class="rounded-lg border px-3 py-2 text-sm"
+                    x-on:click="focused = !focused" x-bind:aria-pressed="!focused"
+                    x-text="focused ? 'Show all workflow sections' : 'Focus on one workflow'">
+                    Show all workflow sections
+                </button>
+            </div>
+            <nav aria-label="Inventory tasks" class="flex gap-2 overflow-x-auto pb-2" role="group">
+                @foreach([
+                    'overview'=>'Overview',
+                    'stock'=>'Stock & counts',
+                    'loans'=>'Borrow / lend',
+                    'returns'=>'Handover & returns',
+                    'approvals'=>'Reviews & closure'
+                ] as $areaKey=>$areaTitle)
+                    <button type="button" class="shrink-0 rounded-lg border px-3 py-3 text-sm font-medium"
+                        x-on:click="focused = true; area = '{{ $areaKey }}'"
+                        x-bind:aria-pressed="focused && area === '{{ $areaKey }}'"
+                        x-bind:class="focused && area === '{{ $areaKey }}' ? 'bg-emerald-800 text-white' : ''">
+                        {{ $areaTitle }}
+                    </button>
+                @endforeach
+            </nav>
+            <p class="text-xs text-gray-600 dark:text-gray-300">Book quantities are not physical recounts. Zero unposted items are not confirmed stock. Borrowed stock never becomes hall-owned stock.</p>
+        </section>
+        <section aria-label="Inventory at a glance" x-show="!focused || area === 'overview'"
+            class="space-y-3 rounded-xl border p-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <h2 class="text-lg font-semibold">Inventory at a glance</h2>
+                <span class="text-sm">{{ $postedLines }} posted item(s); {{ count($pendingLoans) }} recent open loan(s)</span>
+            </div>
+            @if(config('inventory_controls.position_reports_enabled'))
+                <div class="grid grid-cols-2 gap-3 md:grid-cols-3">
+                    @foreach([
+                        ['Owned usable', $bookTotals['ownedUsable']],
+                        ['Owned on loan', $bookTotals['ownedOnLoan']],
+                        ['Owned damaged', $bookTotals['ownedDamaged']],
+                        ['Borrowed usable', $bookTotals['borrowedUsable']],
+                        ['Borrowed transit', $bookTotals['borrowedTransit']],
+                        ['Borrowed damaged', $bookTotals['borrowedDamaged']],
+                    ] as [$name, $amount])
+                        <div class="rounded-lg border p-3">
+                            <p class="text-xs text-gray-600 dark:text-gray-300">{{ $name }}</p>
+                            <p class="text-xl font-semibold tabular-nums">{{ $amount }}</p>
+                        </div>
+                    @endforeach
+                </div>
+                <p class="text-xs">Total usable BOOK custody: {{ $bookTotals['ownedUsable'] + $bookTotals['borrowedUsable'] }} units
+                    ({{ $bookTotals['ownedUsable'] }} owned + {{ $bookTotals['borrowedUsable'] }} borrowed). Different inventory items are not interchangeable.</p>
+            @else
+                <p role="status">Posted inventory reporting is not enabled. Catalog and physical counts are not a substitute for posted balances.</p>
+            @endif
+            @if(config('inventory_controls.loan_drafts_enabled'))
+                <div class="space-y-2">
+                    <h3 class="font-semibold">Recent work requiring follow-up</h3>
+                    @if($overdueLoans > 0)
+                        <p role="status" class="font-medium text-amber-700">{{ $overdueLoans }} recent loan(s) have overdue outstanding custody; investigate before closing.</p>
+                    @endif
+                    @forelse(array_slice($pendingLoans,0,5) as $loan)
+                        @php
+                            $nextAction = match($loan['status'] ?? 'draft_only') {
+                                'source_dispatched_receipt_pending'=>'Receiving-hall Manager: confirm independent physical receipt',
+                                'partial_return_in_transit_source_ack_pending'=>'Source Owner/Admin: review partial return by condition',
+                                'destination_received_return_pending'=>'Receiving-hall Manager: send witnessed return; source then accepts',
+                                'return_acknowledged_outstanding_reconciliation_required'=>'Reconcile missing/damaged quantities and independent decisions',
+                                'external_out_handover_pending_approval'=>'Independent Owner/Admin: review outside dispatch',
+                                'external_out_partner_custody_outstanding'=>'Witness partner return and review condition',
+                                'external_out_partial_return_review'=>'Independent Owner/Admin: inspect outside return',
+                                'external_out_physically_returned_clean_closure_pending'=>'Independent Owner/Admin: assess clean closure',
+                                'external_physical_receipt_pending_review'=>'Independent Owner/Admin: accept outside arrival',
+                                'external_borrowed_received_return_pending'=>'Hall Manager: witness return to outside partner',
+                                'external_partial_return_or_partner_ack_pending'=>'Independent partner confirmation or dispute review required',
+                                'external_all_returns_physically_confirmed_finance_unsettled'=>'Reconcile remaining financial or closure obligations',
+                                default=>'Await independent dispatch / partner physical handover',
+                            };
+                        @endphp
+                        <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm">
+                            <div>
+                                <p class="font-medium">{{ $loan['purpose'] }}</p>
+                                <p class="text-xs">Next: {{ $nextAction }}. Original loan: {{ $loan['id'] }}</p>
+                            </div>
+                            <button type="button" class="rounded-lg border px-3 py-2"
+                                x-on:click="focused = true; area = 'loans'; $nextTick(() => document.getElementById('inventory-multi-item-internal-or-external-borrowing-request')?.scrollIntoView({ behavior: 'smooth' }))">Open loan actions</button>
+                        </div>
+                    @empty
+                        <p class="text-sm">No open loans in the current hall's recent, authorized history.</p>
+                    @endforelse
+                </div>
+            @endif
+        </section>
+
+        <section x-show="!focused || area === 'overview'" x-cloak id="inventory-hall-inventory-item-catalog"  class="space-y-3 rounded-xl border p-4" aria-label="Hall inventory item catalog">
             <h2 class="text-lg font-semibold">Item catalog for selected hall</h2>
             <p class="text-xs text-gray-600 dark:text-gray-300">An item listed below has no verified quantity until the separate stock movement/reconciliation workflow is enabled.</p>
             <div class="overflow-x-auto">
@@ -55,7 +173,7 @@
 
 
         @if(config('inventory_controls.position_reports_enabled'))
-            <section class="space-y-3 rounded-xl border p-4" aria-label="Posted inventory book balances">
+            <section x-show="!focused || area === 'overview'" x-cloak id="inventory-posted-inventory-book-balances"  class="space-y-3 rounded-xl border p-4" aria-label="Posted inventory book balances">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <h2 class="text-lg font-semibold">Hall stock balances and minimum-stock warnings</h2>
                     <div class="flex flex-wrap gap-2">
@@ -117,7 +235,7 @@
         @endif
 
         @if(config('inventory_controls.purchase_receipts_enabled'))
-            <section class="space-y-3 rounded-xl border p-4" aria-label="Purchased stock request and receipt history">
+            <section x-show="!focused || area === 'stock'" x-cloak id="inventory-purchased-stock-request-and-receipt-history"  class="space-y-3 rounded-xl border p-4" aria-label="Purchased stock request and receipt history">
                 <h2 class="text-lg font-semibold">Purchased stock: receiving requested</h2>
                 <p class="text-sm">Record a purchasing claim for independent physical receiving. An invoice or reference here is NOT verified payment or proof of delivered goods. Saving this request posts no owned inventory or financial journal.</p>
                 <form wire:submit="submitPurchaseRequest" class="grid gap-3 rounded-lg border p-3 md:grid-cols-2">
@@ -274,7 +392,7 @@
         @endif
 
         @if(config('inventory_controls.opening_stock_posting_enabled'))
-            <section class="space-y-3 rounded-xl border p-4" aria-label="Opening stock independent review">
+            <section x-show="!focused || area === 'stock'" x-cloak id="inventory-opening-stock-independent-review"  class="space-y-3 rounded-xl border p-4" aria-label="Opening stock independent review">
                 <h2 class="text-lg font-semibold">Opening stock: independent review</h2>
                 <p class="text-sm text-gray-600 dark:text-gray-300">
                     A saved physical opening count alone is NOT owned stock.
@@ -341,7 +459,7 @@
             </section>
         @endif
 
-        <section class="space-y-4 rounded-xl border p-4" aria-label="Create hall inventory catalog item">
+        <section x-show="!focused || area === 'stock'" x-cloak id="inventory-create-hall-inventory-catalog-item"  class="space-y-4 rounded-xl border p-4" aria-label="Create hall inventory catalog item">
             <h2 class="text-lg font-semibold">Add a new item to this hall</h2>
             <div class="grid gap-3 md:grid-cols-2">
                 <label class="block space-y-1"><span class="text-sm">Item name</span>
@@ -376,7 +494,7 @@
         </section>
 
         @if(config('inventory_controls.stocktakes_enabled'))
-            <section class="space-y-4 rounded-xl border p-4" aria-label="Physical inventory stocktake">
+            <section x-show="!focused || area === 'stock'" x-cloak id="inventory-physical-inventory-stocktake"  class="space-y-4 rounded-xl border p-4" aria-label="Physical inventory stocktake">
                 <h2 class="text-lg font-semibold">Count physical inventory</h2>
                 <p class="text-sm text-gray-600 dark:text-gray-300">Add separate rows for owned and temporarily borrowed stock. This saves count evidence only; shortages and new purchases require later authorized reconciliation.</p>
                 <label class="block space-y-1"><span class="text-sm">Audit type</span>
@@ -427,7 +545,7 @@
                         Count submitted for review. Reference {{ $lastCountReference }}. Inventory balances were not adjusted.
                     </p>
                 @endif
-                <section class="space-y-3 rounded-xl border p-4" aria-label="Hall physical count history">
+                <section x-show="!focused || area === 'stock'" x-cloak id="inventory-hall-physical-count-history"  class="space-y-3 rounded-xl border p-4" aria-label="Hall physical count history">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <h3 class="font-semibold">Physical count history (evidence only)</h3>
                         <button type="button" wire:click="reloadStocktakeHistory" class="rounded-lg border px-3 py-2 text-sm">Refresh count history</button>
@@ -453,7 +571,7 @@
                     @endforelse
                 </section>
                 @if(config('inventory_controls.stocktake_variance_enabled') && $varianceStocktakeId !== '')
-                    <section class="rounded-xl border p-4 space-y-2" aria-label="Immutable physical count variance preview">
+                    <section x-show="!focused || area === 'stock'" x-cloak id="inventory-immutable-physical-count-variance-preview"  class="rounded-xl border p-4 space-y-2" aria-label="Immutable physical count variance preview">
                         <h3 class="font-semibold">Physical versus recorded book snapshot</h3>
                         <p class="text-xs">Count {{ $varianceStocktakeId }}. The book baseline was captured at count submission, not taken from today's balance.
                             Missing or inconsistent historical baselines cannot produce a trusted variance. This preview neither posts stock nor settles money.</p>
@@ -536,7 +654,7 @@
         @endif
 
         @if(config('inventory_controls.loan_drafts_enabled'))
-            <section class="space-y-4 rounded-xl border p-4" aria-label="Multi-item internal or external borrowing request">
+            <section x-show="!focused || area === 'loans'" x-cloak id="inventory-multi-item-internal-or-external-borrowing-request"  class="space-y-4 rounded-xl border p-4" aria-label="Multi-item internal or external borrowing request">
                 <h2 class="text-lg font-semibold">Borrow / lend multiple inventory items</h2>
                 <p class="text-sm text-gray-600 dark:text-gray-300">
                     Saving the request does not move inventory. Physical source dispatch,
@@ -704,7 +822,7 @@
                                      ($loan['direction'] === 'external_out' &&
                                         config('inventory_controls.external_out_return_enabled') &&
                                         $loan['externalOutApproved'])))
-                                    <button type="button" wire:click="startLoanIncident('{{ $loan['id'] }}')" class="rounded-lg border px-3 py-2 text-sm">Review damage, missing or disputed items</button>
+                                    <button type="button" wire:click="startLoanIncident('{{ $loan['id'] }}')" class="rounded-lg border px-3 py-2 text-sm" x-on:click="focused = true; area = 'approvals'">Review damage, missing or disputed items</button>
                                 @endif
                                 @if(config('inventory_controls.loan_financial_claims_enabled') &&
                                     $loan['direction']==='external_out' &&
@@ -712,7 +830,7 @@
                                     $loan['externalOutApproved'] &&
                                     $this->canManageFinancialClaims())
                                     <button type="button" wire:click="startFinancialClaims('{{ $loan['id'] }}')"
-                                        class="rounded-lg border px-3 py-2 text-sm">Review provisional damage/loss claims</button>
+                                        class="rounded-lg border px-3 py-2 text-sm" x-on:click="focused = true; area = 'approvals'">Review provisional damage/loss claims</button>
                                 @endif
                                 @if($loan['overdueWithOutstandingCustody'] ?? false)
                                     <p role="status" class="font-semibold text-amber-700 dark:text-amber-300">OVERDUE: dispatched or externally borrowed inventory remains outstanding. Physical reconciliation required; no fee or loss has been assessed.</p>
@@ -847,7 +965,7 @@
                                     @endif
                                     @if(!$loan['externalReceiptRecorded'] && $loan['createdBy']!==(int)auth()->id())
                                         <button type="button" wire:click="startExternalBorrowedReceipt('{{ $loan['id'] }}')"
-                                            class="rounded-lg border px-3 py-2 text-sm">Record witnessed external borrowed delivery</button>
+                                            class="rounded-lg border px-3 py-2 text-sm" x-on:click="focused = true; area = 'returns'">Record witnessed external borrowed delivery</button>
                                     @elseif($loan['externalReceiptRecorded'] && !$loan['externalReceiptAccepted'] &&
                                         $loan['externalCountMatchesDraft'] &&
                                         $this->canIndependentlyAcceptExternalBorrowing())
@@ -860,7 +978,7 @@
                                             !$loan['externalCleanClosed'] &&
                                             $loan['createdBy']!==(int)auth()->id())
                                             <button type="button" wire:click="startExternalBorrowedReturn('{{ $loan['id'] }}')"
-                                                class="rounded-lg border px-3 py-2 text-sm">Prepare partial outside partner return</button>
+                                                class="rounded-lg border px-3 py-2 text-sm" x-on:click="focused = true; area = 'returns'">Prepare partial outside partner return</button>
                                         @endif
                                     @endif
                                     @error('externalIntakeFile') <p role="alert">{{ $message }}</p> @enderror
@@ -890,7 +1008,7 @@
                                     @if(!$loan['externalOutHandoverRecorded'] &&
                                         $loan['createdBy']!==(int)auth()->id())
                                         <button type="button" wire:click="startExternalOutHandover('{{ $loan['id'] }}')"
-                                            class="rounded-lg border px-3 py-2 text-sm">Witness outside partner physical handover</button>
+                                            class="rounded-lg border px-3 py-2 text-sm" x-on:click="focused = true; area = 'returns'">Witness outside partner physical handover</button>
                                     @elseif($loan['externalOutHandoverRecorded'] && !$loan['externalOutApproved'])
                                         <p>Witnessed outside handover:
                                             @foreach($loan['lines'] as $outLine)
@@ -910,7 +1028,7 @@
                                             !$this->canApproveExternalOutDispatch() &&
                                             $loan['createdBy']!==(int)auth()->id())
                                             <button type="button" wire:click="startExternalOutReturn('{{ $loan['id'] }}')"
-                                                class="rounded-lg border px-3 py-2 text-sm">Record partial owned-stock return from outside partner</button>
+                                                class="rounded-lg border px-3 py-2 text-sm" x-on:click="focused = true; area = 'returns'">Record partial owned-stock return from outside partner</button>
                                         @endif
                                     @endif
                                     @if(config('inventory_controls.external_out_clean_closure_enabled') &&
@@ -936,7 +1054,7 @@
                                     ($loan['status']??'')==='draft_only' &&
                                     $this->canManageSourceInventoryDispatch())
                                     <button type="button" wire:click="startInternalDispatch('{{ $loan['id'] }}')"
-                                        class="rounded-lg border px-3 py-2 text-sm">Prepare witnessed source dispatch</button>
+                                        class="rounded-lg border px-3 py-2 text-sm" x-on:click="focused = true; area = 'returns'">Prepare witnessed source dispatch</button>
                                 @endif
                                 @if(config('inventory_controls.loan_clean_closure_enabled') &&
                                     $loan['direction']==='internal' &&
@@ -965,9 +1083,9 @@
                                 @if(config('inventory_controls.internal_discrepancy_enabled') &&
                                     $loan['direction']==='internal' && $loan['destinationReceiptConfirmed'])
                                     @if(($loan['viewRole']??'')==='receiving')
-                                        <button type="button" wire:click="startInternalDiscrepancy('{{ $loan['id'] }}')">File signed borrowing-hall missing/dispute statement</button>
+                                        <button type="button" wire:click="startInternalDiscrepancy('{{ $loan['id'] }}')" x-on:click="focused = true; area = 'approvals'">File signed borrowing-hall missing/dispute statement</button>
                                     @elseif($loan['lendingHallId']===$hallId && $this->canReviewInternalDiscrepancy())
-                                        <button type="button" wire:click="startInternalDiscrepancyReview('{{ $loan['id'] }}')">Review original borrower signed discrepancy evidence</button>
+                                        <button type="button" wire:click="startInternalDiscrepancyReview('{{ $loan['id'] }}')" x-on:click="focused = true; area = 'approvals'">Review original borrower signed discrepancy evidence</button>
                                     @endif
                                 @endif
                                 @if(config('inventory_controls.loan_returns_enabled') &&
@@ -978,14 +1096,14 @@
                                         'return_acknowledged_outstanding_reconciliation_required'
                                     ],true))
                                     <button type="button" wire:click="startInternalReturn('{{ $loan['id'] }}')"
-                                        class="rounded-lg border px-3 py-2 text-sm">Prepare partial return shipment</button>
+                                        class="rounded-lg border px-3 py-2 text-sm" x-on:click="focused = true; area = 'returns'">Prepare partial return shipment</button>
                                 @endif
                                 @if(config('inventory_controls.loan_receipt_enabled') &&
                                     config('inventory_controls.loan_dispatch_enabled') &&
                                     ($loan['viewRole'] ?? '') === 'receiving' &&
                                     ($loan['status'] ?? '') === 'source_dispatched_receipt_pending')
                                     <button type="button" wire:click="startLoanReceipt('{{ $loan['id'] }}')"
-                                        class="rounded-lg border px-3 py-2 text-sm">Record independent receiving count</button>
+                                        class="rounded-lg border px-3 py-2 text-sm" x-on:click="focused = true; area = 'returns'">Record independent receiving count</button>
                                 @endif
                             </article>
                         @empty
@@ -994,12 +1112,12 @@
                     </div>
                 </div>
                 @if(config('inventory_controls.loan_incidents_enabled') && $incidentLoanId !== '')
-                    <section class="space-y-3 rounded-xl border p-4" aria-label="Record inventory loan incident">
+                    <section x-show="!focused || area === 'approvals'" x-cloak id="inventory-record-inventory-loan-incident"  class="space-y-3 rounded-xl border p-4" aria-label="Record inventory loan incident">
                         <h3 class="font-semibold">Independent incident report</h3>
                         <p class="text-sm">Evidence only. Reports do not assess charges, settle damage, transfer inventory or close the loan.</p>
                         <p>Loan: {{ $incidentLoanId }}</p>
                         @if(count($internalAbnormalCustody)>0)
-                            <section aria-label="Internal abnormal custody reconciliation" class="rounded-lg border p-3 space-y-2">
+                            <section x-show="!focused || area === 'approvals'" x-cloak id="inventory-internal-abnormal-custody-reconciliation"  aria-label="Internal abnormal custody reconciliation" class="rounded-lg border p-3 space-y-2">
                                 <h4 class="font-semibold">Original lending hall physical custody (read-only)</h4>
                                 <p>Good units are separate from damaged, unresolved and in-transit units. This view cannot authorize a write-off, debt, receipt, or final closure.</p>
                                 @foreach($internalAbnormalCustody as $balance)
@@ -1026,7 +1144,7 @@
                                 @endforeach
                             </section>
                             @if(config('inventory_controls.loan_nonclean_writeoffs_enabled') && config('inventory_controls.loan_nonclean_reconciliation_enabled'))
-                                <section aria-label="Independent internal damaged stock disposition" class="space-y-2 rounded-lg border p-3">
+                                <section x-show="!focused || area === 'approvals'" x-cloak id="inventory-independent-internal-damaged-stock-disposition"  aria-label="Independent internal damaged stock disposition" class="space-y-2 rounded-lg border p-3">
                                     <h4 class="font-semibold">Damaged owned stock: independent physical disposition</h4>
                                     <p>This only retires confirmed damaged owned stock. A different Owner/Admin must approve. No financial settlement or loan closure occurs.</p>
                                     <select wire:model="internalDamageIncidentId" aria-label="Substantiated damaged incident">
@@ -1123,10 +1241,10 @@
 
                 @if(config('inventory_controls.loan_financial_claims_enabled') &&
                     $financialClaimLoanId !== '' && $this->canManageFinancialClaims())
-                    <section class="space-y-3 rounded-xl border p-4" aria-label="Provisional outside-owned inventory financial claims">
+                    <section x-show="!focused || area === 'approvals'" x-cloak id="inventory-provisional-outside-owned-inventory-financial-claims"  class="space-y-3 rounded-xl border p-4" aria-label="Provisional outside-owned inventory financial claims">
                         <h3 class="font-semibold">Outside lending provisional loss claims</h3>
                         @if(config('inventory_controls.loan_nonclean_reconciliation_enabled') && count($noncleanReconciliation)>0)
-                            <section aria-label="Read-only non-clean loan reconciliation" class="rounded-lg border p-3 space-y-2">
+                            <section x-show="!focused || area === 'approvals'" x-cloak id="inventory-read-only-non-clean-loan-reconciliation"  aria-label="Read-only non-clean loan reconciliation" class="rounded-lg border p-3 space-y-2">
                                 <h4 class="font-semibold">Non-clean loan reconciliation (read-only)</h4>
                                 <p>Original expected partner return date: {{ $noncleanReconciliation['expectedReturnDate'] }}. Due-date disputes need separate hall-local assessment.</p>
                                 @if(config('inventory_controls.loan_nonclean_final_closure_enabled') && \Illuminate\Support\Facades\DB::table('hall_inventory_nonclean_final_closures')->where('company_id',$this->companyId)->where('hall_id',$this->hallId)->where('loan_id',$financialClaimLoanId)->exists())
@@ -1596,7 +1714,7 @@
                     </section>
                 @endif
                 @if(config('inventory_controls.external_out_dispatch_enabled') && $externalOutLoanId !== '')
-                    <section class="rounded-xl border p-4 space-y-3" aria-label="Witness outside lending physical handover">
+                    <section x-show="!focused || area === 'returns'" x-cloak id="inventory-witness-outside-lending-physical-handover"  class="rounded-xl border p-4 space-y-3" aria-label="Witness outside lending physical handover">
                         <h3 class="font-semibold">Outside lending physical handover — independent witness</h3>
                         <p>Loan {{ $externalOutLoanId }}. Enter physical counts; a different owner/admin must approve before owned stock is posted ON LOAN. No finance or closure is posted.</p>
                         @foreach($loanHistory as $outLoan)
@@ -1625,7 +1743,7 @@
                 @endif
                 @if(config('inventory_controls.external_out_return_enabled') &&
                     config('inventory_controls.external_out_dispatch_enabled'))
-                    <section class="rounded-xl border p-4 space-y-3" aria-label="External owned stock physical return history">
+                    <section x-show="!focused || area === 'returns'" x-cloak id="inventory-external-owned-stock-physical-return-history"  class="rounded-xl border p-4 space-y-3" aria-label="External owned stock physical return history">
                         <h3 class="font-semibold">Outside partner returns of hall-owned stock</h3>
                         <p>Signed actual partner handovers require independent owner/admin condition counts. Unreviewed or unresolved units stay ON LOAN. No monetary liability or settlement is created here.</p>
                         @foreach($externalOutReturnHistory as $outsideReceipt)
@@ -1649,14 +1767,14 @@
                                 @elseif($this->canApproveExternalOutDispatch() &&
                                     $outsideReceipt['receivedBy']!==(int)auth()->id())
                                     <button type="button" wire:click="startExternalOutReturnReview('{{ $outsideReceipt['receiptId'] }}')"
-                                        class="rounded-lg border px-3 py-2 text-sm">Independently assess outside partner physical return</button>
+                                        class="rounded-lg border px-3 py-2 text-sm" x-on:click="focused = true; area = 'returns'">Independently assess outside partner physical return</button>
                                 @endif
                             </article>
                         @endforeach
                     </section>
                 @endif
                 @if(config('inventory_controls.external_out_return_enabled') && $externalOutReturnLoanId !== '')
-                    <section class="rounded-xl border p-4 space-y-3" aria-label="Record outside owned stock return">
+                    <section x-show="!focused || area === 'returns'" x-cloak id="inventory-record-outside-owned-stock-return"  class="rounded-xl border p-4 space-y-3" aria-label="Record outside owned stock return">
                         <h3 class="font-semibold">Witness actual partial outside partner return</h3>
                         <p>Loan {{ $externalOutReturnLoanId }}. Only items physically returned now; leave others blank. Partner-signed evidence is mandatory.</p>
                         @foreach($loanHistory as $outLoan)
@@ -1681,7 +1799,7 @@
                     </section>
                 @endif
                 @if(config('inventory_controls.external_out_return_enabled') && $externalOutReviewReceiptId !== '')
-                    <section class="rounded-xl border p-4 space-y-3" aria-label="Independent outside partner return condition review">
+                    <section x-show="!focused || area === 'returns'" x-cloak id="inventory-independent-outside-partner-return-condition-review"  class="rounded-xl border p-4 space-y-3" aria-label="Independent outside partner return condition review">
                         <h3 class="font-semibold">Independent owner inspection — outside partner return</h3>
                         <p>Receipt {{ $externalOutReviewReceiptId }}. Enter separate physically good, damaged and unresolved counts; their sum MUST exactly equal each witnessed return line.</p>
                         @foreach($externalOutReturnHistory as $outsideReceipt)
@@ -1711,7 +1829,7 @@
                     <p role="status">Outside partner return evidence/review {{ $lastExternalOutReturnReference }}. No financial entry, debt or loan closure posted.</p>
                 @endif
                 @if(config('inventory_controls.external_borrowed_intake_enabled') && $externalIntakeLoanId !== '')
-                    <section class="space-y-3 rounded-xl border p-4" aria-label="Witnessed external borrowing arrival">
+                    <section x-show="!focused || area === 'returns'" x-cloak id="inventory-witnessed-external-borrowing-arrival"  class="space-y-3 rounded-xl border p-4" aria-label="Witnessed external borrowing arrival">
                         <h3 class="font-semibold">Witnessed external borrowing, signed partner handover</h3>
                         <p class="text-sm">Recording only captures independently counted physical evidence. A different current owner/admin must accept before BORROWED inventory enters the book. No owned stock or money is posted.</p>
                         <p class="text-xs">External borrowing {{ $externalIntakeLoanId }}</p>
@@ -1746,7 +1864,7 @@
 
                 @if(config('inventory_controls.external_borrowed_return_enabled') &&
                     config('inventory_controls.external_borrowed_intake_enabled'))
-                    <section class="rounded-xl border p-4 space-y-3" aria-label="Outside borrowed return batches">
+                    <section x-show="!focused || area === 'returns'" x-cloak id="inventory-outside-borrowed-return-batches"  class="rounded-xl border p-4 space-y-3" aria-label="Outside borrowed return batches">
                         <h3 class="font-semibold">External borrowed physical returns</h3>
                         <p class="text-sm">Each shipment requires signed handover. Another owner/admin verifies the partner signed receipt and independently enters physically accepted quantities. Short or disputed counts remain in transit. No money or penalty is assumed.</p>
                         @foreach($externalReturnHistory as $returnBatch)
@@ -1785,7 +1903,7 @@
                                         $partnerDiscrepancy['reportedBy'] !== (int)auth()->id() &&
                                         $this->canIndependentlyAcceptExternalBorrowing())
                                         <button type="button" wire:click="startExternalDiscrepancyReview('{{ $partnerDiscrepancy['id'] }}')"
-                                            class="rounded-lg border px-3 py-2">Independently review partner discrepancy</button>
+                                            class="rounded-lg border px-3 py-2" x-on:click="focused = true; area = 'approvals'">Independently review partner discrepancy</button>
                                     @endif
                                     @php($partnerObligation = collect($externalObligationHistory)->firstWhere('discrepancyId', $partnerDiscrepancy['id']))
                                     @if($partnerObligation)
@@ -1796,7 +1914,7 @@
                                             config('inventory_controls.external_in_loss_obligation_enabled') &&
                                             $this->canIndependentlyAcceptExternalBorrowing())
                                             <button type="button" wire:click="startExternalObligationReview('{{ $partnerObligation['id'] }}')"
-                                                class="rounded-lg border px-3 py-2">Independently review partner loss obligation</button>
+                                                class="rounded-lg border px-3 py-2" x-on:click="focused = true; area = 'approvals'">Independently review partner loss obligation</button>
                                         @endif
                                         @php($partnerSettlement = collect($externalSettlementHistory)->firstWhere('obligationId', $partnerObligation['id']))
                                         @if($partnerSettlement)
@@ -1807,7 +1925,7 @@
                                                 config('inventory_controls.external_in_loss_settlement_enabled') &&
                                                 $this->canIndependentlyAcceptExternalBorrowing())
                                                 <button type="button" wire:click="startExternalSettlementReview('{{ $partnerSettlement['id'] }}')"
-                                                    class="rounded-lg border px-3 py-2">Independently verify partner payment evidence</button>
+                                                    class="rounded-lg border px-3 py-2" x-on:click="focused = true; area = 'approvals'">Independently verify partner payment evidence</button>
                                             @endif
                                             @if(($partnerSettlement['journalPosted'] ?? false) && !($partnerSettlement['reversed'] ?? false) &&
                                                 $partnerSettlement['reviewedBy'] !== (int)auth()->id() &&
@@ -1820,32 +1938,32 @@
                                             config('inventory_controls.external_in_loss_settlement_enabled') &&
                                             $this->canIndependentlyAcceptExternalBorrowing())
                                             <button type="button" wire:click="startExternalSettlement('{{ $partnerObligation['id'] }}')"
-                                                class="rounded-lg border px-3 py-2">Record partner payment evidence</button>
+                                                class="rounded-lg border px-3 py-2" x-on:click="focused = true; area = 'approvals'">Record partner payment evidence</button>
                                         @endif
                                     @elseif($partnerDiscrepancy['decision'] === 'substantiated' &&
                                         $partnerDiscrepancy['reportedBy'] !== (int)auth()->id() &&
                                         config('inventory_controls.external_in_loss_obligation_enabled') &&
                                         $this->canIndependentlyAcceptExternalBorrowing())
                                         <button type="button" wire:click="startExternalObligation('{{ $partnerDiscrepancy['id'] }}')"
-                                            class="rounded-lg border px-3 py-2">Propose provisional partner loss obligation</button>
+                                            class="rounded-lg border px-3 py-2" x-on:click="focused = true; area = 'approvals'">Propose provisional partner loss obligation</button>
                                     @endif
                                 @elseif(!$returnBatch['confirmed'] && $returnBatch['dispatchedBy'] !== (int)auth()->id() &&
                                     config('inventory_controls.external_borrowed_discrepancy_enabled') &&
                                     $this->canIndependentlyAcceptExternalBorrowing())
                                     <button type="button" wire:click="startExternalDiscrepancy('{{ $returnBatch['batchId'] }}')"
-                                        class="rounded-lg border px-3 py-2">Record partner short/damaged count</button>
+                                        class="rounded-lg border px-3 py-2" x-on:click="focused = true; area = 'approvals'">Record partner short/damaged count</button>
                                 @endif
                                 @if(!$returnBatch['confirmed'] && $returnBatch['dispatchedBy']!==(int)auth()->id() &&
                                     $this->canIndependentlyAcceptExternalBorrowing())
                                     <button type="button" wire:click="startExternalReturnConfirmation('{{ $returnBatch['batchId'] }}')"
-                                        class="rounded-lg border px-3 py-2">Independently verify partner receipt</button>
+                                        class="rounded-lg border px-3 py-2" x-on:click="focused = true; area = 'returns'">Independently verify partner receipt</button>
                                 @endif
                             </article>
                         @endforeach
                     </section>
                 @endif
                 @if(config('inventory_controls.external_borrowed_return_enabled') && $externalReturnLoanId !== '')
-                    <section class="rounded-xl border p-4 space-y-3" aria-label="Dispatch outside partner return">
+                    <section x-show="!focused || area === 'returns'" x-cloak id="inventory-dispatch-outside-partner-return"  class="rounded-xl border p-4 space-y-3" aria-label="Dispatch outside partner return">
                         <h3 class="font-semibold">Physically send partial borrowed return</h3>
                         <p>Loan {{ $externalReturnLoanId }}. Enter only units physically handed over. Leave non-returned items blank.</p>
                         @foreach($loanHistory as $outsideLoan)
@@ -1870,7 +1988,7 @@
                     </section>
                 @endif
                 @if(config('inventory_controls.external_borrowed_return_enabled') && $externalConfirmBatchId !== '')
-                    <section class="rounded-xl border p-4 space-y-3" aria-label="Independent outside partner receipt verification">
+                    <section x-show="!focused || area === 'returns'" x-cloak id="inventory-independent-outside-partner-receipt-verification"  class="rounded-xl border p-4 space-y-3" aria-label="Independent outside partner receipt verification">
                         <h3 class="font-semibold">Independently confirm outside partner receipt</h3>
                         <p>Batch {{ $externalConfirmBatchId }}. Enter partner-acknowledged counts item by item. Discrepancies MUST stay in transit.</p>
                         @foreach($externalReturnHistory as $returnBatch)
@@ -1895,7 +2013,7 @@
                     </section>
                 @endif
                 @if(config('inventory_controls.external_borrowed_discrepancy_enabled') && $externalDiscrepancyBatchId !== '')
-                    <section class="rounded-xl border p-4 space-y-3" aria-label="Partner short or damaged return count">
+                    <section x-show="!focused || area === 'approvals'" x-cloak id="inventory-partner-short-or-damaged-return-count"  class="rounded-xl border p-4 space-y-3" aria-label="Partner short or damaged return count">
                         <h3 class="font-semibold">Record partner short or damaged return count</h3>
                         <p class="text-sm">Batch {{ $externalDiscrepancyBatchId }}. Enter only the counts written on the partner's signed document. Every unit stays in borrowed transit until a separate resolution; no money, liability, stock retirement or closure is posted.</p>
                         @foreach($externalReturnHistory as $returnBatch)
@@ -1932,7 +2050,7 @@
                     </section>
                 @endif
                 @if(config('inventory_controls.external_borrowed_discrepancy_enabled') && $externalDiscrepancyDecisionTarget !== '')
-                    <section class="rounded-xl border p-4 space-y-3" aria-label="Independent partner discrepancy review">
+                    <section x-show="!focused || area === 'approvals'" x-cloak id="inventory-independent-partner-discrepancy-review"  class="rounded-xl border p-4 space-y-3" aria-label="Independent partner discrepancy review">
                         <h3 class="font-semibold">Independently review partner short/damaged evidence</h3>
                         <p class="text-sm">Discrepancy {{ $externalDiscrepancyDecisionTarget }}. A different current owner/admin decides only the documentary finding. Substantiation does NOT clear borrowed transit, retire stock, create a payable, post money or close the loan.</p>
                         <label class="block text-sm">Decision
@@ -1953,7 +2071,7 @@
                     </section>
                 @endif
                 @if(config('inventory_controls.external_in_loss_obligation_enabled') && $externalObligationDiscrepancyId !== '')
-                    <section class="rounded-xl border p-4 space-y-3" aria-label="Propose provisional partner loss obligation">
+                    <section x-show="!focused || area === 'approvals'" x-cloak id="inventory-propose-provisional-partner-loss-obligation"  class="rounded-xl border p-4 space-y-3" aria-label="Propose provisional partner loss obligation">
                         <h3 class="font-semibold">Propose provisional partner loss obligation</h3>
                         <p class="text-sm">Discrepancy {{ $externalObligationDiscrepancyId }}. Enter a manual amount only for the partner-reported missing and damaged units. This is not an invoice, journal, payment or settlement.</p>
                         <label class="block text-sm">Currency (ISO 4217)
@@ -1976,7 +2094,7 @@
                     </section>
                 @endif
                 @if(config('inventory_controls.external_in_loss_obligation_enabled') && $externalObligationDecisionTarget !== '')
-                    <section class="rounded-xl border p-4 space-y-3" aria-label="Independent partner loss obligation review">
+                    <section x-show="!focused || area === 'approvals'" x-cloak id="inventory-independent-partner-loss-obligation-review"  class="rounded-xl border p-4 space-y-3" aria-label="Independent partner loss obligation review">
                         <h3 class="font-semibold">Independently review partner loss obligation</h3>
                         <p class="text-sm">Obligation {{ $externalObligationDecisionTarget }}. A different current owner/admin decides the provisional amount. Approval never posts money, recognises a receivable/payable journal or settles the loan.</p>
                         <label class="block text-sm">Decision
@@ -1997,7 +2115,7 @@
                     </section>
                 @endif
                 @if(config('inventory_controls.external_in_loss_settlement_enabled') && $externalSettlementObligationId !== '')
-                    <section class="rounded-xl border p-4 space-y-3" aria-label="Record partner payment evidence">
+                    <section x-show="!focused || area === 'approvals'" x-cloak id="inventory-record-partner-payment-evidence"  class="rounded-xl border p-4 space-y-3" aria-label="Record partner payment evidence">
                         <h3 class="font-semibold">Record partner payment evidence</h3>
                         <p class="text-sm">Obligation {{ $externalSettlementObligationId }}. Record a cash or bank payment against the approved amount. This is private evidence only; no journal, cash mutation, settlement or closure is posted.</p>
                         <label class="block text-sm">Amount in minor units
@@ -2031,7 +2149,7 @@
                     </section>
                 @endif
                 @if(config('inventory_controls.external_in_loss_settlement_enabled') && $externalSettlementReviewTarget !== '')
-                    <section class="rounded-xl border p-4 space-y-3" aria-label="Independent partner payment review">
+                    <section x-show="!focused || area === 'approvals'" x-cloak id="inventory-independent-partner-payment-review"  class="rounded-xl border p-4 space-y-3" aria-label="Independent partner payment review">
                         <h3 class="font-semibold">Independently verify partner payment evidence</h3>
                         <p class="text-sm">Settlement {{ $externalSettlementReviewTarget }}. A different current owner/admin verifies the cash/bank reference and private evidence. When company finance posting is enabled, verification also posts a balanced ledger entry; cash, settlement and closure remain unchanged.</p>
                         <label class="block text-sm">Decision
@@ -2051,7 +2169,7 @@
                     </section>
                 @endif
                 @if(config('inventory_controls.external_in_loss_settlement_enabled') && $externalSettlementReversalTarget !== '')
-                    <section class="rounded-xl border p-4 space-y-3" aria-label="Reverse verified partner payment">
+                    <section x-show="!focused || area === 'approvals'" x-cloak id="inventory-reverse-verified-partner-payment"  class="rounded-xl border p-4 space-y-3" aria-label="Reverse verified partner payment">
                         <h3 class="font-semibold">Reverse verified partner payment</h3>
                         <p class="text-sm">Settlement {{ $externalSettlementReversalTarget }}. A different current owner/admin posts a balanced immutable reversal that swaps the original partner-payment ledger lines. Cash, settlement and closure remain unchanged.</p>
                         <label class="block text-sm">Reversal reason
@@ -2082,7 +2200,7 @@
                     <p role="status">External return custody reference: {{ $lastExternalReturnReference }}. No financial entry or loan closure was posted.</p>
                 @endif
                 @if(config('inventory_controls.loan_dispatch_enabled') && $loanDispatchLoanId !== '')
-                    <section class="space-y-3 rounded-xl border p-4" aria-label="Independent internal source dispatch">
+                    <section x-show="!focused || area === 'returns'" x-cloak id="inventory-independent-internal-source-dispatch"  class="space-y-3 rounded-xl border p-4" aria-label="Independent internal source dispatch">
                         <h3 class="font-semibold">Independently witnessed source dispatch</h3>
                         <p class="text-sm">Check each source item and quantity. Actual owned stock leaves the lending hall only when independent owner/admin review and the physical evidence are accepted. Destination receiving is separate.</p>
                         <p class="text-xs">Loan {{ $loanDispatchLoanId }}</p>
@@ -2105,7 +2223,7 @@
                 @endif
                 @if(config('inventory_controls.loan_receipt_enabled') &&
                     config('inventory_controls.loan_dispatch_enabled') && $loanReceiptLoanId !== '')
-                    <section class="space-y-3 rounded-xl border p-4" aria-label="Confirm independent internal loan arrival">
+                    <section x-show="!focused || area === 'returns'" x-cloak id="inventory-confirm-independent-internal-loan-arrival"  class="space-y-3 rounded-xl border p-4" aria-label="Confirm independent internal loan arrival">
                         <h3 class="font-semibold">Confirm receiving-hall physical custody</h3>
                         <p class="text-sm">This records borrowed inventory, not owned purchases or completed returns. Verify each line and attach a physical receiving photograph or PDF.</p>
                         <p class="text-xs">Internal loan: {{ $loanReceiptLoanId }}</p>
@@ -2142,7 +2260,7 @@
                     </p>
                 @endif
                 @if(config('inventory_controls.loan_returns_enabled') && $returnLoanId !== '')
-                    <section class="space-y-3 rounded-xl border p-4" aria-label="Send partial physical borrowed return">
+                    <section x-show="!focused || area === 'returns'" x-cloak id="inventory-send-partial-physical-borrowed-return"  class="space-y-3 rounded-xl border p-4" aria-label="Send partial physical borrowed return">
                         <h3 class="font-semibold">Send a partial borrowed-stock return</h3>
                         <p class="text-sm">This moves destination borrowed stock into transit only. The lender must independently inspect, accept and record condition.</p>
                         <p class="text-xs">Loan: {{ $returnLoanId }}</p>
@@ -2169,7 +2287,7 @@
                     </section>
                 @endif
                 @if(config('inventory_controls.internal_discrepancy_enabled') && $discrepancyLoanId !== '')
-                    <section class="space-y-2 rounded-xl border p-4" aria-label="Signed internal discrepancy evidence">
+                    <section x-show="!focused || area === 'approvals'" x-cloak id="inventory-signed-internal-discrepancy-evidence"  class="space-y-2 rounded-xl border p-4" aria-label="Signed internal discrepancy evidence">
                         <h3>Original internal loan signed discrepancy evidence (no stock or money posting)</h3>
                         <p>Loan {{ $discrepancyLoanId }}. Statements are testimony only, not borrower acceptance or liability.</p>
                         @if(count($discrepancyLines)>0)
@@ -2270,7 +2388,7 @@
                                                 config('inventory_controls.internal_loss_obligation_enabled') &&
                                                 $this->canReviewInternalDiscrepancy())
                                                 <button type="button" wire:click="startInternalObligationReview('{{ $internalObligation['id'] }}')"
-                                                    class="rounded border px-3 py-2">Independently review internal loss obligation</button>
+                                                    class="rounded border px-3 py-2" x-on:click="focused = true; area = 'approvals'">Independently review internal loss obligation</button>
                                             @endif
                                             @if($internalObligation['decision'] === 'approved')
                                                 @php($internalSettlement = collect($internalSettlementHistory)->firstWhere('obligationId', $internalObligation['id']))
@@ -2282,12 +2400,12 @@
                                                         config('inventory_controls.internal_loss_settlement_enabled') &&
                                                         $this->canReviewInternalDiscrepancy())
                                                         <button type="button" wire:click="startInternalSettlementReview('{{ $internalSettlement['id'] }}')"
-                                                            class="rounded border px-3 py-2">Independently verify internal settlement</button>
+                                                            class="rounded border px-3 py-2" x-on:click="focused = true; area = 'approvals'">Independently verify internal settlement</button>
                                                     @endif
                                                 @elseif(config('inventory_controls.internal_loss_settlement_enabled') &&
                                                     $this->canReviewInternalDiscrepancy())
                                                     <button type="button" wire:click="startInternalSettlement('{{ $internalObligation['id'] }}')"
-                                                        class="rounded border px-3 py-2">Record internal settlement evidence</button>
+                                                        class="rounded border px-3 py-2" x-on:click="focused = true; area = 'approvals'">Record internal settlement evidence</button>
                                                 @endif
                                             @endif
                                         @elseif(($finding['decision'] ?? null) === 'confirmed_outstanding' &&
@@ -2295,13 +2413,13 @@
                                             config('inventory_controls.internal_loss_obligation_enabled') &&
                                             $this->canReviewInternalDiscrepancy())
                                             <button type="button" wire:click="startInternalObligation('{{ $finding['id'] }}')"
-                                                class="rounded border px-3 py-2">Propose internal loss obligation</button>
+                                                class="rounded border px-3 py-2" x-on:click="focused = true; area = 'approvals'">Propose internal loss obligation</button>
                                         @endif
                                         <button type="button" wire:click="downloadInternalPhysicalFindingProof('{{ $finding['id'] }}')" class="rounded border px-2 py-1">Private source evidence (audited)</button>
                                     </article>
                                 @endforeach
                                 @if(config('inventory_controls.internal_loss_obligation_enabled') && $internalObligationFindingId !== '')
-                                    <section aria-label="Propose internal loss obligation">
+                                    <section x-show="!focused || area === 'approvals'" x-cloak id="inventory-propose-internal-loss-obligation"  aria-label="Propose internal loss obligation">
                                         <h4 class="font-semibold">Propose internal abnormal loss obligation</h4>
                                         <p class="text-sm">Finding {{ $internalObligationFindingId }}. Manual amount only; provisional position without money or stock retirement.</p>
                                         <label>Currency (ISO 4217)
@@ -2320,7 +2438,7 @@
                                     </section>
                                 @endif
                                 @if(config('inventory_controls.internal_loss_obligation_enabled') && $internalObligationDecisionTarget !== '')
-                                    <section aria-label="Independently review internal loss obligation">
+                                    <section x-show="!focused || area === 'approvals'" x-cloak id="inventory-independently-review-internal-loss-obligation"  aria-label="Independently review internal loss obligation">
                                         <h4 class="font-semibold">Independently review internal loss obligation</h4>
                                         <p class="text-sm">Obligation {{ $internalObligationDecisionTarget }}. A different source owner/admin decides the provisional amount; no journal or money is posted.</p>
                                         <label>Decision
@@ -2339,7 +2457,7 @@
                                     </section>
                                 @endif
                                 @if(config('inventory_controls.internal_loss_settlement_enabled') && $internalSettlementObligationId !== '')
-                                    <section aria-label="Record internal settlement evidence">
+                                    <section x-show="!focused || area === 'approvals'" x-cloak id="inventory-record-internal-settlement-evidence"  aria-label="Record internal settlement evidence">
                                         <h4 class="font-semibold">Record private internal settlement evidence</h4>
                                         <p class="text-sm">Obligation {{ $internalSettlementObligationId }}. Evidence only; no journal, cash mutation by this layer, stock retirement or closure.</p>
                                         <label>Currency (ISO 4217)
@@ -2373,7 +2491,7 @@
                                     </section>
                                 @endif
                                 @if(config('inventory_controls.internal_loss_settlement_enabled') && $internalSettlementReviewTarget !== '')
-                                    <section aria-label="Independently verify internal settlement">
+                                    <section x-show="!focused || area === 'approvals'" x-cloak id="inventory-independently-verify-internal-settlement"  aria-label="Independently verify internal settlement">
                                         <h4 class="font-semibold">Independently verify internal settlement</h4>
                                         <p class="text-sm">Settlement {{ $internalSettlementReviewTarget }}. A different source owner/admin verifies the private evidence; no journal or cash mutation by this layer.</p>
                                         <label>Decision
@@ -2498,7 +2616,7 @@
                 @endif
                 @if(config('inventory_controls.loan_returns_enabled') &&
                     config('inventory_controls.loan_return_acceptance_enabled'))
-                    <section class="space-y-3 rounded-xl border p-4" aria-label="Incoming physical return batches">
+                    <section x-show="!focused || area === 'returns'" x-cloak id="inventory-incoming-physical-return-batches"  class="space-y-3 rounded-xl border p-4" aria-label="Incoming physical return batches">
                         <h3 class="font-semibold">Returned stock awaiting source-hall confirmation</h3>
                         @forelse($returnSourceHistory as $batch)
                             <article class="rounded-lg border p-3 text-sm" wire:key="return-source-batch-{{ $batch['batchId'] }}">
@@ -2528,7 +2646,7 @@
                                             $batch['accepted'] && ($line['remainingUnresolved']??0)>0)
                                             <li><button type="button"
                                                 wire:click="startLatePhysicalReturn('{{ $batch['batchId'] }}','{{ $line['sourceItemId'] }}')"
-                                                class="rounded-lg border px-3 py-2 text-sm">
+                                                class="rounded-lg border px-3 py-2 text-sm" x-on:click="focused = true; area = 'returns'">
                                                 Record separately witnessed later physical arrival
                                             </button></li>
                                         @endif
@@ -2536,7 +2654,7 @@
                                 </ul>
                                 @if(!$batch['accepted'])
                                     <button type="button" wire:click="startReturnAcceptance('{{ $batch['batchId'] }}')"
-                                        class="rounded-lg border px-3 py-2 text-sm">Review physically returned items</button>
+                                        class="rounded-lg border px-3 py-2 text-sm" x-on:click="focused = true; area = 'returns'">Review physically returned items</button>
                                 @endif
                             </article>
                         @empty
@@ -2545,7 +2663,7 @@
                     </section>
                 @endif
                 @if(config('inventory_controls.loan_return_acceptance_enabled') && $returnAcceptBatchId !== '')
-                    <section class="space-y-3 rounded-xl border p-4" aria-label="Accept returned physical stock by condition">
+                    <section x-show="!focused || area === 'returns'" x-cloak id="inventory-accept-returned-physical-stock-by-condition"  class="space-y-3 rounded-xl border p-4" aria-label="Accept returned physical stock by condition">
                         <h3 class="font-semibold">Independent lender return condition count</h3>
                         <p>Acceptance requires physical evidence. Any unaccounted quantity stays outstanding and cannot close the loan.</p>
                         <p class="text-xs">Return batch: {{ $returnAcceptBatchId }}</p>
@@ -2577,7 +2695,7 @@
                     </section>
                 @endif
                 @if(config('inventory_controls.internal_late_return_enabled') && $lateReturnBatchId!=='')
-                    <section class="space-y-3 rounded-xl border p-4" aria-label="Later original loan physical count">
+                    <section x-show="!focused || area === 'returns'" x-cloak id="inventory-later-original-loan-physical-count"  class="space-y-3 rounded-xl border p-4" aria-label="Later original loan physical count">
                         <h3 class="font-semibold">Later independently witnessed physical arrival</h3>
                         <p>Original batch {{ $lateReturnBatchId }}, original source item {{ $lateReturnItemId }}.
                         Record only actual newly observed physical units. No testimony-only credit, stock retirement, payment or automatic closure.</p>

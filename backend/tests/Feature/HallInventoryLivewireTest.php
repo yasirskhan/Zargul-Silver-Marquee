@@ -521,4 +521,48 @@ class HallInventoryLivewireTest extends TestCase
             ->assertSee('RETURN ACKNOWLEDGED / OUTSTANDING RECONCILIATION REQUIRED')
             ->call('startInternalReturn',$loan)->assertHasNoErrors();
     }
+
+    public function test_phase12_focus_workspace_renders_guided_tasks_with_no_permission_or_stock_bypass():void
+    {
+        [$company,$hall,$other,$manager,$membership]=$this->fixture();
+        config()->set('inventory_controls.catalog_enabled',true);
+        config()->set('inventory_controls.position_reports_enabled',true);
+        config()->set('inventory_controls.stocktakes_enabled',true);
+        config()->set('inventory_controls.loan_drafts_enabled',true);
+        config()->set('inventory_controls.loan_returns_enabled',true);
+        config()->set('inventory_controls.loan_return_acceptance_enabled',true);
+        $item=(string)\Illuminate\Support\Str::uuid();
+        app(\App\Services\HallInventoryCatalogService::class)->create(
+            $manager,$company->id,$hall->id,$item,
+            'Focused ceremony chairs','Furniture','piece',25,
+            'Test real hall book visibility without posting stock');
+        DB::table('hall_inventory_positions')->insert([
+            'id'=>(string)\Illuminate\Support\Str::uuid(),
+            'company_id'=>$company->id,'hall_id'=>$hall->id,'item_id'=>$item,
+            'owned_usable'=>100,'owned_on_loan'=>0,'owned_damaged'=>0,
+            'borrowed_usable'=>0,'borrowed_transit'=>0,'borrowed_damaged'=>0,
+            'revision'=>0,'created_at'=>now(),'updated_at'=>now(),
+        ]);
+        $page=Livewire::test(HallInventory::class)
+            ->assertSee('Inventory workflow navigator')
+            ->assertSee('Inventory at a glance')
+            ->assertSee('Stock & counts')
+            ->assertSee('Borrow / lend')
+            ->assertSee('Handover & returns')
+            ->assertSee('Reviews & closure')
+            ->assertSee('Owned usable')
+            ->assertSee('Owned on loan')
+            ->assertSee('Borrowed damaged')
+            ->assertSee('Focused ceremony chairs')
+            ->assertSee('100')
+            ->assertSee('Count physical inventory')
+            ->assertSee('Borrow / lend multiple inventory items');
+        $this->assertSame(0, DB::table('hall_inventory_movement_events')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+        $this->assertSame(0, DB::table('hall_inventory_loan_drafts')->count());
+        $this->assertSame($hall->id,$page->get('hallId'));
+        DB::table('company_memberships')->where('id',$membership->id)->update(['is_active'=>false]);
+        $page->call('reloadPositionReport')->assertForbidden();
+    }
+
 }

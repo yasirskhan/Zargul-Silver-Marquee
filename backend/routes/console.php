@@ -43,6 +43,35 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
         ['name' => 'Synthetic Test Hall', 'capacity' => 300],
     );
 
+
+    // These three actors and the second hall exist ONLY in the isolated
+    // authenticated-browser fixture. No production account or stock is created.
+    $secondHall = \App\Models\Hall::query()->firstOrCreate(
+        ['company_id'=>$company->id,'slug'=>'synthetic-hall-b'],
+        ['name'=>'Synthetic Test Hall B','capacity'=>300],
+    );
+    foreach ([
+        ['a',$hall,'JBSWY3DPEHPK3PXP','synthetic-inventory-manager-a-only'],
+        ['b',$secondHall,'GEZDGNBVGY3TQOJQ','synthetic-inventory-manager-b-only'],
+    ] as [$suffix,$assignedHall,$secret,$password]) {
+        $person=\App\Models\User::query()->firstOrCreate(
+            ['email'=>'browser-e2e-inventory-manager-'.$suffix.'@example.test'],
+            ['name'=>'Synthetic Inventory Manager '.strtoupper($suffix),
+             'password'=>$password,'is_active'=>true],
+        );
+        $person->markEmailAsVerified();
+        $person->app_authentication_secret=$secret;
+        $person->save();
+        $member=\App\Models\CompanyMembership::query()->firstOrCreate(
+            ['company_id'=>$company->id,'user_id'=>$person->id],
+            ['role'=>'manager','is_active'=>true],
+        );
+        \App\Models\HallAssignment::query()->firstOrCreate(
+            ['company_id'=>$company->id,'hall_id'=>$assignedHall->id,
+             'membership_id'=>$member->id],
+        );
+    }
+
     \Illuminate\Support\Facades\Auth::login($owner);
     $service = app(\App\Services\HallProgramRulesService::class);
     if ((int) $hall->program_rules_revision === 0) {
