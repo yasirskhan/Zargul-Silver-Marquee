@@ -1076,6 +1076,8 @@
                                             class="rounded-lg border px-3 py-2 text-sm" x-on:click="focused = true; area = 'returns'">Record witnessed external borrowed delivery</button>
                                     @elseif($loan['externalReceiptRecorded'] && !$loan['externalReceiptAccepted'] &&
                                         $loan['externalCountMatchesDraft'] &&
+                                        $loan['createdBy']!==(int)auth()->id() &&
+                                        ($loan['externalReceiptReceivedBy'] ?? null)!==(int)auth()->id() &&
                                         $this->canIndependentlyAcceptExternalBorrowing())
                                         <button type="button" wire:click="approveExternalBorrowedReceipt('{{ $loan['id'] }}')"
                                             class="rounded-lg border px-3 py-2 text-sm">Independently accept externally borrowed stock</button>

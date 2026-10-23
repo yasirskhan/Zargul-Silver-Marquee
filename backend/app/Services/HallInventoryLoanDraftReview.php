@@ -121,7 +121,8 @@ final class HallInventoryLoanDraftReview
                 'ld.id as dispatch_id','ld.created_at as dispatched_at',
                 'lc.id as closure_id',
                 'lr.id as receipt_id','lr.created_at as received_at',
-                'er.id as external_receipt_id','ea.id as external_acceptance_id',
+                'er.id as external_receipt_id','er.received_by as external_receipt_received_by',
+                'ea.id as external_acceptance_id',
                 'oh.id as external_out_handover_id','od.id as external_out_dispatch_id',
                 'oc.id as external_out_closure_id','nc.id as external_out_nonclean_final_id',
                 'ec.id as external_clean_closure_id',
@@ -424,6 +425,8 @@ final class HallInventoryLoanDraftReview
                 'externalOutCounts'=>$draft->direction==='external_out' ? $outCounts : [],
                 'externalOutCountMatchesDraft'=>$outMatches,
                 'externalReceiptRecorded'=>$draft->external_receipt_id!==null,
+                'externalReceiptReceivedBy'=>$draft->external_receipt_received_by===null
+                    ? null : (int)$draft->external_receipt_received_by,
                 'externalReceiptAccepted'=>$draft->external_acceptance_id!==null,
                 'externalCountByItem'=>$draft->direction==='external_in' ? $actualCounts : [],
                 'externalCountMatchesDraft'=>$matches,
