@@ -392,6 +392,13 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Browser verify owner password TOTP and proposal editing
         run: npx playwright test --config=playwright.auth.config.mjs
+      - name: Save synthetic Phase 12 desktop and mobile evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase12-inventory-browser-evidence
+          path: test-results/phase12-inventory-*.png
+          if-no-files-found: ignore
       - name: Show application log on failed browser acceptance
         if: failure()
         run: |

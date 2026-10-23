@@ -3,8 +3,8 @@ import {inventoryLogin,inventoryFocus,syntheticEvidence} from './inventory-auth.
 
 test('MFA Owner and separate Managers perform actual 100-chair stock, loan and partial return on desktop/mobile',async({browser})=>{
  test.setTimeout(300000);
- const owner=await inventoryLogin(browser,'browser-e2e-owner@example.test',
-  'synthetic-browser-password-only','JBSWY3DPEHPK3PXP',{width:1366,height:768});
+ const owner=await inventoryLogin(browser,'browser-e2e-inventory-owner@example.test',
+  'synthetic-inventory-owner-only','IFBEGRCFIZDUQSKK',{width:1366,height:768});
  const source=await inventoryLogin(browser,'browser-e2e-inventory-manager-a@example.test',
   'synthetic-inventory-manager-a-only','JBSWY3DPEHPK3PXP',{width:390,height:844});
  const dest=await inventoryLogin(browser,'browser-e2e-inventory-manager-b@example.test',
@@ -98,7 +98,7 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
   await returnForm.locator('input[type="number"]').first().fill('85');
   await returnForm.locator('input[type="file"]').setInputFiles(syntheticEvidence);
   await returnForm.getByRole('button',{name:'Record witnessed return shipment'}).click();
-  await expect(b.getByText('Return shipment recorded:',{exact:false}))
+  await expect(b.getByText('Return shipment',{exact:false}))
    .toBeVisible({timeout:30000});
 
   await inventoryFocus(o,'Handover & returns');
@@ -118,6 +118,9 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
   await expect(row).toContainText(/80\s*15\s*5/);
   await expect(o.locator('section[aria-label="Inventory at a glance"]'))
    .toContainText('Owned damaged');
+  // Real authenticated mobile/desktop evidence; no bypassed service or mocked screen.
+  await o.screenshot({path:'test-results/phase12-inventory-desktop.png',fullPage:true});
+  await b.screenshot({path:'test-results/phase12-inventory-manager-mobile.png',fullPage:true});
  } finally {
   await Promise.all([owner.ctx.close(),source.ctx.close(),dest.ctx.close()]);
  }

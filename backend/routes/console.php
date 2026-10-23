@@ -44,6 +44,20 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
     );
 
 
+    // Separate inventory Owner avoids MFA replay between parallel authenticated browser workers.
+    $inventoryOwner = \App\Models\User::query()->firstOrCreate(
+        ['email'=>'browser-e2e-inventory-owner@example.test'],
+        ['name'=>'Synthetic Inventory Independent Owner',
+         'password'=>'synthetic-inventory-owner-only','is_active'=>true],
+    );
+    $inventoryOwner->markEmailAsVerified();
+    $inventoryOwner->app_authentication_secret='IFBEGRCFIZDUQSKK';
+    $inventoryOwner->save();
+    \App\Models\CompanyMembership::query()->firstOrCreate(
+        ['company_id'=>$company->id,'user_id'=>$inventoryOwner->id],
+        ['role'=>'owner','is_active'=>true],
+    );
+
     // These three actors and the second hall exist ONLY in the isolated
     // authenticated-browser fixture. No production account or stock is created.
     $secondHall = \App\Models\Hall::query()->firstOrCreate(
