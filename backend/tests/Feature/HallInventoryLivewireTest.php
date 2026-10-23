@@ -57,6 +57,46 @@ class HallInventoryLivewireTest extends TestCase
         }
     }
 
+    public function test_stocktake_refresh_loads_new_hall_item_without_losing_draft_or_review_state(): void
+    {
+        [$company, $hall, $other, $manager] = $this->fixture();
+        config()->set('inventory_controls.catalog_enabled', true);
+        config()->set('inventory_controls.stocktakes_enabled', true);
+
+        $pendingReview=(string) \Illuminate\Support\Str::uuid();
+        $draft=Livewire::test(HallInventory::class)
+            ->call('addCountRow')
+            ->set('auditKind', 'monthly')
+            ->set('auditReason', 'Ongoing monthly physical count')
+            ->set('countRows.0.usableCount', '20')
+            ->set('countRows.0.damagedCount', '0')
+            ->set('varianceStocktakeId', $pendingReview)
+            ->set('varianceReviewReason', 'Independent variance review draft')
+            ->set('incidentDecisionReason', 'Unsubmitted incident reviewer notes');
+
+        $id=(string) \Illuminate\Support\Str::uuid();
+        app(\App\Services\HallInventoryCatalogService::class)->create(
+            $manager, $company->id, $hall->id, $id,
+            'Recently added soup bowls', 'Crockery', 'piece', 10,
+            'Second user created the item while count remained open'
+        );
+        $draft->assertDontSee('Recently added soup bowls')
+            ->call('refreshCountItems')->assertHasNoErrors()
+            ->assertSee('Recently added soup bowls')
+            ->assertSet('auditKind', 'monthly')
+            ->assertSet('auditReason', 'Ongoing monthly physical count')
+            ->assertSet('countRows.0.usableCount', '20')
+            ->assertSet('countRows.0.damagedCount', '0')
+            ->assertSet('varianceStocktakeId', $pendingReview)
+            ->assertSet('varianceReviewReason', 'Independent variance review draft')
+            ->assertSet('incidentDecisionReason', 'Unsubmitted incident reviewer notes');
+
+        $this->assertSame(0, DB::table('hall_inventory_movement_events')->count());
+        $this->assertSame(0, DB::table('finance_journals')->count());
+        config()->set('inventory_controls.stocktakes_enabled', false);
+        $draft->call('refreshCountItems')->assertForbidden();
+    }
+
     public function test_inventory_catalog_page_hidden_by_default_and_manager_sees_only_assigned_hall(): void
     {
         [$company, $hall, $other] = $this->fixture();

@@ -600,6 +600,10 @@
             <section x-show="!focused || area === 'stock'" x-cloak id="inventory-physical-inventory-stocktake"  class="space-y-4 rounded-xl border p-4" aria-label="Physical inventory stocktake">
                 <h2 class="text-lg font-semibold">Count physical inventory</h2>
                 <p class="text-sm text-gray-600 dark:text-gray-300">Add separate rows for owned and temporarily borrowed stock. This saves count evidence only; shortages and new purchases require later authorized reconciliation.</p>
+                <div class="flex flex-wrap items-center gap-3">
+                    <button type="button" wire:click="refreshCountItems" class="rounded-lg border px-3 py-2 text-sm">Refresh count items</button>
+                    <p class="text-xs text-gray-600 dark:text-gray-300">If another manager created an item, refresh the current hall's item choices without clearing this count or pending reviews.</p>
+                </div>
                 <label class="block space-y-1"><span class="text-sm">Audit type</span>
                     <select wire:model="auditKind" class="w-full rounded-lg border p-3 text-gray-900">
                         <option value="ad_hoc">Additional count</option>

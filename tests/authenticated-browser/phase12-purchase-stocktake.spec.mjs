@@ -82,13 +82,18 @@ test('Phase12 purchase: independent real receiving and review; monthly stocktake
   const stock=b.locator('section[aria-label="Physical inventory stocktake"]');
   await stock.getByRole('combobox',{name:'Audit type'}).selectOption('monthly');
   await stock.getByRole('button',{name:'+ Add item row'}).click();
-  await stock.locator('select[wire\\:model="countRows.0.itemId"]')
-    .selectOption({label:'Purchase and Count Soup Bowls'});
+  const draftCountReason='Monthly physical count evidence before final privately verified purchase stock acceptance';
+  await stock.getByRole('textbox',{name:'Count reason / observations'}).fill(draftCountReason);
+  await stock.getByRole('button',{name:'Refresh count items'}).click();
+  const itemChoice=stock.locator('select[wire\\:model="countRows.0.itemId"]');
+  await expect(itemChoice.locator('option',{hasText:'Purchase and Count Soup Bowls'}))
+    .toHaveCount(1,{timeout:30000});
+  await expect(stock.getByRole('combobox',{name:'Audit type'})).toHaveValue('monthly');
+  await expect(stock.getByRole('textbox',{name:'Count reason / observations'})).toHaveValue(draftCountReason);
+  await itemChoice.selectOption({label:'Purchase and Count Soup Bowls'});
   await stock.locator('select[wire\\:model="countRows.0.ownership"]').selectOption('owned');
   await stock.locator('input[wire\\:model="countRows.0.usableCount"]').fill('20');
   await stock.locator('input[wire\\:model="countRows.0.damagedCount"]').fill('0');
-  await stock.getByRole('textbox',{name:'Count reason / observations'})
-    .fill('Monthly physical count evidence before final privately verified purchase stock acceptance');
   await stock.getByRole('button',{name:'Save physical count evidence'}).click();
   await expect(stock.getByRole('status')).toContainText('Inventory balances were not adjusted.',{timeout:30000});
   await expect(b.locator('section[aria-label="Hall physical count history"]'))

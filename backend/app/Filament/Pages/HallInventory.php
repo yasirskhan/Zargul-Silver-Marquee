@@ -1419,6 +1419,30 @@ final class HallInventory extends Page
         $this->varianceReviewRequestId = '';
         $this->catalog = [];
         $this->authorizeSelection();
+        $this->loadScopedCatalogItems();
+        $this->positionReport = [];
+        if(config('inventory_controls.position_reports_enabled'))
+            $this->reloadPositionReport();
+        $this->reloadStocktakeHistory();
+        $this->reloadLoanHistory();
+        $this->reloadOpeningHistory();
+        $this->reloadPurchaseHistory();
+    }
+
+    /**
+     * Refresh only the current hall's active item options for an in-progress
+     * physical count. Unlike the general catalog reload, this must not clear
+     * entered count rows, explanations or independent review state.
+     */
+    public function refreshCountItems(): void
+    {
+        $this->authorizeSelection();
+        abort_unless(config('inventory_controls.stocktakes_enabled'), 403);
+        $this->loadScopedCatalogItems();
+    }
+
+    private function loadScopedCatalogItems(): void
+    {
         $this->catalog = DB::table('hall_inventory_items')
             ->where('company_id', $this->companyId)->where('hall_id', $this->hallId)
             ->where('is_active', true)->orderBy('name')->limit(100)
@@ -1427,13 +1451,6 @@ final class HallInventory extends Page
                 'id' => $item->id, 'name' => $item->name, 'category' => $item->category,
                 'unit' => $item->unit, 'minimumQuantity' => (int) $item->minimum_quantity,
             ])->all();
-        $this->positionReport = [];
-        if(config('inventory_controls.position_reports_enabled'))
-            $this->reloadPositionReport();
-        $this->reloadStocktakeHistory();
-        $this->reloadLoanHistory();
-        $this->reloadOpeningHistory();
-        $this->reloadPurchaseHistory();
     }
 
     public function reloadPositionReport():void
