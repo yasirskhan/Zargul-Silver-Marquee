@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import {inventoryLogin,inventoryFocus,syntheticEvidence} from './inventory-auth.mjs';
+import {inventoryLogin,inventoryFocus,inventoryUploadEvidence,syntheticEvidence} from './inventory-auth.mjs';
 
 test('MFA Owner and separate Managers perform actual 100-chair stock, loan and partial return on desktop/mobile',async({browser})=>{
  test.setTimeout(600000);
@@ -82,7 +82,7 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
   await ownLoans.getByRole('button',{name:'Prepare witnessed source dispatch'}).click();
   const dispatch=o.locator('section[aria-label="Independent internal source dispatch"]');
   await expect(dispatch).toBeVisible({timeout:30000});
-  await dispatch.locator('input[type="file"]').setInputFiles(syntheticEvidence);
+  await inventoryUploadEvidence(o,dispatch.locator('input[type="file"]'),syntheticEvidence);
   await dispatch.getByRole('button',{name:'Confirm actual source physical dispatch'}).click();
   await expect(o.getByText('Independently witnessed physical dispatch recorded:',{exact:false}))
    .toBeVisible({timeout:30000});
@@ -95,7 +95,7 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
   await expect(receipt).toBeVisible({timeout:30000});
   await receipt.locator('select[wire\\:model^="loanReceiptMapping."]')
    .selectOption({index:1});
-  await receipt.locator('input[type="file"]').setInputFiles(syntheticEvidence);
+  await inventoryUploadEvidence(b,receipt.locator('input[type="file"]'),syntheticEvidence);
   await receipt.getByRole('button',{name:'Confirm physically received stock'}).click();
   await expect(b.getByText('Receiving custody recorded:',{exact:false}))
    .toBeVisible({timeout:30000});
@@ -105,7 +105,7 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
   const returnForm=b.locator('section[aria-label="Send partial physical borrowed return"]');
   await expect(returnForm).toBeVisible({timeout:30000});
   await returnForm.locator('input[type="number"]').first().fill('85');
-  await returnForm.locator('input[type="file"]').setInputFiles(syntheticEvidence);
+  await inventoryUploadEvidence(b,returnForm.locator('input[type="file"]'),syntheticEvidence);
   await returnForm.getByRole('button',{name:'Record witnessed return shipment'}).click();
   await expect(b.getByText('Return shipment',{exact:false}))
    .toBeVisible({timeout:30000});
@@ -124,7 +124,7 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
   await expect(acceptance).toBeVisible({timeout:30000});
   await acceptance.getByRole('spinbutton',{name:'Physically good quantity'}).fill('80');
   await acceptance.getByRole('spinbutton',{name:'Physically damaged quantity'}).fill('5');
-  await acceptance.locator('input[type="file"]').setInputFiles(syntheticEvidence);
+  await inventoryUploadEvidence(o,acceptance.locator('input[type="file"]'),syntheticEvidence);
   await acceptance.getByRole('button',{name:'Accept observed good/damaged return quantities'}).click();
   await inventoryFocus(o,'Overview');
   await o.getByRole('button',{name:'Refresh book balances'}).click();

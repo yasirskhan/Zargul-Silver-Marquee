@@ -85,6 +85,17 @@ export async function inventoryLogin(browser,email,password,secret,viewport){
 export async function inventoryFocus(page,name){
  await page.locator('[aria-label="Inventory tasks"]').getByRole('button',{name,exact:true}).click();
 }
+export async function inventoryUploadEvidence(page, input, file) {
+  await input.evaluate(element => {
+    window.phase12UploadPromise = new Promise((resolve, reject) => {
+      const deadline = setTimeout(() => reject(new Error('Livewire evidence upload timed out')), 30000);
+      element.addEventListener('livewire-upload-finish', () => { clearTimeout(deadline); resolve(true); }, { once: true });
+      element.addEventListener('livewire-upload-error', () => { clearTimeout(deadline); reject(new Error('Livewire evidence upload rejected')); }, { once: true });
+    });
+  });
+  await input.setInputFiles(file);
+  await page.evaluate(() => window.phase12UploadPromise);
+}
 export const syntheticEvidence={
  name:'witness.pdf',mimeType:'application/pdf',
  buffer:Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF')
