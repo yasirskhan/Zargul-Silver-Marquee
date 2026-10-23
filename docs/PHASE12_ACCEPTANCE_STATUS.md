@@ -1,5 +1,13 @@
 # Phase 12 acceptance status (latest verified checks 2026-10-23 UTC)
 
+## Verified authenticated browser increments (2026-10-23 UTC)
+
+- `387008d3b42991984644e587f9bb936765f9eea9`, run [39926249796](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39926249796): **ALL SIX SUCCESS**. Exact original INTERNAL loan/return UUID visible queue/accepted physical 80 good, 5 damaged, 15 remaining on-loan.
+- `42ff341c0d295d81d911747a4846090188c76000`, run [39938110650](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39938110650): **ALL SIX SUCCESS**. Real CI Owner/Manager signed 15 missing statement and separate source Owner corroboration; no fake stock movement or company journal.
+- `ceea883c758bac6e9e8f10744e1ec3266e8ba899`, run [39939171665](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39939171665): **CI IN PROGRESS AT THIS SNAPSHOT**. Original lender incident, second/third original source Owner evidence decision and physical finding browser proof. Pending cannot be accepted.
+- `005d01c8aed922c9d57972659843120c4b2a37ee`, run [39940207005](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39940207005): **CI IN PROGRESS AT THIS SNAPSHOT**. CI-only ADR-0009 provisional obligation/independent review, synthetic private settlement/independent verification, uninvolved write-off approval and immutable numbered IAC/browser readiness, without company journal. Not verified until all six green.
+- External HTTPS staging UAT, private independent witness signatures, proof/payment verification, bank reconciliation, coordinated real PG/document-store restore, TLS/security signoff and Owner release approval remain **BLOCKED EXTERNAL**. CI synthetic PDF and MFA roles are not real operator acceptance. Phase12 OPEN / production flags OFF / no Phase13.
+
 ## Live certification and staging-access reconciliation (2026-10-23 UTC)
 
 - Confirmed green original source: 0a08a8ebf0642adc3a71e9ecbffc6c4454fa276e, CI [39895044762](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/39895044762): **all six successful**. Includes tested NCL/IAC/ENCL serial allocation, original signed-file corruption/rollback, ENCL-versus-finance-reversal both orders and revoked-issuer lock contention.
