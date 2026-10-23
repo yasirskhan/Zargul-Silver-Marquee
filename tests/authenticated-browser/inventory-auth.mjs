@@ -30,12 +30,24 @@ export async function inventoryLogin(browser,email,password,secret,viewport){
  if(!isAuthenticated(page.url())){
    // Filament sometimes auto-submits. Check briefly, then press the real MFA
    // button while the code is still valid instead of waiting 30 seconds.
-   await page.waitForURL(isAuthenticated,{timeout:1200}).catch(()=>{});
-   if(!isAuthenticated(page.url())){
-     const verify=page.getByRole('button',{name:/confirm sign in|verify|continue|sign in/i}).last();
-     await expect(verify).toBeEnabled({timeout:12000});
-     if(!isAuthenticated(page.url()))await verify.click();
-     await page.waitForURL(isAuthenticated,{timeout:20000});
+   // Wait for the real Livewire auto-submission to finish before attempting
+   // a second MFA POST. The old 1.2 s wait could race an in-flight request,
+   // reuse its one-time code, and leave the session at an MFA challenge.
+   try {
+     await page.waitForURL(isAuthenticated,{timeout:30000});
+   } catch {
+     if(!isAuthenticated(page.url())){
+       const verify=page.getByRole('button',{name:/confirm sign in|verify|continue|sign in/i}).last();
+       // Only submit manually when the server still presents a genuine MFA
+       // verification action. Never replace MFA with a session shortcut.
+       if(await verify.isVisible()){
+         await expect(verify).toBeEnabled({timeout:10000});
+         await verify.click();
+         await page.waitForURL(isAuthenticated,{timeout:30000});
+       } else {
+         throw new Error('Real MFA did not redirect to an authenticated panel. Current page: '+new URL(page.url()).pathname);
+       }
+     }
    }
  }
  await page.goto('/admin/hall-inventory');
