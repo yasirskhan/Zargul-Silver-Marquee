@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import {inventoryLogin,inventoryFocus,inventoryUploadEvidence,syntheticEvidence} from './inventory-auth.mjs';
 
 test('MFA Owner and separate Managers perform actual 100-chair stock, loan and partial return on desktop/mobile',async({browser})=>{
- test.setTimeout(900000);
+ test.setTimeout(1200000);
  const owner=await inventoryLogin(browser,'browser-e2e-inventory-owner@example.test',
   'synthetic-inventory-owner-only','IFBEGRCFIZDUQSKK',{width:1366,height:768});
  const source=await inventoryLogin(browser,'browser-e2e-inventory-manager-a@example.test',
@@ -13,11 +13,13 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
   'synthetic-inventory-owner-b-only','MFRGGZDFMZTWQ2LK',{width:1280,height:800});
  const independent=await inventoryLogin(browser,'browser-e2e-inventory-owner-c@example.test',
   'synthetic-inventory-owner-c-only','KRSXG5AUMVZWK4TT',{width:1280,height:800});
+ const authorizer=await inventoryLogin(browser,'browser-e2e-inventory-owner-d@example.test',
+  'synthetic-inventory-owner-d-only','ORUGS4ZANFZSAYJA',{width:1280,height:800});
  try {
-  const a=source.page,b=dest.page,o=owner.page,r=reviewer.page,c=independent.page;
+  const a=source.page,b=dest.page,o=owner.page,r=reviewer.page,c=independent.page,d=authorizer.page;
   // A broken UI locator must fail promptly rather than exhaust the entire
   // 10-minute genuine MFA/role-change browser journey.
-  for(const page of [a,b,o,r,c])page.setDefaultTimeout(30000);
+  for(const page of [a,b,o,r,c,d])page.setDefaultTimeout(30000);
   await expect(a.getByRole('option',{name:'Synthetic Test Hall B'})).toHaveCount(0);
   await expect(b.getByRole('option',{name:'Synthetic Test Hall',exact:true})).toHaveCount(0);
   for(const page of [a,b]){
@@ -298,6 +300,131 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
   await expect(independentPhysical.locator('article')
     .filter({hasText:`Finding ${findingId}:`})).toContainText('confirmed_outstanding',{timeout:30000});
 
+  // The independent physical finding does NOT itself move cash or retire stock.
+  // Owner C proposes a provisional ADR-0009 inter-hall obligation, with no
+  // company-level journal. Owner A independently decides that amount.
+  const confirmedFinding=independentPhysical.locator('article')
+    .filter({hasText:`Finding ${findingId}:`});
+  await confirmedFinding.getByRole('button',{name:'Propose internal loss obligation'}).click();
+  const obligationForm=c.locator('section[aria-label="Propose internal loss obligation"]');
+  await expect(obligationForm).toBeVisible({timeout:30000});
+  await obligationForm.getByRole('textbox',{name:'Currency (ISO 4217)'}).fill('PKR');
+  await obligationForm.getByRole('spinbutton',{name:'Amount in minor units'}).fill('150000');
+  await obligationForm.getByRole('textbox',{name:'Reason'})
+    .fill('Provisional internal allocation for exactly fifteen independently confirmed missing chairs');
+  await obligationForm.getByRole('button',{name:'Propose internal loss obligation'}).click();
+  const obligationStatus=independentEvidence.locator('p[role="status"]')
+    .filter({hasText:/Internal loss obligation [0-9a-f-]{36} recorded/});
+  await expect(obligationStatus).toBeVisible({timeout:30000});
+  const obligationId=(await obligationStatus.textContent())
+    ?.match(/Internal loss obligation ([0-9a-f-]{36}) recorded/i)?.[1];
+  expect(obligationId).toMatch(/^[0-9a-f-]{36}$/i);
+
+  await inventoryFocus(o,'Borrow / lend');
+  await ownLoans.getByRole('button',{name:'Refresh requests'}).click();
+  await originLoan.getByRole('button',{name:'Review original borrower signed discrepancy evidence'}).click();
+  const obligationReviewSection=o.locator('section[aria-label="Signed internal discrepancy evidence"]');
+  await expect(obligationReviewSection).toBeVisible({timeout:30000});
+  const obligationReviewFinding=obligationReviewSection.locator('article')
+    .filter({hasText:`Finding ${findingId}:`});
+  await obligationReviewFinding.getByRole('button',{
+    name:'Independently review internal loss obligation'
+  }).click();
+  const decisionForm=o.locator('section[aria-label="Independently review internal loss obligation"]');
+  await expect(decisionForm).toBeVisible({timeout:30000});
+  await expect(decisionForm).toContainText(obligationId);
+  await decisionForm.getByRole('combobox',{name:'Decision'}).selectOption('approved');
+  await decisionForm.getByRole('textbox',{name:'Independent review reason'})
+    .fill('Owner A independently approves provisional original-loan allocation without company cash posting');
+  await decisionForm.getByRole('button',{name:'Record independent internal loss obligation decision'}).click();
+  await expect(obligationReviewFinding).toContainText('APPROVED',{timeout:30000});
+
+  // Owner B records separate signed settlement evidence; this is explicitly
+  // not a real bank transfer or company journal in an isolated browser test.
+  await inventoryFocus(r,'Borrow / lend');
+  await reviewerLoans.getByRole('button',{name:'Refresh requests'}).click();
+  await reviewerLoan.getByRole('button',{name:'Review original borrower signed discrepancy evidence'}).click();
+  const settlementSection=r.locator('section[aria-label="Signed internal discrepancy evidence"]');
+  await settlementSection.locator('article').filter({hasText:`Finding ${findingId}:`})
+    .getByRole('button',{name:'Record internal settlement evidence'}).click();
+  const settlementForm=r.locator('section[aria-label="Record internal settlement evidence"]');
+  await expect(settlementForm).toBeVisible({timeout:30000});
+  await expect(settlementForm).toContainText(obligationId);
+  await expect(settlementForm.getByRole('spinbutton',{name:'Amount in minor units'}))
+    .toHaveValue('150000');
+  await settlementForm.getByRole('textbox',{name:'Reference'}).fill('SYNTHETIC-ADR0009-LOAN-15');
+  await inventoryUploadEvidence(r,settlementForm.getByLabel('Private proof (PDF/JPEG/PNG)'),syntheticEvidence);
+  await settlementForm.getByRole('button',{name:'Record internal settlement evidence'}).click();
+  const settlementStatus=settlementSection.locator('p[role="status"]')
+    .filter({hasText:/Internal settlement reference [0-9a-f-]{36} recorded/});
+  await expect(settlementStatus).toBeVisible({timeout:30000});
+  const settlementId=(await settlementStatus.textContent())
+    ?.match(/Internal settlement reference ([0-9a-f-]{36}) recorded/i)?.[1];
+  expect(settlementId).toMatch(/^[0-9a-f-]{36}$/i);
+  await expect(settlementStatus).toContainText('No journal, cash mutation');
+
+  // Owner A is neither the settlement recorder (B) nor obligation proposer (C).
+  await inventoryFocus(o,'Borrow / lend');
+  await ownLoans.getByRole('button',{name:'Refresh requests'}).click();
+  await originLoan.getByRole('button',{name:'Review original borrower signed discrepancy evidence'}).click();
+  const verificationSection=o.locator('section[aria-label="Signed internal discrepancy evidence"]');
+  await verificationSection.locator('article').filter({hasText:`Finding ${findingId}:`})
+    .getByRole('button',{name:'Independently verify internal settlement'}).click();
+  const verifyForm=o.locator('section[aria-label="Independently verify internal settlement"]');
+  await expect(verifyForm).toBeVisible({timeout:30000});
+  await expect(verifyForm).toContainText(settlementId);
+  await verifyForm.getByRole('combobox',{name:'Decision'}).selectOption('verified');
+  await verifyForm.getByRole('textbox',{name:'Independent review reason'})
+    .fill('Independent source Owner confirms synthetic private proof matches approved inter-hall obligation');
+  await verifyForm.getByRole('button',{name:'Record independent internal settlement review'}).click();
+  await expect(verificationSection.locator('article')
+    .filter({hasText:`Finding ${findingId}:`})).toContainText('VERIFIED',{timeout:30000});
+
+  // Fourth Owner has not proposed findings/obligations or recorded/reviewed
+  // settlement. Only that uninvolved actor may authorize irreversible writeoff.
+  await inventoryFocus(d,'Borrow / lend');
+  const authorizerLoans=d.locator('[aria-label="Saved borrowing requests awaiting handover"]');
+  await authorizerLoans.getByRole('button',{name:'Refresh requests'}).click();
+  const authorizerLoan=authorizerLoans.locator('article')
+    .filter({hasText:`Reference: ${originalLoanId}.`});
+  await expect(authorizerLoan).toHaveCount(1);
+  await authorizerLoan.getByRole('button',{name:'Review original borrower signed discrepancy evidence'}).click();
+  const closureSection=d.locator('section[aria-label="Signed internal discrepancy evidence"]');
+  await expect(closureSection).toBeVisible({timeout:30000});
+  await expect(closureSection).toContainText(`Loan ${originalLoanId}`);
+  await closureSection.getByRole('button',{name:'Check internal abnormal closure readiness'}).click();
+  // Before final write-off and IAC issuance, the read-only readiness gate
+  // MUST remain BLOCKED even after settlement is independently verified.
+  await expect(closureSection).toContainText('INTERNAL ABNORMAL CLOSURE READINESS: BLOCKED',{timeout:30000});
+  await expect(closureSection).toContainText('approved obligations 1, verified settlements 1');
+  await expect(closureSection).toContainText('No numbered internal abnormal final certificate.');
+  await closureSection.getByRole('textbox',{name:'Independent write-off authorization reason'})
+    .fill('Independent Owner D authorizes final write-off of only the fifteen verified outstanding chairs');
+  await closureSection.getByRole('button',{name:'Authorize internal write-off'}).click();
+  await expect(closureSection).toContainText('Internal write-off authorized for 15 owned-on-loan unit(s)',{timeout:30000});
+  await closureSection.getByRole('button',{name:'Issue internal abnormal final certificate'}).click();
+  await expect(closureSection).toContainText(/INTERNAL ABNORMAL FINAL CERTIFICATE IAC-/,{timeout:30000});
+  // The visible final certificate must retain a numbered original and an
+  // immutable SHA256 proof reference; the UI must never offer second issuance.
+  await expect(closureSection.locator('p')
+    .filter({hasText:/INTERNAL ABNORMAL FINAL CERTIFICATE IAC-/}))
+    .toContainText(/SHA256 [0-9a-f]{64}/,{timeout:30000});
+  await expect(closureSection).toContainText('no company-level journal');
+  await closureSection.getByRole('button',{name:'Check internal abnormal closure readiness'}).click();
+  await expect(closureSection).toContainText('INTERNAL ABNORMAL CLOSURE READINESS: READY',{timeout:30000});
+  await expect(closureSection.getByRole('button',{name:'Issue internal abnormal final certificate'}))
+    .toHaveCount(0);
+
+  // The final certificate cannot manufacture returns or alter the physically
+  // damaged five chairs; only the 15 outstanding original units are retired.
+  await inventoryFocus(d,'Overview');
+  await d.getByRole('button',{name:'Refresh book balances'}).click();
+  const finalStock=d.locator('section[aria-label="Posted inventory book balances"]')
+    .locator('tbody tr').filter({hasText:'Ceremony Chairs'});
+  await expect(finalStock).toBeVisible({timeout:30000});
+  await expect(finalStock).toContainText(/80\s*0\s*5/);
+
+
 
   await inventoryFocus(o,'Overview');
   await o.getByRole('button',{name:'Refresh book balances'}).click();
@@ -307,6 +434,6 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
   await o.screenshot({path:'test-results/phase12-inventory-desktop.png',fullPage:true});
   await b.screenshot({path:'test-results/phase12-inventory-manager-mobile.png',fullPage:true});
  } finally {
-  await Promise.all([owner.ctx.close(),source.ctx.close(),dest.ctx.close(),reviewer.ctx.close(),independent.ctx.close()]);
+  await Promise.all([owner.ctx.close(),source.ctx.close(),dest.ctx.close(),reviewer.ctx.close(),independent.ctx.close(),authorizer.ctx.close()]);
  }
 });

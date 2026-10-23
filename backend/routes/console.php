@@ -63,6 +63,7 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
     foreach ([
         ['b', 'MFRGGZDFMZTWQ2LK'],
         ['c', 'KRSXG5AUMVZWK4TT'],
+        ['d', 'ORUGS4ZANFZSAYJA'],
     ] as [$suffix, $totpSecret]) {
         $reviewer = \App\Models\User::query()->firstOrCreate(
             ['email'=>'browser-e2e-inventory-owner-'.$suffix.'@example.test'],
