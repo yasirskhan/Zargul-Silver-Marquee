@@ -1,4 +1,6 @@
 import {test,expect} from '@playwright/test';
+import {createHash} from 'node:crypto';
+import {readFile} from 'node:fs/promises';
 import {inventoryLogin,inventoryFocus,inventoryUploadEvidence,syntheticEvidence} from './inventory-auth.mjs';
 
 test('MFA Owner and separate Managers perform actual 100-chair stock, loan and partial return on desktop/mobile',async({browser})=>{
@@ -414,6 +416,21 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
   await expect(closureSection).toContainText('INTERNAL ABNORMAL CLOSURE READINESS: READY',{timeout:30000});
   await expect(closureSection.getByRole('button',{name:'Issue internal abnormal final certificate'}))
     .toHaveCount(0);
+  // Audited authenticated download must return the exact immutable numbered PDF
+  // whose SHA256 is shown to the authorized source Owner.
+  const certificateText=await closureSection.locator('p')
+    .filter({hasText:/INTERNAL ABNORMAL FINAL CERTIFICATE IAC-/}).textContent();
+  const certificateSerial=certificateText?.match(/INTERNAL ABNORMAL FINAL CERTIFICATE (IAC-[0-9]+)/)?.[1];
+  const certificateHash=certificateText?.match(/SHA256 ([0-9a-f]{64})/)?.[1];
+  expect(certificateSerial).toMatch(/^IAC-[0-9]+$/);
+  expect(certificateHash).toMatch(/^[0-9a-f]{64}$/);
+  const downloadPromise=d.waitForEvent('download');
+  await closureSection.getByRole('button',{name:'Private numbered certificate (audited)'}).click();
+  const certificateDownload=await downloadPromise;
+  expect(certificateDownload.suggestedFilename()).toBe(`internal-abnormal-${certificateSerial}.pdf`);
+  const certificateBytes=await readFile(await certificateDownload.path());
+  expect(certificateBytes.subarray(0,5).toString()).toBe('%PDF-');
+  expect(createHash('sha256').update(certificateBytes).digest('hex')).toBe(certificateHash);
 
   // The final certificate cannot manufacture returns or alter the physically
   // damaged five chairs; only the 15 outstanding original units are retired.
@@ -428,8 +445,10 @@ test('MFA Owner and separate Managers perform actual 100-chair stock, loan and p
 
   await inventoryFocus(o,'Overview');
   await o.getByRole('button',{name:'Refresh book balances'}).click();
+  // Both authorized Owners must read the same final conservation state after
+  // the one-time 15-unit physical retirement, never the pre-closure snapshot.
   await expect(balance.locator('tbody tr').filter({hasText:'Ceremony Chairs'}))
-    .toContainText(/80\s*15\s*5/);
+    .toContainText(/80\s*0\s*5/);
   // Real authenticated mobile/desktop evidence; no bypassed service or mocked screen.
   await o.screenshot({path:'test-results/phase12-inventory-desktop.png',fullPage:true});
   await b.screenshot({path:'test-results/phase12-inventory-manager-mobile.png',fullPage:true});
