@@ -294,14 +294,29 @@
                 <div class="space-y-2">
                     <h3 class="font-semibold">Company image assets</h3>
                     @forelse ($this->mediaForCurrentCompany() as $asset)
+                        @php($assetUrl = $this->mediaPreviewUrl($asset->id))
                         <div wire:key="asset-{{ $asset->id }}" class="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3">
-                            <div>
-                                <p class="text-sm font-medium">{{ $asset->alt_text }}</p>
-                                <p class="text-xs">{{ $asset->mime_type }} · {{ ucfirst($asset->status) }}</p>
+                            <div class="flex min-w-0 items-center gap-3">
+                                @if ($assetUrl)
+                                    <img src="{{ $assetUrl }}" alt="{{ $asset->alt_text }}"
+                                        width="96" height="64" loading="lazy"
+                                        class="h-16 w-24 rounded border object-cover">
+                                @else
+                                    <span class="grid h-16 w-24 place-items-center rounded border text-xs">No preview</span>
+                                @endif
+                                <div class="min-w-0">
+                                    <p class="text-sm font-medium">{{ $asset->alt_text }}</p>
+                                    <p class="text-xs">{{ $asset->mime_type }} · {{ ucfirst($asset->status) }}</p>
+                                </div>
                             </div>
                             <div class="flex flex-wrap gap-2">
                                 <button type="button" wire:click="addImageFromLibrary('{{ $asset->id }}')"
                                     class="rounded border px-2 py-1 text-sm">Add to draft</button>
+                                <button type="button" wire:click="selectReplacement('{{ $asset->id }}')"
+                                    class="rounded border px-2 py-1 text-sm">Replace</button>
+                                <button type="button" wire:click="retireMedia('{{ $asset->id }}')"
+                                    wire:confirm="Retire this image? It will be refused if a published page still uses it."
+                                    class="rounded border px-2 py-1 text-sm">Retire</button>
                                 @if ($this->canPublishCurrentPage() && $asset->status === 'pending')
                                     <button type="button" wire:click="approveMedia('{{ $asset->id }}')"
                                         wire:confirm="Approve this actual venue image for a published page?"
@@ -313,6 +328,23 @@
                         <p class="text-sm">No staged venue images yet.</p>
                     @endforelse
                 </div>
+                @if ($replacementMediaId !== '')
+                    <section class="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3" aria-label="Stage media replacement">
+                        <h3 class="font-semibold">Stage a replacement image</h3>
+                        <p class="text-sm">A replacement is a new private asset. Published revisions keep their existing image; insert the new asset deliberately.</p>
+                        <input type="file" wire:model="replacementImage" accept="image/jpeg,image/png,image/webp"
+                            class="block w-full rounded border p-2 text-sm">
+                        @error('replacementImage') <span role="alert" class="text-sm text-red-600">{{ $message }}</span> @enderror
+                        <input type="text" wire:model="replacementAltText" maxlength="300"
+                            aria-label="Replacement image description"
+                            class="w-full rounded border p-2 text-gray-900">
+                        @error('replacementAltText') <span role="alert" class="text-sm text-red-600">{{ $message }}</span> @enderror
+                        <button type="button" wire:click="stageReplacementMedia"
+                            class="rounded-lg border px-3 py-2 font-semibold">Stage replacement</button>
+                        <button type="button" wire:click="$set('replacementMediaId', '')"
+                            class="rounded border px-3 py-2">Cancel</button>
+                    </section>
+                @endif
             </section>
 
             <section class="space-y-4" aria-label="Draft page sections">
@@ -350,7 +382,7 @@
                             </div>
                         </div>
                         @foreach (($section['data'] ?? []) as $field => $value)
-                            @if (is_string($value) && ! in_array($field, ['imageId'], true))
+                            @if (is_string($value) && ! in_array($field, ['imageId', 'focalX', 'focalY', 'cropAspect'], true))
                                 <label class="block space-y-1">
                                     <span class="text-sm font-medium">{{ \Illuminate\Support\Str::headline($field) }}</span>
                                     <textarea wire:model="sections.{{ $index }}.data.{{ $field }}" rows="2"
@@ -358,6 +390,34 @@
                                 </label>
                             @endif
                         @endforeach
+                        @if (! empty($section['data']['imageId']))
+                            <div class="grid gap-2 rounded-lg border p-3 md:grid-cols-3" aria-label="Image crop and focal point">
+                                <label class="block space-y-1">
+                                    <span class="text-sm">Focal X (%)</span>
+                                    <input type="number" min="0" max="100"
+                                        wire:model="sections.{{ $index }}.data.focalX"
+                                        value="{{ $section['data']['focalX'] ?? '50' }}"
+                                        class="w-full rounded border p-2 text-gray-900">
+                                </label>
+                                <label class="block space-y-1">
+                                    <span class="text-sm">Focal Y (%)</span>
+                                    <input type="number" min="0" max="100"
+                                        wire:model="sections.{{ $index }}.data.focalY"
+                                        value="{{ $section['data']['focalY'] ?? '50' }}"
+                                        class="w-full rounded border p-2 text-gray-900">
+                                </label>
+                                <label class="block space-y-1">
+                                    <span class="text-sm">Crop</span>
+                                    <select wire:model="sections.{{ $index }}.data.cropAspect"
+                                        class="w-full rounded border p-2 text-gray-900">
+                                        @foreach (['original' => 'Original', '16:9' => '16:9', '4:3' => '4:3', '1:1' => 'Square'] as $cropValue => $cropLabel)
+                                            <option value="{{ $cropValue }}" @selected(($section['data']['cropAspect'] ?? '16:9') === $cropValue)>{{ $cropLabel }}</option>
+                                        @endforeach
+                                    </select>
+                                </label>
+                                <p class="text-xs md:col-span-3">The crop and focal point are saved with the draft revision and only reach the public page after publish.</p>
+                            </div>
+                        @endif
                         @if (($section['type'] ?? '') === 'columns')
                             <div class="space-y-3">
                                 <h4 class="text-sm font-semibold">Desktop proportions</h4>
@@ -444,7 +504,7 @@
                                                             wire:confirm="Remove this block from the draft?" class="rounded border px-2 py-1 text-sm">Remove block</button>
                                                     </div>
                                                     @foreach (($block['data'] ?? []) as $field => $value)
-                                                        @if (is_string($value) && ! in_array($field, ['imageId'], true))
+                                                        @if (is_string($value) && ! in_array($field, ['imageId', 'focalX', 'focalY', 'cropAspect'], true))
                                                             <label class="block space-y-1">
                                                                 <span class="text-sm">{{ \Illuminate\Support\Str::headline($field) }}</span>
                                                                 <textarea wire:model="sections.{{ $index }}.columns.{{ $columnIndex }}.blocks.{{ $blockIndex }}.data.{{ $field }}"
@@ -452,6 +512,33 @@
                                                             </label>
                                                         @endif
                                                     @endforeach
+                                                    @if (! empty($block['data']['imageId']))
+                                                        <div class="grid gap-2 rounded-lg border p-3 md:grid-cols-3" aria-label="Image crop and focal point">
+                                                            <label class="block space-y-1">
+                                                                <span class="text-sm">Focal X (%)</span>
+                                                                <input type="number" min="0" max="100"
+                                                                    wire:model="sections.{{ $index }}.columns.{{ $columnIndex }}.blocks.{{ $blockIndex }}.data.focalX"
+                                                                    value="{{ $block['data']['focalX'] ?? '50' }}"
+                                                                    class="w-full rounded border p-2 text-gray-900">
+                                                            </label>
+                                                            <label class="block space-y-1">
+                                                                <span class="text-sm">Focal Y (%)</span>
+                                                                <input type="number" min="0" max="100"
+                                                                    wire:model="sections.{{ $index }}.columns.{{ $columnIndex }}.blocks.{{ $blockIndex }}.data.focalY"
+                                                                    value="{{ $block['data']['focalY'] ?? '50' }}"
+                                                                    class="w-full rounded border p-2 text-gray-900">
+                                                            </label>
+                                                            <label class="block space-y-1">
+                                                                <span class="text-sm">Crop</span>
+                                                                <select wire:model="sections.{{ $index }}.columns.{{ $columnIndex }}.blocks.{{ $blockIndex }}.data.cropAspect"
+                                                                    class="w-full rounded border p-2 text-gray-900">
+                                                                    @foreach (['original' => 'Original', '16:9' => '16:9', '4:3' => '4:3', '1:1' => 'Square'] as $cropValue => $cropLabel)
+                                                                        <option value="{{ $cropValue }}" @selected(($block['data']['cropAspect'] ?? '16:9') === $cropValue)>{{ $cropLabel }}</option>
+                                                                    @endforeach
+                                                                </select>
+                                                            </label>
+                                                        </div>
+                                                    @endif
                                                 </div>
                                             @endforeach
                                         </div>
@@ -470,7 +557,7 @@
 
             <section class="space-y-3 rounded-xl border p-4" aria-label="Responsive draft preview">
                 <h2 class="text-lg font-semibold">Draft preview</h2>
-                <p class="text-sm">Only safe text and layout placeholders appear here. No unapproved images or live booking data.</p>
+                <p class="text-sm">Authorized company images and safe typed text appear here. This draft is private and never public until an authorized publish; live booking data is not loaded.</p>
                 <div role="group" aria-label="Preview screen size" class="flex flex-wrap gap-2">
                     <button type="button" wire:click="setPreviewMode('desktop')" class="rounded border px-3 py-2" aria-pressed="{{ $previewMode === 'desktop' ? 'true' : 'false' }}">Desktop</button>
                     <button type="button" wire:click="setPreviewMode('tablet')" class="rounded border px-3 py-2" aria-pressed="{{ $previewMode === 'tablet' ? 'true' : 'false' }}">Tablet</button>

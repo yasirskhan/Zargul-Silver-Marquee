@@ -189,6 +189,103 @@ final class SiteMediaService
         }
     }
 
+    /**
+     * Stage a replacement as a NEW immutable-reference asset. Published
+     * revisions keep their existing media ID and bytes; the editor can insert
+     * the replacement deliberately from the library.
+     */
+    public function stageReplacement(
+        User $actor,
+        string $companyId,
+        string $replacedMediaId,
+        UploadedFile $file,
+        string $altText,
+        string $reason,
+    ): string {
+        $this->authorize($actor, $companyId, false);
+        $old = DB::table('site_media')->where('company_id', $companyId)
+            ->where('id', $replacedMediaId)->whereIn('status', ['pending', 'approved'])->first();
+        if (! $old) {
+            throw new InvalidArgumentException('The image to replace is not available in this company.');
+        }
+
+        $newId = $this->stageImage($actor, $companyId, $file, $altText, $reason);
+        $metadata = json_decode((string) DB::table('site_media')->where('company_id', $companyId)
+            ->where('id', $newId)->value('metadata'), true, 512, JSON_THROW_ON_ERROR);
+        $metadata['replaced_from'] = (string) $old->id;
+        DB::table('site_media')->where('company_id', $companyId)->where('id', $newId)
+            ->update(['metadata' => json_encode($metadata, JSON_THROW_ON_ERROR), 'updated_at' => now()]);
+        $this->audit($companyId, $actor, 'website.media_replacement_staged', $newId,
+            ['replacedFrom' => (string) $old->id], ['status' => 'pending'], $reason);
+
+        return $newId;
+    }
+
+    /**
+     * Retire a media asset only when no current published revision references
+     * it. Published snapshots therefore never lose their approved image.
+     */
+    public function retireImage(User $actor, string $companyId, string $mediaId, string $reason): void
+    {
+        $this->authorize($actor, $companyId, false);
+        $this->validateReason($reason);
+
+        DB::transaction(function () use ($actor, $companyId, $mediaId, $reason): void {
+            $asset = DB::table('site_media')->where('company_id', $companyId)
+                ->where('id', $mediaId)->lockForUpdate()->first();
+            $this->authorize($actor, $companyId, false);
+            if (! $asset || ! in_array($asset->status, ['pending', 'approved'], true)) {
+                throw new InvalidArgumentException('The image is not available for retirement in this company.');
+            }
+            if ($this->isReferencedByPublishedRevision($companyId, $mediaId)) {
+                throw new InvalidArgumentException(
+                    'This image is referenced by a published page. Replace it in a new draft or take the page offline before retiring it.'
+                );
+            }
+            DB::table('site_media')->where('company_id', $companyId)->where('id', $mediaId)
+                ->update(['status' => 'retired', 'updated_at' => now()]);
+            $this->audit($companyId, $actor, 'website.media_retired', $mediaId,
+                ['status' => $asset->status], ['status' => 'retired'], $reason);
+        }, 3);
+    }
+
+    private function isReferencedByPublishedRevision(string $companyId, string $mediaId): bool
+    {
+        $contents = DB::table('site_pages as p')
+            ->join('site_page_revisions as r', function ($join): void {
+                $join->on('r.company_id', '=', 'p.company_id')
+                    ->on('r.id', '=', 'p.published_revision_id');
+            })->where('p.company_id', $companyId)
+            ->whereNotNull('p.published_revision_id')
+            ->pluck('r.content');
+
+        foreach ($contents as $content) {
+            $decoded = json_decode((string) $content, true);
+            if (is_array($decoded) && $this->containsMediaId($decoded, $mediaId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function containsMediaId(array $value, string $mediaId): bool
+    {
+        foreach ($value as $key => $child) {
+            if ($key === 'imageId' && $child === $mediaId) {
+                return true;
+            }
+            if ($key === 'mediaIds' && is_array($child) && in_array($mediaId, $child, true)) {
+                return true;
+            }
+            if (is_array($child) && $this->containsMediaId($child, $mediaId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function authorize(User $actor, string $companyId, bool $approving): void
     {
         if (! Auth::check() || (int) Auth::id() !== (int) $actor->getKey()

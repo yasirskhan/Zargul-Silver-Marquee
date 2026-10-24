@@ -11,9 +11,10 @@ use InvalidArgumentException;
 final class SiteContentValidator
 {
     private const FIELDS = [
-        'hero' => ['eyebrow', 'title', 'subtitle', 'buttonLabel', 'buttonHref', 'imageId'],
+        'hero' => ['eyebrow', 'title', 'subtitle', 'buttonLabel', 'buttonHref', 'imageId',
+            'focalX', 'focalY', 'cropAspect'],
         'text' => ['title', 'body'],
-        'image' => ['imageId', 'alt', 'caption'],
+        'image' => ['imageId', 'alt', 'caption', 'focalX', 'focalY', 'cropAspect'],
         'gallery' => ['title', 'mediaIds'],
         'halls' => ['title', 'description'],
         'packages' => ['title', 'description'],
@@ -76,6 +77,14 @@ final class SiteContentValidator
             $this->require(! str_contains($value, '<') && ! str_contains($value, '>') && ! preg_match('/javascript\s*:|\bon\w+\s*=/i', $value), 'Unsafe CMS text');
             if ($field === 'buttonHref') {
                 $this->require($this->safeHref($value), 'Unsafe CMS link');
+            }
+            if (in_array($field, ['focalX', 'focalY'], true)) {
+                $this->require(preg_match('/\A(?:100|[0-9]{1,2})\z/', $value) === 1,
+                    'Invalid image focal point');
+            }
+            if ($field === 'cropAspect') {
+                $this->require(in_array($value, ['original', '16:9', '4:3', '1:1'], true),
+                    'Invalid image crop');
             }
         }
 

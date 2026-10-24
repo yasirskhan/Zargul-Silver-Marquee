@@ -264,6 +264,58 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   await expect(branding.getByRole('button', { name: 'Show /gallery' })).toBeVisible();
   await expect(page.getByText('browser-e2e-private@example.test')).toHaveCount(0);
   await expect(page.getByText('Synthetic Browser Customer')).toHaveCount(0);
+
+  // CMS-003/004: real owner columns, desktop widths/order and independent phone order.
+  await pageSections.getByRole('button', { name: '+ 2 columns' }).click();
+  await expect(pageSections.getByText('Desktop column 1 (6/12)')).toBeVisible();
+  await pageSections.getByRole('button', { name: 'Wide left 8 / 4' }).click();
+  await expect(pageSections.getByText('Desktop column 1 (8/12)')).toBeVisible();
+  await pageSections.getByRole('button', { name: 'Desktop left' }).last().click();
+  await expect(pageSections.getByText('Desktop column 1 (4/12)')).toBeVisible();
+  await pageSections.getByRole('button', { name: 'Phone later' }).first().click();
+  await expect(pageSections.getByText('Phone order: 2').first()).toBeVisible();
+  await reason.fill('Browser owner arranges responsive columns');
+  await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(pageStatus).toContainText('Editor loaded revision: 2', { timeout: 25_000 });
+  await page.getByRole('button', { name: 'Reload latest draft' }).click();
+  await expect(pageSections.getByText('Desktop column 1 (4/12)')).toBeVisible();
+  await expect(pageSections.getByText('Phone order: 2').first()).toBeVisible();
+
+  // CMS-002: real owner upload, private thumbnail, approval and crop/focal controls.
+  const mediaLibrary = page.locator('section[aria-label="Website media library"]');
+  const syntheticPng = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAE0lEQVR4nGPcsqCCAQaY4Cy8HABbGAHU4FlqOwAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  await mediaLibrary.locator('input[type="file"]').setInputFiles({
+    name: 'synthetic-venue.png', mimeType: 'image/png', buffer: syntheticPng,
+  });
+  await mediaLibrary.getByRole('textbox', { name: 'Image description for accessibility' })
+    .fill('Synthetic owner uploaded venue photograph');
+  await mediaLibrary.getByRole('textbox', { name: 'Media upload or approval reason' })
+    .fill('Synthetic browser owner uploads a private venue image');
+  await mediaLibrary.getByRole('button', { name: 'Stage image privately' }).click();
+  const uploadedThumb = mediaLibrary.getByRole('img', { name: 'Synthetic owner uploaded venue photograph' });
+  await expect(uploadedThumb).toBeVisible({ timeout: 25_000 });
+  expect(await uploadedThumb.evaluate(img => img.naturalWidth)).toBeGreaterThan(0);
+
+  page.once('dialog', dialog => dialog.accept());
+  await mediaLibrary.getByRole('button', { name: 'Approve image' }).first().click();
+  await expect(mediaLibrary.getByText(/Approved/).first()).toBeVisible({ timeout: 25_000 });
+  await mediaLibrary.getByRole('button', { name: 'Add to draft' }).first().click();
+  const cropControls = page.locator('div[aria-label="Image crop and focal point"]').last();
+  await expect(cropControls).toBeVisible();
+  await cropControls.getByRole('spinbutton', { name: 'Focal X (%)' }).fill('35');
+  await cropControls.getByRole('spinbutton', { name: 'Focal Y (%)' }).fill('65');
+  await cropControls.locator('select').selectOption('4:3');
+  await reason.fill('Browser owner sets approved photo crop and focal point');
+  await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(pageStatus).toContainText('Editor loaded revision: 3', { timeout: 25_000 });
+  await page.getByRole('button', { name: 'Reload latest draft' }).click();
+  const reloadedCrop = page.locator('div[aria-label="Image crop and focal point"]').last();
+  await expect(reloadedCrop.getByRole('spinbutton', { name: 'Focal X (%)' })).toHaveValue('35');
+  await expect(reloadedCrop.getByRole('spinbutton', { name: 'Focal Y (%)' })).toHaveValue('65');
+  await expect(reloadedCrop.locator('select')).toHaveValue('4:3');
 });
 
 test('real operations MFA grants only assigned-hall search and planning on mobile', async ({ page }) => {

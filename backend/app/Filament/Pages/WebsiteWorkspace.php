@@ -69,6 +69,13 @@ final class WebsiteWorkspace extends Page
 
     public string $mediaReason = '';
 
+    /** Staged replacement target; a replacement always creates a new media ID. */
+    public string $replacementMediaId = '';
+
+    public $replacementImage = null;
+
+    public string $replacementAltText = '';
+
     /** Owner-editable branding form, separate from approved public settings. */
     public array $branding = [];
 
@@ -221,6 +228,9 @@ final class WebsiteWorkspace extends Page
         $this->unpublishRequestKey = (string) Str::uuid();
         $this->sections = [];
         $this->columnMediaSelections = [];
+        $this->replacementMediaId = '';
+        $this->replacementImage = null;
+        $this->replacementAltText = '';
         $this->pageSeoTitle = '';
         $this->pageSeoDescription = '';
         $this->expectedRevision = 0;
@@ -559,6 +569,71 @@ final class WebsiteWorkspace extends Page
         Notification::make()->title('Image staged privately for review')->success()->send();
     }
 
+    /** Authenticated company-scoped preview/thumbnail URL; null for foreign or retired media. */
+    public function mediaPreviewUrl(string $mediaId): ?string
+    {
+        $actor = Filament::auth()->user();
+        $page = $this->currentPage();
+        if (! $actor instanceof User || ! $page || ! Str::isUuid($mediaId)
+            || ! Gate::forUser($actor)->allows('update', $page)) {
+            return null;
+        }
+        $exists = DB::table('site_media')->where('company_id', $page->company_id)
+            ->where('id', $mediaId)->whereIn('status', ['pending', 'approved'])->exists();
+
+        return $exists ? route('site.media.preview', ['mediaId' => $mediaId]) : null;
+    }
+
+    public function selectReplacement(string $mediaId): void
+    {
+        [$actor, $page] = $this->authorizeSelectedPage('update');
+        $this->checkEditorSnapshot($page);
+        $asset = DB::table('site_media')->where('company_id', $page->company_id)
+            ->where('id', $mediaId)->whereIn('status', ['pending', 'approved'])->first();
+        abort_unless($asset, 404);
+        $this->replacementMediaId = (string) $asset->id;
+        $this->replacementAltText = (string) ($asset->alt_text ?? '');
+        $this->replacementImage = null;
+    }
+
+    public function stageReplacementMedia(): void
+    {
+        [$actor, $page] = $this->authorizeSelectedPage('update');
+        $this->checkEditorSnapshot($page);
+        $this->validate([
+            'replacementMediaId' => ['required', 'uuid'],
+            'replacementImage' => ['required', 'file', 'max:4096'],
+            'replacementAltText' => ['required', 'string', 'max:300'],
+            'mediaReason' => ['required', 'string', 'min:3', 'max:500'],
+        ]);
+        $asset = DB::table('site_media')->where('company_id', $page->company_id)
+            ->where('id', $this->replacementMediaId)->whereIn('status', ['pending', 'approved'])->first();
+        abort_unless($asset, 404);
+
+        app(SiteMediaService::class)->stageReplacement(
+            $actor, $page->company_id, (string) $asset->id,
+            $this->replacementImage, $this->replacementAltText, $this->mediaReason
+        );
+        $this->reset('replacementImage', 'replacementMediaId', 'replacementAltText', 'mediaReason');
+        Notification::make()->title('Replacement staged privately; published revisions keep the old image')->success()->send();
+    }
+
+    public function retireMedia(string $mediaId): void
+    {
+        [$actor, $page] = $this->authorizeSelectedPage('update');
+        $this->checkEditorSnapshot($page);
+        $this->validate(['mediaReason' => ['required', 'string', 'min:3', 'max:500']]);
+        try {
+            app(SiteMediaService::class)->retireImage(
+                $actor, $page->company_id, $mediaId, $this->mediaReason
+            );
+        } catch (\InvalidArgumentException $exception) {
+            throw ValidationException::withMessages(['mediaReason' => $exception->getMessage()]);
+        }
+        $this->mediaReason = '';
+        Notification::make()->title('Image retired from the library')->success()->send();
+    }
+
     public function approveMedia(string $mediaId): void
     {
         [$actor, $page] = $this->authorizeSelectedPage('publish');
@@ -591,6 +666,9 @@ final class WebsiteWorkspace extends Page
                 'imageId' => $asset->id,
                 'alt' => $asset->alt_text ?: 'Venue photograph',
                 'caption' => '',
+                'focalX' => '50',
+                'focalY' => '50',
+                'cropAspect' => '16:9',
             ],
         ];
     }
@@ -784,6 +862,9 @@ final class WebsiteWorkspace extends Page
                 'imageId' => $asset->id,
                 'alt' => $asset->alt_text ?: 'Venue photograph',
                 'caption' => '',
+                'focalX' => '50',
+                'focalY' => '50',
+                'cropAspect' => '16:9',
             ],
         ];
         $this->columnMediaSelections[$sectionIndex][$columnIndex] = '';

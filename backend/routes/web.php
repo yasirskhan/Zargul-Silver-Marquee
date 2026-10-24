@@ -19,6 +19,13 @@ Route::get('/_venue-media/{pageSlug}/{mediaId}.webp',
 Route::get('/robots.txt', \App\Http\Controllers\PublishedVenueRobotsController::class);
 Route::get('/sitemap.xml', \App\Http\Controllers\PublishedVenueSitemapController::class);
 
+// Authenticated, company-authorized private CMS media preview/thumbnail.
+// Only an authorized editor/publisher can fetch these bytes; no public path.
+Route::get('/site-media/{mediaId}', \App\Http\Controllers\SiteMediaPreviewController::class)
+    ->whereUuid('mediaId')
+    ->middleware(['auth'])
+    ->name('site.media.preview');
+
 /**
  * Only Telegram itself may call this endpoint. In production, reject plain
  * HTTP even behind an accidentally misconfigured reverse proxy.

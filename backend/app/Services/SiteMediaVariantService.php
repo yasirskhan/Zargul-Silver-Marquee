@@ -14,6 +14,15 @@ final class SiteMediaVariantService
 {
     public function webp1200(string $source, string $expectedMime): array
     {
+        return $this->webpFit($source, $expectedMime, 1200);
+    }
+
+    /** Decode arbitrary approved/staged image bytes and emit a private WebP fit within bounds. */
+    public function webpFit(string $source, string $expectedMime, int $maxDimension): array
+    {
+        if ($maxDimension < 1 || $maxDimension > 6000) {
+            throw new InvalidArgumentException('Invalid image variant bound.');
+        }
         if (! function_exists('imagecreatefromstring') || ! function_exists('imagewebp')) {
             throw new RuntimeException('GD WebP support is required for image approval.');
         }
@@ -34,7 +43,7 @@ final class SiteMediaVariantService
         }
 
         try {
-            $scale = min(1, 1200 / max(imagesx($image), imagesy($image)));
+            $scale = min(1, $maxDimension / max(imagesx($image), imagesy($image)));
             $width = max(1, (int) round(imagesx($image) * $scale));
             $height = max(1, (int) round(imagesy($image) * $scale));
             $target = imagecreatetruecolor($width, $height);
