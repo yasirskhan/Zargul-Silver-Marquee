@@ -50,8 +50,8 @@ change customer invoice, reservation or ledger. Actual overtime billing still ne
 authorized contractual adjustment and operator release.
 Acceptance evidence for Phase 7/7.1/7.2/7.3: docs/PHASE7_ACCEPTANCE.md at `5735312`, CI 40120614543 all six success; event recording remains OFF and no real attendance, fulfilment or financial adjustment is claimed.
 
-## Phase 8 — Controlled pilot
-No real launch until finance, isolation, restores, booking concurrency and real user tests are accepted.
+## Phase 8 — Controlled pilot (technical prep verified; real staging/UAT/restore/operator BLOCKED)
+No real launch until finance, isolation, restores, booking concurrency and real user tests are accepted. Technical evidence: docs/PHASE8_PILOT_READINESS.md at `cb04416`, CI 40127753617 six jobs; `venuedesk:pilot-readiness` fails closed and all external pilot steps remain OPEN.
 
 ## Phase 9 — Commercial licensing and initial setup (approved, not implemented)
 Separate VenueDesk Central Control Center; signed license activation/renewal; hosted + self-hosted tenancy; scoped hall/user entitlements; public maintenance at expiry with backend grace; renew/export/reconcile; resumable securely closed owner/hall/pricing/payment setup wizard and existing-installation migration.
