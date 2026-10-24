@@ -4,7 +4,7 @@ Repository `yasirskhan/Zargul-Silver-Marquee`, **only branch `chatgpt/phase0-fou
 
 ## Current verified baseline
 
-- **Final integrated baseline: `57353125a9e160c3b6068c291a1d0ea622d34b47`, [run 40120614543](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40120614543) — six jobs SUCCESS.**
+- **Final integrated baseline: `cb04416a264ee73dd003af64e2da1e655bf7ea0e`, [run 40127753617](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40127753617) — six jobs SUCCESS.**
 - Phase 0: `7ab6ff8`, CI 40020880262; `docs/PHASE0_ACCEPTANCE.md`.
 - Phase 0.5: `63c6b7a`, CI 40050039945; `docs/PHASE0_5_ACCEPTANCE.md`.
 - Phase 1: `4024399`, CI 40064675256; `docs/PHASE1_ACCEPTANCE.md`.
@@ -14,22 +14,20 @@ Repository `yasirskhan/Zargul-Silver-Marquee`, **only branch `chatgpt/phase0-fou
 - Phase 5: `ef6217b`, CI 40113341018; `docs/PHASE5_ACCEPTANCE.md`.
 - Phase 6: `59beb42`, CI 40119020374; `docs/PHASE6_ACCEPTANCE.md`.
 - Phase 7/7.1/7.2/7.3: `5735312`, CI 40120614543; `docs/PHASE7_ACCEPTANCE.md`.
-  - Internal planning checklist, role/hall isolation, revision CAS and immutable audit.
-  - Observed actual start/finish, nonbinding overtime/grace/hard-stop preview, no extension or customer charge.
-  - Witnessed one-time task fulfilment with performed/missing/outstanding evidence.
-  - Frozen closeout summary with unresolved-task preservation and read-only operational cost preview.
-  - `VENUE_EVENT_RECORDING_ENABLED` remains OFF; no real attendance/fulfilment/financial adjustment claimed.
+- Phase 8: technical prep `cb04416`, CI 40127753617; `docs/PHASE8_PILOT_READINESS.md`.
+  - `venuedesk:pilot-readiness [--json]` fails closed on production, any release flag ON, non-PostgreSQL/missing tables, unwritable storage or no active verified owner; reports role/MFA/mailer warnings.
+  - `PilotReadinessCommandTest` covers pass and flag-on failure.
+  - Real staging, backup restore, Owner/Manager UAT, staff attendance, payment and operator signoff remain **BLOCKED EXTERNAL**.
 
 ## External/operational gates (not fabricated)
 
-- Controlled Phase 8 pilot with real venue staff/events and operator signoff.
-- Real event recording, staff attendance, witnessed service evidence and any authorized overtime adjustment.
+- Controlled Phase 8 pilot with real staging, participants, paired backup/restore and independent operator/security signoff.
 - Real Telegram/payment/bank credentials, off-site backup/restore, real photography/DNS, staging/security/operator acceptance.
 - Phase 12 operational acceptance remains open; Phase 13 not promoted.
 
 ## Next executable phase
 
-Phase 8 — controlled pilot preparation. Verify the existing pilot/readiness surfaces and staging runbook; do not claim real pilot acceptance without participants. Then continue Phase 9 Central Control Center UI/remaining approved work that is not externally blocked.
+Phase 9/9.1/9.2 — HAFZATECH Central Control Center and client licensing portal. Reuse `central/src` foundations; do not recreate. Prioritize usable central staff/customer/licensing/support interfaces and client installation/licensing workflows that are independent of external DNS/KMS/bank credentials; keep `CENTRAL_API_ENABLED` and all release gates OFF; verify six jobs, record acceptance, then continue Phase 10.
 
 ## Rules and gates
 

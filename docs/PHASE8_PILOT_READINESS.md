@@ -13,14 +13,14 @@ Hosted CI: [run 40127753617](https://github.com/yasirskhan/Zargul-Silver-Marquee
   - the storage root is writable;
   - at least one active, verified owner exists;
   - role coverage is reported for owner/admin/manager/operations/reception.
-- The command reports warnings for missing pilot roles, private storage not yet provisioned, absent MFA enrolment and non-delivering mailer configuration.
+- Reports warnings for missing pilot roles, private storage not yet provisioned, absent MFA enrolment and non-delivering mailer configuration.
 - `PilotReadinessCommandTest` proves the pass path and failure when a release flag is enabled.
 
-## Operator checklist (still to execute externally)
+## Operator checklist (still external)
 
 1. Provision isolated staging PostgreSQL, private document storage and HTTPS host.
 2. Create synthetic owner/admin/manager/operations/reception accounts with real TOTP MFA.
-3. Run `php artisan venuedesk:pilot-readiness --json` and retain the output.
+3. Run `php artisan venuedesk:pilot-readiness --json` and retain output.
 4. Complete paired PostgreSQL/private-document backup and restore into a clean staging instance.
 5. Execute booking → calendar → quote/invoice/payment → approval → website enquiry → event execution → closeout scenarios with synthetic data only.
 6. Verify tenant/company/hall isolation, revocation, concurrency, idempotency and failure recovery.
@@ -30,4 +30,4 @@ Hosted CI: [run 40127753617](https://github.com/yasirskhan/Zargul-Silver-Marquee
 
 No real staging environment, backup restore, Owner/Manager UAT, real staff attendance, customer payment, provider/bank settlement or operator signoff is claimed. All production flags remain OFF. Phase 8 remains **BLOCKED EXTERNAL** until the checklist evidence exists.
 
-Phase 9 Central Control Center work is the next software phase; external DNS/HTTPS, KMS/HSM, bank/provider credentials and production activation remain blocked and separate.
+Phase 9 Central Control Center work remains the next software phase; external DNS/HTTPS, KMS/HSM, bank/provider credentials and production activation remain blocked and separate.

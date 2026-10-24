@@ -27,7 +27,7 @@ Repository `yasirskhan/Zargul-Silver-Marquee`, **only branch `chatgpt/phase0-fou
 
 ## Next executable phase
 
-Phase 9/9.1/9.2 — HAFZATECH Central Control Center and client licensing portal. Reuse `central/src` foundations; do not recreate. Prioritize usable central staff/customer/licensing/support interfaces and client installation/licensing workflows that are independent of external DNS/KMS/bank credentials; keep `CENTRAL_API_ENABLED` and all release gates OFF; verify six jobs, record acceptance, then continue Phase 10.
+Phase 9/9.1/9.2 — HAFZATECH Central Control Center and client licensing portal. Reuse `central/src` foundations; do not recreate. Prioritize usable central staff/customer/licensing/support interfaces and client installation/licensing workflows independent of external DNS/KMS/bank credentials; keep `CENTRAL_API_ENABLED` and all release gates OFF; verify six jobs, record acceptance, then continue Phase 10.
 
 ## Rules and gates
 
