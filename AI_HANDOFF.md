@@ -1,17 +1,26 @@
-# Zargul Silver Marquee — concise development handoff (2026-10-23)
+# Zargul Silver Marquee — concise development handoff (2026-10-24)
 
-Repository `yasirskhan/Zargul-Silver-Marquee`, ONLY `chatgpt/phase0-foundation`. Single authorized normal-Chat writer. Never Work/main/new branch/force-push/property-platform/production activation. Read root AGENTS.md, docs/SESSION_CONTROL.md, master spec, roadmap, feature/issue registers and latest exact CI before edits. Use expected_sha+force=false, no overlapping writer.
+Repository `yasirskhan/Zargul-Silver-Marquee`, **only branch `chatgpt/phase0-foundation`**. Single authorized normal-Chat writer. Never Work mode, `main`, a new branch, force-push, `property-platform`, or production activation. Always recheck live HEAD and exact branch CI before writes; publish with expected SHA and `force=false`.
 
-## Phase 12 executable-code checkpoint
-- Code SHA `8e14d0c0b4e7ec973f9c4fb82d233cc554d04fc1`, GitHub Actions [40018835848](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40018835848): **ALL SIX SUCCESS**. Repaired actual Manager C stocktake catalog staleness using a hall-scoped "Refresh count items" action preserving unsaved count/other reviews; genuine Owner/Manager/Manager MFA browser purchase receiving, review, monthly physical count and CSV works. Original red `3274825a` run `39997583349` failed because no fresh dropdown option. Intermediate `5e2d3ee7` run `40017456932` had one backend test fail because it attempted client mutation of immutable `varianceStocktakeId`; removed only the forbidden test mutation in `8e14d0c0`, protected property stayed LOCKED.
-- Already verified prior INTERNAL exact 100-chair signed loss/15 missing/ADR-0009/authorized writeoff/immutable numbered IAC with SHA256 download, external-in/out signed custody/returns and selected real PostgreSQL concurrent safety tests. Do not repeat these completed flows.
-- Approved Phase 12 register: all 59 source file mappings present; 40 `HOSTED_CODE_TESTS_PASSED`, 17 `CODE_PRESENT_LEGACY_LABEL_RECONCILED`, 2 `SOURCE_FOUND_PILOT_UNACCEPTED` at baseline. No newly proven mandatory missing source implementation identified by this audit; avoid changing 17/2 labels into full human acceptance without real evidence. Engineering code is **technically ready for controlled staging/operator verification**, not operationally accepted.
-- **Phase 12 OPERATIONAL ACCEPTANCE OPEN.** No verified real HTTPS staging, authorized original witnesses, independent partner/bank reconciliation, private-file+Postgres restore, security/operator release signatures. Production inventory and financial flags OFF. No Phase13 promotion/production.
+## Current verified baseline
 
-## Resume sequential approved roadmap
-- Phase 0 foundation source and six-job CI already exist; README explicitly separates root HTML prototypes from guarded Laravel/Central systems. Roadmap and PLAT feature register updated in `c49cc13d3a941ba3d328314e5ffbccd51e2f9715` (latest CMS source).
-- Phase 0.5 is the next executable work. Commit `c49cc13d3a941ba3d328314e5ffbccd51e2f9715` / [run 40019799112](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40019799112) **CI PENDING at this snapshot**: owner/editor adds typed text/CTA blocks, keyboard/touch move within/between columns, removes draft blocks, preserves immutable publish pointer, layout test. Repair any actual red logs before further publish.
-- Follow-on **published source in this successor commit, CI unverified**: company-scoped image-library insertion into authenticated visual columns using approved or staged media, no arbitrary file URL or executable HTML. Existing media staging/approval/publish test now covers nested image block, while the previous block-order/editor run `40019799112` remains a distinct exact SHA. Verify every hosted CI job and repair actual failures before marking CMS technically complete.
-- Continue **phase by phase**, earliest unfinished requirement; finish genuine backend/UI functionality and exact six-job source verification, not redundant retrospective test scenarios. Then Phase1, Phase2 and so on in documented order. No VPS/website staging activation until owner later resumes operational testing.
+- Phase 0 foundation: `7ab6ff8b573a45f99eec19a81825a1d79ad762c7`, [run 40020880262](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40020880262) — six jobs SUCCESS. Acceptance: `docs/PHASE0_ACCEPTANCE.md`.
+- Phase 0.5 CMS editor: `63c6b7a8d2a6180c51e74f5ded2cbeb3a6a192ea`, [run 40050039945](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40050039945) — six jobs SUCCESS. Acceptance: `docs/PHASE0_5_ACCEPTANCE.md`.
+- Phase 0.5 work completed in this batch:
+  - authenticated private media thumbnails via `/site-media/{uuid}` with company edit/publish authorization, active/verified user checks and generated WebP;
+  - real logo/photo rendering in branding and draft previews; image blocks preserve bounded `focalX`, `focalY`, `cropAspect` in draft revisions;
+  - safe replacement as a **new media ID** (published revisions keep old bytes) and retirement refused while a published revision references the asset;
+  - authenticated Owner browser journey covering upload/approve/thumbnail/crop plus two-column width, desktop reorder and independent phone order, save and reload;
+  - backend regressions for private route access, foreign-company denial, replacement/retirement and crop/focal persistence.
+- Phase 12 remains **OPEN** on external operational acceptance. Do not promote Phase 13 or enable production inventory/finance flags. Its existing handoff/report files remain authoritative for Phase 12.
 
-Six required jobs: prototype-checks, central-postgres, licensing-postgres, laravel-postgres, editor-browser-e2e, authenticated-panel-e2e. A result is VERIFIED only when all six belong to exact source SHA and completed SUCCESS.
+## Next executable requirement
+
+Continue sequentially with the earliest genuinely unfinished **Phase 1** requirement in `docs/FEATURE_REGISTER.csv` (AUTH-001/TEN-001/AUD-001/CMS-008/UX-001/PLAT-005/PLAT-006). Inspect actual code/tests before changing labels; many “pending exact CI” notes pre-date the current green baseline and must be reconciled only against executable evidence. Do not repeat Phase 0/0.5 or Phase 12 work already verified.
+
+## Rules and gates
+
+- All production release flags remain OFF until operator/security/restore acceptance.
+- Use synthetic test media only; real Owner uploads/staging acceptance remain external.
+- Preserve draft/publish separation, immutable revisions/audit, company isolation and role checks.
+- Six required jobs: `prototype-checks`, `central-postgres`, `licensing-postgres`, `laravel-postgres`, `editor-browser-e2e`, `authenticated-panel-e2e`. A result is VERIFIED only when all six on the exact SHA are completed SUCCESS.
