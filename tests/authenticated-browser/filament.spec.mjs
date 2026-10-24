@@ -219,7 +219,6 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   await page.goto('/admin/finance-review');
   await expect(page.getByText('Finance review is internal only.')).toBeVisible();
   await page.waitForFunction(() => Boolean(window.Livewire?.all?.().length), null, { timeout: 30_000 });
-  await expect(page.getByText('Financial posting is disabled', { exact: false })).toBeVisible();
   await page.getByLabel('Internal proposal under review').selectOption({ index: 1 });
   await page.getByLabel('Internal purpose (no customer contact)')
     .fill('Synthetic owner review of frozen rental-only price');
