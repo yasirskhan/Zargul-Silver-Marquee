@@ -4,33 +4,38 @@ Repository `yasirskhan/Zargul-Silver-Marquee`, **only branch `chatgpt/phase0-fou
 
 ## Current verified baseline
 
-- **Final integrated baseline: `cb04416a264ee73dd003af64e2da1e655bf7ea0e`, [run 40127753617](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40127753617) — six jobs SUCCESS.**
-- Phase 0: `7ab6ff8`, CI 40020880262; `docs/PHASE0_ACCEPTANCE.md`.
-- Phase 0.5: `63c6b7a`, CI 40050039945; `docs/PHASE0_5_ACCEPTANCE.md`.
-- Phase 1: `4024399`, CI 40064675256; `docs/PHASE1_ACCEPTANCE.md`.
-- Phase 2: `39a0315`, CI 40072138788; `docs/PHASE2_ACCEPTANCE.md`.
-- Phase 3: `bf288cb`, CI 40075891670; `docs/PHASE3_ACCEPTANCE.md`.
-- Phase 4: `1d4afb3`, CI 40090557799; `docs/PHASE4_ACCEPTANCE.md`.
-- Phase 5: `ef6217b`, CI 40113341018; `docs/PHASE5_ACCEPTANCE.md`.
-- Phase 6: `59beb42`, CI 40119020374; `docs/PHASE6_ACCEPTANCE.md`.
-- Phase 7/7.1/7.2/7.3: `5735312`, CI 40120614543; `docs/PHASE7_ACCEPTANCE.md`.
-- Phase 8: technical prep `cb04416`, CI 40127753617; `docs/PHASE8_PILOT_READINESS.md`.
-  - `venuedesk:pilot-readiness [--json]` fails closed on production, any release flag ON, non-PostgreSQL/missing tables, unwritable storage or no active verified owner; reports role/MFA/mailer warnings.
-  - `PilotReadinessCommandTest` covers pass and flag-on failure.
-  - Real staging, backup restore, Owner/Manager UAT, staff attendance, payment and operator signoff remain **BLOCKED EXTERNAL**.
+- **Final integrated baseline: `fbc13a519b7cb6a4fc96f3ea86b3a46e0c3d5c5f`, [run 40134105446](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40134105446) — six jobs SUCCESS.**
+- Phase 0: `7ab6ff8`, CI 40020880262.
+- Phase 0.5: `63c6b7a`, CI 40050039945.
+- Phase 1: `4024399`, CI 40064675256.
+- Phase 2: `39a0315`, CI 40072138788.
+- Phase 3: `bf288cb`, CI 40075891670.
+- Phase 4: `1d4afb3`, CI 40090557799.
+- Phase 5: `ef6217b`, CI 40113341018.
+- Phase 6: `59beb42`, CI 40119020374.
+- Phase 7/7.1–7.3: `5735312`, CI 40120614543.
+- Phase 8 technical prep: `cb04416`, CI 40127753617; real pilot **BLOCKED EXTERNAL**.
+- Phase 9 first milestone: `fbc13a5`, CI 40134105446; `docs/PHASE9_CENTRAL_PORTAL.md`.
+  - `central/public/staff.php`: default-off, verified-HTTPS-host staff front controller with vendor-only email/password/TOTP login, secure session cookie, CSRF and delegation to the existing central staff portal router.
+  - External `CENTRAL_STAFF_KMS_BOOTSTRAP` supplies TOTP decryption/support-reply encryption; no KMS/signing secret in repo.
+  - `central/tests/staff_public_portal.php` proves default denial, trusted-host login UI, wrong-host denial, no secret output and fail-closed missing KMS.
+  - Dashboard/customer directory/license queue/billing/support/audit endpoints are the existing role-scoped portal services; not yet exercised by a deployed authenticated browser.
 
 ## External/operational gates (not fabricated)
 
-- Controlled Phase 8 pilot with real staging, participants, paired backup/restore and independent operator/security signoff.
-- Real Telegram/payment/bank credentials, off-site backup/restore, real photography/DNS, staging/security/operator acceptance.
+- Real staging pilot, backup restore, Owner/Manager UAT, operator/security signoff.
+- Central DNS/HTTPS, KMS/HSM, database credentials, staff seed accounts, bank/provider settlement.
+- Real Telegram/payment credentials, off-site backup/restore, real photography/DNS.
 - Phase 12 operational acceptance remains open; Phase 13 not promoted.
 
-## Next executable phase
+## Next executable work
 
-Phase 9/9.1/9.2 — HAFZATECH Central Control Center and client licensing portal. Reuse `central/src` foundations; do not recreate. Prioritize usable central staff/customer/licensing/support interfaces and client installation/licensing workflows independent of external DNS/KMS/bank credentials; keep `CENTRAL_API_ENABLED` and all release gates OFF; verify six jobs, record acceptance, then continue Phase 10.
+1. Authenticated browser journey for the gated central portal in an isolated test environment (login, dashboard, customer/installation directory, authorized/denied roles, logout).
+2. Complete the resumable installation wizard on `InstallationSetup`: owner/MFA, company/venue, halls/addresses/capacities, currency/timezone, programs/pricing, guest brackets, add-ons, branding/maps/footer, approved payment settings, staff permissions, review/complete; preserve installed data and make retries safe.
+3. Continue central license/billing/support and client licensing workflows; keep `CENTRAL_API_ENABLED`, `CENTRAL_STAFF_PUBLIC_PORTAL_ENABLED` and all release gates OFF until external approval.
 
 ## Rules and gates
 
 - All production release flags remain OFF until operator/security/restore acceptance.
-- Preserve immutable revisions/audit, company/hall isolation, balanced ledger, role checks, enquiry consent and customer privacy.
+- Preserve immutable audit, tenant isolation, MFA, role checks, financial controls and customer privacy.
 - Six required jobs: `prototype-checks`, `central-postgres`, `licensing-postgres`, `laravel-postgres`, `editor-browser-e2e`, `authenticated-panel-e2e`. VERIFIED only when all six on the exact SHA are completed SUCCESS.

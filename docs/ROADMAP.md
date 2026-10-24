@@ -53,7 +53,8 @@ Acceptance evidence for Phase 7/7.1/7.2/7.3: docs/PHASE7_ACCEPTANCE.md at `57353
 ## Phase 8 — Controlled pilot (technical prep verified; real staging/UAT/restore/operator BLOCKED)
 No real launch until finance, isolation, restores, booking concurrency and real user tests are accepted. Technical evidence: docs/PHASE8_PILOT_READINESS.md at `cb04416`, CI 40127753617 six jobs; `venuedesk:pilot-readiness` fails closed and all external pilot steps remain OPEN.
 
-## Phase 9 — Commercial licensing and initial setup (approved, not implemented)
+## Phase 9 — Commercial licensing and initial setup (staff portal milestone verified; full licensing/wizard pending)
+Gated central staff front controller and login milestone: docs/PHASE9_CENTRAL_PORTAL.md at `fbc13a5`, CI 40134105446 six jobs. Client installation wizard, deployed browser UAT and external DNS/KMS/bank activation remain OPEN.
 Separate VenueDesk Central Control Center; signed license activation/renewal; hosted + self-hosted tenancy; scoped hall/user entitlements; public maintenance at expiry with backend grace; renew/export/reconcile; resumable securely closed owner/hall/pricing/payment setup wizard and existing-installation migration.
 
 ## Phase 10 — Public website productization (approved, not implemented)
