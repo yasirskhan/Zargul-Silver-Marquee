@@ -99,6 +99,8 @@ test('private proposal route requires authentication and does not reveal custome
 
 test('real owner password and TOTP flow protects mobile proposal editing without booking', async ({ page }) => {
   test.setTimeout(240_000);
+  // Other authenticated specs start against the same real login limiter.
+  await page.waitForTimeout(65_000);
   await page.setViewportSize({ width: 360, height: 740 });
   await page.goto('/admin/login');
   await expect(page.locator('input[type="email"]')).toBeVisible();
