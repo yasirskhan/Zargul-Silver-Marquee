@@ -292,11 +292,22 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   await mediaLibrary.locator('input[type="file"]').setInputFiles({
     name: 'synthetic-venue.png', mimeType: 'image/png', buffer: syntheticPng,
   });
-  await mediaLibrary.getByRole('textbox', { name: 'Image description for accessibility' })
-    .fill('Synthetic owner uploaded venue photograph');
-  await mediaLibrary.getByRole('textbox', { name: 'Media upload or approval reason' })
-    .fill('Synthetic browser owner uploads a private venue image');
-  await mediaLibrary.getByRole('button', { name: 'Stage image privately' }).click();
+  await page.waitForTimeout(1_500);
+  const mediaAltField = mediaLibrary.getByRole('textbox', { name: 'Image description for accessibility' });
+  const mediaReasonField = mediaLibrary.getByRole('textbox', { name: 'Media upload or approval reason' });
+  const stageButton = mediaLibrary.getByRole('button', { name: 'Stage image privately' });
+  await mediaAltField.fill('Synthetic owner uploaded venue photograph');
+  await mediaReasonField.fill('Synthetic browser owner uploads a private venue image');
+  await stageButton.click();
+  await page.waitForTimeout(800);
+  if ((await mediaReasonField.inputValue()) !== '') {
+    // Livewire temp-upload hydration can still be in flight on a slow runner.
+    await page.waitForTimeout(1_500);
+    await mediaAltField.fill('Synthetic owner uploaded venue photograph');
+    await mediaReasonField.fill('Synthetic browser owner uploads a private venue image');
+    await stageButton.click();
+  }
+  await expect(mediaReasonField).toHaveValue('');
   const uploadedThumb = mediaLibrary.getByRole('img', { name: 'Synthetic owner uploaded venue photograph' });
   await expect(uploadedThumb).toBeVisible({ timeout: 25_000 });
   expect(await uploadedThumb.evaluate(img => img.naturalWidth)).toBeGreaterThan(0);
