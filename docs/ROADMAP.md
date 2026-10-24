@@ -25,7 +25,7 @@ Owner review center, Telegram notification integration, approvals audit, permiss
 ## Phase 6 — Venue public website (technically verified base; public launch/media/operator separate)
 Production-grade Zargul Silver Marquee brand site and integrated enquiry flow, legitimate venue photos/packages. Acceptance evidence: docs/PHASE6_ACCEPTANCE.md at `59beb42`, CI 40119020374 all six success; public site gate remains OFF and real photography/DNS/UAT are external.
 
-## Phase 7 — Operations/readiness
+## Phase 7 — Operations/readiness (technically verified; real execution/operator separate)
 Event actual times, setup/cleaning, services, staffing, overtime billing and operational reports.
 
 ## Phase 7.1 — Actual event operations (release gated)
@@ -48,6 +48,7 @@ reviewed planned-task counts and witnessed performed/unperformed evidence.
 Display unresolved services without falsely marking them delivered, do not silently
 change customer invoice, reservation or ledger. Actual overtime billing still needs
 authorized contractual adjustment and operator release.
+Acceptance evidence for Phase 7/7.1/7.2/7.3: docs/PHASE7_ACCEPTANCE.md at `5735312`, CI 40120614543 all six success; event recording remains OFF and no real attendance, fulfilment or financial adjustment is claimed.
 
 ## Phase 8 — Controlled pilot
 No real launch until finance, isolation, restores, booking concurrency and real user tests are accepted.
