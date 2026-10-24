@@ -41,12 +41,21 @@ async function waitForLoginHydration(page) {
   null, { timeout: 30_000 });
 }
 
-async function signInWithTotp(page, email, password, secret) {
+async function signInWithTotp(page, email, password, secret, attempt = 0) {
+  if (attempt > 2) throw new Error('Real MFA login was repeatedly throttled');
   await page.goto('/admin/login');
   await waitForLoginHydration(page);
   await page.locator('input[type="email"]').fill(email);
   await page.getByLabel(/Password/).fill(password);
   await page.getByRole('button', { name: /sign in|log in/i }).first().click();
+  await page.waitForTimeout(400);
+  const throttle = page.getByText(/Too many login attempts/i).first();
+  if (await throttle.isVisible().catch(() => false)) {
+    const message = String(await throttle.textContent());
+    const seconds = Number(message.match(/(\d+)\s+seconds?/i)?.[1] ?? 65);
+    await page.waitForTimeout((Math.min(120, Math.max(1, seconds)) + 2) * 1000);
+    return signInWithTotp(page, email, password, secret, attempt + 1);
+  }
   const code = page.locator(
     'input[autocomplete="one-time-code"]:visible, input[id*="code"]:visible, input[name*="code"]:visible, input[inputmode="numeric"]:visible',
   ).first();
@@ -59,12 +68,22 @@ async function signInWithTotp(page, email, password, secret) {
         .some((blocked) => path.startsWith(blocked));
   };
   try {
-    await page.waitForURL(authenticated, { timeout: 20_000 });
+    await page.waitForURL(authenticated, { timeout: 15_000 });
+    return;
   } catch {
+    if (await throttle.isVisible().catch(() => false)) {
+      const message = String(await throttle.textContent());
+      const seconds = Number(message.match(/(\d+)\s+seconds?/i)?.[1] ?? 65);
+      await page.waitForTimeout((Math.min(120, Math.max(1, seconds)) + 2) * 1000);
+      return signInWithTotp(page, email, password, secret, attempt + 1);
+    }
     const verify = page.getByRole('button', {
       name: /confirm sign in|verify|continue|sign in/i,
     }).last();
-    if (await verify.isVisible().catch(() => false)) await verify.click();
+    if (await verify.isVisible().catch(() => false)) {
+      await expect(verify).toBeEnabled({ timeout: 10_000 });
+      await verify.click();
+    }
     await page.waitForURL(authenticated, { timeout: 30_000 });
   }
 }
@@ -366,7 +385,7 @@ test('real owner password and TOTP flow protects mobile proposal editing without
 });
 
 test('real owner configures hall schedule seating and add-ons without booking', async ({ page }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   await page.setViewportSize({ width: 1440, height: 900 });
   await signInWithTotp(
     page, 'browser-e2e-inventory-owner-b@example.test',
@@ -421,7 +440,7 @@ test('real owner configures hall schedule seating and add-ons without booking', 
 });
 
 test('assigned manager sees hall configuration read-only on mobile', async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   await page.setViewportSize({ width: 390, height: 844 });
   await signInWithTotp(
     page, 'browser-e2e-inventory-manager-c@example.test',
