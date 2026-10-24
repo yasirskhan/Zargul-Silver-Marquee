@@ -13,8 +13,9 @@ use InvalidArgumentException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /**
- * Internal encrypted audit export foundation. No HTTP/download route,
- * external backup, retention guarantee or operator-approved key procedure.
+ * Internal encrypted audit export foundation. Owner/admin ciphertext download
+ * is supported; approved off-site storage, key custody, retention and recovery
+ * authorization remain external.
  */
 final class AuditExportService
 {
@@ -126,6 +127,48 @@ final class AuditExportService
                 'sha256' => $digest, 'encryptedPayload' => $ciphertext,
             ];
         }, 3);
+    }
+
+    /**
+     * Decrypt and structurally verify an exported archive for recovery drills.
+     * This is intentionally callable without a web session; possession of the
+     * ciphertext and the application key is required.
+     */
+    public function verify(string $ciphertext, ?string $expectedSha256 = null): array
+    {
+        try {
+            $plaintext = Crypt::decryptString($ciphertext);
+        } catch (\Illuminate\Contracts\Encryption\DecryptException) {
+            throw new InvalidArgumentException('Audit export cannot be decrypted with this application key.');
+        }
+
+        try {
+            $archive = json_decode($plaintext, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            throw new InvalidArgumentException('Audit export is not valid JSON.');
+        }
+        if (! is_array($archive)
+            || ($archive['format'] ?? null) !== 'venuedesk-audit-v1'
+            || ! is_string($archive['exportId'] ?? null) || ! Str::isUuid($archive['exportId'])
+            || ! is_string($archive['companyId'] ?? null) || ! Str::isUuid($archive['companyId'])
+            || ! is_array($archive['entries'] ?? null) || ! array_is_list($archive['entries'])) {
+            throw new InvalidArgumentException('Audit export archive structure is invalid.');
+        }
+
+        $sha256 = hash('sha256', $plaintext);
+        if ($expectedSha256 !== null
+            && (! preg_match('/\A[a-f0-9]{64}\z/', $expectedSha256)
+                || ! hash_equals($expectedSha256, $sha256))) {
+            throw new InvalidArgumentException('Audit export checksum does not match the expected digest.');
+        }
+
+        return [
+            'exportId' => $archive['exportId'],
+            'companyId' => $archive['companyId'],
+            'entryCount' => count($archive['entries']),
+            'exportedAt' => is_string($archive['exportedAt'] ?? null) ? $archive['exportedAt'] : null,
+            'sha256' => $sha256,
+        ];
     }
 
     private function authorize(User $actor, string $companyId): void

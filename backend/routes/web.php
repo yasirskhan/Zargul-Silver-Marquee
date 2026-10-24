@@ -26,6 +26,12 @@ Route::get('/site-media/{mediaId}', \App\Http\Controllers\SiteMediaPreviewContro
     ->middleware(['throttle:120,1'])
     ->name('site.media.preview');
 
+// Owner/admin encrypted audit archive download; ciphertext only.
+Route::get('/audit-export/{exportId}', \App\Http\Controllers\AuditExportDownloadController::class)
+    ->whereUuid('exportId')
+    ->middleware(['throttle:30,1'])
+    ->name('audit.export.download');
+
 /**
  * Only Telegram itself may call this endpoint. In production, reject plain
  * HTTP even behind an accidentally misconfigured reverse proxy.

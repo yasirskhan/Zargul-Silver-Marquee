@@ -34,6 +34,10 @@ final class AuditHistory extends Page
         'fromDate' => '', 'toDate' => '',
     ];
 
+    public string $exportFromDate = '';
+    public string $exportToDate = '';
+    public string $exportReason = '';
+
     #[Locked]
     public array $entries = [];
 
@@ -87,6 +91,8 @@ final class AuditHistory extends Page
         abort_unless($requested === null || (is_string($requested)
             && array_key_exists($requested, $options)), 403);
         $this->companyId = $requested ?? array_key_first($options);
+        $this->exportFromDate = now()->subDays(6)->toDateString();
+        $this->exportToDate = now()->toDateString();
         $this->applyFilters();
     }
 
@@ -117,6 +123,34 @@ final class AuditHistory extends Page
         }
         $this->offset += self::PAGE_SIZE;
         $this->loadEntries();
+    }
+
+    public function downloadEncryptedExport()
+    {
+        abort_unless(static::canAccess() && $this->companyId !== null
+            && array_key_exists($this->companyId, $this->companyOptions()), 403);
+        $this->validate([
+            'exportFromDate' => ['required', 'date_format:Y-m-d'],
+            'exportToDate' => ['required', 'date_format:Y-m-d'],
+            'exportReason' => ['required', 'string', 'min:3', 'max:300'],
+        ]);
+        $actor = Filament::auth()->user();
+        abort_unless($actor instanceof User, 403);
+
+        try {
+            $result = app(\App\Services\AuditExportService::class)->prepare(
+                $actor, $this->companyId,
+                ['fromDate' => $this->exportFromDate, 'toDate' => $this->exportToDate],
+                $this->exportReason, (string) \Illuminate\Support\Str::uuid(),
+            );
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'exportReason' => $exception->getMessage(),
+            ]);
+        }
+        $this->exportReason = '';
+
+        return redirect()->route('audit.export.download', ['exportId' => $result['exportId']]);
     }
 
     public function previousPage(): void

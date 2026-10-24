@@ -2,7 +2,8 @@
     <div class="space-y-6">
         <p class="text-sm text-gray-600 dark:text-gray-300">
             Owner/admin-only, read-only company audit history. Filters match exact identifiers.
-            Some entries can contain sensitive business information. No export or external sharing is enabled.
+            Some entries can contain sensitive business information. Encrypted owner export is available;
+            secure off-site storage, key custody and restore approval remain external.
         </p>
 
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -41,6 +42,38 @@
             </button>
             @error('filters') <p role="alert" class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
         </div>
+
+        <section aria-label="Encrypted audit export" class="space-y-3 rounded-xl border p-4">
+            <h2 class="font-semibold">Encrypted audit export</h2>
+            <p class="text-sm">
+                Downloads ciphertext only, encrypted with the application key. It contains no plaintext in the browser,
+                URL or audit log. Use an approved secure store and verify the archive before any recovery.
+            </p>
+            <div class="grid gap-3 md:grid-cols-3">
+                <label class="block space-y-1">
+                    <span class="text-sm font-medium">From date</span>
+                    <input type="date" wire:model="exportFromDate" class="w-full rounded-lg border p-3 text-gray-900">
+                </label>
+                <label class="block space-y-1">
+                    <span class="text-sm font-medium">To date</span>
+                    <input type="date" wire:model="exportToDate" class="w-full rounded-lg border p-3 text-gray-900">
+                </label>
+                <label class="block space-y-1">
+                    <span class="text-sm font-medium">Export reason</span>
+                    <input type="text" wire:model="exportReason" maxlength="300"
+                        placeholder="Why is this protected archive needed?"
+                        class="w-full rounded-lg border p-3 text-gray-900">
+                </label>
+            </div>
+            @error('exportFromDate') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+            @error('exportToDate') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+            @error('exportReason') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+            <button type="button" wire:click="downloadEncryptedExport"
+                class="rounded-lg bg-emerald-800 px-4 py-2 text-sm font-semibold text-white">
+                Prepare encrypted audit export
+            </button>
+            <p class="text-xs">Maximum window: 31 days. The export is idempotent per request and audited.</p>
+        </section>
 
         @if ($loadedCompanyId === $companyId)
             <section aria-label="Company audit results" class="space-y-4">

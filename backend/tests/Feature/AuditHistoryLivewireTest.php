@@ -131,6 +131,58 @@ class AuditHistoryLivewireTest extends TestCase
         $this->assertSame(2, DB::table('audit_events')->count());
     }
 
+    public function test_owner_prepares_encrypted_export_and_private_download_route_enforces_scope(): void
+    {
+        [$company, $foreign, $owner, $membership] = $this->fixture();
+        $this->record($company->id, $owner->id, 'hall.exportable', (string) Str::uuid());
+
+        $component = Livewire::test(AuditHistory::class)
+            ->set('exportFromDate', now()->toDateString())
+            ->set('exportToDate', now()->toDateString())
+            ->set('exportReason', 'Owner encrypted backup review')
+            ->call('downloadEncryptedExport')->assertHasNoErrors();
+        $exportId = DB::table('audit_export_requests')->value('id');
+        $this->assertNotNull($exportId);
+        $component->assertRedirect(route('audit.export.download', ['exportId' => $exportId]));
+
+        $response = $this->get(route('audit.export.download', ['exportId' => $exportId]));
+        $response->assertOk();
+        $this->assertSame('application/octet-stream', $response->headers->get('Content-Type'));
+        $this->assertStringContainsString(
+            'attachment; filename="venuedesk-audit-'.$exportId.'.enc"',
+            (string) $response->headers->get('Content-Disposition'),
+        );
+        $this->assertStringStartsWith('eyJ', (string) $response->getContent());
+        $this->assertSame(1, DB::table('audit_events')
+            ->where('action', 'audit.export_downloaded')->count());
+
+        $foreignOwner = User::create([
+            'name' => 'Foreign owner', 'email' => 'audit-export-foreign@example.test',
+            'password' => 'test-only',
+        ]);
+        $foreignOwner->markEmailAsVerified();
+        CompanyMembership::create([
+            'company_id' => $foreign->id, 'user_id' => $foreignOwner->id, 'role' => 'owner',
+        ]);
+        $this->be($foreignOwner);
+        $this->get(route('audit.export.download', ['exportId' => $exportId]))->assertForbidden();
+
+        $manager = User::create([
+            'name' => 'Manager', 'email' => 'audit-export-ui-manager@example.test',
+            'password' => 'test-only',
+        ]);
+        $manager->markEmailAsVerified();
+        CompanyMembership::create([
+            'company_id' => $company->id, 'user_id' => $manager->id, 'role' => 'manager',
+        ]);
+        $this->be($manager);
+        $this->get(route('audit.export.download', ['exportId' => $exportId]))->assertForbidden();
+
+        $membership->update(['is_active' => false]);
+        $this->be($owner);
+        $this->get(route('audit.export.download', ['exportId' => $exportId]))->assertForbidden();
+    }
+
     public function test_authorized_owner_switches_company_without_reusing_prior_results(): void
     {
         [$company, $foreign, $owner] = $this->fixture();
