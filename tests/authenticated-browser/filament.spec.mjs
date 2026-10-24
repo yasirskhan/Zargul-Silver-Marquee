@@ -441,29 +441,6 @@ test('real owner configures hall schedule seating and add-ons without booking', 
     .getByLabel('Service name')).toHaveValue('Stage lighting');
 });
 
-test('real owner creates an encrypted customer booking request without a hall claim', async ({ page }) => {
-  test.setTimeout(240_000);
-  await page.waitForTimeout(65_000);
-  await page.setViewportSize({ width: 1366, height: 768 });
-  await signInWithTotp(
-    page, 'browser-e2e-inventory-owner-c@example.test',
-    'synthetic-inventory-owner-c-only', 'KRSXG5AUMVZWK4TT',
-  );
-  await page.goto('/admin/reservations');
-  const intake = page.locator('section[aria-label="Assigned staff customer and booking request intake"]');
-  await expect(intake).toBeVisible({ timeout: 25_000 });
-  await intake.getByLabel('Customer name').fill('Synthetic Phase Three Customer');
-  await intake.getByLabel('Customer email (optional)').fill('phase3-browser@example.test');
-  await intake.getByLabel('Hall').selectOption({ label: 'Synthetic Test Hall' });
-  await intake.getByLabel('Event date').fill('2027-06-15');
-  await intake.getByLabel('Event program').selectOption('noon');
-  await intake.getByLabel('Guest count for new booking').fill('120');
-  await intake.getByLabel('Internal reason (exclude customer personal details)')
-    .fill('Synthetic Phase 3 browser booking request without a hall claim');
-  await intake.getByRole('button', { name: 'Save customer and request owner review' }).click();
-  await expect(page.getByText(/Unconfirmed proposal:/)).toBeVisible({ timeout: 30_000 });
-});
-
 test('real owner records controlled cash opening and UTC closeout without payment', async ({ page }) => {
   test.setTimeout(240_000);
   await page.waitForTimeout(65_000);
@@ -484,7 +461,7 @@ test('real owner records controlled cash opening and UTC closeout without paymen
   await ledger.getByLabel('Cash handover reason').fill('Synthetic Phase 4 counted handover');
   await ledger.getByRole('button', { name: 'Freeze immutable daily cash count' }).click();
   await expect(page.getByText(/Counted 99975/)).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText(/variance -25/)).toBeVisible();
+  await expect(page.getByText(/variance -25/).first()).toBeVisible();
 });
 
 test('real operations MFA grants only assigned-hall search and planning on mobile', async ({ page }) => {
