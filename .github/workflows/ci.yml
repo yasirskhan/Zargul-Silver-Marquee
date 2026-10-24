@@ -312,6 +312,9 @@ jobs:
       APP_ENV: testing
       APP_DEBUG: 'false'
       BROWSER_E2E_SEED: '1'
+      # Isolated CI-only finance posting for synthetic cash closeout acceptance.
+      # Config defaults and production remain OFF.
+      VENUE_FINANCE_POSTING_ENABLED: 'true'
       # Isolated CI-only inventory release. Config defaults / production remain OFF.
       VENUE_INVENTORY_CATALOG_ENABLED: 'true'
       VENUE_INVENTORY_POSITION_REPORTS_ENABLED: 'true'

@@ -464,6 +464,29 @@ test('real owner creates an encrypted customer booking request without a hall cl
   await expect(page.getByText(/Unconfirmed proposal:/)).toBeVisible({ timeout: 30_000 });
 });
 
+test('real owner records controlled cash opening and UTC closeout without payment', async ({ page }) => {
+  test.setTimeout(240_000);
+  await page.waitForTimeout(65_000);
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await signInWithTotp(
+    page, 'browser-e2e-inventory-owner-d@example.test',
+    'synthetic-inventory-owner-d-only', 'ORUGS4ZANFZSAYJA',
+  );
+  await page.goto('/admin/finance-review');
+  const ledger = page.locator('section[aria-label="Controlled cash ledger and daily reconciliation"]');
+  await expect(ledger).toBeVisible({ timeout: 25_000 });
+  await ledger.getByLabel('ISO currency').fill('PKR');
+  await ledger.getByLabel('Opening cash minor units').fill('100000');
+  await ledger.getByLabel('Opening reason').fill('Synthetic Phase 4 controlled opening');
+  await ledger.getByRole('button', { name: 'Record controlled opening (double-entry)' }).click();
+  await expect(page.getByText(/opening cash/i).first()).toBeVisible({ timeout: 30_000 });
+  await ledger.getByLabel('Physically counted minor units').fill('99975');
+  await ledger.getByLabel('Cash handover reason').fill('Synthetic Phase 4 counted handover');
+  await ledger.getByRole('button', { name: 'Freeze immutable daily cash count' }).click();
+  await expect(page.getByText(/Counted 99975/)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/variance -25/)).toBeVisible();
+});
+
 test('real operations MFA grants only assigned-hall search and planning on mobile', async ({ page }) => {
   test.setTimeout(180_000);
   // The preceding owner journey uses the real login limiter from the same IP.
