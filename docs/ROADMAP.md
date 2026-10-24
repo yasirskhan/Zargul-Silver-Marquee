@@ -16,8 +16,8 @@ Sessions morning/noon/evening, times, grace, overtime, buffer, capacity, seating
 Color-coded multi-hall calendar, temporary holds, concurrency constraints, customer profiles, enquiries and mobile wizard.
 A new PostgreSQL backed INTERNAL owner/admin/assigned-manager/reception confirmation flow consumes a reviewed proposal into a separate confirmed reservation, locks an exclusive hall/date/program claim, and supports same-hall rescheduling and audited cancellation. The calendar projects confirmed occupancy. Release gate VENUE_BOOKING_CONFIRMATION_ENABLED defaults OFF until operator readiness signoff. This is NOT a public intake, full booking management milestone or ready-to-charge booking: new customer onboarding for manager/reception, cross-hall transfers, operator timezone, expiry/holds UX, consent/privacy signoff, production race acceptance, invoice/payment and mobile browser UAT remain open. Acceptance evidence: docs/PHASE3_ACCEPTANCE.md at `bf288cb`, CI 40075891670 all six success; full browser hold/confirm remains gate-off/operator.
 
-## Phase 4 — Finance
-Quote, invoice, receipt, deposit, ledger, correction, refund, cash reconciliation, PDFs.
+## Phase 4 — Finance (technically verified; provider/bank/operator separate)
+Quote, invoice, receipt, deposit, ledger, correction, refund, cash reconciliation, PDFs. Acceptance evidence: docs/PHASE4_ACCEPTANCE.md at `1d4afb3`, CI 40090557799 all six success; all production finance/payment gates remain OFF.
 
 ## Phase 5 — Approvals
 Owner review center, Telegram notification integration, approvals audit, permissions, emergency delegation and approvals under concurrency.
