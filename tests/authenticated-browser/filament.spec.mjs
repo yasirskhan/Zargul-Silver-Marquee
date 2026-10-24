@@ -302,6 +302,8 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   expect(await uploadedThumb.evaluate(img => img.naturalWidth)).toBeGreaterThan(0);
 
   page.once('dialog', dialog => dialog.accept());
+  await mediaLibrary.getByRole('textbox', { name: 'Media upload or approval reason' })
+    .fill('Owner approves the synthetic venue photograph');
   await mediaLibrary.getByRole('button', { name: 'Approve image' }).first().click();
   await expect(mediaLibrary.getByText(/Approved/).first()).toBeVisible({ timeout: 25_000 });
   await mediaLibrary.getByRole('button', { name: 'Add to draft' }).first().click();
