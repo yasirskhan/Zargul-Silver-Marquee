@@ -310,7 +310,11 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   await expect(mediaReasonField).toHaveValue('');
   const uploadedThumb = mediaLibrary.getByRole('img', { name: 'Synthetic owner uploaded venue photograph' });
   await expect(uploadedThumb).toBeVisible({ timeout: 25_000 });
-  expect(await uploadedThumb.evaluate(img => img.naturalWidth)).toBeGreaterThan(0);
+  const thumbWidth = await uploadedThumb.evaluate(async img => {
+    try { await img.decode(); } catch { /* fall through to naturalWidth */ }
+    return img.naturalWidth;
+  });
+  expect(thumbWidth).toBeGreaterThan(0);
 
   page.once('dialog', dialog => dialog.accept());
   await mediaLibrary.getByRole('textbox', { name: 'Media upload or approval reason' })
