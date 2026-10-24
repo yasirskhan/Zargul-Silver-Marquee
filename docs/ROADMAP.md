@@ -19,8 +19,8 @@ A new PostgreSQL backed INTERNAL owner/admin/assigned-manager/reception confirma
 ## Phase 4 — Finance (technically verified; provider/bank/operator separate)
 Quote, invoice, receipt, deposit, ledger, correction, refund, cash reconciliation, PDFs. Acceptance evidence: docs/PHASE4_ACCEPTANCE.md at `1d4afb3`, CI 40090557799 all six success; all production finance/payment gates remain OFF.
 
-## Phase 5 — Approvals
-Owner review center, Telegram notification integration, approvals audit, permissions, emergency delegation and approvals under concurrency.
+## Phase 5 — Approvals (technically verified; Telegram pilot/operator separate)
+Owner review center, Telegram notification integration, approvals audit, permissions, emergency delegation and approvals under concurrency. Acceptance evidence: docs/PHASE5_ACCEPTANCE.md at `ef6217b`, CI 40113341018 all six success; live Telegram credentials and real financial application remain OFF.
 
 ## Phase 6 — Venue public website
 Production-grade Zargul Silver Marquee brand site and integrated enquiry flow, legitimate venue photos/packages.
