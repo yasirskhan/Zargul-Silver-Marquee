@@ -111,7 +111,7 @@ class InstallationWizardServiceTest extends TestCase
         try {
             $service->save($owner, $company->id, 1, ['company' => [
                 'legalName' => 'Valid Name', 'contactEmail' => '', 'contactPhone' => '',
-                'address' => '', 'currency' => 'pkr', 'timezone' => 'Asia/Karachi',
+                'address' => '', 'currency' => 'PK', 'timezone' => 'Asia/Karachi',
             ]], $state['revision']);
             $this->fail('Lowercase currency accepted.');
         } catch (InvalidArgumentException) {
