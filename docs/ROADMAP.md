@@ -9,8 +9,8 @@ Formalize owner-configurable website design, typed safe sections and columns, pu
 ## Phase 1 — Secure server foundation (technically accepted; external email/backup/operator acceptance separate)
 Laravel/Filament/PostgreSQL versions verified; migration foundation, operating company and halls, authentication, roles, MFA, policy tests, tamper-resistant audit. Acceptance evidence: docs/PHASE1_ACCEPTANCE.md at `4024399`, CI 40064675256 all six success.
 
-## Phase 2 — Owner configuration
-Sessions morning/noon/evening, times, grace, overtime, buffer, capacity, seating pricing, catering and add-ons; snapshot/versioned pricing.
+## Phase 2 — Owner configuration (technically accepted; booking/quote and production separate)
+Sessions morning/noon/evening, times, grace, overtime, buffer, capacity, seating pricing, catering and add-ons; snapshot/versioned pricing. Acceptance evidence: docs/PHASE2_ACCEPTANCE.md at `39a0315`, CI 40072138788 all six success.
 
 ## Phase 3 — Bookings and universal search (core internal confirmation implementation pending hosted CI)
 Color-coded multi-hall calendar, temporary holds, concurrency constraints, customer profiles, enquiries and mobile wizard.
