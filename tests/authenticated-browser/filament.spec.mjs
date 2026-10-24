@@ -60,6 +60,8 @@ async function signInWithTotp(page, email, password, secret, attempt = 0) {
     'input[autocomplete="one-time-code"]:visible, input[id*="code"]:visible, input[name*="code"]:visible, input[inputmode="numeric"]:visible',
   ).first();
   await expect(code).toBeVisible({ timeout: 25_000 });
+  const remaining = 30_000 - (Date.now() % 30_000);
+  if (remaining < 10_000) await page.waitForTimeout(remaining + 350);
   await code.fill(totp(secret));
   const authenticated = (url) => {
     const path = new URL(url).pathname;
@@ -443,8 +445,8 @@ test('assigned manager sees hall configuration read-only on mobile', async ({ pa
   test.setTimeout(240_000);
   await page.setViewportSize({ width: 390, height: 844 });
   await signInWithTotp(
-    page, 'browser-e2e-inventory-manager-c@example.test',
-    'synthetic-inventory-manager-c-only', 'IFBEGRCFIZDUQSKL',
+    page, 'browser-e2e-inventory-manager-a@example.test',
+    'synthetic-inventory-manager-a-only', 'JBSWY3DPEHPK3PXP',
   );
   await page.goto('/admin/hall-programs');
   await expect(page.locator('section[aria-label="Read-only hall program rules"]'))
