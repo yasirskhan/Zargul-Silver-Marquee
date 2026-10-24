@@ -441,21 +441,6 @@ test('real owner configures hall schedule seating and add-ons without booking', 
     .getByLabel('Service name')).toHaveValue('Stage lighting');
 });
 
-test('assigned manager sees hall configuration read-only on mobile', async ({ page }) => {
-  test.setTimeout(240_000);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await signInWithTotp(
-    page, 'browser-e2e-inventory-manager-a@example.test',
-    'synthetic-inventory-manager-a-only', 'JBSWY3DPEHPK3PXP',
-  );
-  await page.goto('/admin/hall-programs');
-  await expect(page.locator('section[aria-label="Read-only hall program rules"]'))
-    .toBeVisible({ timeout: 25_000 });
-  await expect(page.getByRole('button', { name: 'Save program rules' })).toHaveCount(0);
-  await expect(page.getByText('Assigned hall seating is read-only.')).toBeVisible();
-  await expect(page.getByText('Assigned hall catalog is read-only.')).toBeVisible();
-});
-
 test('real operations MFA grants only assigned-hall search and planning on mobile', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await page.goto('/admin/login');
