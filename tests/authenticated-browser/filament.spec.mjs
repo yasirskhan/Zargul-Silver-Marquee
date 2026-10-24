@@ -465,6 +465,26 @@ test('real owner records controlled cash opening and UTC closeout without paymen
   await expect(page.getByText(/variance -25/).first()).toBeVisible();
 });
 
+test('real owner records an auditable approval decision without finance mutation', async ({ page }) => {
+  test.setTimeout(240_000);
+  await page.waitForTimeout(65_000);
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await signInWithTotp(
+    page, 'browser-e2e-inventory-owner-c@example.test',
+    'synthetic-inventory-owner-c-only', 'KRSXG5AUMVZWK4TT',
+  );
+  await page.goto('/admin/approval-center');
+  await expect(page.getByText('Internal, company-scoped exception requests.')).toBeVisible({ timeout: 25_000 });
+  await page.waitForFunction(() => Boolean(window.Livewire?.all?.().length), null, { timeout: 30_000 });
+  const review = page.getByRole('button', { name: 'Review decision' }).first();
+  await expect(review).toBeVisible({ timeout: 20_000 });
+  await review.click();
+  await page.getByLabel('Decision reason').fill('Synthetic Phase 5 owner approval decision');
+  await page.getByRole('button', { name: 'Approve proposal only' }).click();
+  await expect(page.getByText('Recorded approval decision')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('Telegram is not configured for this venue installation.')).toBeVisible();
+});
+
 test('real operations MFA grants only assigned-hall search and planning on mobile', async ({ page }) => {
   test.setTimeout(180_000);
   // The preceding owner journey uses the real login limiter from the same IP.
