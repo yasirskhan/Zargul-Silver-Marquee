@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Company;
 use App\Models\CompanyMembership;
+use App\Models\Hall;
 use App\Models\User;
 use App\Services\SiteBrandingService;
 use App\Services\SitePagePublishingService;
@@ -316,5 +317,41 @@ class PublishedVenueRouteTest extends TestCase
         config()->set('public_site.host', 'venue.example.test');
         config()->set('public_site.website_id', '');
         $this->get('http://venue.example.test/')->assertStatus(503);
+    }
+
+    public function test_public_enquiry_form_persists_consented_enquiry_without_booking(): void
+    {
+        [$company, $owner, $site, $page] = $this->fixture();
+        $hall = Hall::create([
+            'company_id' => $company->id, 'name' => 'Public Grand Hall',
+            'slug' => 'public-grand-hall', 'capacity' => 220,
+        ]);
+        $this->enable($company->id, $site);
+        $this->publish($company, $owner, $site, $page);
+
+        $this->get('http://venue.example.test/')->assertOk()
+            ->assertSee('Enquire about your event')
+            ->assertSee('aria-label="Venue enquiry form"', false)
+            ->assertSee('Public Grand Hall');
+        $response = $this->post('http://venue.example.test/enquiry', [
+            'request_key' => (string) Str::uuid(),
+            'customer_name' => 'Synthetic Public Enquirer',
+            'email' => 'public-enquirer@example.test',
+            'phone' => '',
+            'hall_id' => $hall->id,
+            'event_date' => now()->addDays(14)->toDateString(),
+            'program' => 'evening',
+            'guests' => 100,
+            'message' => 'Synthetic public enquiry without a booking',
+            'consent' => '1',
+        ]);
+        $response->assertRedirect('/');
+        $this->assertSame(1, DB::table('venue_enquiries')->count());
+        $this->assertSame('Synthetic Public Enquirer',
+            DB::table('venue_enquiries')->value('customer_name'));
+        $this->assertSame(1, DB::table('audit_events')
+            ->where('action', 'public.enquiry_received')->count());
+        $this->assertSame(0, DB::table('hall_slot_claims')->count());
+        $this->assertSame(0, DB::table('venue_reservations')->count());
     }
 }

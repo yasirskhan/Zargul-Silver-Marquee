@@ -77,6 +77,15 @@
         .site-section img, .brand-logo { display: block; max-width: 100%; height: auto; border-radius: 10px; }
         .brand-logo { margin-top: 16px; }
         .media-placeholder { padding: 30px 15px; border: 2px dashed {{ $palette['accent'] }}; border-radius: 10px; text-align: center; }
+        .enquiry-form { display: grid; gap: 12px; max-width: 680px; }
+        .enquiry-form label { display: grid; gap: 5px; font-weight: 600; }
+        .enquiry-form input, .enquiry-form select, .enquiry-form textarea { width: 100%; padding: 10px; border: 1px solid {{ $palette['accent'] }}; border-radius: 8px; font: inherit; }
+        .enquiry-form .enquiry-consent { display: flex; align-items: flex-start; gap: 8px; font-weight: 400; }
+        .enquiry-form .enquiry-consent input { width: auto; margin-top: 4px; }
+        .enquiry-form button { justify-self: start; padding: 12px 20px; border: 0; border-radius: 8px; background: {{ $palette['foreground'] }}; color: {{ $palette['background'] }}; font: inherit; font-weight: 700; cursor: pointer; }
+        .enquiry-honeypot { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+        .enquiry-success { padding: 10px; border: 1px solid {{ $palette['accent'] }}; border-radius: 8px; }
+        .enquiry-error { padding: 10px; border: 1px solid #b91c1c; border-radius: 8px; color: #b91c1c; }
         @@media (max-width: 640px) {
             .shell { padding: 15px; }
             .site-section { padding: 14px; }
@@ -119,6 +128,63 @@
                 @include('site.partials.published-block', ['block' => $block, 'media' => $snapshot['media'], 'mediaBase' => $mediaBase])
             @endforeach
         </main>
+        @if ($canonicalUrl !== null)
+            <section class="site-section" aria-label="Venue enquiry form">
+                <h2>Enquire about your event</h2>
+                <p>Send a private enquiry to the venue. This is not a confirmed booking and no payment is taken.</p>
+                @if (session('enquiry_success'))
+                    <p role="status" class="enquiry-success">{{ session('enquiry_success') }}</p>
+                @endif
+                @if ($errors->any())
+                    <p role="alert" class="enquiry-error">{{ $errors->first() }}</p>
+                @endif
+                <form method="POST" action="/enquiry" class="enquiry-form">
+                    @csrf
+                    <input type="hidden" name="request_key" value="{{ old('request_key', (string) \Illuminate\Support\Str::uuid()) }}">
+                    <div class="enquiry-honeypot" aria-hidden="true">
+                        <label>Company website <input type="text" name="company_website" tabindex="-1" autocomplete="off"></label>
+                    </div>
+                    <label>Your name
+                        <input type="text" name="customer_name" required maxlength="120" value="{{ old('customer_name') }}">
+                    </label>
+                    <label>Email address
+                        <input type="email" name="email" maxlength="254" value="{{ old('email') }}">
+                    </label>
+                    <label>Phone number
+                        <input type="text" name="phone" maxlength="32" value="{{ old('phone') }}">
+                    </label>
+                    <label>Preferred hall
+                        <select name="hall_id">
+                            <option value="">General enquiry</option>
+                            @foreach (($snapshot['halls'] ?? []) as $hall)
+                                <option value="{{ $hall['id'] }}" @selected(old('hall_id') === $hall['id'])>{{ $hall['name'] }} (up to {{ $hall['capacity'] }} guests)</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label>Preferred date
+                        <input type="date" name="event_date" required value="{{ old('event_date') }}">
+                    </label>
+                    <label>Program
+                        <select name="program" required>
+                            <option value="morning" @selected(old('program') === 'morning')>Morning</option>
+                            <option value="noon" @selected(old('program') === 'noon')>Noon</option>
+                            <option value="evening" @selected(old('program') === 'evening')>Evening</option>
+                        </select>
+                    </label>
+                    <label>Guest count
+                        <input type="number" name="guests" min="1" max="100000" required value="{{ old('guests') }}">
+                    </label>
+                    <label>Message
+                        <textarea name="message" rows="4" maxlength="2000">{{ old('message') }}</textarea>
+                    </label>
+                    <label class="enquiry-consent">
+                        <input type="checkbox" name="consent" value="1" required>
+                        I consent to the venue using these details only to respond to this enquiry.
+                    </label>
+                    <button type="submit">Send private enquiry</button>
+                </form>
+            </section>
+        @endif
         <footer class="site-footer">
             <p>{{ ($branding['footerText'] ?? '') !== '' ? $branding['footerText'] : $branding['siteName'] }}</p>
             @if ($canonicalUrl === null)

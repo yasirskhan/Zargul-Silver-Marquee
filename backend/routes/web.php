@@ -8,6 +8,11 @@ Route::get('/', \App\Http\Controllers\PublishedVenuePageController::class);
 Route::get('/{pageSlug}', \App\Http\Controllers\PublishedVenuePageController::class)
     ->whereIn('pageSlug', ['halls', 'packages', 'services', 'gallery', 'about', 'contact', 'privacy', 'terms']);
 
+// Host-bound public enquiry intake; no booking, hold or payment.
+Route::post('/enquiry', \App\Http\Controllers\PublicEnquiryController::class)
+    ->middleware(['throttle:5,1'])
+    ->name('public.enquiry.store');
+
 // Serve approved, optimized WebP bytes only when referenced by the CURRENT
 // published site page. No direct private disk or unapproved upload route.
 Route::get('/_venue-media/{pageSlug}/{mediaId}.webp',

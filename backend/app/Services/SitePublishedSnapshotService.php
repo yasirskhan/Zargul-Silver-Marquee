@@ -89,6 +89,12 @@ final class SitePublishedSnapshotService
             }
         }
 
+        $halls = DB::table('halls')->where('company_id', $companyId)
+            ->where('is_active', true)->orderBy('name')->get(['id', 'name', 'capacity'])
+            ->map(fn ($hall): array => [
+                'id' => $hall->id, 'name' => $hall->name, 'capacity' => (int) $hall->capacity,
+            ])->all();
+
         return [
             'branding' => $branding,
             'page' => [
@@ -100,6 +106,7 @@ final class SitePublishedSnapshotService
             ],
             'media' => $media,
             'navigation' => $links,
+            'halls' => $halls,
         ];
     }
 
