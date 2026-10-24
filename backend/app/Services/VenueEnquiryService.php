@@ -115,7 +115,7 @@ final class VenueEnquiryService
     {
         $this->authorize($actor, $companyId);
 
-        return DB::table('venue_enquiries')->where('company_id', $companyId)
+        return DB::table('venue_enquiries')->where('venue_enquiries.company_id', $companyId)
             ->leftJoin('halls', 'halls.id', '=', 'venue_enquiries.hall_id')
             ->orderByDesc('venue_enquiries.created_at')->limit(100)->get([
                 'venue_enquiries.id', 'venue_enquiries.hall_id', 'halls.name as hall_name',

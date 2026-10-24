@@ -145,7 +145,7 @@ class SitePublishedWebpTest extends TestCase
         config()->set('public_site.indexing_enabled', false);
         $this->assertSame($expected['bytes'], $http->getContent());
         $this->get('http://venue.example.test/')->assertOk()
-            ->assertHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; script-src 'none'; object-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'")
+            ->assertHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; script-src 'none'; object-src 'none'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
             ->assertSee('src="/_venue-media/home/'.$published.'.webp"', false)
             ->assertSee('alt="Verified real venue image"', false)
             ->assertDontSee('Approved image placeholder')
