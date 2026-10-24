@@ -442,6 +442,9 @@ test('real owner configures hall schedule seating and add-ons without booking', 
 });
 
 test('real operations MFA grants only assigned-hall search and planning on mobile', async ({ page }) => {
+  test.setTimeout(180_000);
+  // The preceding owner journey uses the real login limiter from the same IP.
+  await page.waitForTimeout(65_000);
   await page.setViewportSize({ width: 360, height: 740 });
   await page.goto('/admin/login');
   await waitForLoginHydration(page);
