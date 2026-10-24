@@ -41,6 +41,34 @@ async function waitForLoginHydration(page) {
   null, { timeout: 30_000 });
 }
 
+async function signInWithTotp(page, email, password, secret) {
+  await page.goto('/admin/login');
+  await waitForLoginHydration(page);
+  await page.locator('input[type="email"]').fill(email);
+  await page.getByLabel(/Password/).fill(password);
+  await page.getByRole('button', { name: /sign in|log in/i }).first().click();
+  const code = page.locator(
+    'input[autocomplete="one-time-code"]:visible, input[id*="code"]:visible, input[name*="code"]:visible, input[inputmode="numeric"]:visible',
+  ).first();
+  await expect(code).toBeVisible({ timeout: 25_000 });
+  await code.fill(totp(secret));
+  const authenticated = (url) => {
+    const path = new URL(url).pathname;
+    return path.startsWith('/admin')
+      && !['/admin/login', '/admin/multi-factor-authentication', '/admin/password-reset']
+        .some((blocked) => path.startsWith(blocked));
+  };
+  try {
+    await page.waitForURL(authenticated, { timeout: 20_000 });
+  } catch {
+    const verify = page.getByRole('button', {
+      name: /confirm sign in|verify|continue|sign in/i,
+    }).last();
+    if (await verify.isVisible().catch(() => false)) await verify.click();
+    await page.waitForURL(authenticated, { timeout: 30_000 });
+  }
+}
+
 test('private proposal route requires authentication and does not reveal customer data', async ({ page }) => {
   await page.goto('/admin/booking-proposals');
   await expect(page).toHaveURL(/\/admin\/login/, { timeout: 20_000 });
@@ -335,6 +363,76 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   await expect(reloadedCrop.getByRole('spinbutton', { name: 'Focal X (%)' })).toHaveValue('35');
   await expect(reloadedCrop.getByRole('spinbutton', { name: 'Focal Y (%)' })).toHaveValue('65');
   await expect(reloadedCrop.locator('select')).toHaveValue('4:3');
+});
+
+test('real owner configures hall schedule seating and add-ons without booking', async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signInWithTotp(
+    page, 'browser-e2e-inventory-owner-b@example.test',
+    'synthetic-inventory-owner-b-only', 'MFRGGZDFMZTWQ2LK',
+  );
+  await page.goto('/admin/hall-programs');
+  const form = page.locator('form[aria-label="Edit three daily hall programs"]');
+  await expect(form).toBeVisible({ timeout: 25_000 });
+
+  const morning = form.locator('fieldset').filter({ hasText: 'Morning' }).first();
+  await morning.getByRole('spinbutton', { name: 'Rental rate (minor units)' }).fill('150000');
+  await page.getByLabel('Reason for this schedule or price change')
+    .fill('Synthetic owner approves the morning rental rate');
+  await page.getByRole('button', { name: 'Save program rules' }).click();
+  await expect(page.getByText('Hall program rules saved with audit history'))
+    .toBeVisible({ timeout: 25_000 });
+  await page.reload();
+  const reloadedMorning = page.locator('form[aria-label="Edit three daily hall programs"] fieldset')
+    .filter({ hasText: 'Morning' }).first();
+  await expect(reloadedMorning.getByRole('spinbutton', { name: 'Rental rate (minor units)' }))
+    .toHaveValue('150000');
+
+  await page.getByRole('spinbutton', { name: 'Maximum guests' }).fill('350');
+  await page.getByRole('spinbutton', { name: 'Chairs included' }).fill('300');
+  await page.getByRole('spinbutton', { name: 'Tables included' }).fill('20');
+  await page.getByRole('spinbutton', { name: 'Additional chair price (minor units)' }).fill('500');
+  await page.getByRole('spinbutton', { name: 'Additional table price (minor units)' }).fill('2000');
+  await page.getByLabel('Seating rate currency code').fill('PKR');
+  await page.getByLabel('Reason for seating or rate change')
+    .fill('Synthetic owner approves seating capacity and unit prices');
+  await page.getByRole('button', { name: 'Save seating rules' }).click();
+  await expect(page.getByText('Hall seating and unit prices saved with audit history'))
+    .toBeVisible({ timeout: 25_000 });
+
+  await page.getByRole('button', { name: 'Add optional service' }).click();
+  const addon = page.locator('fieldset').filter({ hasText: 'Optional service 1' }).first();
+  await addon.getByLabel('Unique code').fill('stage_lighting');
+  await addon.getByLabel('Service name').fill('Stage lighting');
+  await addon.getByLabel('Category').selectOption('lighting');
+  await addon.getByLabel('Charge unit').selectOption('flat');
+  await addon.getByLabel('Rate (minor units)').fill('25000');
+  await addon.getByLabel('Available for selection').check();
+  await page.getByLabel('Catalog currency code').fill('PKR');
+  await page.getByLabel('Change reason')
+    .fill('Synthetic owner approves the stage lighting catalog item');
+  await page.getByRole('button', { name: 'Save optional services' }).click();
+  await expect(page.getByText('Hall add-on catalog saved with audit history'))
+    .toBeVisible({ timeout: 25_000 });
+  await page.reload();
+  await expect(page.locator('fieldset').filter({ hasText: 'Optional service 1' })
+    .getByLabel('Service name')).toHaveValue('Stage lighting');
+});
+
+test('assigned manager sees hall configuration read-only on mobile', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signInWithTotp(
+    page, 'browser-e2e-inventory-manager-c@example.test',
+    'synthetic-inventory-manager-c-only', 'IFBEGRCFIZDUQSKL',
+  );
+  await page.goto('/admin/hall-programs');
+  await expect(page.locator('section[aria-label="Read-only hall program rules"]'))
+    .toBeVisible({ timeout: 25_000 });
+  await expect(page.getByRole('button', { name: 'Save program rules' })).toHaveCount(0);
+  await expect(page.getByText('Assigned hall seating is read-only.')).toBeVisible();
+  await expect(page.getByText('Assigned hall catalog is read-only.')).toBeVisible();
 });
 
 test('real operations MFA grants only assigned-hall search and planning on mobile', async ({ page }) => {
