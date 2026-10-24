@@ -6,8 +6,8 @@ Establish dedicated repo, approved spec, requirement register, AI handoff, CI, e
 ## Phase 0.5 — Website CMS architecture + editor usability (code complete and technically verified; real Owner/staging acceptance separate)
 Formalize owner-configurable website design, typed safe sections and columns, publishing/audit/access policy and page/version/storage model. Test pure layout/revision helpers, then build a practical visual editor integrated into VenueDesk. Owner can move text, images, sections, columns and mobile stacking. Keep business price and booking constraints on backend. See docs/WEBSITE_CMS_DESIGN.md and docs/PHASE0_5_ACCEPTANCE.md at `63c6b7a`, CI 40050039945 all six success; final integrated baseline `df1e5b8`, CI 40058788632 all six success.
 
-## Phase 1 — Secure server foundation
-Laravel/Filament/PostgreSQL versions verified; migration foundation, operating company and halls, authentication, roles, MFA, policy tests, tamper-resistant audit.
+## Phase 1 — Secure server foundation (technically accepted; external email/backup/operator acceptance separate)
+Laravel/Filament/PostgreSQL versions verified; migration foundation, operating company and halls, authentication, roles, MFA, policy tests, tamper-resistant audit. Acceptance evidence: docs/PHASE1_ACCEPTANCE.md at `4024399`, CI 40064675256 all six success.
 
 ## Phase 2 — Owner configuration
 Sessions morning/noon/evening, times, grace, overtime, buffer, capacity, seating pricing, catering and add-ons; snapshot/versioned pricing.
