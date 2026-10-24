@@ -1,6 +1,6 @@
 # Website Content Management and Visual Page Builder
-Status: APPROVED SCOPE / PARTIALLY IMPLEMENTED IN GUARDED BACKEND — 2026-10-23; OPERATOR LAUNCH PENDING
-Related: docs/PROJECT_MASTER_SPEC.md, docs/FEATURE_REGISTER.csv
+Status: CORE CMS-001..004 IMPLEMENTED AND VERIFIED (`df1e5b8`, six-job CI 40058788632); PUBLIC-SITE CMS-005..009 AND OPERATOR LAUNCH PENDING
+Related: docs/PROJECT_MASTER_SPEC.md, docs/FEATURE_REGISTER.csv, docs/PHASE0_5_ACCEPTANCE.md
 
 ## Product promise
 The Zargul Silver Marquee public website must be editable by an authorized venue owner or designated website administrator WITHOUT editing code. It is part of VenueDesk, not a disconnected CMS. The operator should be able to change:
@@ -26,7 +26,7 @@ Editor:
 Hero image/title/button; image-text split; image gallery; hall list; packages; services grid; metrics only with verified figures; testimonials only with real consent; CTA; FAQs; 1/2/3-column custom sections; map/contact; validated enquiry form.
 Use well-designed templates. Owners can drag blocks and move columns. Avoid unrestricted raw code or arbitrary executable HTML to prevent XSS, layout breakage, and privilege bypass. Advanced custom-code deployment requires developer-controlled review and cannot be injected from normal CMS fields.
 
-## Data model proposal (PostgreSQL, not implemented)
+## Data model proposal (PostgreSQL; core CMS-001..004 implemented, later public-site items pending)
 - site_settings(tenant_id, website_id, theme_tokens, logo_media_id, favicon_media_id, site_contact, ...);
 - website_domains(website_id, hostname, verified_at, status, ssl_state);
 - site_pages(id, website_id, slug, title, seo_fields, status, published_revision_id, created_by, updated_by);

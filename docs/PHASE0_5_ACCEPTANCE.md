@@ -3,6 +3,7 @@
 Status: **CODE COMPLETE / TECHNICALLY VERIFIED. Real Owner media uploads and staging acceptance remain external.**
 Verified source: `63c6b7a8d2a6180c51e74f5ded2cbeb3a6a192ea`
 Hosted CI: [run 40050039945](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40050039945) — **all six SUCCESS**.
+Final integrated code/docs/Phase 1 baseline: `df1e5b8fb4147d5e8993549cdd0a9352875074f7`, [run 40058788632](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40058788632) — **all six SUCCESS**.
 
 ## Approved CMS-001 to CMS-004 scope
 

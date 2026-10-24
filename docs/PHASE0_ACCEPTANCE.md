@@ -3,6 +3,7 @@
 Status: **CODE COMPLETE / TECHNICALLY VERIFIED. Production and operator release remain separate and OFF.**
 Verified source: `7ab6ff8b573a45f99eec19a81825a1d79ad762c7`
 Hosted CI: [run 40020880262](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40020880262) — **all six SUCCESS**.
+Final integrated code/docs/Phase 1 baseline: `df1e5b8fb4147d5e8993549cdd0a9352875074f7`, [run 40058788632](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40058788632) — **all six SUCCESS**.
 
 ## Approved Phase 0 requirements
 
