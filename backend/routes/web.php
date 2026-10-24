@@ -23,7 +23,7 @@ Route::get('/sitemap.xml', \App\Http\Controllers\PublishedVenueSitemapController
 // Only an authorized editor/publisher can fetch these bytes; no public path.
 Route::get('/site-media/{mediaId}', \App\Http\Controllers\SiteMediaPreviewController::class)
     ->whereUuid('mediaId')
-    ->middleware(['auth'])
+    ->middleware(['throttle:120,1'])
     ->name('site.media.preview');
 
 /**

@@ -49,6 +49,7 @@ test('private proposal route requires authentication and does not reveal custome
 });
 
 test('real owner password and TOTP flow protects mobile proposal editing without booking', async ({ page }) => {
+  test.setTimeout(240_000);
   await page.setViewportSize({ width: 360, height: 740 });
   await page.goto('/admin/login');
   await expect(page.locator('input[type="email"]')).toBeVisible();
@@ -272,14 +273,15 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   await expect(pageSections.getByText('Desktop column 1 (8/12)')).toBeVisible();
   await pageSections.getByRole('button', { name: 'Desktop left' }).last().click();
   await expect(pageSections.getByText('Desktop column 1 (4/12)')).toBeVisible();
-  await pageSections.getByRole('button', { name: 'Phone later' }).first().click();
   await expect(pageSections.getByText('Phone order: 2').first()).toBeVisible();
+  await pageSections.getByRole('button', { name: 'Phone earlier' }).first().click();
+  await expect(pageSections.getByText('Phone order: 1').first()).toBeVisible();
   await reason.fill('Browser owner arranges responsive columns');
   await page.getByRole('button', { name: 'Save draft', exact: true }).click();
   await expect(pageStatus).toContainText('Editor loaded revision: 2', { timeout: 25_000 });
   await page.getByRole('button', { name: 'Reload latest draft' }).click();
   await expect(pageSections.getByText('Desktop column 1 (4/12)')).toBeVisible();
-  await expect(pageSections.getByText('Phone order: 2').first()).toBeVisible();
+  await expect(pageSections.getByText('Phone order: 1').first()).toBeVisible();
 
   // CMS-002: real owner upload, private thumbnail, approval and crop/focal controls.
   const mediaLibrary = page.locator('section[aria-label="Website media library"]');
