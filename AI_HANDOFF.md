@@ -4,7 +4,7 @@ Repository `yasirskhan/Zargul-Silver-Marquee`, **only branch `chatgpt/phase0-fou
 
 ## Current verified baseline
 
-- **Final integrated baseline: `fbc13a519b7cb6a4fc96f3ea86b3a46e0c3d5c5f`, [run 40134105446](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40134105446) — six jobs SUCCESS.**
+- **Final integrated baseline: `59fb9650eddb57bf0a82bf5c49a706342c03567c`, [run 40138475496](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40138475496) — six jobs SUCCESS.**
 - Phase 0: `7ab6ff8`, CI 40020880262.
 - Phase 0.5: `63c6b7a`, CI 40050039945.
 - Phase 1: `4024399`, CI 40064675256.
@@ -15,10 +15,10 @@ Repository `yasirskhan/Zargul-Silver-Marquee`, **only branch `chatgpt/phase0-fou
 - Phase 6: `59beb42`, CI 40119020374.
 - Phase 7/7.1–7.3: `5735312`, CI 40120614543.
 - Phase 8 technical prep: `cb04416`, CI 40127753617; real pilot **BLOCKED EXTERNAL**.
-- Phase 9 first milestone: `fbc13a5`, CI 40134105446; `docs/PHASE9_CENTRAL_PORTAL.md`.
+- Phase 9 first milestone: `59fb965`, CI 40138475496; `docs/PHASE9_CENTRAL_PORTAL.md`.
   - `central/public/staff.php`: default-off, verified-HTTPS-host staff front controller with vendor-only email/password/TOTP login, secure session cookie, CSRF and delegation to the existing central staff portal router.
   - External `CENTRAL_STAFF_KMS_BOOTSTRAP` supplies TOTP decryption/support-reply encryption; no KMS/signing secret in repo.
-  - `central/tests/staff_public_portal.php` proves default denial, trusted-host login UI, wrong-host denial, no secret output and fail-closed missing KMS.
+  - `central/tests/staff_public_portal.php` proves default denial, trusted-host login UI, wrong-host denial, no secret output and fail-closed missing KMS.\n  - `central/tests/staff_portal_journey.php` proves real central PostgreSQL staff login + TOTP, secure cookie/CSRF, home, customer directory, logout and revoked-session denial via the operator HTTP composition.
   - Dashboard/customer directory/license queue/billing/support/audit endpoints are the existing role-scoped portal services; not yet exercised by a deployed authenticated browser.
 
 ## External/operational gates (not fabricated)

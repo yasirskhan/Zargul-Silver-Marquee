@@ -1,8 +1,8 @@
 # Phase 9 central staff portal — first verified milestone
 
-Status: **GATED FRONT-CONTROLLER MILESTONE VERIFIED. Default OFF; external DNS/HTTPS, KMS, central database credentials and operator signoff remain BLOCKED.**
-Verified source: `fbc13a519b7cb6a4fc96f3ea86b3a46e0c3d5c5f`
-Hosted CI: [run 40134105446](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40134105446) — all six SUCCESS.
+Status: **GATED FRONT-CONTROLLER AND AUTHENTICATED PORTAL JOURNEY VERIFIED. Default OFF; external DNS/HTTPS, KMS, central database credentials and operator signoff remain BLOCKED.**
+Verified source: `59fb9650eddb57bf0a82bf5c49a706342c03567c`
+Hosted CI: [run 40138475496](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40138475496) — all six SUCCESS.
 
 ## Implemented source
 
@@ -21,6 +21,7 @@ Hosted CI: [run 40134105446](https://github.com/yasirskhan/Zargul-Silver-Marquee
   - proves wrong-host denial and no secret material in login HTML;
   - proves POST fails closed without the external KMS bootstrap.
 - `.github/workflows/ci.yml`: runs the new central test before the existing operator-wiring tests.
+- `central/tests/staff_portal_journey.php`: real central PostgreSQL staff row + TOTP, login through the operator app, secure 64-hex host-only cookie, CSRF proof, authenticated `/staff/home`, authorized `/staff/customers/directory`, logout cookie clearing and rejection of the old session; invalid MFA is denied without cookie/body. This is an HTTP integration journey, not a deployed browser run.
 
 ## Working user actions (when operator-configured)
 
