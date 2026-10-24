@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Storage;
  * Never exposes object keys, raw staged uploads to anonymous users, or
  * arbitrary filesystem paths.
  */
-final class SiteMediaPreviewController extends Controller
+final class SiteMediaPreviewController
 {
     public function __invoke(Request $request, string $mediaId)
     {
