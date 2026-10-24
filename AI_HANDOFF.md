@@ -4,7 +4,7 @@ Repository `yasirskhan/Zargul-Silver-Marquee`, **only branch `chatgpt/phase0-fou
 
 ## Current verified baseline
 
-- **Final integrated baseline: `ef6217b8e8097609131385ec83a976eacb16fd56`, [run 40113341018](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40113341018) — six jobs SUCCESS.**
+- **Final integrated baseline: `59beb429586ba76369e50ca34e41eee18f622dbc`, [run 40119020374](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40119020374) — six jobs SUCCESS.**
 - Phase 0: `7ab6ff8`, CI 40020880262; `docs/PHASE0_ACCEPTANCE.md`.
 - Phase 0.5: `63c6b7a`, CI 40050039945; `docs/PHASE0_5_ACCEPTANCE.md`.
 - Phase 1: `4024399`, CI 40064675256; `docs/PHASE1_ACCEPTANCE.md`.
@@ -12,24 +12,26 @@ Repository `yasirskhan/Zargul-Silver-Marquee`, **only branch `chatgpt/phase0-fou
 - Phase 3: `bf288cb`, CI 40075891670; `docs/PHASE3_ACCEPTANCE.md`.
 - Phase 4: `1d4afb3`, CI 40090557799; `docs/PHASE4_ACCEPTANCE.md`.
 - Phase 5: `ef6217b`, CI 40113341018; `docs/PHASE5_ACCEPTANCE.md`.
-  - Owner browser reviews and approves a pending non-self expense request; approved count updates; no financial application.
-  - Approval Center categories, linked proposal rules, exact-reference/status filters, immutable decisions, no self-approval and tenant/role isolation are PostgreSQL/Livewire-tested.
-  - Telegram pairing/webhook/dedup/revocation and owner login alert are backend/UI tested; live credentials are absent and the browser asserts the explicit unconfigured state.
-  - Emergency delegation to active admins with category/amount ceiling, expiry and revocation is tested.
+- Phase 6: `59beb42`, CI 40119020374; `docs/PHASE6_ACCEPTANCE.md`.
+  - Public rendered site remains host-bound and operator-gated.
+  - New consented public enquiry form persists company/website-scoped enquiries with idempotent request UUID, IP hash, immutable audit, honeypot, CSRF and 5/minute throttle; no booking/hold/invoice/payment.
+  - New owner/admin Enquiries page lists private contact, hall/date/program/guests/message and records audited status/reason triage; manager denied.
+  - Active hall names/capacities are published for the enquiry selector; no private hall/customer/financial data.
+  - Public-site launch, real photography, DNS/indexing approval and public browser UAT remain external.
 
 ## External/operational gates (not fabricated)
 
-- Real Telegram bot/chat credentials and operator pilot.
-- Real discount/refund/waiver/free-service application to quotes/invoices/payments.
-- Payment-provider/bank settlement, real customer data, SMTP provider, off-site backup/restore, staging/security/operator acceptance.
+- `VENUE_PUBLIC_SITE_ENABLED` remains OFF; real DNS/host, real venue photography, owner/public UAT and indexing approval.
+- Phase 10 advanced themes, precise guest pricing brackets, maps/contact presentation and verified-payment 5% holds.
+- Telegram/payment provider/bank credentials, off-site backup/restore, staging/security/operator acceptance.
 - Phase 12 operational acceptance remains open; Phase 13 not promoted.
 
 ## Next executable phase
 
-Phase 6 — Public website and customer-facing experience. Reconcile the existing CMS/website/public routes and templates; deliver the complete responsive public site UI and CMS-backed content/navigation; implement only genuinely missing workflow/UI/browser acceptance; keep booking/payment gates OFF; verify six jobs, record `docs/PHASE6_ACCEPTANCE.md`, then continue Phase 7 without another prompt.
+Phase 7 — Event operations and staff workflows. Reconcile existing event operations, tasks, staff assignment, attendance, closeout and dashboard UI; implement only genuinely missing backend/UI/browser acceptance; keep production flags OFF; verify six jobs, record `docs/PHASE7_ACCEPTANCE.md`, then continue Phase 8 without another prompt.
 
 ## Rules and gates
 
 - All production release flags remain OFF until operator/security/restore acceptance.
-- Preserve immutable revisions/audit, company/hall isolation, balanced ledger, role checks and customer privacy.
+- Preserve immutable revisions/audit, company/hall isolation, balanced ledger, role checks, customer privacy and enquiry consent.
 - Six required jobs: `prototype-checks`, `central-postgres`, `licensing-postgres`, `laravel-postgres`, `editor-browser-e2e`, `authenticated-panel-e2e`. VERIFIED only when all six on the exact SHA are completed SUCCESS.

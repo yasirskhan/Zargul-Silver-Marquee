@@ -22,8 +22,8 @@ Quote, invoice, receipt, deposit, ledger, correction, refund, cash reconciliatio
 ## Phase 5 — Approvals (technically verified; Telegram pilot/operator separate)
 Owner review center, Telegram notification integration, approvals audit, permissions, emergency delegation and approvals under concurrency. Acceptance evidence: docs/PHASE5_ACCEPTANCE.md at `ef6217b`, CI 40113341018 all six success; live Telegram credentials and real financial application remain OFF.
 
-## Phase 6 — Venue public website
-Production-grade Zargul Silver Marquee brand site and integrated enquiry flow, legitimate venue photos/packages.
+## Phase 6 — Venue public website (technically verified base; public launch/media/operator separate)
+Production-grade Zargul Silver Marquee brand site and integrated enquiry flow, legitimate venue photos/packages. Acceptance evidence: docs/PHASE6_ACCEPTANCE.md at `59beb42`, CI 40119020374 all six success; public site gate remains OFF and real photography/DNS/UAT are external.
 
 ## Phase 7 — Operations/readiness
 Event actual times, setup/cleaning, services, staffing, overtime billing and operational reports.
