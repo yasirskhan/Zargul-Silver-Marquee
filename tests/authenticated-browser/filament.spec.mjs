@@ -481,7 +481,7 @@ test('real owner records an auditable approval decision without finance mutation
   await review.click();
   await page.getByLabel('Decision reason').fill('Synthetic Phase 5 owner approval decision');
   await page.getByRole('button', { name: 'Approve proposal only' }).click();
-  await expect(page.getByText('Recorded approval decision')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/Approved: 1/)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText('Telegram is not configured for this venue installation.')).toBeVisible();
 });
 
