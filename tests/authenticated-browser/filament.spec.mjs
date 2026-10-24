@@ -449,7 +449,7 @@ test('real owner creates an encrypted customer booking request without a hall cl
     page, 'browser-e2e-inventory-owner-c@example.test',
     'synthetic-inventory-owner-c-only', 'KRSXG5AUMVZWK4TT',
   );
-  await page.goto('/admin/venue-reservations');
+  await page.goto('/admin/reservations');
   const intake = page.locator('section[aria-label="Assigned staff customer and booking request intake"]');
   await expect(intake).toBeVisible({ timeout: 25_000 });
   await intake.getByLabel('Customer name').fill('Synthetic Phase Three Customer');
