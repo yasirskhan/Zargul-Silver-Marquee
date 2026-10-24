@@ -102,6 +102,7 @@ jobs:
           php central/tests/staff_http_boundary.php
           php central/tests/staff_response_emitter.php
           php central/tests/staff_operator_wiring.php
+          php central/tests/staff_public_portal.php
           php central/tests/staff_session_audit_reader.php
           php central/tests/staff_suspension.php
           php central/tests/staff_authenticated_mfa_history.php
