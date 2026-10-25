@@ -24,7 +24,7 @@
             </section>
         @else
             <ol class="flex flex-wrap gap-2 text-sm" aria-label="Setup steps">
-                @foreach ([1 => 'Company and venue', 2 => 'Halls', 3 => 'Programs', 4 => 'Pricing', 5 => 'Add-ons', 6 => 'Branding', 7 => 'Review'] as $number => $label)
+                @foreach ([1 => 'Company and venue', 2 => 'Halls', 3 => 'Programs', 4 => 'Pricing', 5 => 'Add-ons', 6 => 'Branding', 7 => 'Payments', 8 => 'Review'] as $number => $label)
                     <li class="rounded-lg border px-3 py-2 {{ $step === $number ? 'font-semibold' : '' }}">
                         {{ $number }}. {{ $label }}
                     </li>
@@ -210,6 +210,29 @@
                         </label>
                         <p class="text-xs md:col-span-2">Saves an authorized branding draft only. Public publication remains a separate publisher action and is not enabled by the wizard.</p>
                     </section>
+                @elseif ($step === 7)
+                    <section aria-label="Tenant payment settings" class="space-y-3 rounded-xl border p-4">
+                        <h2 class="font-semibold">Venue-owned payment instructions</h2>
+                        <p class="text-sm">These are the venue's customer-facing payment instructions, separate from HAFZATECH subscription billing. No live provider or payment activation occurs.</p>
+                        <label class="space-y-1 text-sm"><span>Manual instructions</span>
+                            <textarea wire:model="payments.instructions" rows="3" maxlength="1000" class="w-full rounded border p-3"></textarea>
+                        </label>
+                        <label class="space-y-1 text-sm"><span>QR / wallet instructions</span>
+                            <textarea wire:model="payments.qrInstructions" rows="2" maxlength="1000" class="w-full rounded border p-3"></textarea>
+                        </label>
+                        <label class="space-y-1 text-sm"><span>Approved deposit percentage (5% where applicable)</span>
+                            <input type="number" min="0" max="100" wire:model="payments.depositPercent" class="w-full rounded border p-3">
+                        </label>
+                        <fieldset class="space-y-2">
+                            <legend class="text-sm font-medium">Permitted manual methods</legend>
+                            @foreach (['bank_transfer' => 'Bank transfer', 'cash' => 'Cash', 'qr' => 'QR instructions', 'easypaisa' => 'Easypaisa', 'jazzcash' => 'JazzCash', 'raast' => 'Raast'] as $value => $label)
+                                <label class="flex items-center gap-2 text-sm">
+                                    <input type="checkbox" wire:model="payments.methods" value="{{ $value }}"> {{ $label }}
+                                </label>
+                            @endforeach
+                        </fieldset>
+                        <p class="text-xs">Provider API activation and raw credentials are unavailable in setup. QR screenshots and transaction references are never treated as verified settlement.</p>
+                    </section>
                 @else
                     <section aria-label="Review installation details" class="space-y-3 rounded-xl border p-4">
                         <h2 class="font-semibold">Review</h2>
@@ -235,7 +258,7 @@
                     @if ($step > 1)
                         <button type="button" wire:click="back" class="rounded-lg border px-4 py-2">Back</button>
                     @endif
-                    @if ($step < 7)
+                    @if ($step < 8)
                         <button type="submit" class="rounded-lg bg-emerald-800 px-4 py-2 font-semibold text-white">Save and continue</button>
                     @else
                         <p class="text-xs">Final completion requires every approved stage: branding, payments, staff and licensing. This review does not complete the installation.</p>

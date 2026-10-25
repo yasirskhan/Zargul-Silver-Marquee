@@ -194,7 +194,8 @@ final class InstallationWizardService
             $actor, $companyId, $expectedRevision, 'branding', 7,
             function (array $state) use ($actor, $companyId, $branding): array {
                 $website = DB::table('websites')->where('company_id', $companyId)
-                    ->orderBy('id')->first(['id', 'branding_draft_revision']);
+                    ->orderBy('id')->first(['id', 'branding_draft_revision',
+                        'branding_published_revision_id']);
                 if ($website === null) {
                     $websiteId = (string) Str::uuid();
                     DB::table('websites')->insert([
@@ -203,21 +204,41 @@ final class InstallationWizardService
                         'created_at' => now(), 'updated_at' => now(),
                     ]);
                     $draftRevision = 0;
+                    $publishedRevisionId = null;
                 } else {
                     $websiteId = $website->id;
                     $draftRevision = (int) $website->branding_draft_revision;
+                    $publishedRevisionId = $website->branding_published_revision_id;
+                }
+                $existing = null;
+                if ($draftRevision > 0) {
+                    $existing = DB::table('site_branding_revisions')
+                        ->where('company_id', $companyId)->where('website_id', $websiteId)
+                        ->where('revision_number', $draftRevision)->value('content');
+                } elseif ($publishedRevisionId !== null) {
+                    $existing = DB::table('site_branding_revisions')
+                        ->where('company_id', $companyId)->where('website_id', $websiteId)
+                        ->where('id', $publishedRevisionId)->value('content');
+                }
+                $base = is_string($existing)
+                    ? json_decode($existing, true, 512, JSON_THROW_ON_ERROR) : [];
+                $payload = array_merge(is_array($base) ? $base : [], [
+                    'siteName' => $branding['siteName'],
+                    'tagline' => $branding['tagline'] ?? '',
+                    'themePreset' => $branding['themePreset'] ?? 'silver',
+                    'fontPreset' => $branding['fontPreset'] ?? 'classic',
+                    'footerText' => $branding['footerText'] ?? '',
+                    'seoDescription' => $branding['seoDescription'] ?? '',
+                ]);
+                // Existing approved logo/favicon/navigation/media references survive
+                // wizard edits unless a separate media workflow changes them.
+                $payload['logoMediaId'] = $base['logoMediaId'] ?? null;
+                $payload['faviconMediaId'] = $base['faviconMediaId'] ?? null;
+                if (isset($base['navigationOrder']) && is_array($base['navigationOrder'])) {
+                    $payload['navigationOrder'] = $base['navigationOrder'];
                 }
                 $revision = app(SiteBrandingService::class)->saveDraft(
-                    $actor, $companyId, $websiteId,
-                    [
-                        'siteName' => $branding['siteName'],
-                        'tagline' => $branding['tagline'] ?? '',
-                        'themePreset' => $branding['themePreset'] ?? 'silver',
-                        'fontPreset' => $branding['fontPreset'] ?? 'classic',
-                        'logoMediaId' => null, 'faviconMediaId' => null,
-                        'footerText' => $branding['footerText'] ?? '',
-                        'seoDescription' => $branding['seoDescription'] ?? '',
-                    ],
+                    $actor, $companyId, $websiteId, $payload,
                     $draftRevision, 'Initial installation wizard branding',
                 );
 
@@ -230,6 +251,25 @@ final class InstallationWizardService
                     'footerText' => $branding['footerText'] ?? '',
                     'seoDescription' => $branding['seoDescription'] ?? '',
                 ]];
+            },
+        );
+    }
+
+    public function savePayments(
+        User $actor, string $companyId, array $payments, int $expectedRevision,
+    ): array {
+        $this->authorize($actor, $companyId);
+
+        return $this->saveOperationalStage(
+            $actor, $companyId, $expectedRevision, 'payments', 8,
+            function (array $state) use ($actor, $companyId, $payments): array {
+                $paymentService = app(TenantPaymentSettingsService::class);
+                $current = $paymentService->state($actor, $companyId);
+                $saved = $paymentService->save(
+                    $actor, $companyId, $payments, (int) $current['revision'],
+                );
+
+                return ['payments' => $saved['config']];
             },
         );
     }

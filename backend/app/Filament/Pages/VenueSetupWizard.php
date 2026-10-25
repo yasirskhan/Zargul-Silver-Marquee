@@ -63,6 +63,11 @@ final class VenueSetupWizard extends Page
         'fontPreset' => 'classic', 'footerText' => '', 'seoDescription' => '',
     ];
 
+    public array $payments = [
+        'banks' => [], 'instructions' => '', 'qrInstructions' => '',
+        'methods' => [], 'depositPercent' => 0, 'providerApiEnabled' => false,
+    ];
+
     public static function canAccess(): bool
     {
         $actor = Filament::auth()->user();
@@ -181,6 +186,9 @@ final class VenueSetupWizard extends Page
         if (is_array($data['branding'] ?? null)) {
             $this->branding = array_merge($this->branding, $data['branding']);
         }
+        if (is_array($data['payments'] ?? null)) {
+            $this->payments = array_merge($this->payments, $data['payments']);
+        }
     }
 
     public function addAddon(string $hallId): void
@@ -236,6 +244,7 @@ final class VenueSetupWizard extends Page
                 4 => $service->savePricing($actor, $this->companyId, $this->pricing, $this->revision),
                 5 => $service->saveAddons($actor, $this->companyId, $this->addons, $this->revision),
                 6 => $service->saveBranding($actor, $this->companyId, $this->branding, $this->revision),
+                7 => $service->savePayments($actor, $this->companyId, $this->payments, $this->revision),
                 default => throw new InvalidArgumentException('Review the saved setup before completing.'),
             };
         } catch (InvalidArgumentException $exception) {
@@ -331,6 +340,17 @@ final class VenueSetupWizard extends Page
                 'branding.fontPreset' => ['required', 'in:classic,modern'],
                 'branding.footerText' => ['nullable', 'string', 'max:240'],
                 'branding.seoDescription' => ['nullable', 'string', 'max:160'],
+            ],
+            7 => [
+                'payments.banks' => ['array', 'max:5'],
+                'payments.banks.*.bankName' => ['nullable', 'string', 'max:120'],
+                'payments.banks.*.branch' => ['nullable', 'string', 'max:160'],
+                'payments.banks.*.accountMasked' => ['nullable', 'string', 'max:32'],
+                'payments.instructions' => ['nullable', 'string', 'max:1000'],
+                'payments.qrInstructions' => ['nullable', 'string', 'max:1000'],
+                'payments.methods' => ['array'],
+                'payments.methods.*' => ['in:bank_transfer,cash,qr,easypaisa,jazzcash,raast'],
+                'payments.depositPercent' => ['required', 'integer', 'min:0', 'max:100'],
             ],
             default => [],
         };
