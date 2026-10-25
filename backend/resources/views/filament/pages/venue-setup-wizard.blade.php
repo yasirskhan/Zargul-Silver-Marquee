@@ -117,7 +117,8 @@
                     @if ($step < 3)
                         <button type="submit" class="rounded-lg bg-emerald-800 px-4 py-2 font-semibold text-white">Save and continue</button>
                     @else
-                        <button type="button" wire:click="complete" class="rounded-lg bg-emerald-800 px-4 py-2 font-semibold text-white">Complete venue setup</button>
+                        <button type="submit" class="rounded-lg bg-emerald-800 px-4 py-2 font-semibold text-white">Save setup progress</button>
+                        <p class="text-xs">Final completion requires every approved stage: programs, pricing, add-ons, branding, payments, staff and licensing.</p>
                     @endif
                 </div>
             </form>

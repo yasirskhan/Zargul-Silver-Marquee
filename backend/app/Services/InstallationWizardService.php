@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Support\Iso4217;
 use DateTimeZone;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
@@ -10,9 +11,18 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
-/** Persistent, resumable first-run venue setup. Never resets an existing installation. */
+/**
+ * Persistent, resumable first-run venue setup. Partial stages are saved but
+ * final completion remains unavailable until every approved stage exists.
+ */
 final class InstallationWizardService
 {
+    /** Final completion requires every approved operational stage. */
+    public const REQUIRED_STAGES = [
+        'company', 'halls', 'programs', 'pricing', 'addons',
+        'branding', 'payments', 'staff', 'license',
+    ];
+
     public function state(User $actor, string $companyId): array
     {
         $this->authorize($actor, $companyId);
@@ -38,6 +48,7 @@ final class InstallationWizardService
             throw new InvalidArgumentException('Invalid installation wizard step or revision.');
         }
         $this->state($actor, $companyId);
+        $stage = match ($step) { 1 => 'company', 2 => 'halls', 3 => null };
         $clean = match ($step) {
             1 => ['company' => $this->company($data)],
             2 => ['halls' => $this->halls($data)],
@@ -45,7 +56,7 @@ final class InstallationWizardService
         };
 
         return DB::transaction(function () use (
-            $actor, $companyId, $step, $clean, $expectedRevision,
+            $actor, $companyId, $step, $stage, $clean, $expectedRevision,
         ): array {
             $row = DB::table('installation_wizard_states')->where('company_id', $companyId)
                 ->lockForUpdate()->first();
@@ -60,13 +71,26 @@ final class InstallationWizardService
             }
             $current = json_decode($row->data, true, 512, JSON_THROW_ON_ERROR);
             $merged = array_replace_recursive($current, $clean);
+            $stages = array_values(array_unique(array_merge(
+                is_array($current['completedStages'] ?? null) ? $current['completedStages'] : [],
+                $stage !== null ? [$stage] : [],
+            )));
+            $merged['completedStages'] = $stages;
+            if ($stage === 'company') {
+                $this->persistCompany($companyId, $merged['company']);
+            }
+            if ($stage === 'halls') {
+                $merged['halls'] = $this->persistHalls($companyId, $merged['halls']);
+            }
             $next = $expectedRevision + 1;
             DB::table('installation_wizard_states')->where('company_id', $companyId)->update([
                 'step' => min(3, $step + 1), 'revision' => $next,
+                'status' => 'in_progress',
                 'data' => json_encode($merged, JSON_THROW_ON_ERROR), 'updated_at' => now(),
             ]);
             $this->audit($actor, $companyId, 'installation.wizard_step_saved', [
-                'step' => $step, 'revision' => $next,
+                'step' => $step, 'stage' => $stage, 'revision' => $next,
+                'completedStages' => $stages,
             ]);
             $fresh = DB::table('installation_wizard_states')->where('company_id', $companyId)->first();
 
@@ -94,6 +118,13 @@ final class InstallationWizardService
                 throw new ConflictHttpException('Installation setup changed; reload before completing.');
             }
             $data = json_decode($row->data, true, 512, JSON_THROW_ON_ERROR);
+            $stages = is_array($data['completedStages'] ?? null) ? $data['completedStages'] : [];
+            $missing = array_values(array_diff(self::REQUIRED_STAGES, $stages));
+            if ($missing !== []) {
+                throw new InvalidArgumentException(
+                    'Complete all approved setup stages before finishing: '.implode(', ', $missing)
+                );
+            }
             $company = $data['company'] ?? [];
             $halls = $data['halls'] ?? [];
             if (! is_array($company) || ($company['legalName'] ?? '') === ''
@@ -103,34 +134,7 @@ final class InstallationWizardService
             DB::table('companies')->where('id', $companyId)->update([
                 'name' => $company['legalName'], 'updated_at' => now(),
             ]);
-            $savedHalls = [];
-            foreach ($halls as $hall) {
-                $hallId = is_string($hall['id'] ?? null) && Str::isUuid($hall['id'])
-                    ? $hall['id'] : (string) Str::uuid();
-                $existing = DB::table('halls')->where('company_id', $companyId)
-                    ->where('id', $hallId)->first();
-                if ($existing) {
-                    DB::table('halls')->where('company_id', $companyId)->where('id', $hallId)
-                        ->update(['name' => $hall['name'], 'capacity' => $hall['capacity'],
-                            'is_active' => true, 'updated_at' => now()]);
-                } else {
-                    $slug = Str::slug($hall['name']);
-                    $base = $slug !== '' ? $slug : 'hall';
-                    $slug = $base;
-                    $suffix = 2;
-                    while (DB::table('halls')->where('company_id', $companyId)
-                        ->where('slug', $slug)->exists()) {
-                        $slug = $base.'-'.$suffix++;
-                    }
-                    DB::table('halls')->insert([
-                        'id' => $hallId, 'company_id' => $companyId, 'slug' => $slug,
-                        'name' => $hall['name'], 'capacity' => $hall['capacity'],
-                        'included_chairs' => 0, 'included_tables' => 0,
-                        'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
-                    ]);
-                }
-                $savedHalls[] = array_merge($hall, ['id' => $hallId]);
-            }
+            $savedHalls = $this->persistHalls($companyId, $halls);
             $data['halls'] = $savedHalls;
             $next = $expectedRevision + 1;
             DB::table('installation_wizard_states')->where('company_id', $companyId)->update([
@@ -146,6 +150,56 @@ final class InstallationWizardService
 
             return $this->project($fresh);
         }, 3);
+    }
+
+    private function persistCompany(string $companyId, array $company): void
+    {
+        DB::table('companies')->where('id', $companyId)->update([
+            'legal_name' => $company['legalName'],
+            'contact_email' => $company['contactEmail'] ?: null,
+            'contact_phone' => $company['contactPhone'] ?: null,
+            'address' => $company['address'] ?: null,
+            'currency_code' => $company['currency'],
+            'timezone' => $company['timezone'],
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function persistHalls(string $companyId, array $halls): array
+    {
+        $saved = [];
+        foreach ($halls as $hall) {
+            $hallId = is_string($hall['id'] ?? null) && Str::isUuid($hall['id'])
+                ? $hall['id'] : (string) Str::uuid();
+            $existing = DB::table('halls')->where('company_id', $companyId)
+                ->where('id', $hallId)->first();
+            if ($existing) {
+                // Preserve lifecycle state: setup never silently reactivates a hall.
+                DB::table('halls')->where('company_id', $companyId)->where('id', $hallId)
+                    ->update(['name' => $hall['name'], 'capacity' => $hall['capacity'],
+                        'address' => $hall['address'] ?: null,
+                        'phone' => $hall['phone'] ?: null, 'updated_at' => now()]);
+            } else {
+                $base = Str::slug($hall['name']) ?: 'hall';
+                $slug = $base;
+                $suffix = 2;
+                while (DB::table('halls')->where('company_id', $companyId)
+                    ->where('slug', $slug)->exists()) {
+                    $slug = $base.'-'.$suffix++;
+                }
+                DB::table('halls')->insert([
+                    'id' => $hallId, 'company_id' => $companyId, 'slug' => $slug,
+                    'name' => $hall['name'], 'capacity' => $hall['capacity'],
+                    'address' => $hall['address'] ?: null,
+                    'phone' => $hall['phone'] ?: null,
+                    'included_chairs' => 0, 'included_tables' => 0,
+                    'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+                ]);
+            }
+            $saved[] = array_merge($hall, ['id' => $hallId]);
+        }
+
+        return $saved;
     }
 
     private function authorize(User $actor, string $companyId): void
@@ -181,6 +235,7 @@ final class InstallationWizardService
                 'address' => '', 'currency' => 'PKR', 'timezone' => 'Asia/Karachi',
             ],
             'halls' => [],
+            'completedStages' => [],
         ];
     }
 
@@ -197,9 +252,9 @@ final class InstallationWizardService
             || ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) === false)
             || mb_strlen($email) > 254 || mb_strlen($phone) > 32 || mb_strlen($address) > 240
             || preg_match('/[<>[:cntrl:]]/u', $name.$email.$phone.$address)
-            || preg_match('/\A[A-Z]{3}\z/', $currency) !== 1
+            || ! Iso4217::isValid($currency)
             || ! in_array($timezone, DateTimeZone::listIdentifiers(), true)) {
-            throw new InvalidArgumentException('Valid legal name, contact, ISO currency and IANA timezone are required.');
+            throw new InvalidArgumentException('Valid legal name, contact, ISO 4217 currency and IANA timezone are required.');
         }
 
         return [

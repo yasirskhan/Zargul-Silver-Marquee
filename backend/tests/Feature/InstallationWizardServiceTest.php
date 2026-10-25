@@ -55,22 +55,43 @@ class InstallationWizardServiceTest extends TestCase
                 'phone' => '', 'capacity' => 150],
         ]], $state['revision']);
         $this->assertSame(3, $state['step']);
+        $this->assertSame('in_progress', $state['status']);
+        $this->assertContains('company', $state['data']['completedStages']);
+        $this->assertContains('halls', $state['data']['completedStages']);
         $this->assertCount(2, $state['data']['halls']);
-
-        $state = $service->complete($owner, $company->id, $state['revision']);
-        $this->assertSame('completed', $state['status']);
-        $this->assertNotNull($state['completedAt']);
-        $this->assertSame('Zargul Silver Marquee', DB::table('companies')->value('name'));
+        $this->assertSame('Zargul Silver Marquee', DB::table('companies')->value('legal_name'));
+        $this->assertSame('PKR', DB::table('companies')->value('currency_code'));
         $this->assertSame(2, DB::table('halls')->where('company_id', $company->id)->count());
-        $this->assertSame(1, DB::table('audit_events')
-            ->where('action', 'installation.wizard_completed')->count());
+        $this->assertSame('Hall address', DB::table('halls')->where('name', 'Grand Hall')->value('address'));
 
         try {
             $service->complete($owner, $company->id, $state['revision']);
-            $this->fail('Completed wizard was reopened.');
-        } catch (ConflictHttpException) {
-            $this->assertTrue(true);
+            $this->fail('Partial three-step installation was falsely completed.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertStringContainsString('Complete all approved setup stages', $exception->getMessage());
         }
+        $this->assertSame('in_progress', DB::table('installation_wizard_states')->value('status'));
+        $this->assertNull(DB::table('installation_wizard_states')->value('completed_at'));
+    }
+
+    public function test_inactive_hall_is_not_reactivated_or_deleted_by_setup(): void
+    {
+        [$company, $owner] = $this->fixture();
+        $hall = Hall::create([
+            'company_id' => $company->id, 'name' => 'Closed Hall',
+            'slug' => 'closed-hall', 'capacity' => 80, 'is_active' => false,
+        ]);
+        $service = app(InstallationWizardService::class);
+        $state = $service->save($owner, $company->id, 2, ['halls' => [[
+            'id' => $hall->id, 'name' => 'Renamed Closed Hall',
+            'address' => 'New address', 'phone' => '+1 555 0199', 'capacity' => 90,
+        ]]], $service->state($owner, $company->id)['revision']);
+        $this->assertSame('Renamed Closed Hall', DB::table('halls')->where('id', $hall->id)->value('name'));
+        $this->assertSame(90, (int) DB::table('halls')->where('id', $hall->id)->value('capacity'));
+        $this->assertSame('New address', DB::table('halls')->where('id', $hall->id)->value('address'));
+        $this->assertFalse((bool) DB::table('halls')->where('id', $hall->id)->value('is_active'));
+        $this->assertSame(1, DB::table('halls')->where('company_id', $company->id)->count());
+        $this->assertNotNull($state['data']['halls'][0]['id']);
     }
 
     public function test_stale_revision_foreign_manager_and_invalid_currency_fail_closed(): void

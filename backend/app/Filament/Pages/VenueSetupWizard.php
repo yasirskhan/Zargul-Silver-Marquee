@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\CompanyMembership;
 use App\Models\User;
 use App\Services\InstallationWizardService;
+use App\Support\Iso4217;
 use BackedEnum;
 use DateTimeZone;
 use Filament\Facades\Filament;
@@ -188,7 +189,7 @@ final class VenueSetupWizard extends Page
                 'company.contactEmail' => ['nullable', 'email', 'max:254'],
                 'company.contactPhone' => ['nullable', 'string', 'max:32'],
                 'company.address' => ['nullable', 'string', 'max:240'],
-                'company.currency' => ['required', 'regex:/^[A-Z]{3}$/'],
+                'company.currency' => ['required', 'in:'.implode(',', array_keys(Iso4217::all()))],
                 'company.timezone' => ['required', 'in:'.implode(',', DateTimeZone::listIdentifiers())],
             ];
         }

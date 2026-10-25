@@ -33,7 +33,7 @@ class VenueSetupWizardLivewireTest extends TestCase
         return [$company, $owner];
     }
 
-    public function test_owner_saves_company_and_halls_and_completes_wizard(): void
+    public function test_owner_saves_company_and_halls_but_partial_setup_cannot_finalize(): void
     {
         [$company] = $this->fixture();
         $component = Livewire::test(VenueSetupWizard::class)
@@ -52,14 +52,18 @@ class VenueSetupWizardLivewireTest extends TestCase
             ->call('saveAndContinue')
             ->assertHasNoErrors()
             ->assertSet('step', 3)
+            ->assertSet('status', 'in_progress')
             ->call('complete')
-            ->assertHasNoErrors()
-            ->assertSet('status', 'completed');
+            ->assertHasErrors(['wizard'])
+            ->assertSet('status', 'in_progress');
 
         $this->assertSame(1, DB::table('halls')->where('company_id', $company->id)->count());
-        $this->assertSame('completed', DB::table('installation_wizard_states')->value('status'));
-        $this->assertSame(1, DB::table('audit_events')
+        $this->assertSame('in_progress', DB::table('installation_wizard_states')->value('status'));
+        $this->assertNull(DB::table('installation_wizard_states')->value('completed_at'));
+        $this->assertSame(0, DB::table('audit_events')
             ->where('action', 'installation.wizard_completed')->count());
+        $this->assertSame(2, DB::table('audit_events')
+            ->where('action', 'installation.wizard_step_saved')->count());
     }
 
     public function test_manager_cannot_open_owner_wizard(): void
