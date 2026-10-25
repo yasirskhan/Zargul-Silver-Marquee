@@ -341,7 +341,10 @@ final class VenueSetupWizard extends Page
         abort_if($this->status === 'completed', 403);
         $actor = Filament::auth()->user();
         abort_unless($actor instanceof User && $this->companyId !== null, 403);
-        $this->validate($this->rulesForStep());
+        $rules = $this->rulesForStep();
+        if ($rules !== []) {
+            $this->validate($rules);
+        }
         try {
             $service = app(InstallationWizardService::class);
             $state = match ($this->step) {
