@@ -4,7 +4,7 @@ Repository `yasirskhan/Zargul-Silver-Marquee`, **only branch `chatgpt/phase0-fou
 
 ## Current verified baseline
 
-- **Final integrated baseline: `eca1e21804ffab757fac6a3ffac28e092d75ba3e`, [run 40148896410](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40148896410) — six jobs SUCCESS.**
+- **Final integrated baseline: `297b67b0c15608a2c82ad51afd8fdd69e24bf0cd`, [run 40153851545](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40153851545) — six jobs SUCCESS.**
 - Phase 0: `7ab6ff8`, CI 40020880262.
 - Phase 0.5: `63c6b7a`, CI 40050039945.
 - Phase 1: `4024399`, CI 40064675256.
@@ -18,7 +18,7 @@ Repository `yasirskhan/Zargul-Silver-Marquee`, **only branch `chatgpt/phase0-fou
 - Phase 9 first milestone: `59fb965`, CI 40138475496; `docs/PHASE9_CENTRAL_PORTAL.md`.
   - `central/public/staff.php`: default-off, verified-HTTPS-host staff front controller with vendor-only email/password/TOTP login, secure session cookie, CSRF and delegation to the existing central staff portal router.
   - External `CENTRAL_STAFF_KMS_BOOTSTRAP` supplies TOTP decryption/support-reply encryption; no KMS/signing secret in repo.
-  - `central/tests/staff_public_portal.php` proves default denial, trusted-host login UI, wrong-host denial, no secret output and fail-closed missing KMS.\n  - `central/tests/staff_portal_journey.php` proves real central PostgreSQL staff login + TOTP, secure cookie/CSRF, home, customer directory, logout and revoked-session denial via the operator HTTP composition.\n  - `VenueSetupWizard` is registered in the admin panel; authenticated Playwright owner journey saves company/contact/currency/timezone, two halls, reloads/resumes, uses Back/Review and verifies in_progress with no false completion; docs/PHASE9_INSTALLATION_WIZARD.md.
+  - `central/tests/staff_public_portal.php` proves default denial, trusted-host login UI, wrong-host denial, no secret output and fail-closed missing KMS.\n  - `central/tests/staff_portal_journey.php` proves real central PostgreSQL staff login + TOTP, secure cookie/CSRF, home, customer directory, logout and revoked-session denial via the operator HTTP composition.\n  - `VenueSetupWizard` is registered in the admin panel; authenticated Playwright owner journey saves company/contact/currency/timezone, two halls, hall programs, seating pricing and add-ons, reloads/resumes and verifies in_progress with no false completion; docs/PHASE9_INSTALLATION_WIZARD.md.
   - Dashboard/customer directory/license queue/billing/support/audit endpoints are the existing role-scoped portal services; not yet exercised by a deployed authenticated browser.
 
 ## External/operational gates (not fabricated)

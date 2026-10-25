@@ -1,8 +1,8 @@
 # Phase 9 installation wizard — corrected foundation
 
-Status: **PAGE REGISTRATION + AUTHENTICATED OWNER BROWSER JOURNEY VERIFIED. Partial stages only; final completion intentionally unavailable.**
-Verified source: `eca1e21804ffab757fac6a3ffac28e092d75ba3e`
-Hosted CI: [run 40148896410](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40148896410) — all six SUCCESS.
+Status: **PAGE REGISTRATION + AUTHENTICATED OWNER BROWSER JOURNEY VERIFIED. Programs, pricing, add-ons and authenticated browser journey verified; final completion intentionally unavailable.**
+Verified source: `297b67b0c15608a2c82ad51afd8fdd69e24bf0cd`
+Hosted CI: [run 40153851545](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40153570974) — all six SUCCESS.
 
 ## Fixed
 
@@ -25,7 +25,7 @@ Hosted CI: [run 40148896410](https://github.com/yasirskhan/Zargul-Silver-Marquee
 - `completedStages` is versioned in wizard JSON; final completion requires all approved stages.
 - Existing partial states remain resumable; no destructive reset.
 
-## Still missing
+## Added operational stages\n\n- Step 3 hall programs through `HallProgramRulesService` for every hall: morning/noon/evening start/end, setup/cleaning, grace, overtime interval/rate and rental rate; immutable program revisions and audit.\n- Step 4 seating/guest pricing through `HallSeatingPriceService`: hall capacity, included chairs/tables and extra unit prices in company currency minor units; immutable pricing revisions.\n- Step 5 add-ons through `HallAddonCatalogService`: categorized code/name/rate/charge unit with immutable catalog revision and audit.\n- Wizard `completedStages` now includes programs/pricing/addons; final completion still refuses until branding/payments/staff/licensing stages exist.\n- Authenticated browser journey saves and resumes all six steps, including two halls and reload; PostgreSQL tests cover canonical revision counters and audit.\n\n## Still missing
 
 - Programs/schedules, guest pricing brackets, seating/add-ons, branding, tenant payment settings, staff invitations, licensing and final readiness stages.
 - Real concurrent two-connection and failed-audit rollback tests beyond existing revision conflict coverage.
