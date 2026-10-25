@@ -383,8 +383,14 @@ final class InstallationWizardService
                     'Complete all approved setup stages before finishing: '.implode(', ', $missing)
                 );
             }
-            $license = app(CentralLicensingOverviewService::class)
-                ->snapshotForCompany($actor, $companyId, now()->toDateTimeImmutable());
+            try {
+                $license = app(CentralLicensingOverviewService::class)
+                    ->snapshotForCompany($actor, $companyId, now()->toDateTimeImmutable());
+            } catch (AuthorizationException) {
+                throw new InvalidArgumentException(
+                    'A currently verified signed license is required before installation completion.'
+                );
+            }
             if (! in_array($license['state'] ?? null, ['licensed', 'expired_grace'], true)) {
                 throw new InvalidArgumentException(
                     'A currently verified signed license is required before installation completion.'

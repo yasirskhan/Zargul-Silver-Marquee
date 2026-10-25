@@ -113,7 +113,8 @@ class InstallationWizardServiceTest extends TestCase
         $license = (string) Str::uuid();
         $domain = 'wizard-complete.example.test';
         DB::table('central_installation_activation')->insert([
-            'singleton_id' => 1, 'installation_id' => $identity['installation_id'],
+            'singleton_id' => 1, 'company_id' => $company->id,
+            'installation_id' => $identity['installation_id'],
             'customer_id' => $customer, 'approved_domain' => $domain,
             'status' => 'registered_pending_license', 'central_registered_at' => now(),
             'created_at' => now(), 'updated_at' => now(),
