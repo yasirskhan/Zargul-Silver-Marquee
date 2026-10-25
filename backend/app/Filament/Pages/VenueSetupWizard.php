@@ -70,7 +70,7 @@ final class VenueSetupWizard extends Page
         'methods' => [], 'depositPercent' => 0, 'providerApiEnabled' => false,
     ];
 
-    public bool $ownerOnly = false;
+    public string $staffMode = '';
     public string $staffEmail = '';
     public string $staffRole = 'manager';
     public array $staffHallIds = [];
@@ -200,7 +200,7 @@ final class VenueSetupWizard extends Page
         if (is_array($data['payments'] ?? null)) {
             $this->payments = array_merge($this->payments, $data['payments']);
         }
-        $this->ownerOnly = (bool) ($data['staff']['ownerOnly'] ?? false);
+        $this->staffMode = ($data['staff']['ownerOnly'] ?? false) ? 'owner_only' : '';
         $this->refreshStaffInvitations();
     }
 
@@ -279,7 +279,7 @@ final class VenueSetupWizard extends Page
             'banks' => [], 'instructions' => '', 'qrInstructions' => '',
             'methods' => [], 'depositPercent' => 0, 'providerApiEnabled' => false,
         ];
-        $this->ownerOnly = false;
+        $this->staffMode = '';
         $this->staffEmail = '';
         $this->staffRole = 'manager';
         $this->staffHallIds = [];
@@ -355,7 +355,7 @@ final class VenueSetupWizard extends Page
                 5 => $service->saveAddons($actor, $this->companyId, $this->addons, $this->revision),
                 6 => $service->saveBranding($actor, $this->companyId, $this->branding, $this->revision),
                 7 => $service->savePayments($actor, $this->companyId, $this->payments, $this->revision),
-                8 => $service->saveStaff($actor, $this->companyId, $this->ownerOnly, $this->revision),
+                8 => $service->saveStaff($actor, $this->companyId, $this->staffMode === 'owner_only', $this->revision),
                 default => throw new InvalidArgumentException('Review the saved setup before completing.'),
             };
         } catch (InvalidArgumentException $exception) {

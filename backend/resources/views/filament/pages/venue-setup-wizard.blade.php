@@ -257,8 +257,12 @@
                     <section aria-label="Staff invitations" class="space-y-4 rounded-xl border p-4">
                         <h2 class="font-semibold">Initial staff</h2>
                         <p class="text-sm">Invitations do not grant access. Staff must accept, verify email and enrol in MFA before privileged use. Owner-only venues may skip additional staff explicitly.</p>
-                        <label class="flex items-center gap-2 text-sm">
-                            <input type="checkbox" wire:model="ownerOnly"> This venue is operated only by its Owner
+                        <label class="block max-w-sm space-y-1 text-sm"><span>Staff setup</span>
+                            <select wire:model="staffMode" class="w-full rounded border p-2">
+                                <option value="">Choose explicitly</option>
+                                <option value="owner_only">Owner-operated venue (no additional staff)</option>
+                                <option value="invite">Invite staff below</option>
+                            </select>
                         </label>
                         <div class="grid gap-3 md:grid-cols-3">
                             <label class="space-y-1 text-sm"><span>Staff email</span>
