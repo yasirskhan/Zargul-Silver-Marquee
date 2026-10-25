@@ -77,6 +77,7 @@ class InstallationWizardServiceTest extends TestCase
     public function test_program_pricing_and_addon_stages_persist_through_canonical_services(): void
     {
         [$company, $owner] = $this->fixture();
+        $this->be($owner);
         $service = app(InstallationWizardService::class);
         $state = $service->save($owner, $company->id, 1, ['company' => [
             'legalName' => 'Operational Venue', 'contactEmail' => 'ops@example.test',
