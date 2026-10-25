@@ -274,6 +274,29 @@ final class InstallationWizardService
         );
     }
 
+    public function saveStaff(
+        User $actor, string $companyId, bool $ownerOnly, int $expectedRevision,
+    ): array {
+        $this->authorize($actor, $companyId);
+
+        return $this->saveOperationalStage(
+            $actor, $companyId, $expectedRevision, 'staff', 9,
+            function () use ($actor, $companyId, $ownerOnly): array {
+                $invitations = app(StaffInvitationService::class)->list($actor, $companyId);
+                if (! $ownerOnly && $invitations === []) {
+                    throw new InvalidArgumentException(
+                        'Invite at least one staff member or explicitly choose an owner-operated venue.'
+                    );
+                }
+
+                return ['staff' => [
+                    'ownerOnly' => $ownerOnly,
+                    'invitationCount' => count($invitations),
+                ]];
+            },
+        );
+    }
+
     private function saveOperationalStage(
         User $actor, string $companyId, int $expectedRevision,
         string $stage, int $nextStep, callable $persist,

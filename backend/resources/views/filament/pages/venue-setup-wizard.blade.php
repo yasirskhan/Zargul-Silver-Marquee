@@ -24,7 +24,7 @@
             </section>
         @else
             <ol class="flex flex-wrap gap-2 text-sm" aria-label="Setup steps">
-                @foreach ([1 => 'Company and venue', 2 => 'Halls', 3 => 'Programs', 4 => 'Pricing', 5 => 'Add-ons', 6 => 'Branding', 7 => 'Payments', 8 => 'Review'] as $number => $label)
+                @foreach ([1 => 'Company and venue', 2 => 'Halls', 3 => 'Programs', 4 => 'Pricing', 5 => 'Add-ons', 6 => 'Branding', 7 => 'Payments', 8 => 'Staff', 9 => 'Review'] as $number => $label)
                     <li class="rounded-lg border px-3 py-2 {{ $step === $number ? 'font-semibold' : '' }}">
                         {{ $number }}. {{ $label }}
                     </li>
@@ -253,6 +253,53 @@
                         </fieldset>
                         <p class="text-xs">Provider API activation and raw credentials are unavailable in setup. QR screenshots and transaction references are never treated as verified settlement.</p>
                     </section>
+                @elseif ($step === 8)
+                    <section aria-label="Staff invitations" class="space-y-4 rounded-xl border p-4">
+                        <h2 class="font-semibold">Initial staff</h2>
+                        <p class="text-sm">Invitations do not grant access. Staff must accept, verify email and enrol in MFA before privileged use. Owner-only venues may skip additional staff explicitly.</p>
+                        <label class="flex items-center gap-2 text-sm">
+                            <input type="checkbox" wire:model="ownerOnly"> This venue is operated only by its Owner
+                        </label>
+                        <div class="grid gap-3 md:grid-cols-3">
+                            <label class="space-y-1 text-sm"><span>Staff email</span>
+                                <input type="email" wire:model="staffEmail" maxlength="254" class="w-full rounded border p-2">
+                            </label>
+                            <label class="space-y-1 text-sm"><span>Role</span>
+                                <select wire:model="staffRole" class="w-full rounded border p-2">
+                                    <option value="admin">Admin</option>
+                                    <option value="manager">Manager</option>
+                                    <option value="reception">Reception</option>
+                                    <option value="operations">Operations</option>
+                                </select>
+                            </label>
+                            <label class="space-y-1 text-sm"><span>Invitation reason</span>
+                                <input wire:model="staffReason" maxlength="300" class="w-full rounded border p-2">
+                            </label>
+                        </div>
+                        <fieldset class="space-y-2">
+                            <legend class="text-sm font-medium">Assign halls (where applicable)</legend>
+                            @foreach ($halls as $hall)
+                                <label class="flex items-center gap-2 text-sm">
+                                    <input type="checkbox" wire:model="staffHallIds" value="{{ $hall['id'] }}"> {{ $hall['name'] }}
+                                </label>
+                            @endforeach
+                        </fieldset>
+                        <button type="button" wire:click="inviteStaff" class="rounded border px-3 py-2 text-sm">Create invitation</button>
+                        @error('staffEmail') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                        @error('staffReason') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                        <div class="space-y-2">
+                            @forelse ($staffInvitations as $invite)
+                                <div class="flex flex-wrap justify-between gap-2 rounded border p-2 text-sm">
+                                    <span>{{ $invite['email'] }} · {{ $invite['role'] }} · {{ strtoupper($invite['status']) }}</span>
+                                    @if ($invite['status'] !== 'revoked')
+                                        <button type="button" wire:click="revokeStaff('{{ $invite['id'] }}')" class="rounded border px-3 py-1">Revoke</button>
+                                    @endif
+                                </div>
+                            @empty
+                                <p class="text-sm">No staff invitations yet.</p>
+                            @endforelse
+                        </div>
+                    </section>
                 @else
                     <section aria-label="Review installation details" class="space-y-3 rounded-xl border p-4">
                         <h2 class="font-semibold">Review</h2>
@@ -278,7 +325,7 @@
                     @if ($step > 1)
                         <button type="button" wire:click="back" class="rounded-lg border px-4 py-2">Back</button>
                     @endif
-                    @if ($step < 8)
+                    @if ($step < 9)
                         <button type="submit" class="rounded-lg bg-emerald-800 px-4 py-2 font-semibold text-white">Save and continue</button>
                     @else
                         <p class="text-xs">Final completion requires every approved stage: branding, payments, staff and licensing. This review does not complete the installation.</p>

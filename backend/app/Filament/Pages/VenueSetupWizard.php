@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\CompanyMembership;
 use App\Models\User;
 use App\Services\InstallationWizardService;
+use App\Services\StaffInvitationService;
 use App\Support\Iso4217;
 use BackedEnum;
 use DateTimeZone;
@@ -15,6 +16,7 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Livewire\Attributes\Locked;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /** Persistent owner-only first-run venue setup; no destructive re-initialization. */
 final class VenueSetupWizard extends Page
@@ -67,6 +69,13 @@ final class VenueSetupWizard extends Page
         'banks' => [], 'instructions' => '', 'qrInstructions' => '',
         'methods' => [], 'depositPercent' => 0, 'providerApiEnabled' => false,
     ];
+
+    public bool $ownerOnly = false;
+    public string $staffEmail = '';
+    public string $staffRole = 'manager';
+    public array $staffHallIds = [];
+    public string $staffReason = '';
+    public array $staffInvitations = [];
 
     public static function canAccess(): bool
     {
@@ -123,7 +132,9 @@ final class VenueSetupWizard extends Page
     private function loadState(): void
     {
         $actor = Filament::auth()->user();
-        abort_unless($actor instanceof User && $this->companyId !== null, 403);
+        abort_unless($actor instanceof User && $this->companyId !== null
+            && array_key_exists($this->companyId, $this->companyOptions()), 403);
+        $this->resetCompanyFormState();
         $state = app(InstallationWizardService::class)->state($actor, $this->companyId);
         $this->step = $state['step'];
         $this->revision = $state['revision'];
@@ -189,6 +200,85 @@ final class VenueSetupWizard extends Page
         if (is_array($data['payments'] ?? null)) {
             $this->payments = array_merge($this->payments, $data['payments']);
         }
+        $this->ownerOnly = (bool) ($data['staff']['ownerOnly'] ?? false);
+        $this->refreshStaffInvitations();
+    }
+
+    public function refreshStaffInvitations(): void
+    {
+        $actor = Filament::auth()->user();
+        if (! $actor instanceof User || $this->companyId === null
+            || ! array_key_exists($this->companyId, $this->companyOptions())) {
+            $this->staffInvitations = [];
+            return;
+        }
+        try {
+            $this->staffInvitations = app(StaffInvitationService::class)->list($actor, $this->companyId);
+        } catch (\Throwable) {
+            $this->staffInvitations = [];
+        }
+    }
+
+    public function inviteStaff(): void
+    {
+        abort_unless($this->companyId !== null
+            && array_key_exists($this->companyId, $this->companyOptions()), 403);
+        $actor = Filament::auth()->user();
+        abort_unless($actor instanceof User, 403);
+        $this->validate([
+            'staffEmail' => ['required', 'email', 'max:254'],
+            'staffRole' => ['required', 'in:admin,manager,reception,operations'],
+            'staffReason' => ['required', 'string', 'min:3', 'max:300'],
+        ]);
+        try {
+            app(StaffInvitationService::class)->invite(
+                $actor, $this->companyId, $this->staffEmail, $this->staffRole,
+                $this->staffHallIds, $this->staffReason,
+            );
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages(['staffEmail' => $exception->getMessage()]);
+        } catch (ConflictHttpException $exception) {
+            throw ValidationException::withMessages(['staffEmail' => $exception->getMessage()]);
+        }
+        $this->staffEmail = '';
+        $this->staffReason = '';
+        $this->refreshStaffInvitations();
+        Notification::make()->title('Staff invitation created; no access until acceptance and MFA')->success()->send();
+    }
+
+    public function revokeStaff(string $id): void
+    {
+        abort_unless($this->companyId !== null
+            && array_key_exists($this->companyId, $this->companyOptions()), 403);
+        $actor = Filament::auth()->user();
+        abort_unless($actor instanceof User, 403);
+        $this->validate(['staffReason' => ['required', 'string', 'min:3', 'max:300']]);
+        app(StaffInvitationService::class)->revoke($actor, $this->companyId, $id, $this->staffReason);
+        $this->staffReason = '';
+        $this->refreshStaffInvitations();
+        Notification::make()->title('Invitation revoked and access deactivated')->success()->send();
+    }
+
+    private function resetCompanyFormState(): void
+    {
+        $this->company = [
+            'legalName' => '', 'contactEmail' => '', 'contactPhone' => '',
+            'address' => '', 'currency' => 'PKR', 'timezone' => 'Asia/Karachi',
+        ];
+        $this->halls = [
+            ['id' => null, 'name' => '', 'address' => '', 'phone' => '', 'capacity' => 100],
+        ];
+        $this->programs = [];
+        $this->pricing = [];
+        $this->addons = [];
+        $this->branding = [
+            'siteName' => '', 'tagline' => '', 'themePreset' => 'silver',
+            'fontPreset' => 'classic', 'footerText' => '', 'seoDescription' => '',
+        ];
+        $this->payments = [
+            'banks' => [], 'instructions' => '', 'qrInstructions' => '',
+            'methods' => [], 'depositPercent' => 0, 'providerApiEnabled' => false,
+        ];
     }
 
     public function addBank(): void
@@ -241,6 +331,7 @@ final class VenueSetupWizard extends Page
 
     public function saveAndContinue(): void
     {
+        abort_unless($this->companyId !== null && array_key_exists($this->companyId, $this->companyOptions()), 403);
         abort_if($this->status === 'completed', 403);
         $actor = Filament::auth()->user();
         abort_unless($actor instanceof User && $this->companyId !== null, 403);
@@ -258,6 +349,7 @@ final class VenueSetupWizard extends Page
                 5 => $service->saveAddons($actor, $this->companyId, $this->addons, $this->revision),
                 6 => $service->saveBranding($actor, $this->companyId, $this->branding, $this->revision),
                 7 => $service->savePayments($actor, $this->companyId, $this->payments, $this->revision),
+                8 => $service->saveStaff($actor, $this->companyId, $this->ownerOnly, $this->revision),
                 default => throw new InvalidArgumentException('Review the saved setup before completing.'),
             };
         } catch (InvalidArgumentException $exception) {
@@ -269,6 +361,7 @@ final class VenueSetupWizard extends Page
 
     public function complete(): void
     {
+        abort_unless($this->companyId !== null && array_key_exists($this->companyId, $this->companyOptions()), 403);
         abort_if($this->status === 'completed', 403);
         $actor = Filament::auth()->user();
         abort_unless($actor instanceof User && $this->companyId !== null, 403);
