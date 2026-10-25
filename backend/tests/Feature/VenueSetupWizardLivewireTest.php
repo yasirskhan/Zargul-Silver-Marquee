@@ -66,6 +66,38 @@ class VenueSetupWizardLivewireTest extends TestCase
             ->where('action', 'installation.wizard_step_saved')->count());
     }
 
+    public function test_staff_mode_advances_to_review_at_step_eight(): void
+    {
+        [$company] = $this->fixture();
+        $hallId = (string) \Illuminate\Support\Str::uuid();
+        DB::table('halls')->insert([
+            'id' => $hallId, 'company_id' => $company->id, 'slug' => 'staff-stage-hall',
+            'name' => 'Staff Stage Hall', 'capacity' => 100,
+            'included_chairs' => 0, 'included_tables' => 0, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('installation_wizard_states')->insert([
+            'id' => (string) \Illuminate\Support\Str::uuid(), 'company_id' => $company->id,
+            'step' => 8, 'revision' => 10, 'status' => 'in_progress',
+            'data' => json_encode([
+                'company' => ['legalName' => 'Wizard Livewire', 'contactEmail' => '',
+                    'contactPhone' => '', 'address' => '', 'currency' => 'PKR',
+                    'timezone' => 'Asia/Karachi'],
+                'halls' => [['id' => $hallId, 'name' => 'Staff Stage Hall',
+                    'address' => '', 'phone' => '', 'capacity' => 100]],
+                'completedStages' => ['company', 'halls', 'programs', 'pricing', 'addons',
+                    'branding', 'payments'],
+            ], JSON_THROW_ON_ERROR),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        Livewire::test(VenueSetupWizard::class)
+            ->assertSet('step', 8)
+            ->set('staffMode', 'owner_only')
+            ->call('saveAndContinue')
+            ->assertHasNoErrors()
+            ->assertSet('step', 9);
+    }
     public function test_manager_cannot_open_owner_wizard(): void
     {
         [$company] = $this->fixture();
