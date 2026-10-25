@@ -44,6 +44,47 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
     );
 
 
+    if (getenv('VENUE_CENTRAL_ACTIVATION_ENABLED') === 'true') {
+        // Isolated signed-license fixture for the browser installation journey.
+        // The public key is written before `artisan serve`; no production key
+        // or external activation is used.
+        $pair = sodium_crypto_sign_keypair();
+        $b64 = static fn (string $raw): string => rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
+        $publicKey = $b64(sodium_crypto_sign_publickey($pair));
+        @mkdir(storage_path('app'), 0775, true);
+        file_put_contents(storage_path('app/browser-e2e-license-public.key'), $publicKey);
+        config()->set('central_control.trusted_signing_public_keys', [
+            'browser-e2e-fixture' => $publicKey,
+        ]);
+        $identity = app(\App\Services\CentralInstallationIdentity::class)->initialize();
+        $customer = (string) \Illuminate\Support\Str::uuid();
+        $license = (string) \Illuminate\Support\Str::uuid();
+        $domain = 'wizard.browser.test';
+        \Illuminate\Support\Facades\DB::table('central_installation_activation')->updateOrInsert(
+            ['singleton_id' => 1],
+            ['company_id' => $company->id, 'installation_id' => $identity['installation_id'],
+             'customer_id' => $customer, 'approved_domain' => $domain,
+             'status' => 'registered_pending_license', 'central_registered_at' => now(),
+             'created_at' => now(), 'updated_at' => now()],
+        );
+        $grant = [
+            'api_version' => 'v1', 'issuer' => 'HAFZATECH', 'product' => 'VenueDesk',
+            'license_id' => $license, 'installation_id' => $identity['installation_id'],
+            'customer_id' => $customer, 'revision' => 1, 'term_months' => 12,
+            'edition' => 'standard', 'approved_domains' => [$domain],
+            'not_before' => now()->subDay()->toIso8601ZuluString(),
+            'expires_at' => now()->addYear()->toIso8601ZuluString(),
+            'limits' => ['max_halls' => 5, 'max_staff' => 20],
+            'features' => ['booking' => true],
+        ];
+        $raw = json_encode($grant, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        app(\App\Services\CentralSignedLicenseCache::class)->accept([
+            'key_id' => 'browser-e2e-fixture', 'payload' => $b64($raw),
+            'signature' => $b64(sodium_crypto_sign_detached(
+                "HAFZATECH-LICENSE-GRANT-V1\n".$raw,
+                sodium_crypto_sign_secretkey($pair))),
+        ], $customer, $domain, now()->toDateTimeImmutable());
+    }
     // Separate inventory Owner avoids MFA replay between parallel authenticated browser workers.
     $inventoryOwner = \App\Models\User::query()->firstOrCreate(
         ['email'=>'browser-e2e-inventory-owner@example.test'],

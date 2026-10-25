@@ -20,5 +20,16 @@ return [
     'support_reply_pull_enabled' => (bool) env('VENUE_CENTRAL_SUPPORT_REPLY_PULL_ENABLED', false),
     // Populate ONLY in the vendor-built installer with audited pinned Ed25519
     // public keys. Never trust keys downloaded from an unauthenticated host.
-    'trusted_signing_public_keys' => [],
+    'trusted_signing_public_keys' => (static function (): array {
+        // Browser acceptance only: an isolated fixture command writes this
+        // public key before the test server starts. Production never enters
+        // this branch unless APP_ENV is explicitly testing.
+        if (! app()->environment('testing')) {
+            return [];
+        }
+        $path = storage_path('app/browser-e2e-license-public.key');
+        return is_file($path)
+            ? ['browser-e2e-fixture' => trim((string) file_get_contents($path))]
+            : [];
+    })(),
 ];

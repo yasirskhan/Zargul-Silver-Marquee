@@ -314,6 +314,8 @@ jobs:
       APP_ENV: testing
       APP_DEBUG: 'false'
       BROWSER_E2E_SEED: '1'
+      VENUE_CENTRAL_ACTIVATION_ENABLED: 'true'
+      VENUE_CENTRAL_MANUAL_CHECKS_ENABLED: 'true'
       # Isolated CI-only finance posting for synthetic cash closeout acceptance.
       # Config defaults and production remain OFF.
       VENUE_FINANCE_POSTING_ENABLED: 'true'

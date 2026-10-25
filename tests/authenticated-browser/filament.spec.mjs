@@ -543,6 +543,11 @@ test('real owner saves and resumes installation wizard without false completion'
   await expect(page.getByText('Wizard Hall Two')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Review' })).toBeVisible();
   await expect(page.getByText('Venue setup completed')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Complete installation' }).click();
+  await expect(page.getByText('Venue setup completed')).toBeVisible({ timeout: 25_000 });
+  await page.reload();
+  await expect(page.getByText('Venue setup completed')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Complete installation' })).toHaveCount(0);
 });
 
 

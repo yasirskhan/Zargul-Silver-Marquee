@@ -362,7 +362,8 @@
                     @if ($step < 10)
                         <button type="submit" class="rounded-lg bg-emerald-800 px-4 py-2 font-semibold text-white">Save and continue</button>
                     @else
-                        <p class="text-xs">Final completion requires every approved stage: branding, payments, staff and licensing. This review does not complete the installation.</p>
+                        <p class="text-xs">Final completion revalidates the current signed license and server readiness. It does not activate production.</p>
+                        <button type="button" wire:click="complete" class="rounded-lg bg-emerald-800 px-4 py-2 font-semibold text-white">Complete installation</button>
                     @endif
                 </div>
             </form>
