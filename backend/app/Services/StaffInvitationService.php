@@ -38,9 +38,13 @@ final class StaffInvitationService
                 throw new InvalidArgumentException('Invitation halls must belong to this company.');
             }
         }
-        if (DB::table('users')->where('email', $email)->exists()) {
-            throw new ConflictHttpException('That email already has an account; use role assignment instead.');
-        }
+        // Existing users may join another authorized company through the same
+        // single-use invitation; acceptance attaches a membership instead of
+        // creating a duplicate account.
+        DB::table('staff_invitations')->where('company_id', $companyId)
+            ->where('email', $email)->where('status', 'pending')
+            ->where('expires_at', '<=', now())
+            ->update(['status' => 'expired', 'updated_at' => now()]);
         if (DB::table('staff_invitations')->where('company_id', $companyId)
             ->where('email', $email)->where('status', 'pending')
             ->where('expires_at', '>', now())->exists()) {
