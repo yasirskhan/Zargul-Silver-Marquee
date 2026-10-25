@@ -529,13 +529,16 @@ test('real owner saves and resumes installation wizard without false completion'
   await expect(page.getByText('8. Staff', { exact: true })).toBeVisible({ timeout: 25_000 });
   await page.getByLabel('Staff setup').selectOption('owner_only');
   await page.getByRole('button', { name: 'Save and continue' }).click();
-  await expect(page.getByText('9. Review', { exact: true })).toBeVisible({ timeout: 25_000 });
+  await expect(page.getByText('9. Licensing', { exact: true })).toBeVisible({ timeout: 25_000 });
+  await expect(page.getByRole('heading', { name: 'HAFZATECH installation license' })).toBeVisible();
+  await page.getByRole('button', { name: 'Save and continue' }).click();
+  await expect(page.getByText('10. Review', { exact: true })).toBeVisible({ timeout: 25_000 });
   await expect(page.getByText('Wizard Hall One')).toBeVisible();
   await expect(page.getByText('Wizard Hall Two')).toBeVisible();
   await expect(page.getByText('Venue setup completed')).toHaveCount(0);
 
   await page.reload();
-  await expect(page.getByText('9. Review', { exact: true })).toBeVisible({ timeout: 25_000 });
+  await expect(page.getByText('10. Review', { exact: true })).toBeVisible({ timeout: 25_000 });
   await expect(page.getByText('Wizard Hall One')).toBeVisible();
   await expect(page.getByText('Wizard Hall Two')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Review' })).toBeVisible();

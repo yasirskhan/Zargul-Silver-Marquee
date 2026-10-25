@@ -293,6 +293,20 @@ final class InstallationWizardService
         );
     }
 
+    public function saveLicense(
+        User $actor, string $companyId, string $licenseState, int $expectedRevision,
+    ): array {
+        $this->authorize($actor, $companyId);
+
+        return $this->saveOperationalStage(
+            $actor, $companyId, $expectedRevision, 'license', 10,
+            fn (): array => ['license' => [
+                'state' => $licenseState,
+                'recordedAt' => now()->toIso8601String(),
+            ]],
+        );
+    }
+
     private function saveOperationalStage(
         User $actor, string $companyId, int $expectedRevision,
         string $stage, int $nextStep, callable $persist,
@@ -367,6 +381,12 @@ final class InstallationWizardService
             if ($missing !== []) {
                 throw new InvalidArgumentException(
                     'Complete all approved setup stages before finishing: '.implode(', ', $missing)
+                );
+            }
+            $licenseState = $data['license']['state'] ?? null;
+            if (! in_array($licenseState, ['licensed', 'expired_grace'], true)) {
+                throw new InvalidArgumentException(
+                    'A currently verified signed license is required before installation completion.'
                 );
             }
             $company = $data['company'] ?? [];

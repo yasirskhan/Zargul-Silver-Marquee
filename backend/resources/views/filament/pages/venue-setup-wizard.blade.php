@@ -24,7 +24,7 @@
             </section>
         @else
             <ol class="flex flex-wrap gap-2 text-sm" aria-label="Setup steps">
-                @foreach ([1 => 'Company and venue', 2 => 'Halls', 3 => 'Programs', 4 => 'Pricing', 5 => 'Add-ons', 6 => 'Branding', 7 => 'Payments', 8 => 'Staff', 9 => 'Review'] as $number => $label)
+                @foreach ([1 => 'Company and venue', 2 => 'Halls', 3 => 'Programs', 4 => 'Pricing', 5 => 'Add-ons', 6 => 'Branding', 7 => 'Payments', 8 => 'Staff', 9 => 'Licensing', 10 => 'Review'] as $number => $label)
                     <li class="rounded-lg border px-3 py-2 {{ $step === $number ? 'font-semibold' : '' }}">
                         {{ $number }}. {{ $label }}
                     </li>
@@ -304,6 +304,36 @@
                             @endforelse
                         </div>
                     </section>
+                @elseif ($step === 9)
+                    <section aria-label="Installation licensing" class="space-y-3 rounded-xl border p-4">
+                        <h2 class="font-semibold">HAFZATECH installation license</h2>
+                        <p class="text-sm">A pending registration, payment reference or screenshot is not a verified license. Only a locally verified signed grant can complete licensing readiness.</p>
+                        <dl class="grid gap-2 text-sm md:grid-cols-2">
+                            <div><dt class="font-medium">Status</dt><dd>{{ $licenseSummary['state'] ?? 'unavailable' }}</dd></div>
+                            <div><dt class="font-medium">License ID</dt><dd>{{ $licenseSummary['license_id'] ?? 'not issued' }}</dd></div>
+                            <div><dt class="font-medium">Edition</dt><dd>{{ $licenseSummary['edition'] ?? 'not available' }}</dd></div>
+                            <div><dt class="font-medium">Expires</dt><dd>{{ $licenseSummary['expires_at'] ?? 'not available' }}</dd></div>
+                            <div><dt class="font-medium">Grace ends</dt><dd>{{ $licenseSummary['grace_ends_at'] ?? 'not available' }}</dd></div>
+                            <div><dt class="font-medium">Last online verification</dt><dd>{{ $licenseSummary['last_online_verified_at'] ?? 'never' }}</dd></div>
+                            <div><dt class="font-medium">Next automatic check</dt><dd>{{ $licenseSummary['next_routine_check_at'] ?? 'not scheduled' }}</dd></div>
+                            <div><dt class="font-medium">Next retry</dt><dd>{{ $licenseSummary['next_retry_at'] ?? 'none' }}</dd></div>
+                        </dl>
+                        @if (($licenseSummary['state'] ?? '') === 'feature_disabled')
+                            <p class="text-sm">Central licensing is not released on this installation. Setup can be saved, but final completion remains blocked.</p>
+                        @endif
+                        @if ($licenseMessage) <p role="status" class="text-sm">{{ $licenseMessage }}</p> @endif
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" wire:click="verifyWizardLicense" class="rounded border px-3 py-2 text-sm">Verify License</button>
+                            <label class="flex items-center gap-2 text-sm"><span>Renewal term</span>
+                                <select wire:model="requestedTermMonths" class="rounded border p-2">
+                                    <option value="6">Six months</option>
+                                    <option value="12">Twelve months</option>
+                                </select>
+                            </label>
+                            <button type="button" wire:click="requestWizardRenewal" class="rounded border px-3 py-2 text-sm">Request renewal review</button>
+                        </div>
+                        <p class="text-xs">No live payment, signature or production activation occurs here. Expiry warnings begin 15 days before signed expiry; backend grace is seven days.</p>
+                    </section>
                 @else
                     <section aria-label="Review installation details" class="space-y-3 rounded-xl border p-4">
                         <h2 class="font-semibold">Review</h2>
@@ -329,7 +359,7 @@
                     @if ($step > 1)
                         <button type="button" wire:click="back" class="rounded-lg border px-4 py-2">Back</button>
                     @endif
-                    @if ($step < 9)
+                    @if ($step < 10)
                         <button type="submit" class="rounded-lg bg-emerald-800 px-4 py-2 font-semibold text-white">Save and continue</button>
                     @else
                         <p class="text-xs">Final completion requires every approved stage: branding, payments, staff and licensing. This review does not complete the installation.</p>

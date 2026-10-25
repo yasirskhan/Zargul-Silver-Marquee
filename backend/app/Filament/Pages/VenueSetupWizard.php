@@ -77,6 +77,12 @@ final class VenueSetupWizard extends Page
     public string $staffReason = '';
     public array $staffInvitations = [];
 
+    #[Locked]
+    public array $licenseSummary = [];
+
+    public ?string $licenseMessage = null;
+    public string $requestedTermMonths = '12';
+
     public static function canAccess(): bool
     {
         $actor = Filament::auth()->user();
@@ -202,6 +208,60 @@ final class VenueSetupWizard extends Page
         }
         $this->staffMode = ($data['staff']['ownerOnly'] ?? false) ? 'owner_only' : '';
         $this->refreshStaffInvitations();
+        $this->refreshLicenseSummary();
+    }
+
+    public function refreshLicenseSummary(): void
+    {
+        $this->licenseSummary = [];
+        $actor = Filament::auth()->user();
+        if (! $actor instanceof User || $this->companyId === null
+            || ! array_key_exists($this->companyId, $this->companyOptions())) {
+            return;
+        }
+        try {
+            $this->licenseSummary = app(\App\Services\CentralLicensingOverviewService::class)
+                ->snapshotForCompany($actor, $this->companyId, now()->toDateTimeImmutable());
+        } catch (\Throwable) {
+            $this->licenseSummary = ['state' => 'unavailable'];
+        }
+    }
+
+    public function verifyWizardLicense(): void
+    {
+        $actor = Filament::auth()->user();
+        abort_unless($actor instanceof User && $this->companyId !== null
+            && array_key_exists($this->companyId, $this->companyOptions()), 403);
+        try {
+            $result = app(\App\Services\CentralOwnerManualLicenseVerification::class)
+                ->verify($actor, $this->companyId, now()->toDateTimeImmutable());
+            $this->licenseMessage = match ($result['state']) {
+                'verified' => 'License signature and central status verified.',
+                'rate_limited' => 'Verification was requested recently; try again shortly.',
+                'pending_signed_license' => 'No valid signed license has been delivered yet.',
+                'license_attention' => 'Central licensing reports an issue; contact support.',
+                default => 'Verification unavailable. The locally signed license is unchanged.',
+            };
+        } catch (\Throwable) {
+            $this->licenseMessage = 'Central verification is not released or unreachable. No activation was performed.';
+        }
+        $this->refreshLicenseSummary();
+    }
+
+    public function requestWizardRenewal(): void
+    {
+        $actor = Filament::auth()->user();
+        abort_unless($actor instanceof User && $this->companyId !== null
+            && array_key_exists($this->companyId, $this->companyOptions()), 403);
+        abort_unless(in_array($this->requestedTermMonths, ['6', '12'], true), 422);
+        try {
+            app(\App\Services\CentralOwnerLicenseReviewRequest::class)
+                ->queue($actor, $this->companyId, (int) $this->requestedTermMonths);
+            $this->licenseMessage = 'Renewal review request recorded. No payment or license was approved.';
+        } catch (\Throwable) {
+            $this->licenseMessage = 'Renewal request could not be recorded. Contact HAFTECH support.';
+        }
+        $this->refreshLicenseSummary();
     }
 
     public function refreshStaffInvitations(): void
@@ -285,6 +345,8 @@ final class VenueSetupWizard extends Page
         $this->staffHallIds = [];
         $this->staffReason = '';
         $this->staffInvitations = [];
+        $this->licenseSummary = [];
+        $this->licenseMessage = null;
     }
 
     public function addBank(): void
@@ -359,6 +421,7 @@ final class VenueSetupWizard extends Page
                 6 => $service->saveBranding($actor, $this->companyId, $this->branding, $this->revision),
                 7 => $service->savePayments($actor, $this->companyId, $this->payments, $this->revision),
                 8 => $service->saveStaff($actor, $this->companyId, $this->staffMode === 'owner_only', $this->revision),
+                9 => $service->saveLicense($actor, $this->companyId, (string) ($this->licenseSummary['state'] ?? 'unavailable'), $this->revision),
                 default => throw new InvalidArgumentException('Review the saved setup before completing.'),
             };
         } catch (InvalidArgumentException $exception) {
