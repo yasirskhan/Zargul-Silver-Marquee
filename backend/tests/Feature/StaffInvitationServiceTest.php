@@ -100,6 +100,29 @@ class StaffInvitationServiceTest extends TestCase
             'password_confirmation' => 'synthetic-replay-password',
         ])->assertSessionHasErrors('invitation');
     }
+    public function test_existing_user_joins_another_company_without_duplicate_account(): void
+    {
+        [$company, $hall, $owner] = $this->fixture();
+        $existing = User::create(['name' => 'Existing User',
+            'email' => 'existing.staff@example.test', 'password' => 'test-only']);
+        $existing->markEmailAsVerified();
+        Mail::fake();
+        $invite = app(StaffInvitationService::class)->invite($owner, $company->id,
+            'existing.staff@example.test', 'operations', [$hall->id],
+            'Existing user joins second company');
+        $token = null;
+        Mail::assertSent(StaffInvitationMail::class, function ($mail) use (&$token): bool {
+            $token = $mail->token;
+            return true;
+        });
+        $accepted = app(StaffInvitationService::class)->accept(
+            $token, 'Existing User', 'ignored-existing-password');
+        $this->assertSame((int) $existing->id, $accepted['userId']);
+        $this->assertSame(1, User::where('email', 'existing.staff@example.test')->count());
+        $this->assertSame(1, DB::table('company_memberships')->where('company_id', $company->id)
+            ->where('user_id', $existing->id)->count());
+        $this->assertSame(1, DB::table('hall_assignments')->where('hall_id', $hall->id)->count());
+    }
     public function test_manager_cannot_invite_or_read_private_invitations(): void
     {
         [$company, $hall, $owner] = $this->fixture();
