@@ -538,7 +538,7 @@ test('real owner saves and resumes installation wizard without false completion'
   await expect(page.getByText('9. Review', { exact: true })).toBeVisible({ timeout: 25_000 });
   await expect(page.getByText('Wizard Hall One')).toBeVisible();
   await expect(page.getByText('Wizard Hall Two')).toBeVisible();
-  await expect(page.getByText('Final completion requires every approved stage')).toBeVisible();
+  await expect(page.getByText('Final completion remains blocked')).toBeVisible();
   await expect(page.getByText('Venue setup completed')).toHaveCount(0);
 });
 
