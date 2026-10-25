@@ -49,6 +49,15 @@ final class VenueSetupWizard extends Page
         ['id' => null, 'name' => '', 'address' => '', 'phone' => '', 'capacity' => 100],
     ];
 
+    /** @var array<string,array<string,array<string,mixed>>> */
+    public array $programs = [];
+
+    /** @var array<string,array<string,int>> */
+    public array $pricing = [];
+
+    /** @var array<string,array<int,array<string,mixed>>> */
+    public array $addons = [];
+
     public static function canAccess(): bool
     {
         $actor = Filament::auth()->user();
@@ -115,6 +124,45 @@ final class VenueSetupWizard extends Page
         if (is_array($halls) && $halls !== []) {
             $this->halls = array_values($halls);
         }
+        $this->hydrateOperationalInputs($state['data']);
+    }
+
+    private function hydrateOperationalInputs(array $data): void
+    {
+        $defaults = [];
+        foreach ($this->halls as $hall) {
+            $id = (string) ($hall['id'] ?? '');
+            if ($id === '') {
+                continue;
+            }
+            $slot = static fn (string $start, string $end): array => [
+                'start' => $start, 'end' => $end, 'setupMinutes' => 20,
+                'cleaningMinutes' => 20, 'graceMinutes' => 15,
+                'overtimeIntervalMinutes' => 30, 'overtimeRateMinor' => 0,
+                'rentalRateMinor' => 0,
+            ];
+            $defaults[$id] = [
+                'morning' => $slot('08:00', '11:00'),
+                'noon' => $slot('12:00', '15:00'),
+                'evening' => $slot('17:00', '22:00'),
+            ];
+            $this->pricing[$id] = $this->pricing[$id] ?? [
+                'capacity' => (int) $hall['capacity'],
+                'includedChairs' => 0, 'includedTables' => 0,
+                'extraChairRateMinor' => 0, 'extraTableRateMinor' => 0,
+            ];
+            $this->addons[$id] = $this->addons[$id] ?? [[
+                'code' => 'catering_standard', 'name' => 'Catering package',
+                'category' => 'catering', 'chargeUnit' => 'flat',
+                'rateMinor' => 0, 'enabled' => true,
+            ]];
+        }
+        foreach (($data['programs'] ?? []) as $hallId => $saved) {
+            if (isset($saved['rules'])) {
+                $defaults[$hallId] = $saved['rules'];
+            }
+        }
+        $this->programs = $defaults;
     }
 
     public function addHall(): void
@@ -142,10 +190,18 @@ final class VenueSetupWizard extends Page
         abort_unless($actor instanceof User && $this->companyId !== null, 403);
         $this->validate($this->rulesForStep());
         try {
-            $data = $this->step === 1 ? ['company' => $this->company] : ['halls' => $this->halls];
-            $state = app(InstallationWizardService::class)->save(
-                $actor, $this->companyId, $this->step, $data, $this->revision,
-            );
+            $service = app(InstallationWizardService::class);
+            $state = match ($this->step) {
+                1, 2 => $service->save(
+                    $actor, $this->companyId, $this->step,
+                    $this->step === 1 ? ['company' => $this->company] : ['halls' => $this->halls],
+                    $this->revision,
+                ),
+                3 => $service->savePrograms($actor, $this->companyId, $this->programs, $this->revision),
+                4 => $service->savePricing($actor, $this->companyId, $this->pricing, $this->revision),
+                5 => $service->saveAddons($actor, $this->companyId, $this->addons, $this->revision),
+                default => throw new InvalidArgumentException('Review the saved setup before completing.'),
+            };
         } catch (InvalidArgumentException $exception) {
             throw ValidationException::withMessages(['wizard' => $exception->getMessage()]);
         }
@@ -179,27 +235,60 @@ final class VenueSetupWizard extends Page
         if (is_array($state['data']['halls'] ?? null) && $state['data']['halls'] !== []) {
             $this->halls = array_values($state['data']['halls']);
         }
+        $this->hydrateOperationalInputs($state['data']);
     }
 
     private function rulesForStep(): array
     {
-        if ($this->step === 1) {
-            return [
+        return match ($this->step) {
+            1 => [
                 'company.legalName' => ['required', 'string', 'min:2', 'max:160'],
                 'company.contactEmail' => ['nullable', 'email', 'max:254'],
                 'company.contactPhone' => ['nullable', 'string', 'max:32'],
                 'company.address' => ['nullable', 'string', 'max:240'],
                 'company.currency' => ['required', 'in:'.implode(',', array_keys(Iso4217::all()))],
                 'company.timezone' => ['required', 'in:'.implode(',', DateTimeZone::listIdentifiers())],
-            ];
-        }
-
-        return [
-            'halls' => ['required', 'array', 'min:1', 'max:10'],
-            'halls.*.name' => ['required', 'string', 'min:2', 'max:120'],
-            'halls.*.address' => ['nullable', 'string', 'max:240'],
-            'halls.*.phone' => ['nullable', 'string', 'max:32'],
-            'halls.*.capacity' => ['required', 'integer', 'min:1', 'max:100000'],
-        ];
+            ],
+            2 => [
+                'halls' => ['required', 'array', 'min:1', 'max:10'],
+                'halls.*.name' => ['required', 'string', 'min:2', 'max:120'],
+                'halls.*.address' => ['nullable', 'string', 'max:240'],
+                'halls.*.phone' => ['nullable', 'string', 'max:32'],
+                'halls.*.capacity' => ['required', 'integer', 'min:1', 'max:100000'],
+            ],
+            3 => [
+                'programs' => ['required', 'array', 'min:1'],
+                'programs.*.morning.start' => ['required', 'date_format:H:i'],
+                'programs.*.morning.end' => ['required', 'date_format:H:i'],
+                'programs.*.noon.start' => ['required', 'date_format:H:i'],
+                'programs.*.noon.end' => ['required', 'date_format:H:i'],
+                'programs.*.evening.start' => ['required', 'date_format:H:i'],
+                'programs.*.evening.end' => ['required', 'date_format:H:i'],
+                'programs.*.*.setupMinutes' => ['required', 'integer', 'min:0', 'max:720'],
+                'programs.*.*.cleaningMinutes' => ['required', 'integer', 'min:0', 'max:720'],
+                'programs.*.*.graceMinutes' => ['required', 'integer', 'min:0', 'max:120'],
+                'programs.*.*.overtimeIntervalMinutes' => ['required', 'integer', 'min:1', 'max:120'],
+                'programs.*.*.rentalRateMinor' => ['required', 'integer', 'min:0'],
+                'programs.*.*.overtimeRateMinor' => ['required', 'integer', 'min:0'],
+            ],
+            4 => [
+                'pricing' => ['required', 'array', 'min:1'],
+                'pricing.*.capacity' => ['required', 'integer', 'min:1', 'max:100000'],
+                'pricing.*.includedChairs' => ['required', 'integer', 'min:0', 'max:100000'],
+                'pricing.*.includedTables' => ['required', 'integer', 'min:0', 'max:100000'],
+                'pricing.*.extraChairRateMinor' => ['required', 'integer', 'min:0'],
+                'pricing.*.extraTableRateMinor' => ['required', 'integer', 'min:0'],
+            ],
+            5 => [
+                'addons' => ['required', 'array', 'min:1'],
+                'addons.*' => ['required', 'array', 'min:1'],
+                'addons.*.*.code' => ['required', 'string', 'min:2', 'max:40'],
+                'addons.*.*.name' => ['required', 'string', 'min:2', 'max:120'],
+                'addons.*.*.category' => ['required', 'in:catering,music,lighting,bridal_entry,stage,photography,other'],
+                'addons.*.*.chargeUnit' => ['required', 'in:flat,per_guest,per_unit'],
+                'addons.*.*.rateMinor' => ['required', 'integer', 'min:0'],
+            ],
+            default => [],
+        };
     }
 }

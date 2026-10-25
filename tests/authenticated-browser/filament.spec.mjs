@@ -514,18 +514,19 @@ test('real owner saves and resumes installation wizard without false completion'
   await page.getByLabel('Hall phone').nth(1).fill('+1 555 0102');
   await page.getByLabel('Capacity').nth(1).fill('90');
   await page.getByRole('button', { name: 'Save and continue' }).click();
-  await expect(page.getByText('3. Review', { exact: true })).toBeVisible({ timeout: 25_000 });
+  await expect(page.getByText('3. Programs', { exact: true })).toBeVisible({ timeout: 25_000 });
+  await page.getByRole('button', { name: 'Save and continue' }).click();
+  await expect(page.getByText('4. Pricing', { exact: true })).toBeVisible({ timeout: 25_000 });
+  await page.getByRole('button', { name: 'Save and continue' }).click();
+  await expect(page.getByText('5. Add-ons', { exact: true })).toBeVisible({ timeout: 25_000 });
+  await page.getByRole('button', { name: 'Save and continue' }).click();
+  await expect(page.getByText('6. Review', { exact: true })).toBeVisible({ timeout: 25_000 });
   await expect(page.getByText('Wizard Hall One')).toBeVisible();
   await expect(page.getByText('Wizard Hall Two')).toBeVisible();
   await expect(page.getByText('Venue setup completed')).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Back' }).click();
-  await expect(page.getByText('2. Halls', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Save and continue' }).click();
-  await expect(page.getByText('3. Review', { exact: true })).toBeVisible();
-
   await page.reload();
-  await expect(page.getByText('3. Review', { exact: true })).toBeVisible({ timeout: 25_000 });
+  await expect(page.getByText('6. Review', { exact: true })).toBeVisible({ timeout: 25_000 });
   await expect(page.getByText('Wizard Hall One')).toBeVisible();
   await expect(page.getByText('Wizard Hall Two')).toBeVisible();
   await expect(page.getByText('Final completion requires every approved stage')).toBeVisible();

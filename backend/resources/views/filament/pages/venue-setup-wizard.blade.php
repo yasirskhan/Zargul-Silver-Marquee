@@ -24,7 +24,7 @@
             </section>
         @else
             <ol class="flex flex-wrap gap-2 text-sm" aria-label="Setup steps">
-                @foreach ([1 => 'Company and venue', 2 => 'Halls', 3 => 'Review'] as $number => $label)
+                @foreach ([1 => 'Company and venue', 2 => 'Halls', 3 => 'Programs', 4 => 'Pricing', 5 => 'Add-ons', 6 => 'Review'] as $number => $label)
                     <li class="rounded-lg border px-3 py-2 {{ $step === $number ? 'font-semibold' : '' }}">
                         {{ $number }}. {{ $label }}
                     </li>
@@ -89,8 +89,88 @@
                         @endforeach
                         <button type="button" wire:click="addHall" class="rounded-lg border px-3 py-2 text-sm">Add another hall</button>
                     </section>
+                @elseif ($step === 3)
+                    <section aria-label="Hall programs" class="space-y-4 rounded-xl border p-4">
+                        @foreach ($halls as $hall)
+                            <fieldset wire:key="wizard-programs-{{ $hall['id'] }}" class="space-y-3 rounded-lg border p-3">
+                                <legend class="px-1 font-medium">{{ $hall['name'] }} programs</legend>
+                                @foreach (['morning' => 'Morning', 'noon' => 'Noon', 'evening' => 'Evening'] as $program => $label)
+                                    <div class="grid gap-2 md:grid-cols-3">
+                                        <p class="font-medium">{{ $label }}</p>
+                                        <label class="space-y-1 text-sm"><span>Start</span>
+                                            <input type="time" wire:model="programs.{{ $hall['id'] }}.{{ $program }}.start" required class="w-full rounded border p-2">
+                                        </label>
+                                        <label class="space-y-1 text-sm"><span>End</span>
+                                            <input type="time" wire:model="programs.{{ $hall['id'] }}.{{ $program }}.end" required class="w-full rounded border p-2">
+                                        </label>
+                                        <label class="space-y-1 text-sm"><span>Setup min</span>
+                                            <input type="number" min="0" wire:model="programs.{{ $hall['id'] }}.{{ $program }}.setupMinutes" required class="w-full rounded border p-2">
+                                        </label>
+                                        <label class="space-y-1 text-sm"><span>Cleaning min</span>
+                                            <input type="number" min="0" wire:model="programs.{{ $hall['id'] }}.{{ $program }}.cleaningMinutes" required class="w-full rounded border p-2">
+                                        </label>
+                                        <label class="space-y-1 text-sm"><span>Grace min</span>
+                                            <input type="number" min="0" max="120" wire:model="programs.{{ $hall['id'] }}.{{ $program }}.graceMinutes" required class="w-full rounded border p-2">
+                                        </label>
+                                        <label class="space-y-1 text-sm"><span>Overtime interval</span>
+                                            <input type="number" min="1" max="120" wire:model="programs.{{ $hall['id'] }}.{{ $program }}.overtimeIntervalMinutes" required class="w-full rounded border p-2">
+                                        </label>
+                                        <label class="space-y-1 text-sm"><span>Rental minor units</span>
+                                            <input type="number" min="0" wire:model="programs.{{ $hall['id'] }}.{{ $program }}.rentalRateMinor" required class="w-full rounded border p-2">
+                                        </label>
+                                        <label class="space-y-1 text-sm"><span>Overtime minor units</span>
+                                            <input type="number" min="0" wire:model="programs.{{ $hall['id'] }}.{{ $program }}.overtimeRateMinor" required class="w-full rounded border p-2">
+                                        </label>
+                                    </div>
+                                @endforeach
+                            </fieldset>
+                        @endforeach
+                    </section>
+                @elseif ($step === 4)
+                    <section aria-label="Seating and guest pricing" class="space-y-4 rounded-xl border p-4">
+                        @foreach ($halls as $hall)
+                            <fieldset wire:key="wizard-pricing-{{ $hall['id'] }}" class="grid gap-3 rounded-lg border p-3 md:grid-cols-2">
+                                <legend class="px-1 font-medium">{{ $hall['name'] }} seating</legend>
+                                @foreach (['capacity' => 'Capacity', 'includedChairs' => 'Included chairs', 'includedTables' => 'Included tables', 'extraChairRateMinor' => 'Extra chair minor units', 'extraTableRateMinor' => 'Extra table minor units'] as $field => $label)
+                                    <label class="space-y-1 text-sm"><span>{{ $label }}</span>
+                                        <input type="number" min="0" wire:model="pricing.{{ $hall['id'] }}.{{ $field }}" required class="w-full rounded border p-2">
+                                    </label>
+                                @endforeach
+                            </fieldset>
+                        @endforeach
+                    </section>
+                @elseif ($step === 5)
+                    <section aria-label="Add-ons" class="space-y-4 rounded-xl border p-4">
+                        @foreach ($halls as $hall)
+                            <fieldset wire:key="wizard-addons-{{ $hall['id'] }}" class="grid gap-3 rounded-lg border p-3 md:grid-cols-2">
+                                <legend class="px-1 font-medium">{{ $hall['name'] }} add-ons</legend>
+                                <label class="space-y-1 text-sm"><span>Code</span>
+                                    <input wire:model="addons.{{ $hall['id'] }}.0.code" maxlength="40" required class="w-full rounded border p-2">
+                                </label>
+                                <label class="space-y-1 text-sm"><span>Name</span>
+                                    <input wire:model="addons.{{ $hall['id'] }}.0.name" maxlength="120" required class="w-full rounded border p-2">
+                                </label>
+                                <label class="space-y-1 text-sm"><span>Category</span>
+                                    <select wire:model="addons.{{ $hall['id'] }}.0.category" class="w-full rounded border p-2">
+                                        @foreach (['catering' => 'Catering', 'music' => 'Music/DJ', 'lighting' => 'Lighting', 'bridal_entry' => 'Bridal entry', 'stage' => 'Stage', 'photography' => 'Photography', 'other' => 'Other'] as $value => $label)
+                                            <option value="{{ $value }}">{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                </label>
+                                <label class="space-y-1 text-sm"><span>Charge unit</span>
+                                    <select wire:model="addons.{{ $hall['id'] }}.0.chargeUnit" class="w-full rounded border p-2">
+                                        <option value="flat">Per event</option>
+                                        <option value="per_guest">Per guest</option>
+                                        <option value="per_unit">Per item</option>
+                                    </select>
+                                </label>
+                                <label class="space-y-1 text-sm"><span>Rate minor units</span>
+                                    <input type="number" min="0" wire:model="addons.{{ $hall['id'] }}.0.rateMinor" required class="w-full rounded border p-2">
+                                </label>
+                            </fieldset>
+                        @endforeach
+                    </section>
                 @else
-                    <section aria-label="Review installation details" class="space-y-3 rounded-xl border p-4">
                         <h2 class="font-semibold">Review</h2>
                         <p><strong>Venue:</strong> {{ $company['legalName'] }}</p>
                         <p><strong>Contact:</strong> {{ $company['contactEmail'] ?: 'not provided' }} · {{ $company['contactPhone'] ?: 'not provided' }}</p>
@@ -104,7 +184,7 @@
                                 </li>
                             @endforeach
                         </ul>
-                        <p class="text-xs">Completion saves the company name and halls to PostgreSQL, locks this wizard and writes an immutable audit event. Licensing and production activation remain separate.</p>
+                        <p class="text-xs">Saved company, halls, program and pricing revisions are operational immediately. Final completion remains blocked until branding, payments, staff and licensing stages exist.</p>
                     </section>
                 @endif
 
@@ -114,11 +194,10 @@
                     @if ($step > 1)
                         <button type="button" wire:click="back" class="rounded-lg border px-4 py-2">Back</button>
                     @endif
-                    @if ($step < 3)
+                    @if ($step < 6)
                         <button type="submit" class="rounded-lg bg-emerald-800 px-4 py-2 font-semibold text-white">Save and continue</button>
                     @else
-                        <button type="submit" class="rounded-lg bg-emerald-800 px-4 py-2 font-semibold text-white">Save setup progress</button>
-                        <p class="text-xs">Final completion requires every approved stage: programs, pricing, add-ons, branding, payments, staff and licensing.</p>
+                        <p class="text-xs">Final completion requires every approved stage: branding, payments, staff and licensing. This review does not complete the installation.</p>
                     @endif
                 </div>
             </form>

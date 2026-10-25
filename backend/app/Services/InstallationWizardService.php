@@ -98,6 +98,142 @@ final class InstallationWizardService
         }, 3);
     }
 
+    public function savePrograms(
+        User $actor, string $companyId, array $programs, int $expectedRevision,
+    ): array {
+        $this->authorize($actor, $companyId);
+
+        return $this->saveOperationalStage(
+            $actor, $companyId, $expectedRevision, 'programs', 4,
+            function (array $state) use ($actor, $companyId, $programs): array {
+                $rulesService = app(HallProgramRulesService::class);
+                $saved = [];
+                foreach ($state['halls'] as $hall) {
+                    $rules = $programs[$hall['id']] ?? null;
+                    if (! is_array($rules)) {
+                        throw new InvalidArgumentException('Configure morning, noon and evening for every hall.');
+                    }
+                    $current = $rulesService->current($actor, $companyId, $hall['id']);
+                    $revision = $rulesService->configure(
+                        $actor, $companyId, $hall['id'], $rules,
+                        $state['company']['currency'], (int) ($current['revision'] ?? 0),
+                        'Initial installation wizard hall programs',
+                    );
+                    $saved[$hall['id']] = ['rules' => $rules, 'revision' => $revision];
+                }
+
+                return ['programs' => $saved];
+            },
+        );
+    }
+
+    public function savePricing(
+        User $actor, string $companyId, array $pricing, int $expectedRevision,
+    ): array {
+        $this->authorize($actor, $companyId);
+
+        return $this->saveOperationalStage(
+            $actor, $companyId, $expectedRevision, 'pricing', 5,
+            function (array $state) use ($actor, $companyId, $pricing): array {
+                $service = app(HallSeatingPriceService::class);
+                $saved = [];
+                foreach ($state['halls'] as $hall) {
+                    $config = $pricing[$hall['id']] ?? null;
+                    if (! is_array($config)) {
+                        throw new InvalidArgumentException('Configure seating pricing for every hall.');
+                    }
+                    $current = $service->current($actor, $companyId, $hall['id']);
+                    $revision = $service->configure(
+                        $actor, $companyId, $hall['id'], $config,
+                        $state['company']['currency'], (int) ($current['revision'] ?? 0),
+                        'Initial installation wizard seating and unit prices',
+                    );
+                    $saved[$hall['id']] = ['config' => $config, 'revision' => $revision];
+                }
+
+                return ['pricing' => $saved];
+            },
+        );
+    }
+
+    public function saveAddons(
+        User $actor, string $companyId, array $addons, int $expectedRevision,
+    ): array {
+        $this->authorize($actor, $companyId);
+
+        return $this->saveOperationalStage(
+            $actor, $companyId, $expectedRevision, 'addons', 6,
+            function (array $state) use ($actor, $companyId, $addons): array {
+                $service = app(HallAddonCatalogService::class);
+                $saved = [];
+                foreach ($state['halls'] as $hall) {
+                    $items = $addons[$hall['id']] ?? null;
+                    if (! is_array($items) || $items === []) {
+                        throw new InvalidArgumentException('Add at least one approved option for every hall.');
+                    }
+                    $current = $service->current($actor, $companyId, $hall['id']);
+                    $revision = $service->configure(
+                        $actor, $companyId, $hall['id'], $items,
+                        $state['company']['currency'], (int) ($current['revision'] ?? 0),
+                        'Initial installation wizard add-on catalog',
+                    );
+                    $saved[$hall['id']] = ['items' => $items, 'revision' => $revision];
+                }
+
+                return ['addons' => $saved];
+            },
+        );
+    }
+
+    private function saveOperationalStage(
+        User $actor, string $companyId, int $expectedRevision,
+        string $stage, int $nextStep, callable $persist,
+    ): array {
+        if ($expectedRevision < 1) {
+            throw new InvalidArgumentException('A valid installation revision is required.');
+        }
+
+        return DB::transaction(function () use (
+            $actor, $companyId, $expectedRevision, $stage, $nextStep, $persist,
+        ): array {
+            $row = DB::table('installation_wizard_states')->where('company_id', $companyId)
+                ->lockForUpdate()->first();
+            if ($row === null) {
+                throw new ConflictHttpException('Installation state is unavailable.');
+            }
+            if ($row->status === 'completed') {
+                throw new ConflictHttpException('This installation is already complete.');
+            }
+            if ((int) $row->revision !== $expectedRevision) {
+                throw new ConflictHttpException('Installation setup changed; reload before retrying.');
+            }
+            $data = json_decode($row->data, true, 512, JSON_THROW_ON_ERROR);
+            $halls = $data['halls'] ?? [];
+            if (! is_array($halls) || $halls === []) {
+                throw new InvalidArgumentException('Save halls before configuring operations.');
+            }
+            $clean = $persist($data);
+            $merged = array_replace_recursive($data, $clean);
+            $stages = array_values(array_unique(array_merge(
+                is_array($data['completedStages'] ?? null) ? $data['completedStages'] : [],
+                [$stage],
+            )));
+            $merged['completedStages'] = $stages;
+            $next = $expectedRevision + 1;
+            DB::table('installation_wizard_states')->where('company_id', $companyId)->update([
+                'step' => max($row->step, $nextStep), 'revision' => $next,
+                'status' => 'in_progress',
+                'data' => json_encode($merged, JSON_THROW_ON_ERROR), 'updated_at' => now(),
+            ]);
+            $this->audit($actor, $companyId, 'installation.wizard_stage_saved', [
+                'stage' => $stage, 'revision' => $next, 'completedStages' => $stages,
+            ]);
+            $fresh = DB::table('installation_wizard_states')->where('company_id', $companyId)->first();
+
+            return $this->project($fresh);
+        }, 3);
+    }
+
     public function complete(User $actor, string $companyId, int $expectedRevision): array
     {
         $this->authorize($actor, $companyId);

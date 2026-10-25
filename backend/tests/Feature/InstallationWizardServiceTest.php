@@ -74,6 +74,62 @@ class InstallationWizardServiceTest extends TestCase
         $this->assertNull(DB::table('installation_wizard_states')->value('completed_at'));
     }
 
+    public function test_program_pricing_and_addon_stages_persist_through_canonical_services(): void
+    {
+        [$company, $owner] = $this->fixture();
+        $service = app(InstallationWizardService::class);
+        $state = $service->save($owner, $company->id, 1, ['company' => [
+            'legalName' => 'Operational Venue', 'contactEmail' => 'ops@example.test',
+            'contactPhone' => '', 'address' => '', 'currency' => 'PKR',
+            'timezone' => 'Asia/Karachi',
+        ]], $service->state($owner, $company->id)['revision']);
+        $state = $service->save($owner, $company->id, 2, ['halls' => [[
+            'id' => null, 'name' => 'Operational Hall', 'address' => 'Address',
+            'phone' => '', 'capacity' => 220,
+        ]]], $state['revision']);
+        $hallId = $state['data']['halls'][0]['id'];
+        $slot = static fn (string $start, string $end): array => [
+            'start' => $start, 'end' => $end, 'setupMinutes' => 20,
+            'cleaningMinutes' => 20, 'graceMinutes' => 15,
+            'overtimeIntervalMinutes' => 30, 'overtimeRateMinor' => 5000,
+            'rentalRateMinor' => 150000,
+        ];
+        $state = $service->savePrograms($owner, $company->id, [
+            $hallId => [
+                'morning' => $slot('08:00', '11:00'),
+                'noon' => $slot('12:00', '15:00'),
+                'evening' => $slot('17:00', '22:00'),
+            ],
+        ], $state['revision']);
+        $this->assertContains('programs', $state['data']['completedStages']);
+        $this->assertSame(1, (int) DB::table('halls')->where('id', $hallId)
+            ->value('program_rules_revision'));
+
+        $state = $service->savePricing($owner, $company->id, [
+            $hallId => ['capacity' => 220, 'includedChairs' => 200,
+                'includedTables' => 20, 'extraChairRateMinor' => 500,
+                'extraTableRateMinor' => 2000],
+        ], $state['revision']);
+        $this->assertContains('pricing', $state['data']['completedStages']);
+        $this->assertSame(1, (int) DB::table('halls')->where('id', $hallId)
+            ->value('seating_price_revision'));
+
+        $state = $service->saveAddons($owner, $company->id, [
+            $hallId => [[
+                'code' => 'stage_lighting', 'name' => 'Stage lighting',
+                'category' => 'lighting', 'chargeUnit' => 'flat',
+                'rateMinor' => 25000, 'enabled' => true,
+            ]],
+        ], $state['revision']);
+        $this->assertContains('addons', $state['data']['completedStages']);
+        $this->assertSame(1, (int) DB::table('halls')->where('id', $hallId)
+            ->value('addon_catalog_revision'));
+        $this->assertSame(3, DB::table('audit_events')
+            ->whereIn('action', ['hall.program_rules_updated',
+                'hall.seating_prices_updated', 'hall.addon_catalog_updated'])->count());
+        $this->assertSame('in_progress', DB::table('installation_wizard_states')->value('status'));
+    }
+
     public function test_inactive_hall_is_not_reactivated_or_deleted_by_setup(): void
     {
         [$company, $owner] = $this->fixture();
