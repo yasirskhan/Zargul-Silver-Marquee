@@ -279,6 +279,12 @@ final class VenueSetupWizard extends Page
             'banks' => [], 'instructions' => '', 'qrInstructions' => '',
             'methods' => [], 'depositPercent' => 0, 'providerApiEnabled' => false,
         ];
+        $this->ownerOnly = false;
+        $this->staffEmail = '';
+        $this->staffRole = 'manager';
+        $this->staffHallIds = [];
+        $this->staffReason = '';
+        $this->staffInvitations = [];
     }
 
     public function addBank(): void

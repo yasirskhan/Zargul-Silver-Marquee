@@ -281,12 +281,17 @@ final class InstallationWizardService
 
         return $this->saveOperationalStage(
             $actor, $companyId, $expectedRevision, 'staff', 9,
-            function () use ($actor, $companyId, $ownerOnly): array {
-                $invitations = app(StaffInvitationService::class)->list($actor, $companyId);
+            function () use ($companyId, $ownerOnly): array {
+                $count = DB::table('staff_invitations')->where('company_id', $companyId)->count();
+                if (! $ownerOnly && $count === 0) {
+                    throw new InvalidArgumentException(
+                        'Invite at least one staff member or explicitly choose an owner-operated venue.'
+                    );
+                }
 
                 return ['staff' => [
-                    'ownerOnly' => $ownerOnly || $invitations === [],
-                    'invitationCount' => count($invitations),
+                    'ownerOnly' => $ownerOnly,
+                    'invitationCount' => $count,
                 ]];
             },
         );
