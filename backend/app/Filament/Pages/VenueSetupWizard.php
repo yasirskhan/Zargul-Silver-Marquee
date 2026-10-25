@@ -58,6 +58,11 @@ final class VenueSetupWizard extends Page
     /** @var array<string,array<int,array<string,mixed>>> */
     public array $addons = [];
 
+    public array $branding = [
+        'siteName' => '', 'tagline' => '', 'themePreset' => 'silver',
+        'fontPreset' => 'classic', 'footerText' => '', 'seoDescription' => '',
+    ];
+
     public static function canAccess(): bool
     {
         $actor = Filament::auth()->user();
@@ -157,12 +162,42 @@ final class VenueSetupWizard extends Page
                 'rateMinor' => 0, 'enabled' => true,
             ]];
         }
+        foreach (($data['pricing'] ?? []) as $hallId => $saved) {
+            if (isset($saved['config'])) {
+                $this->pricing[$hallId] = $saved['config'];
+            }
+        }
+        foreach (($data['addons'] ?? []) as $hallId => $saved) {
+            if (isset($saved['items']) && is_array($saved['items'])) {
+                $this->addons[$hallId] = array_values($saved['items']);
+            }
+        }
         foreach (($data['programs'] ?? []) as $hallId => $saved) {
             if (isset($saved['rules'])) {
                 $defaults[$hallId] = $saved['rules'];
             }
         }
         $this->programs = $defaults;
+        if (is_array($data['branding'] ?? null)) {
+            $this->branding = array_merge($this->branding, $data['branding']);
+        }
+    }
+
+    public function addAddon(string $hallId): void
+    {
+        abort_if($this->status === 'completed' || ! isset($this->addons[$hallId])
+            || count($this->addons[$hallId]) >= 20, 403);
+        $this->addons[$hallId][] = [
+            'code' => '', 'name' => '', 'category' => 'catering',
+            'chargeUnit' => 'flat', 'rateMinor' => 0, 'enabled' => true,
+        ];
+    }
+
+    public function removeAddon(string $hallId, int $index): void
+    {
+        abort_if($this->status === 'completed' || ! isset($this->addons[$hallId][$index]), 403);
+        unset($this->addons[$hallId][$index]);
+        $this->addons[$hallId] = array_values($this->addons[$hallId]);
     }
 
     public function addHall(): void
@@ -200,6 +235,7 @@ final class VenueSetupWizard extends Page
                 3 => $service->savePrograms($actor, $this->companyId, $this->programs, $this->revision),
                 4 => $service->savePricing($actor, $this->companyId, $this->pricing, $this->revision),
                 5 => $service->saveAddons($actor, $this->companyId, $this->addons, $this->revision),
+                6 => $service->saveBranding($actor, $this->companyId, $this->branding, $this->revision),
                 default => throw new InvalidArgumentException('Review the saved setup before completing.'),
             };
         } catch (InvalidArgumentException $exception) {
@@ -280,13 +316,21 @@ final class VenueSetupWizard extends Page
                 'pricing.*.extraTableRateMinor' => ['required', 'integer', 'min:0'],
             ],
             5 => [
-                'addons' => ['required', 'array', 'min:1'],
-                'addons.*' => ['required', 'array', 'min:1'],
+                'addons' => ['required', 'array'],
+                'addons.*' => ['array'],
                 'addons.*.*.code' => ['required', 'string', 'min:2', 'max:40'],
                 'addons.*.*.name' => ['required', 'string', 'min:2', 'max:120'],
                 'addons.*.*.category' => ['required', 'in:catering,music,lighting,bridal_entry,stage,photography,other'],
                 'addons.*.*.chargeUnit' => ['required', 'in:flat,per_guest,per_unit'],
                 'addons.*.*.rateMinor' => ['required', 'integer', 'min:0'],
+            ],
+            6 => [
+                'branding.siteName' => ['required', 'string', 'min:1', 'max:120'],
+                'branding.tagline' => ['nullable', 'string', 'max:240'],
+                'branding.themePreset' => ['required', 'in:silver,ivory,midnight,sage'],
+                'branding.fontPreset' => ['required', 'in:classic,modern'],
+                'branding.footerText' => ['nullable', 'string', 'max:240'],
+                'branding.seoDescription' => ['nullable', 'string', 'max:160'],
             ],
             default => [],
         };

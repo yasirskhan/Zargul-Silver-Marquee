@@ -125,6 +125,17 @@ class InstallationWizardServiceTest extends TestCase
         $this->assertContains('addons', $state['data']['completedStages']);
         $this->assertSame(1, (int) DB::table('halls')->where('id', $hallId)
             ->value('addon_catalog_revision'));
+
+        $state = $service->saveBranding($owner, $company->id, [
+            'siteName' => 'Operational Venue Website', 'tagline' => 'Weddings in the marquee',
+            'themePreset' => 'ivory', 'fontPreset' => 'modern',
+            'footerText' => 'Synthetic footer', 'seoDescription' => 'Synthetic description',
+        ], $state['revision']);
+        $this->assertContains('branding', $state['data']['completedStages']);
+        $this->assertSame(1, DB::table('websites')->where('company_id', $company->id)->count());
+        $this->assertSame(1, DB::table('site_branding_revisions')
+            ->where('company_id', $company->id)->count());
+        $this->assertSame('in_progress', DB::table('installation_wizard_states')->value('status'));
         $this->assertSame(3, DB::table('audit_events')
             ->whereIn('action', ['hall.program_rules_updated',
                 'hall.seating_prices_updated', 'hall.addon_catalog_updated'])->count());

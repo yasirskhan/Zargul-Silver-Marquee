@@ -24,7 +24,7 @@
             </section>
         @else
             <ol class="flex flex-wrap gap-2 text-sm" aria-label="Setup steps">
-                @foreach ([1 => 'Company and venue', 2 => 'Halls', 3 => 'Programs', 4 => 'Pricing', 5 => 'Add-ons', 6 => 'Review'] as $number => $label)
+                @foreach ([1 => 'Company and venue', 2 => 'Halls', 3 => 'Programs', 4 => 'Pricing', 5 => 'Add-ons', 6 => 'Branding', 7 => 'Review'] as $number => $label)
                     <li class="rounded-lg border px-3 py-2 {{ $step === $number ? 'font-semibold' : '' }}">
                         {{ $number }}. {{ $label }}
                     </li>
@@ -142,35 +142,76 @@
                 @elseif ($step === 5)
                     <section aria-label="Add-ons" class="space-y-4 rounded-xl border p-4">
                         @foreach ($halls as $hall)
-                            <fieldset wire:key="wizard-addons-{{ $hall['id'] }}" class="grid gap-3 rounded-lg border p-3 md:grid-cols-2">
+                            <fieldset wire:key="wizard-addons-{{ $hall['id'] }}" class="space-y-3 rounded-lg border p-3">
                                 <legend class="px-1 font-medium">{{ $hall['name'] }} add-ons</legend>
-                                <label class="space-y-1 text-sm"><span>Code</span>
-                                    <input wire:model="addons.{{ $hall['id'] }}.0.code" maxlength="40" required class="w-full rounded border p-2">
-                                </label>
-                                <label class="space-y-1 text-sm"><span>Name</span>
-                                    <input wire:model="addons.{{ $hall['id'] }}.0.name" maxlength="120" required class="w-full rounded border p-2">
-                                </label>
-                                <label class="space-y-1 text-sm"><span>Category</span>
-                                    <select wire:model="addons.{{ $hall['id'] }}.0.category" class="w-full rounded border p-2">
-                                        @foreach (['catering' => 'Catering', 'music' => 'Music/DJ', 'lighting' => 'Lighting', 'bridal_entry' => 'Bridal entry', 'stage' => 'Stage', 'photography' => 'Photography', 'other' => 'Other'] as $value => $label)
-                                            <option value="{{ $value }}">{{ $label }}</option>
-                                        @endforeach
-                                    </select>
-                                </label>
-                                <label class="space-y-1 text-sm"><span>Charge unit</span>
-                                    <select wire:model="addons.{{ $hall['id'] }}.0.chargeUnit" class="w-full rounded border p-2">
-                                        <option value="flat">Per event</option>
-                                        <option value="per_guest">Per guest</option>
-                                        <option value="per_unit">Per item</option>
-                                    </select>
-                                </label>
-                                <label class="space-y-1 text-sm"><span>Rate minor units</span>
-                                    <input type="number" min="0" wire:model="addons.{{ $hall['id'] }}.0.rateMinor" required class="w-full rounded border p-2">
-                                </label>
+                                @forelse (($addons[$hall['id']] ?? []) as $index => $item)
+                                    <div wire:key="wizard-addon-{{ $hall['id'] }}-{{ $index }}" class="grid gap-2 rounded border p-2 md:grid-cols-2">
+                                        <label class="space-y-1 text-sm"><span>Code</span>
+                                            <input wire:model="addons.{{ $hall['id'] }}.{{ $index }}.code" maxlength="40" required class="w-full rounded border p-2">
+                                        </label>
+                                        <label class="space-y-1 text-sm"><span>Name</span>
+                                            <input wire:model="addons.{{ $hall['id'] }}.{{ $index }}.name" maxlength="120" required class="w-full rounded border p-2">
+                                        </label>
+                                        <label class="space-y-1 text-sm"><span>Category</span>
+                                            <select wire:model="addons.{{ $hall['id'] }}.{{ $index }}.category" class="w-full rounded border p-2">
+                                                @foreach (['catering' => 'Catering', 'music' => 'Music/DJ', 'lighting' => 'Lighting', 'bridal_entry' => 'Bridal entry', 'stage' => 'Stage', 'photography' => 'Photography', 'other' => 'Other'] as $value => $label)
+                                                    <option value="{{ $value }}">{{ $label }}</option>
+                                                @endforeach
+                                            </select>
+                                        </label>
+                                        <label class="space-y-1 text-sm"><span>Charge unit</span>
+                                            <select wire:model="addons.{{ $hall['id'] }}.{{ $index }}.chargeUnit" class="w-full rounded border p-2">
+                                                <option value="flat">Per event</option>
+                                                <option value="per_guest">Per guest</option>
+                                                <option value="per_unit">Per item</option>
+                                            </select>
+                                        </label>
+                                        <label class="space-y-1 text-sm"><span>Rate minor units</span>
+                                            <input type="number" min="0" wire:model="addons.{{ $hall['id'] }}.{{ $index }}.rateMinor" required class="w-full rounded border p-2">
+                                        </label>
+                                        <label class="flex items-center gap-2 text-sm">
+                                            <input type="checkbox" wire:model="addons.{{ $hall['id'] }}.{{ $index }}.enabled"> Available
+                                        </label>
+                                        <button type="button" wire:click="removeAddon('{{ $hall['id'] }}', {{ $index }})" class="rounded border px-3 py-2 text-sm">Remove</button>
+                                    </div>
+                                @empty
+                                    <p class="text-sm">No optional add-ons configured for this hall.</p>
+                                @endforelse
+                                <button type="button" wire:click="addAddon('{{ $hall['id'] }}')" class="rounded border px-3 py-2 text-sm">Add optional service</button>
                             </fieldset>
                         @endforeach
                     </section>
+                @elseif ($step === 6)
+                    <section aria-label="Website branding" class="grid gap-3 rounded-xl border p-4 md:grid-cols-2">
+                        <h2 class="font-semibold md:col-span-2">Website branding</h2>
+                        <label class="space-y-1 text-sm"><span>Website display name</span>
+                            <input wire:model="branding.siteName" maxlength="120" required class="w-full rounded border p-3">
+                        </label>
+                        <label class="space-y-1 text-sm"><span>Tagline</span>
+                            <input wire:model="branding.tagline" maxlength="240" class="w-full rounded border p-3">
+                        </label>
+                        <label class="space-y-1 text-sm"><span>Approved theme</span>
+                            <select wire:model="branding.themePreset" class="w-full rounded border p-3">
+                                @foreach (['silver' => 'Silver', 'ivory' => 'Ivory', 'midnight' => 'Midnight', 'sage' => 'Sage'] as $value => $label)
+                                    <option value="{{ $value }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        <label class="space-y-1 text-sm"><span>Typography</span>
+                            <select wire:model="branding.fontPreset" class="w-full rounded border p-3">
+                                <option value="classic">Classic</option><option value="modern">Modern</option>
+                            </select>
+                        </label>
+                        <label class="space-y-1 text-sm"><span>Footer message</span>
+                            <input wire:model="branding.footerText" maxlength="240" class="w-full rounded border p-3">
+                        </label>
+                        <label class="space-y-1 text-sm"><span>Search description</span>
+                            <input wire:model="branding.seoDescription" maxlength="160" class="w-full rounded border p-3">
+                        </label>
+                        <p class="text-xs md:col-span-2">Saves an authorized branding draft only. Public publication remains a separate publisher action and is not enabled by the wizard.</p>
+                    </section>
                 @else
+                    <section aria-label="Review installation details" class="space-y-3 rounded-xl border p-4">
                         <h2 class="font-semibold">Review</h2>
                         <p><strong>Venue:</strong> {{ $company['legalName'] }}</p>
                         <p><strong>Contact:</strong> {{ $company['contactEmail'] ?: 'not provided' }} · {{ $company['contactPhone'] ?: 'not provided' }}</p>
@@ -194,7 +235,7 @@
                     @if ($step > 1)
                         <button type="button" wire:click="back" class="rounded-lg border px-4 py-2">Back</button>
                     @endif
-                    @if ($step < 6)
+                    @if ($step < 7)
                         <button type="submit" class="rounded-lg bg-emerald-800 px-4 py-2 font-semibold text-white">Save and continue</button>
                     @else
                         <p class="text-xs">Final completion requires every approved stage: branding, payments, staff and licensing. This review does not complete the installation.</p>

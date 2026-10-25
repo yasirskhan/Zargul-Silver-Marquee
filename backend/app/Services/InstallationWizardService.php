@@ -168,8 +168,8 @@ final class InstallationWizardService
                 $saved = [];
                 foreach ($state['halls'] as $hall) {
                     $items = $addons[$hall['id']] ?? null;
-                    if (! is_array($items) || $items === []) {
-                        throw new InvalidArgumentException('Add at least one approved option for every hall.');
+                    if (! is_array($items)) {
+                        throw new InvalidArgumentException('Configure the optional add-on list for every hall.');
                     }
                     $current = $service->current($actor, $companyId, $hall['id']);
                     $revision = $service->configure(
@@ -181,6 +181,55 @@ final class InstallationWizardService
                 }
 
                 return ['addons' => $saved];
+            },
+        );
+    }
+
+    public function saveBranding(
+        User $actor, string $companyId, array $branding, int $expectedRevision,
+    ): array {
+        $this->authorize($actor, $companyId);
+
+        return $this->saveOperationalStage(
+            $actor, $companyId, $expectedRevision, 'branding', 7,
+            function (array $state) use ($actor, $companyId, $branding): array {
+                $website = DB::table('websites')->where('company_id', $companyId)
+                    ->orderBy('id')->first(['id', 'branding_draft_revision']);
+                if ($website === null) {
+                    $websiteId = (string) Str::uuid();
+                    DB::table('websites')->insert([
+                        'id' => $websiteId, 'company_id' => $companyId,
+                        'name' => $state['company']['legalName'],
+                        'created_at' => now(), 'updated_at' => now(),
+                    ]);
+                    $draftRevision = 0;
+                } else {
+                    $websiteId = $website->id;
+                    $draftRevision = (int) $website->branding_draft_revision;
+                }
+                $revision = app(SiteBrandingService::class)->saveDraft(
+                    $actor, $companyId, $websiteId,
+                    [
+                        'siteName' => $branding['siteName'],
+                        'tagline' => $branding['tagline'] ?? '',
+                        'themePreset' => $branding['themePreset'] ?? 'silver',
+                        'fontPreset' => $branding['fontPreset'] ?? 'classic',
+                        'logoMediaId' => null, 'faviconMediaId' => null,
+                        'footerText' => $branding['footerText'] ?? '',
+                        'seoDescription' => $branding['seoDescription'] ?? '',
+                    ],
+                    $draftRevision, 'Initial installation wizard branding',
+                );
+
+                return ['branding' => [
+                    'websiteId' => $websiteId, 'revision' => $revision,
+                    'siteName' => $branding['siteName'],
+                    'tagline' => $branding['tagline'] ?? '',
+                    'themePreset' => $branding['themePreset'] ?? 'silver',
+                    'fontPreset' => $branding['fontPreset'] ?? 'classic',
+                    'footerText' => $branding['footerText'] ?? '',
+                    'seoDescription' => $branding['seoDescription'] ?? '',
+                ]];
             },
         );
     }
