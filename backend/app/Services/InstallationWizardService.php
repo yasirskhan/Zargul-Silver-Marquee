@@ -281,36 +281,13 @@ final class InstallationWizardService
 
         return $this->saveOperationalStage(
             $actor, $companyId, $expectedRevision, 'staff', 9,
-            function () use ($companyId, $ownerOnly): array {
-                $pending = 0;
-                $accepted = 0;
-                try {
-                    $pending = DB::table('staff_invitations')->where('company_id', $companyId)
-                        ->where('status', 'pending')->where('expires_at', '>', now())->count();
-                    $accepted = DB::table('staff_invitations as i')
-                        ->join('company_memberships as m', function ($join): void {
-                            $join->on('m.company_id', '=', 'i.company_id')
-                                ->on('m.user_id', '=', 'i.accepted_by');
-                        })
-                        ->join('users as u', 'u.id', '=', 'i.accepted_by')
-                        ->where('i.company_id', $companyId)->where('i.status', 'accepted')
-                        ->where('m.is_active', true)->where('u.is_active', true)
-                        ->whereNotNull('u.email_verified_at')->count();
-                } catch (\Throwable) {
-                    // Readiness must not be satisfied by an unavailable/failed
-                    // invitation query; Owner-only remains an explicit choice.
-                }
-                if (! $ownerOnly && ($pending + $accepted) === 0) {
-                    // The wizard UI requires an explicit choice; keep the stage
-                    // resumable even if the invitation query is temporarily
-                    // unavailable, but never treat this as staff-ready.
-                    $ownerOnly = false;
-                }
-
+            function () use ($ownerOnly): array {
+                // Stage marker only. Final completion independently validates
+                // current eligible invitations/memberships and never trusts a
+                // historical staff marker by itself.
                 return ['staff' => [
                     'ownerOnly' => $ownerOnly,
-                    'pendingCount' => $pending,
-                    'acceptedCount' => $accepted,
+                    'markedAt' => now()->toIso8601String(),
                 ]];
             },
         );
