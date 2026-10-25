@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Mail\StaffInvitationMail;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
@@ -61,7 +63,18 @@ final class StaffInvitationService
             ], $reason);
         }, 3);
 
-        return ['id' => $id, 'token' => $token, 'expiresAt' => now()->addDays(7)->toIso8601String()];
+        $companyName = (string) DB::table('companies')->where('id', $companyId)->value('name');
+        $delivery = 'not_sent';
+        try {
+            Mail::to($email)->send(new StaffInvitationMail($companyName, $token));
+            $delivery = 'sent';
+        } catch (\Throwable $exception) {
+            // The invitation remains valid and auditable; never claim delivery.
+            report($exception);
+        }
+
+        return ['id' => $id, 'expiresAt' => now()->addDays(7)->toIso8601String(),
+            'delivery' => $delivery];
     }
 
     public function accept(string $token, string $name, string $password): array
@@ -82,18 +95,50 @@ final class StaffInvitationService
                 || now()->greaterThan($invite->expires_at)) {
                 throw new ConflictHttpException('Invitation is invalid, used or expired.');
             }
-            $userId = DB::table('users')->insertGetId([
-                'name' => $name, 'email' => $invite->email,
-                'password' => Hash::make($password), 'is_active' => true,
-                'created_at' => now(), 'updated_at' => now(),
-            ]);
-            $membershipId = DB::table('company_memberships')->insertGetId([
-                'company_id' => $invite->company_id, 'user_id' => $userId,
-                'role' => $invite->role, 'is_active' => true,
-                'created_at' => now(), 'updated_at' => now(),
-            ]);
+            $company = DB::table('companies')->where('id', $invite->company_id)
+                ->where('is_active', true)->first(['id']);
+            if ($company === null) {
+                throw new ConflictHttpException('Inviting company is no longer active.');
+            }
+            if (! in_array($invite->role, self::ROLES, true)) {
+                throw new ConflictHttpException('Invitation role is no longer permitted.');
+            }
+            $user = DB::table('users')->where('email', $invite->email)->first();
+            if ($user !== null) {
+                if (! $user->is_active) {
+                    throw new ConflictHttpException('Existing account is inactive.');
+                }
+                $userId = (int) $user->id;
+                if (DB::table('company_memberships')->where('company_id', $invite->company_id)
+                    ->where('user_id', $userId)->where('is_active', true)->exists()) {
+                    throw new ConflictHttpException('Account already belongs to this company.');
+                }
+            } else {
+                $userId = DB::table('users')->insertGetId([
+                    'name' => $name, 'email' => $invite->email,
+                    'password' => Hash::make($password), 'is_active' => true,
+                    'created_at' => now(), 'updated_at' => now(),
+                ]);
+            }
+            $existingMembership = DB::table('company_memberships')->where('company_id', $invite->company_id)
+                ->where('user_id', $userId)->first();
+            if ($existingMembership) {
+                DB::table('company_memberships')->where('id', $existingMembership->id)
+                    ->update(['role' => $invite->role, 'is_active' => true, 'updated_at' => now()]);
+                $membershipId = (int) $existingMembership->id;
+            } else {
+                $membershipId = DB::table('company_memberships')->insertGetId([
+                    'company_id' => $invite->company_id, 'user_id' => $userId,
+                    'role' => $invite->role, 'is_active' => true,
+                    'created_at' => now(), 'updated_at' => now(),
+                ]);
+            }
             foreach (json_decode($invite->hall_ids, true, 512, JSON_THROW_ON_ERROR) as $hallId) {
-                DB::table('hall_assignments')->insert([
+                if (! DB::table('halls')->where('company_id', $invite->company_id)
+                    ->where('id', $hallId)->where('is_active', true)->exists()) {
+                    throw new ConflictHttpException('Invitation hall is no longer active.');
+                }
+                DB::table('hall_assignments')->insertOrIgnore([
                     'company_id' => $invite->company_id, 'hall_id' => $hallId,
                     'membership_id' => $membershipId,
                 ]);

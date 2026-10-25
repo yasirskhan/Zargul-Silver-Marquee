@@ -24,6 +24,12 @@ Route::get('/_venue-media/{pageSlug}/{mediaId}.webp',
 Route::get('/robots.txt', \App\Http\Controllers\PublishedVenueRobotsController::class);
 Route::get('/sitemap.xml', \App\Http\Controllers\PublishedVenueSitemapController::class);
 
+// Staff invitation acceptance: token-bound, single-use, rate limited.
+Route::get('/staff-invitation/{token}', [\App\Http\Controllers\StaffInvitationAcceptanceController::class, 'show'])
+    ->where('token', '[a-f0-9]{64}')->name('staff.invitation.show');
+Route::post('/staff-invitation/{token}', [\App\Http\Controllers\StaffInvitationAcceptanceController::class, 'accept'])
+    ->where('token', '[a-f0-9]{64}')->middleware(['throttle:6,1'])->name('staff.invitation.accept');
+
 // Authenticated, company-authorized private CMS media preview/thumbnail.
 // Only an authorized editor/publisher can fetch these bytes; no public path.
 Route::get('/site-media/{mediaId}', \App\Http\Controllers\SiteMediaPreviewController::class)

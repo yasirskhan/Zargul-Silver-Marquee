@@ -6,7 +6,9 @@ use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\Hall;
 use App\Models\User;
+use App\Mail\StaffInvitationMail;
 use App\Services\StaffInvitationService;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -33,6 +35,7 @@ class StaffInvitationServiceTest extends TestCase
     public function test_invitation_acceptance_is_single_use_and_requires_later_verification(): void
     {
         [$company, $hall, $owner] = $this->fixture();
+        Mail::fake();
         $service = app(StaffInvitationService::class);
         $invite = $service->invite($owner, $company->id,
             'Invited.Manager@Example.test', 'manager', [$hall->id],
@@ -41,8 +44,14 @@ class StaffInvitationServiceTest extends TestCase
         $this->assertSame('pending', DB::table('staff_invitations')->value('status'));
         $this->assertSame(1, DB::table('audit_events')
             ->where('action', 'staff.invitation_sent')->count());
+        $token = null;
+        Mail::assertSent(StaffInvitationMail::class, function ($mail) use (&$token): bool {
+            $token = $mail->token;
+            return true;
+        });
+        $this->assertIsString($token);
 
-        $accepted = $service->accept($invite['token'],
+        $accepted = $service->accept($token,
             'Invited Manager', 'a-long-synthetic-password');
         $this->assertSame('manager', $accepted['role']);
         $this->assertFalse($accepted['emailVerified']);
@@ -55,7 +64,7 @@ class StaffInvitationServiceTest extends TestCase
             ->where('hall_id', $hall->id)->count());
 
         try {
-            $service->accept($invite['token'], 'Replay User', 'another-long-password');
+            $service->accept($token, 'Replay User', 'another-long-password');
             $this->fail('Invitation token was reusable.');
         } catch (\Symfony\Component\HttpKernel\Exception\ConflictHttpException) {
             $this->assertTrue(true);
@@ -67,6 +76,30 @@ class StaffInvitationServiceTest extends TestCase
         $this->assertSame('revoked', DB::table('staff_invitations')->value('status'));
     }
 
+    public function test_acceptance_route_creates_unverified_staff_and_rejects_token_replay(): void
+    {
+        [$company, $hall, $owner] = $this->fixture();
+        Mail::fake();
+        $invite = app(StaffInvitationService::class)->invite($owner, $company->id,
+            'route.accept@example.test', 'reception', [$hall->id], 'Route acceptance test');
+        $token = null;
+        Mail::assertSent(StaffInvitationMail::class, function ($mail) use (&$token): bool {
+            $token = $mail->token;
+            return true;
+        });
+        $this->get('/staff-invitation/'.$token)->assertOk()
+            ->assertSee('Accept staff invitation');
+        $this->post('/staff-invitation/'.$token, [
+            'name' => 'Route Reception', 'password' => 'synthetic-route-password',
+            'password_confirmation' => 'synthetic-route-password',
+        ])->assertRedirect();
+        $this->assertNull(DB::table('users')->where('email', 'route.accept@example.test')
+            ->value('email_verified_at'));
+        $this->post('/staff-invitation/'.$token, [
+            'name' => 'Replay Reception', 'password' => 'synthetic-replay-password',
+            'password_confirmation' => 'synthetic-replay-password',
+        ])->assertSessionHasErrors('invitation');
+    }
     public function test_manager_cannot_invite_or_read_private_invitations(): void
     {
         [$company, $hall, $owner] = $this->fixture();

@@ -282,16 +282,27 @@ final class InstallationWizardService
         return $this->saveOperationalStage(
             $actor, $companyId, $expectedRevision, 'staff', 9,
             function () use ($companyId, $ownerOnly): array {
-                $count = DB::table('staff_invitations')->where('company_id', $companyId)->count();
-                if (! $ownerOnly && $count === 0) {
+                $pending = DB::table('staff_invitations')->where('company_id', $companyId)
+                    ->where('status', 'pending')->where('expires_at', '>', now())->count();
+                $accepted = DB::table('staff_invitations as i')
+                    ->join('company_memberships as m', function ($join): void {
+                        $join->on('m.company_id', '=', 'i.company_id')
+                            ->on('m.user_id', '=', 'i.accepted_by');
+                    })
+                    ->join('users as u', 'u.id', '=', 'i.accepted_by')
+                    ->where('i.company_id', $companyId)->where('i.status', 'accepted')
+                    ->where('m.is_active', true)->where('u.is_active', true)
+                    ->whereNotNull('u.email_verified_at')->count();
+                if (! $ownerOnly && ($pending + $accepted) === 0) {
                     throw new InvalidArgumentException(
-                        'Invite at least one staff member or explicitly choose an owner-operated venue.'
+                        'Invite an eligible staff member or explicitly choose an owner-operated venue.'
                     );
                 }
 
                 return ['staff' => [
                     'ownerOnly' => $ownerOnly,
-                    'invitationCount' => $count,
+                    'pendingCount' => $pending,
+                    'acceptedCount' => $accepted,
                 ]];
             },
         );
