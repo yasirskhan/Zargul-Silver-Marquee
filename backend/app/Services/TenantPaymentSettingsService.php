@@ -39,26 +39,36 @@ final class TenantPaymentSettingsService
         if ($expectedRevision < 0) {
             throw new InvalidArgumentException('Invalid payment settings revision.');
         }
-        $current = DB::table('tenant_payment_settings')->where('company_id', $companyId)
-            ->lockForUpdate()->first();
-        $live = $current ? (int) $current->revision : 0;
-        if ($live !== $expectedRevision) {
-            throw new ConflictHttpException('Payment settings changed; reload before saving.');
-        }
-        $next = $live + 1;
-        DB::transaction(function () use ($actor, $companyId, $clean, $next, $current): void {
+
+        return DB::transaction(function () use (
+            $actor, $companyId, $clean, $expectedRevision,
+        ): array {
+            $current = DB::table('tenant_payment_settings')->where('company_id', $companyId)
+                ->lockForUpdate()->first();
+            $live = $current ? (int) $current->revision : 0;
+            if ($live !== $expectedRevision) {
+                throw new ConflictHttpException('Payment settings changed; reload before saving.');
+            }
+            $next = $live + 1;
             if ($current) {
                 DB::table('tenant_payment_settings')->where('company_id', $companyId)->update([
                     'config' => json_encode($clean, JSON_THROW_ON_ERROR),
                     'revision' => $next, 'updated_by' => $actor->getKey(), 'updated_at' => now(),
                 ]);
             } else {
-                DB::table('tenant_payment_settings')->insert([
-                    'id' => (string) Str::uuid(), 'company_id' => $companyId,
-                    'config' => json_encode($clean, JSON_THROW_ON_ERROR),
-                    'revision' => $next, 'updated_by' => $actor->getKey(),
-                    'created_at' => now(), 'updated_at' => now(),
-                ]);
+                try {
+                    DB::table('tenant_payment_settings')->insert([
+                        'id' => (string) Str::uuid(), 'company_id' => $companyId,
+                        'config' => json_encode($clean, JSON_THROW_ON_ERROR),
+                        'revision' => $next, 'updated_by' => $actor->getKey(),
+                        'created_at' => now(), 'updated_at' => now(),
+                    ]);
+                } catch (\Illuminate\Database\QueryException $exception) {
+                    throw new ConflictHttpException(
+                        'Payment settings were created concurrently; reload before saving.',
+                        0, $exception,
+                    );
+                }
             }
             DB::table('audit_events')->insert([
                 'id' => (string) Str::uuid(), 'company_id' => $companyId,
@@ -67,14 +77,15 @@ final class TenantPaymentSettingsService
                 'before_values' => null,
                 'after_values' => json_encode([
                     'revision' => $next, 'methods' => $clean['methods'],
+                    'bankCount' => count($clean['banks']),
                     'depositPercent' => $clean['depositPercent'],
                     'providerApiEnabled' => false,
                 ], JSON_THROW_ON_ERROR),
                 'context' => json_encode(['no_live_payment_activation' => true], JSON_THROW_ON_ERROR),
             ]);
-        }, 3);
 
-        return ['revision' => $next, 'config' => $clean];
+            return ['revision' => $next, 'config' => $clean];
+        }, 3);
     }
 
     private function authorize(User $actor, string $companyId): void
@@ -134,7 +145,9 @@ final class TenantPaymentSettingsService
                 || preg_match('/[<>[:cntrl:]]/u', $name.$branch.$masked)) {
                 throw new InvalidArgumentException('Bank details require a name and a masked account reference only.');
             }
-            $cleanBanks[] = compact('name', 'branch', 'masked');
+            $cleanBanks[] = [
+                'bankName' => $name, 'branch' => $branch, 'accountMasked' => $masked,
+            ];
         }
         $methods = is_array($config['methods'] ?? null) ? array_values(array_unique($config['methods'])) : [];
         foreach ($methods as $method) {

@@ -214,6 +214,26 @@
                     <section aria-label="Tenant payment settings" class="space-y-3 rounded-xl border p-4">
                         <h2 class="font-semibold">Venue-owned payment instructions</h2>
                         <p class="text-sm">These are the venue's customer-facing payment instructions, separate from HAFZATECH subscription billing. No live provider or payment activation occurs.</p>
+                        <div class="space-y-2">
+                            <h3 class="font-medium">Venue bank accounts</h3>
+                            @forelse (($payments['banks'] ?? []) as $index => $bank)
+                                <div wire:key="payment-bank-{{ $index }}" class="grid gap-2 rounded border p-2 md:grid-cols-3">
+                                    <label class="space-y-1 text-sm"><span>Bank name</span>
+                                        <input wire:model="payments.banks.{{ $index }}.bankName" maxlength="120" class="w-full rounded border p-2">
+                                    </label>
+                                    <label class="space-y-1 text-sm"><span>Branch</span>
+                                        <input wire:model="payments.banks.{{ $index }}.branch" maxlength="160" class="w-full rounded border p-2">
+                                    </label>
+                                    <label class="space-y-1 text-sm"><span>Masked account (e.g. ****1234)</span>
+                                        <input wire:model="payments.banks.{{ $index }}.accountMasked" maxlength="32" class="w-full rounded border p-2">
+                                    </label>
+                                    <button type="button" wire:click="removeBank({{ $index }})" class="rounded border px-3 py-2 text-sm md:col-span-3">Remove bank</button>
+                                </div>
+                            @empty
+                                <p class="text-sm">No venue bank account configured.</p>
+                            @endforelse
+                            <button type="button" wire:click="addBank" class="rounded border px-3 py-2 text-sm">Add bank account</button>
+                        </div>
                         <label class="space-y-1 text-sm"><span>Manual instructions</span>
                             <textarea wire:model="payments.instructions" rows="3" maxlength="1000" class="w-full rounded border p-3"></textarea>
                         </label>

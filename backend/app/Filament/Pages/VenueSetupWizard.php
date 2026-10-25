@@ -191,6 +191,19 @@ final class VenueSetupWizard extends Page
         }
     }
 
+    public function addBank(): void
+    {
+        abort_if($this->status === 'completed' || count($this->payments['banks'] ?? []) >= 5, 403);
+        $this->payments['banks'][] = ['bankName' => '', 'branch' => '', 'accountMasked' => ''];
+    }
+
+    public function removeBank(int $index): void
+    {
+        abort_if($this->status === 'completed' || ! isset($this->payments['banks'][$index]), 403);
+        unset($this->payments['banks'][$index]);
+        $this->payments['banks'] = array_values($this->payments['banks']);
+    }
+
     public function addAddon(string $hallId): void
     {
         abort_if($this->status === 'completed' || ! isset($this->addons[$hallId])
