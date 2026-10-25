@@ -74,6 +74,96 @@ class InstallationWizardServiceTest extends TestCase
         $this->assertNull(DB::table('installation_wizard_states')->value('completed_at'));
     }
 
+    public function test_forged_saved_license_state_cannot_complete_without_live_signed_grant(): void
+    {
+        [$company, $owner] = $this->fixture();
+        $this->be($owner);
+        DB::table('installation_wizard_states')->insert([
+            'id' => (string) \Illuminate\Support\Str::uuid(), 'company_id' => $company->id,
+            'step' => 10, 'revision' => 4, 'status' => 'in_progress',
+            'data' => json_encode([
+                'company' => ['legalName' => 'Forged License Venue', 'contactEmail' => '',
+                    'contactPhone' => '', 'address' => '', 'currency' => 'PKR',
+                    'timezone' => 'Asia/Karachi'],
+                'halls' => [['id' => null, 'name' => 'Forged Hall',
+                    'address' => '', 'phone' => '', 'capacity' => 100]],
+                'completedStages' => ['company', 'halls', 'programs', 'pricing',
+                    'addons', 'branding', 'payments', 'staff', 'license'],
+                'license' => ['state' => 'licensed'],
+                'staff' => ['ownerOnly' => true],
+            ], JSON_THROW_ON_ERROR),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        try {
+            app(InstallationWizardService::class)->complete($owner, $company->id, 4);
+            $this->fail('Forged saved license state completed the installation.');
+        } catch (\InvalidArgumentException $exception) {
+            $this->assertStringContainsString('verified signed license', $exception->getMessage());
+        }
+        $this->assertSame('in_progress', DB::table('installation_wizard_states')->value('status'));
+        $this->assertSame(0, DB::table('halls')->where('company_id', $company->id)->count());
+    }
+    public function test_current_signed_test_grant_allows_successful_audited_completion(): void
+    {
+        [$company, $owner] = $this->fixture();
+        $this->be($owner);
+        config()->set('central_control.activation_enabled', true);
+        $identity = app(\App\Services\CentralInstallationIdentity::class)->initialize();
+        $customer = (string) Str::uuid();
+        $license = (string) Str::uuid();
+        $domain = 'wizard-complete.example.test';
+        DB::table('central_installation_activation')->insert([
+            'singleton_id' => 1, 'installation_id' => $identity['installation_id'],
+            'customer_id' => $customer, 'approved_domain' => $domain,
+            'status' => 'registered_pending_license', 'central_registered_at' => now(),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $pair = sodium_crypto_sign_keypair();
+        $b64 = fn (string $raw): string => rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
+        config()->set('central_control.trusted_signing_public_keys', [
+            'test-key' => $b64(sodium_crypto_sign_publickey($pair)),
+        ]);
+        $grant = [
+            'api_version' => 'v1', 'issuer' => 'HAFZATECH', 'product' => 'VenueDesk',
+            'license_id' => $license, 'installation_id' => $identity['installation_id'],
+            'customer_id' => $customer, 'revision' => 1, 'term_months' => 12,
+            'edition' => 'standard', 'approved_domains' => [$domain],
+            'not_before' => now()->subDay()->toIso8601ZuluString(),
+            'expires_at' => now()->addYear()->toIso8601ZuluString(),
+            'limits' => ['max_halls' => 2, 'max_staff' => 10],
+            'features' => ['booking' => true],
+        ];
+        $raw = json_encode($grant, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        $envelope = [
+            'key_id' => 'test-key', 'payload' => $b64($raw),
+            'signature' => $b64(sodium_crypto_sign_detached(
+                "HAFZATECH-LICENSE-GRANT-V1\n".$raw,
+                sodium_crypto_sign_secretkey($pair))),
+        ];
+        app(\App\Services\CentralSignedLicenseCache::class)->accept(
+            $envelope, $customer, $domain, now()->toDateTimeImmutable());
+        DB::table('installation_wizard_states')->insert([
+            'id' => (string) Str::uuid(), 'company_id' => $company->id,
+            'step' => 10, 'revision' => 6, 'status' => 'in_progress',
+            'data' => json_encode([
+                'company' => ['legalName' => 'Licensed Wizard Venue', 'contactEmail' => '',
+                    'contactPhone' => '', 'address' => '', 'currency' => 'PKR',
+                    'timezone' => 'Asia/Karachi'],
+                'halls' => [['id' => null, 'name' => 'Licensed Hall',
+                    'address' => '', 'phone' => '', 'capacity' => 100]],
+                'completedStages' => ['company', 'halls', 'programs', 'pricing',
+                    'addons', 'branding', 'payments', 'staff', 'license'],
+                'license' => ['state' => 'forged-old-string'],
+                'staff' => ['ownerOnly' => true],
+            ], JSON_THROW_ON_ERROR),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $state = app(InstallationWizardService::class)->complete($owner, $company->id, 6);
+        $this->assertSame('completed', $state['status']);
+        $this->assertSame(1, DB::table('halls')->where('company_id', $company->id)->count());
+        $this->assertSame(1, DB::table('audit_events')
+            ->where('action', 'installation.wizard_completed')->count());
+    }
     public function test_program_pricing_and_addon_stages_persist_through_canonical_services(): void
     {
         [$company, $owner] = $this->fixture();
