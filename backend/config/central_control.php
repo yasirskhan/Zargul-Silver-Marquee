@@ -24,7 +24,7 @@ return [
         // Browser acceptance only: an isolated fixture command writes this
         // public key before the test server starts. Production never enters
         // this branch unless APP_ENV is explicitly testing.
-        if (! app()->environment('testing')) {
+        if (env('APP_ENV') !== 'testing') {
             return [];
         }
         $path = storage_path('app/browser-e2e-license-public.key');
