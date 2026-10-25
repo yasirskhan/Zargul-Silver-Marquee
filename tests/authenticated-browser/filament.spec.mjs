@@ -527,9 +527,12 @@ test('real owner saves and resumes installation wizard without false completion'
   await page.getByLabel('Approved deposit percentage (5% where applicable)').fill('5');
   await page.getByRole('button', { name: 'Save and continue' }).click();
   await expect(page.getByText('8. Staff', { exact: true })).toBeVisible({ timeout: 25_000 });
-  await page.getByLabel('This venue is operated only by its Owner').check();
+  const ownerOnly = page.getByLabel('This venue is operated only by its Owner');
+  await ownerOnly.check();
+  await expect(ownerOnly).toBeChecked();
+  await page.waitForTimeout(750);
   await page.getByRole('button', { name: 'Save and continue' }).click();
-  await expect(page.getByText('9. Review', { exact: true })).toBeVisible({ timeout: 25_000 });
+  await expect(page.getByRole('heading', { name: 'Review' })).toBeVisible({ timeout: 25_000 });
   await expect(page.getByText('Wizard Hall One')).toBeVisible();
   await expect(page.getByText('Wizard Hall Two')).toBeVisible();
   await expect(page.getByText('Venue setup completed')).toHaveCount(0);
