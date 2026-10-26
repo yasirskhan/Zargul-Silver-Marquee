@@ -121,12 +121,17 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
         );
     }
 
-    // Three original browser actors and the second hall exist ONLY in the
-    // isolated test fixture. No production account or stock is created.
     $secondHall = \App\Models\Hall::query()->firstOrCreate(
         ['company_id'=>$company->id,'slug'=>'synthetic-hall-b'],
         ['name'=>'Synthetic Test Hall B','capacity'=>300],
     );
+    // These operational rehearsal halls are not part of the clean wizard
+    // installation set; only halls explicitly made bookable count for setup.
+    $hall->forceFill(['is_bookable' => false])->save();
+    $secondHall->forceFill(['is_bookable' => false])->save();
+
+    // Three original browser actors and the second hall exist ONLY in the
+    // isolated test fixture. No production account or stock is created.
     foreach ([
         ['a',$hall,'JBSWY3DPEHPK3PXP','synthetic-inventory-manager-a-only'],
         ['b',$secondHall,'GEZDGNBVGY3TQOJQ','synthetic-inventory-manager-b-only'],
