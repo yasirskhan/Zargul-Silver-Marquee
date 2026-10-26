@@ -45,6 +45,8 @@ foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
 ] as $name) {
     require dirname(__DIR__).'/src/'.$name.'.php';
 }
+require dirname(__DIR__).'/src/InstallationStatusService.php';
+require dirname(__DIR__).'/src/SignedGrantDeliveryService.php';
 require dirname(__DIR__).'/signing/Ed25519GrantCodec.php';
 function paidSessionAssert(bool $ok, string $message): void {
     if (!$ok) throw new RuntimeException('Session-bound license: '.$message);
@@ -90,6 +92,7 @@ $db->prepare("INSERT INTO installation_enrollments
     'id'=>$enrollment,'customer'=>$company,'digest'=>hash('sha256',random_bytes(32))
 ]);
 $keypair=sodium_crypto_sign_keypair();
+$installationKeys=$keypair;
 $db->prepare("INSERT INTO registered_installations
     (id,customer_id,enrollment_id,approved_domain,ed25519_public_key)
     VALUES(:id,:customer,:enrollment,'licensed-session.example.test',:key)")
@@ -914,6 +917,41 @@ $signatureCount=$db->prepare('SELECT count(*) FROM central_license_signature_eve
 $signatureCount->execute(['rev'=>$prepared['revision_id'],'officer'=>$officer]);
 paidSessionAssert((int)$signatureCount->fetchColumn()===1,
     'exactly one immutable signing audit tied to authenticated vendor officer');
+// Signed-grant delivery path: the finalization output must be retrievable only
+// by a fresh Ed25519 installation proof and must equal the signed envelope.
+$deliveryNonce=paidSessionUuid();$deliveryTime=gmdate('Y-m-d\TH:i:s\Z');
+$deliveryMessage=implode("\n",['HAFZATECH-INSTALL-CHECK-V1',$installation,
+    $company,$deliveryTime,$deliveryNonce,'0']);
+$deliveryRequest=['installation_id'=>$installation,'customer_id'=>$company,
+    'request_time'=>$deliveryTime,'nonce'=>InstallationRegistry::base64Url(random_bytes(32)),
+    'known_revision'=>0,
+    'signature'=>InstallationRegistry::base64Url(sodium_crypto_sign_detached(
+        $deliveryMessage,sodium_crypto_sign_secretkey($installationKeys)))];
+$deliveryRequest['nonce']=InstallationRegistry::base64Url(random_bytes(32));
+$deliveryMessage=implode("\n",['HAFZATECH-INSTALL-CHECK-V1',$installation,
+    $company,$deliveryTime,$deliveryRequest['nonce'],'0']);
+$deliveryRequest['signature']=InstallationRegistry::base64Url(
+    sodium_crypto_sign_detached($deliveryMessage,
+        sodium_crypto_sign_secretkey($installationKeys)));
+$unseal=static function(string $sealed)use($vault):string|false{
+    $nonce=substr($sealed,0,SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+    return sodium_crypto_secretbox_open(
+        substr($sealed,SODIUM_CRYPTO_SECRETBOX_NONCEBYTES),$nonce,$vault);
+};
+$delivery=new \Hafzatech\Central\SignedGrantDeliveryService(
+    $db,new \Hafzatech\Central\InstallationStatusService($db),$unseal,
+    ['session-test-key'=>$public]);
+putenv('CENTRAL_GRANT_DELIVERY_ENABLED=true');
+try {
+    $delivered=$delivery->fetch($deliveryRequest);
+    paidSessionAssert($delivered['status']==='signed_revision_pending_delivery' &&
+        $delivered['revision']===1 && is_array($delivered['signed_grant']) &&
+        $delivered['signed_grant']===$envelope,
+        'authenticated installation receives exactly the finalized signed grant');
+} finally {
+    putenv('CENTRAL_GRANT_DELIVERY_ENABLED=false');
+}
+paidSessionDeny(fn()=>$delivery->fetch($deliveryRequest),'grant_delivery_not_enabled');
 // A revoked License Officer must also lose the pending queue capability.
 $db->prepare("UPDATE central_staff_role_grants SET revoked_at=now()
     WHERE staff_id=:id AND role='license_officer'")
