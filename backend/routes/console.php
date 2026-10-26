@@ -360,7 +360,11 @@ Artisan::command('venuedesk:test-license-window {mode}', function (string $mode)
     $private = base64_decode(strtr(trim(file_get_contents($privateFile)), '-_', '+/'), true);
     $b64 = static fn (string $raw): string => rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
     $now = now()->toDateTimeImmutable();
-    $expires = $mode === 'grace' ? $now->sub(new \DateInterval('P1D')) : $now->add(new \DateInterval('P10D'));
+    $expires = match ($mode) {
+        'grace' => $now->sub(new \DateInterval('P1D')),
+        'expired' => $now->sub(new \DateInterval('P10D')),
+        default => $now->add(new \DateInterval('P10D')),
+    };
     $grant = [
         'api_version' => 'v1', 'issuer' => 'HAFZATECH', 'product' => 'VenueDesk',
         'license_id' => $cache->license_id, 'installation_id' => $binding->installation_id,
