@@ -27,6 +27,13 @@ final class InstallationReadinessService
 
         $company = DB::table('companies')->where('id', $companyId)->first();
         $ownerRow = DB::table('users')->where('id', $actor->getKey())->first();
+        $designatedIds = collect($data['halls'] ?? [])->pluck('id')
+            ->filter(fn ($id): bool => is_string($id) && $id !== '')->values();
+        $designatedValid = $designatedIds->isNotEmpty()
+            && $designatedIds->unique()->count() === $designatedIds->count()
+            && DB::table('halls')->where('company_id', $companyId)
+                ->whereIn('id', $designatedIds)->where('is_active', true)
+                ->where('is_bookable', true)->count() === $designatedIds->count();
         $halls = DB::table('halls')->where('company_id', $companyId)
             ->where('is_active', true)->where('is_bookable', true)->get();
         $checks = [
@@ -36,7 +43,7 @@ final class InstallationReadinessService
                 && trim((string) ($data['company']['legalName'] ?? '')) !== ''
                 && preg_match('/\A[A-Z]{3}\z/', (string) ($data['company']['currency'] ?? '')) === 1
                 && trim((string) ($data['company']['timezone'] ?? '')) !== '',
-            'halls' => $halls->count() >= 1,
+            'halls' => $halls->count() >= 1 && $designatedValid,
             'programs' => $halls->count() >= 1 && $halls->every(
                 fn ($hall): bool => (int) $hall->program_rules_revision > 0),
             'pricing' => $halls->count() >= 1 && $halls->every(
