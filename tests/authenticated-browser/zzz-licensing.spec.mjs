@@ -22,17 +22,18 @@ function totp(secret) {
 test('Owner verifies a signed license online and requests renewal review', async ({ page }) => {
   test.setTimeout(240_000);
   await page.goto('/admin/login');
-  await page.locator('input[type="email"]').fill('browser-e2e-inventory-owner-c@example.test');
-  await page.getByLabel(/Password/).fill('synthetic-inventory-owner-c-only');
+  await page.locator('input[type="email"]').fill('browser-e2e-license-owner@example.test');
+  await page.getByLabel(/Password/).fill('synthetic-license-owner-only');
   await page.getByRole('button', { name: /sign in|log in/i }).first().click();
   const code = page.locator('input[autocomplete="one-time-code"]:visible').first();
   await expect(code).toBeVisible({ timeout: 25_000 });
-  await code.fill(totp('KRSXG5AUMVZWK4TT'));
+  await code.fill(totp('GEZDGNBVGY3TQOJQ'));
   await page.waitForURL(url => !new URL(url).pathname.startsWith('/admin/login')
     && !new URL(url).pathname.startsWith('/admin/multi-factor-authentication'), { timeout: 25_000 });
   await page.goto('/admin/licensing');
   await expect(page.getByRole('heading', { name: 'Licensing' })).toBeVisible();
   await expect(page.getByText('licensed', { exact: true })).toBeVisible();
+  await expect(page.getByText(/within 15 days of expiration/i)).toBeVisible();
 
   await page.getByRole('button', { name: 'Verify License' }).click();
   await expect(page.getByText('Last authenticated HAFZATECH verification (UTC)'))

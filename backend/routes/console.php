@@ -87,6 +87,21 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
                 sodium_crypto_sign_secretkey($pair))),
         ], $customer, $domain, now()->toDateTimeImmutable());
     }
+    // Dedicated licensing Owner: isolated from installation/staff/inventory
+    // browser identities so login throttling or MFA state cannot contaminate
+    // warning/grace licensing acceptance.
+    $licenseOwner = \App\Models\User::query()->firstOrCreate(
+        ['email' => 'browser-e2e-license-owner@example.test'],
+        ['name' => 'Synthetic License Owner',
+         'password' => 'synthetic-license-owner-only', 'is_active' => true],
+    );
+    $licenseOwner->markEmailAsVerified();
+    $licenseOwner->app_authentication_secret = 'GEZDGNBVGY3TQOJQ';
+    $licenseOwner->save();
+    \App\Models\CompanyMembership::query()->firstOrCreate(
+        ['company_id' => $company->id, 'user_id' => $licenseOwner->id],
+        ['role' => 'owner', 'is_active' => true],
+    );
     // Separate inventory Owner avoids MFA replay between parallel authenticated browser workers.
     $inventoryOwner = \App\Models\User::query()->firstOrCreate(
         ['email'=>'browser-e2e-inventory-owner@example.test'],
