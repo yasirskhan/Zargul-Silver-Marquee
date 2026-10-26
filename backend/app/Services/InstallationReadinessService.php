@@ -27,7 +27,10 @@ final class InstallationReadinessService
 
         $company = DB::table('companies')->where('id', $companyId)->first();
         $ownerRow = DB::table('users')->where('id', $actor->getKey())->first();
-        $halls = DB::table('halls')->where('company_id', $companyId)->where('is_active', true)->get();
+        $designatedHallIds = collect($data['halls'] ?? [])->pluck('id')
+            ->filter(fn ($id): bool => is_string($id) && $id !== '')->values()->all();
+        $halls = DB::table('halls')->where('company_id', $companyId)->where('is_active', true)
+            ->whereIn('id', $designatedHallIds)->get();
         $checks = [
             'ownerVerified' => $ownerRow !== null && $ownerRow->email_verified_at !== null,
             'ownerMfa' => $ownerRow !== null && ! empty($ownerRow->app_authentication_secret),

@@ -490,8 +490,8 @@ test('real owner saves and resumes installation wizard without false completion'
   await page.waitForTimeout(65_000);
   await page.setViewportSize({ width: 1366, height: 768 });
   await signInWithTotp(
-    page, 'browser-e2e-wizard-owner@example.test',
-    'synthetic-wizard-owner-only', 'MFRGGZDFMZTWQ2LK',
+    page, 'browser-e2e-inventory-owner-c@example.test',
+    'synthetic-inventory-owner-c-only', 'KRSXG5AUMVZWK4TT',
   );
   await page.goto('/admin/venue-setup');
   await expect(page.getByText('Only an active, verified company Owner can complete this setup.'))

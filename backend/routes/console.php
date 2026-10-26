@@ -44,25 +44,6 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
     );
 
 
-    // Isolated clean installation company: no pre-existing operational halls,
-    // so readiness can require every active/bookable hall to be configured.
-    $wizardCompany = \App\Models\Company::query()->firstOrCreate(
-        ['slug' => 'browser-e2e-wizard'],
-        ['name' => 'Synthetic Wizard Installation', 'is_active' => true],
-    );
-    $wizardOwner = \App\Models\User::query()->firstOrCreate(
-        ['email' => 'browser-e2e-wizard-owner@example.test'],
-        ['name' => 'Synthetic Wizard Owner',
-         'password' => 'synthetic-wizard-owner-only', 'is_active' => true],
-    );
-    $wizardOwner->markEmailAsVerified();
-    $wizardOwner->app_authentication_secret = 'MFRGGZDFMZTWQ2LK';
-    $wizardOwner->save();
-    \App\Models\CompanyMembership::query()->firstOrCreate(
-        ['company_id' => $wizardCompany->id, 'user_id' => $wizardOwner->id],
-        ['role' => 'owner', 'is_active' => true],
-    );
-
     if (getenv('VENUE_CENTRAL_ACTIVATION_ENABLED') === 'true') { 
         // Isolated signed-license fixture for the browser installation journey.
         // The public key is written before `artisan serve`; no production key
@@ -81,7 +62,7 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
         $domain = 'wizard.browser.test';
         \Illuminate\Support\Facades\DB::table('central_installation_activation')->updateOrInsert(
             ['singleton_id' => 1],
-            ['company_id' => $wizardCompany->id, 'installation_id' => $identity['installation_id'],
+            ['company_id' => $company->id, 'installation_id' => $identity['installation_id'],
              'customer_id' => $customer, 'approved_domain' => $domain,
              'status' => 'registered_pending_license', 'central_registered_at' => now(),
              'created_at' => now(), 'updated_at' => now()],
