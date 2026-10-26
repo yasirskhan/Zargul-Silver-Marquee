@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Mail\OwnerBootstrapMail;
 use App\Services\OwnerBootstrapService;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -13,8 +15,14 @@ class OwnerBootstrapTest extends TestCase
 
     public function test_one_time_bootstrap_creates_verified_owner_and_cannot_replay(): void
     {
+        Mail::fake();
         $service = app(OwnerBootstrapService::class);
         $issued = $service->issue('Bootstrap Venue', 'First Owner', 'first.owner@example.test');
+        $this->assertSame('sent', $issued['delivery']);
+        Mail::assertSent(OwnerBootstrapMail::class, function ($mail) use ($issued): bool {
+            return $mail->hasTo('first.owner@example.test') && $mail->token === $issued['token'];
+        });
+
         $this->get('/install/owner/'.$issued['token'])->assertOk()
             ->assertSee('Create the installation Owner');
         $this->post('/install/owner/'.$issued['token'], [
@@ -37,6 +45,7 @@ class OwnerBootstrapTest extends TestCase
 
     public function test_bootstrap_cannot_be_issued_when_owner_exists(): void
     {
+        Mail::fake();
         $service = app(OwnerBootstrapService::class);
         $issued = $service->issue('Bootstrap Venue', 'First Owner', 'first.owner@example.test');
         $service->accept($issued['token'], 'synthetic-bootstrap-password');

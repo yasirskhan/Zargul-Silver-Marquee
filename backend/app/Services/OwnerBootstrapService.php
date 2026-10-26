@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Mail\OwnerBootstrapMail;
 use App\Models\User;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -31,7 +33,16 @@ final class OwnerBootstrapService
             'created_at' => now(), 'updated_at' => now(),
         ]);
 
-        return ['token' => $token, 'expiresAt' => now()->addHours(24)->toIso8601String()];
+        $delivery = 'not_sent';
+        try {
+            Mail::to($email)->send(new OwnerBootstrapMail($companyName, $token));
+            $delivery = 'sent';
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+
+        return ['token' => $token, 'expiresAt' => now()->addHours(24)->toIso8601String(),
+            'delivery' => $delivery];
     }
 
     public function accept(string $token, string $password): array
