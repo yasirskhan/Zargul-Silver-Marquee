@@ -93,7 +93,7 @@ test('Owner invites staff who accepts verifies email enrols MFA and is revoked',
   await expect(staff.getByText(/multi-factor|two-factor|authenticator|set up/i).first())
     .toBeVisible({ timeout: 25_000 });
   await staff.getByText('Set up', { exact: true }).click();
-  await staff.waitForTimeout(1_000);
+  await staff.waitForTimeout(5_000);
   const body = await staff.locator('body').innerText();
   const secret = body.match(/\b[A-Z2-7]{32}\b/)?.[0];
   if (!secret) throw new Error('MFA setup secret not shown');
