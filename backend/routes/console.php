@@ -53,6 +53,8 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
         $publicKey = $b64(sodium_crypto_sign_publickey($pair));
         @mkdir(storage_path('app'), 0775, true);
         file_put_contents(storage_path('app/browser-e2e-license-public.key'), $publicKey);
+        file_put_contents(storage_path('app/browser-e2e-license-private.key'),
+            $b64(sodium_crypto_sign_secretkey($pair)));
         config()->set('central_control.trusted_signing_public_keys', [
             'browser-e2e-fixture' => $publicKey,
         ]);

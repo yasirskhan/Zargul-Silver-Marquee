@@ -58,7 +58,7 @@ final class CentralInstallationStatusTransport
         $response = Http::acceptJson()->asJson()
             ->withOptions(['allow_redirects' => false])
             ->connectTimeout(3)->timeout(8)
-            ->post('https://lichall.hafzatech.com/api/v1/installations/status', $request);
+            ->post(rtrim((string) config('central_control.trusted_base_url'), '/').'/api/v1/installations/status', $request);
 
         if ($response->status() !== 200) {
             throw new InvalidArgumentException('Trusted central status check failed.');
