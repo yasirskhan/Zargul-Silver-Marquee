@@ -24,6 +24,12 @@ Route::get('/_venue-media/{pageSlug}/{mediaId}.webp',
 Route::get('/robots.txt', \App\Http\Controllers\PublishedVenueRobotsController::class);
 Route::get('/sitemap.xml', \App\Http\Controllers\PublishedVenueSitemapController::class);
 
+// First-Owner bootstrap: operator-issued, one-time, rate limited.
+Route::get('/install/owner/{token}', [\App\Http\Controllers\OwnerBootstrapController::class, 'show'])
+    ->where('token', '[a-f0-9]{64}')->name('installation.owner.show');
+Route::post('/install/owner/{token}', [\App\Http\Controllers\OwnerBootstrapController::class, 'accept'])
+    ->where('token', '[a-f0-9]{64}')->middleware(['throttle:6,1'])->name('installation.owner.accept');
+
 // Staff invitation acceptance: token-bound, single-use, rate limited.
 Route::get('/staff-invitation/{token}', [\App\Http\Controllers\StaffInvitationAcceptanceController::class, 'show'])
     ->where('token', '[a-f0-9]{64}')->name('staff.invitation.show');

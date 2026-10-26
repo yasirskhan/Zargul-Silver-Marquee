@@ -28,11 +28,6 @@ final class InstallationReadinessService
         $company = DB::table('companies')->where('id', $companyId)->first();
         $ownerRow = DB::table('users')->where('id', $actor->getKey())->first();
         $halls = DB::table('halls')->where('company_id', $companyId)->where('is_active', true)->get();
-        $configuredHalls = $halls->filter(
-            fn ($hall): bool => (int) $hall->program_rules_revision > 0
-                && (int) $hall->seating_price_revision > 0
-                && (int) $hall->addon_catalog_revision > 0,
-        )->count();
         $checks = [
             'ownerVerified' => $ownerRow !== null && $ownerRow->email_verified_at !== null,
             'ownerMfa' => $ownerRow !== null && ! empty($ownerRow->app_authentication_secret),
@@ -41,9 +36,12 @@ final class InstallationReadinessService
                 && preg_match('/\A[A-Z]{3}\z/', (string) ($data['company']['currency'] ?? '')) === 1
                 && trim((string) ($data['company']['timezone'] ?? '')) !== '',
             'halls' => $halls->count() >= 1,
-            'programs' => $configuredHalls >= 1,
-            'pricing' => $configuredHalls >= 1,
-            'addons' => $configuredHalls >= 1,
+            'programs' => $halls->count() >= 1 && $halls->every(
+                fn ($hall): bool => (int) $hall->program_rules_revision > 0),
+            'pricing' => $halls->count() >= 1 && $halls->every(
+                fn ($hall): bool => (int) $hall->seating_price_revision > 0),
+            'addons' => $halls->count() >= 1 && $halls->every(
+                fn ($hall): bool => (int) $hall->addon_catalog_revision > 0),
             'branding' => DB::table('websites')->where('company_id', $companyId)
                 ->where(fn ($query) => $query->where('branding_draft_revision', '>', 0)
                     ->orWhereNotNull('branding_published_revision_id'))->exists(),
