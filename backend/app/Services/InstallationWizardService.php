@@ -383,19 +383,6 @@ final class InstallationWizardService
                     'Complete all approved setup stages before finishing: '.implode(', ', $missing)
                 );
             }
-            try {
-                $license = app(CentralLicensingOverviewService::class)
-                    ->snapshotForCompany($actor, $companyId, now()->toDateTimeImmutable());
-            } catch (AuthorizationException) {
-                throw new InvalidArgumentException(
-                    'A currently verified signed license is required before installation completion.'
-                );
-            }
-            if (! in_array($license['state'] ?? null, ['licensed', 'expired_grace'], true)) {
-                throw new InvalidArgumentException(
-                    'A currently verified signed license is required before installation completion.'
-                );
-            }
             $company = $data['company'] ?? [];
             $halls = $data['halls'] ?? [];
             if (! is_array($company) || ($company['legalName'] ?? '') === ''
@@ -407,6 +394,13 @@ final class InstallationWizardService
             ]);
             $savedHalls = $this->persistHalls($companyId, $halls);
             $data['halls'] = $savedHalls;
+            $readiness = app(InstallationReadinessService::class)
+                ->evaluate($actor, $companyId, $data);
+            if (! $readiness['ready']) {
+                throw new InvalidArgumentException(
+                    'Installation is not ready: '.implode(', ', $readiness['failures'])
+                );
+            }
             $next = $expectedRevision + 1;
             DB::table('installation_wizard_states')->where('company_id', $companyId)->update([
                 'status' => 'completed', 'step' => 3, 'revision' => $next,

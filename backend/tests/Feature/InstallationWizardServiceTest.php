@@ -98,7 +98,7 @@ class InstallationWizardServiceTest extends TestCase
             app(InstallationWizardService::class)->complete($owner, $company->id, 4);
             $this->fail('Forged saved license state completed the installation.');
         } catch (\InvalidArgumentException $exception) {
-            $this->assertStringContainsString('verified signed license', $exception->getMessage());
+            $this->assertStringContainsString('license', $exception->getMessage());
         }
         $this->assertSame('in_progress', DB::table('installation_wizard_states')->value('status'));
         $this->assertSame(0, DB::table('halls')->where('company_id', $company->id)->count());
@@ -143,6 +143,24 @@ class InstallationWizardServiceTest extends TestCase
         ];
         app(\App\Services\CentralSignedLicenseCache::class)->accept(
             $envelope, $customer, $domain, now()->toDateTimeImmutable());
+        $owner->forceFill(['app_authentication_secret' => 'JBSWY3DPEHPK3PXP'])->save();
+        $hallId = (string) Str::uuid();
+        DB::table('halls')->insert([
+            'id' => $hallId, 'company_id' => $company->id, 'slug' => 'licensed-hall',
+            'name' => 'Licensed Hall', 'capacity' => 100, 'is_active' => true,
+            'program_rules_revision' => 1, 'seating_price_revision' => 1,
+            'addon_catalog_revision' => 1, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('websites')->insert([
+            'id' => (string) Str::uuid(), 'company_id' => $company->id,
+            'name' => 'Licensed Wizard Venue', 'branding_draft_revision' => 1,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('tenant_payment_settings')->insert([
+            'id' => (string) Str::uuid(), 'company_id' => $company->id,
+            'config' => json_encode(['banks' => [], 'methods' => []], JSON_THROW_ON_ERROR),
+            'revision' => 1, 'created_at' => now(), 'updated_at' => now(),
+        ]);
         DB::table('installation_wizard_states')->insert([
             'id' => (string) Str::uuid(), 'company_id' => $company->id,
             'step' => 10, 'revision' => 6, 'status' => 'in_progress',
@@ -150,7 +168,7 @@ class InstallationWizardServiceTest extends TestCase
                 'company' => ['legalName' => 'Licensed Wizard Venue', 'contactEmail' => '',
                     'contactPhone' => '', 'address' => '', 'currency' => 'PKR',
                     'timezone' => 'Asia/Karachi'],
-                'halls' => [['id' => null, 'name' => 'Licensed Hall',
+                'halls' => [['id' => $hallId, 'name' => 'Licensed Hall',
                     'address' => '', 'phone' => '', 'capacity' => 100]],
                 'completedStages' => ['company', 'halls', 'programs', 'pricing',
                     'addons', 'branding', 'payments', 'staff', 'license'],
