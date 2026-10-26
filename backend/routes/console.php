@@ -333,3 +333,36 @@ Artisan::command('venuedesk:issue-owner-bootstrap {--company=} {--name=} {--emai
     $this->line(rtrim((string) config('app.url'), '/').'/install/owner/'.$issued['token']);
     return 0;
 })->purpose('Issue a one-time first-Owner bootstrap link');
+Artisan::command('venuedesk:test-license-window {mode}', function (string $mode): int {
+    if (! app()->environment('testing')) { $this->error('test only'); return 1; }
+    $privateFile = storage_path('app/browser-e2e-license-private.key');
+    if (! is_file($privateFile)) { $this->error('missing test key'); return 1; }
+    $binding = \Illuminate\Support\Facades\DB::table('central_installation_activation')
+        ->where('singleton_id', 1)->first();
+    $cache = \Illuminate\Support\Facades\DB::table('central_signed_license_cache')
+        ->where('singleton_id', 1)->first();
+    if (! $binding || ! $cache) { $this->error('license fixture missing'); return 1; }
+    $private = base64_decode(strtr(trim(file_get_contents($privateFile)), '-_', '+/'), true);
+    $b64 = static fn (string $raw): string => rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
+    $now = now()->toDateTimeImmutable();
+    $expires = $mode === 'grace' ? $now->sub(new \DateInterval('P1D')) : $now->add(new \DateInterval('P10D'));
+    $grant = [
+        'api_version' => 'v1', 'issuer' => 'HAFZATECH', 'product' => 'VenueDesk',
+        'license_id' => $cache->license_id, 'installation_id' => $binding->installation_id,
+        'customer_id' => $binding->customer_id, 'revision' => (int) $cache->revision + 1,
+        'term_months' => 12, 'edition' => 'standard',
+        'approved_domains' => [$binding->approved_domain],
+        'not_before' => $now->sub(new \DateInterval('P2Y'))->format('Y-m-d\TH:i:s\Z'),
+        'expires_at' => $expires->format('Y-m-d\TH:i:s\Z'),
+        'limits' => ['max_halls' => 5, 'max_staff' => 20],
+        'features' => ['booking' => true],
+    ];
+    $raw = json_encode($grant, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+    app(\App\Services\CentralSignedLicenseCache::class)->accept([
+        'key_id' => 'browser-e2e-fixture', 'payload' => $b64($raw),
+        'signature' => $b64(sodium_crypto_sign_detached(
+            "HAFZATECH-LICENSE-GRANT-V1\n".$raw, $private)),
+    ], $binding->customer_id, $binding->approved_domain, $now);
+    $this->info('test license window: '.$mode);
+    return 0;
+})->purpose('Set isolated test license warning/grace window');
