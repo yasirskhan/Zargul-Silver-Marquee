@@ -153,6 +153,10 @@ final class StaffInvitationService
             ]);
             $this->audit(null, $invite->company_id, 'staff.invitation_accepted',
                 $invite->id, ['userId' => $userId, 'role' => $invite->role], 'Invitation accepted by staff');
+            $acceptedUser = User::query()->find($userId);
+            if ($acceptedUser !== null && ! $acceptedUser->hasVerifiedEmail()) {
+                $acceptedUser->sendEmailVerificationNotification();
+            }
 
             return ['userId' => $userId, 'companyId' => $invite->company_id,
                 'role' => $invite->role, 'emailVerified' => false];

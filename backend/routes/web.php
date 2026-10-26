@@ -24,6 +24,10 @@ Route::get('/_venue-media/{pageSlug}/{mediaId}.webp',
 Route::get('/robots.txt', \App\Http\Controllers\PublishedVenueRobotsController::class);
 Route::get('/sitemap.xml', \App\Http\Controllers\PublishedVenueSitemapController::class);
 
+// Signed email-ownership verification used by staff invitations.
+Route::get('/email/verify/{id}/{hash}', \App\Http\Controllers\VerifyEmailController::class)
+    ->middleware(['signed', 'throttle:6,1'])->name('verification.verify');
+
 // First-Owner bootstrap: operator-issued, one-time, rate limited.
 Route::get('/install/owner/{token}', [\App\Http\Controllers\OwnerBootstrapController::class, 'show'])
     ->where('token', '[a-f0-9]{64}')->name('installation.owner.show');

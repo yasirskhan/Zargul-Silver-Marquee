@@ -127,7 +127,8 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
     );
     // These operational rehearsal halls are not part of the clean wizard
     // installation set; only halls explicitly made bookable count for setup.
-    $hall->forceFill(['is_bookable' => false])->save();
+    $hall->forceFill(['is_bookable' => true, 'seating_price_revision' => 1,
+        'addon_catalog_revision' => 1])->save();
     $secondHall->forceFill(['is_bookable' => false])->save();
 
     // Three original browser actors and the second hall exist ONLY in the
