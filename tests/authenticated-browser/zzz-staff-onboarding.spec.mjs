@@ -95,14 +95,21 @@ test('Owner invites staff who accepts verifies email enrols MFA and is revoked',
   await staff.getByText('Set up', { exact: true }).click();
   await staff.waitForTimeout(5_000);
   const body = await staff.locator('body').innerText();
-  const secret = body.match(/\b[A-Z2-7]{32}\b/)?.[0];
+  const secret = body.match(/\b[A-Z2-7]{16}\b/)?.[0];
   if (!secret) throw new Error('MFA setup secret not shown');
   const setupCode = staff.locator('input[autocomplete="one-time-code"]:visible, input[id*="code"]:visible')
     .first();
   await setupCode.fill(totp(secret));
-  await staff.getByRole('button', { name: /confirm|enable|verify|continue/i }).last().click();
+  await staff.getByRole('button', { name: /next/i }).last().click();
+  await staff.waitForTimeout(1_000);
+  const currentPassword = staff.getByLabel(/Current password/);
+  if (await currentPassword.isVisible().catch(() => false)) {
+    await currentPassword.fill('synthetic-staff-password-only');
+  }
+  await staff.getByRole('button', { name: /enable authenticator app/i }).click();
   await staff.waitForURL(url => new URL(url).pathname.startsWith('/admin')
-    && !new URL(url).pathname.startsWith('/admin/login'));
+    && !new URL(url).pathname.startsWith('/admin/login')
+    && !new URL(url).pathname.startsWith('/admin/multi-factor-authentication'), { timeout: 25_000 });
   await staff.goto('/admin/hall-calendar');
   await expect(staff.getByText('Synthetic Test Hall').first()).toBeVisible({ timeout: 20_000 });
 
