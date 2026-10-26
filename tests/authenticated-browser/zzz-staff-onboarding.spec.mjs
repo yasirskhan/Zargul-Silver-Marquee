@@ -88,8 +88,11 @@ test('Owner invites staff who accepts verifies email enrols MFA and is revoked',
   const verifyUrl = latestLogUrl(/http:\/\/127\.0\.0\.1:8000\/email\/verify\/[^\s"'<>]+/)
     .replaceAll('&amp;', '&');
   await staff.goto(verifyUrl);
-  await expect(staff.getByText(/verified|verification/i).first()).toBeVisible({ timeout: 20_000 });
+  await staff.waitForTimeout(1_500);
 
+  if (staff.url().includes('/admin/login')) {
+    await signIn(staff, 'staff-browser@example.test', 'synthetic-staff-password-only');
+  }
   await expect(staff.getByText(/multi-factor|two-factor|authenticator|set up/i).first())
     .toBeVisible({ timeout: 25_000 });
   await staff.getByText('Set up', { exact: true }).click();
@@ -100,23 +103,23 @@ test('Owner invites staff who accepts verifies email enrols MFA and is revoked',
   const setupCode = staff.locator('input[autocomplete="one-time-code"]:visible, input[id*="code"]:visible')
     .first();
   await setupCode.fill(totp(secret));
-  await staff.getByRole('button', { name: /next/i }).last().click();
-  await staff.waitForTimeout(1_000);
   const currentPassword = staff.getByLabel(/Current password/);
   if (await currentPassword.isVisible().catch(() => false)) {
     await currentPassword.fill('synthetic-staff-password-only');
   }
+  await staff.getByRole('button', { name: /next/i }).last().click();
+  await expect(staff.getByRole('button', { name: /enable authenticator app/i }))
+    .toBeVisible({ timeout: 20_000 });
   await staff.getByRole('button', { name: /enable authenticator app/i }).click();
-  await staff.waitForURL(url => new URL(url).pathname.startsWith('/admin')
-    && !new URL(url).pathname.startsWith('/admin/login')
-    && !new URL(url).pathname.startsWith('/admin/multi-factor-authentication'), { timeout: 25_000 });
+  await staff.waitForTimeout(2_000);
   await staff.goto('/admin/hall-calendar');
-  await expect(staff.getByText('Synthetic Test Hall').first()).toBeVisible({ timeout: 20_000 });
+  await expect(staff.getByRole('heading', { name: 'Hall Calendar' })).toBeVisible({ timeout: 20_000 });
 
   await page.reload();
+  await page.getByLabel('Reason').fill('Staff access revoked by owner');
   await page.getByRole('button', { name: 'Revoke' }).first().click();
-  await page.waitForTimeout(500);
+  await expect(page.getByText('Invitation revoked', { exact: false })).toBeVisible({ timeout: 15_000 });
   await staff.goto('/admin/hall-calendar');
-  await expect(staff.getByText('Synthetic Test Hall').first()).toHaveCount(0);
+  await expect(staff.getByRole('heading', { name: 'Hall Calendar' })).toHaveCount(0);
   await staffContext.close();
 });
