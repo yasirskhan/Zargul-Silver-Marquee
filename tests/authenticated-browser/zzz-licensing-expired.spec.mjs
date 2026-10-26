@@ -28,12 +28,16 @@ test('Owner sees expired license restrictions', async ({ page }) => {
   const code = page.locator('input[autocomplete="one-time-code"]:visible').first();
   await expect(code).toBeVisible({ timeout: 25_000 });
   await code.fill(totp('GEZDGNBVGY3TQOJQ'));
-  await page.getByRole('button', { name: 'Confirm sign in' }).click();
+  const confirm = page.getByRole('button', { name: 'Confirm sign in' });
+  if (await confirm.isVisible().catch(() => false)
+      && await confirm.isEnabled().catch(() => false)) {
+    await confirm.click();
+  }
   await page.waitForURL(url => !new URL(url).pathname.startsWith('/admin/login')
     && !new URL(url).pathname.startsWith('/admin/multi-factor-authentication'), { timeout: 25_000 });
   await page.goto('/admin/licensing');
   await expect(page.getByRole('heading', { name: 'Licensing' })).toBeVisible();
-  await expect(page.getByText('expired_or_not_yet_valid', { exact: true })).toBeVisible();
+  await expect(page.getByText('expired or not yet valid', { exact: true })).toBeVisible();
   await expect(page.getByText('expired grace', { exact: true })).toHaveCount(0);
   await expect(page.getByText(/Public-site policy: maintenance/i)).toBeVisible();
   await expect(page.getByText(/Dashboard policy: (grace|restricted)/i)).toBeVisible();
