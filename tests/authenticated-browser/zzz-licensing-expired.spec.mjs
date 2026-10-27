@@ -23,12 +23,12 @@ test('Owner sees expired license restrictions', async ({ page }) => {
   await page.request.get('/__test/license-window/expired');
   test.setTimeout(240_000);
   await page.goto('/admin/login');
-  await page.locator('input[type="email"]').fill('browser-e2e-license-owner@example.test');
-  await page.getByLabel(/Password/).fill('synthetic-license-owner-only');
+  await page.locator('input[type="email"]').fill('browser-e2e-license-expired@example.test');
+  await page.getByLabel(/Password/).fill('synthetic-license-expired-only');
   await page.getByRole('button', { name: /sign in|log in/i }).first().click();
   const code = page.locator('input[autocomplete="one-time-code"]:visible').first();
   await expect(code).toBeVisible({ timeout: 25_000 });
-  await code.fill(totp('GEZDGNBVGY3TQOJQ'));
+  await code.fill(totp('MFRGGZDFMZTWQ2LK'));
   const confirm = page.getByRole('button', { name: 'Confirm sign in' });
   if (await confirm.isVisible().catch(() => false)
       && await confirm.isEnabled().catch(() => false)) {

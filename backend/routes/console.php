@@ -102,6 +102,25 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
         ['company_id' => $company->id, 'user_id' => $licenseOwner->id],
         ['role' => 'owner', 'is_active' => true],
     );
+
+    foreach ([
+        ['grace', 'GEZDGNBVGY3TQOJQ', 'JBSWY3DPEHPK3PXP'],
+        ['expired', 'JBSWY3DPEHPK3PXP', 'MFRGGZDFMZTWQ2LK'],
+        ['valid', 'MFRGGZDFMZTWQ2LK', 'GEZDGNBVGY3TQOJQ'],
+    ] as [$suffix, $passwordSecret, $totpSecret]) {
+        $windowOwner = \App\Models\User::query()->firstOrCreate(
+            ['email' => 'browser-e2e-license-'..'@example.test'],
+            ['name' => 'Synthetic License Owner '.strtoupper(),
+             'password' => 'synthetic-license-'..'-only', 'is_active' => true],
+        );
+        $windowOwner->markEmailAsVerified();
+        $windowOwner->app_authentication_secret = $totpSecret;
+        $windowOwner->save();
+        \App\Models\CompanyMembership::query()->firstOrCreate(
+            ['company_id' => $company->id, 'user_id' => $windowOwner->id],
+            ['role' => 'owner', 'is_active' => true],
+        );
+    }
     // Separate inventory Owner avoids MFA replay between parallel authenticated browser workers.
     $inventoryOwner = \App\Models\User::query()->firstOrCreate(
         ['email'=>'browser-e2e-inventory-owner@example.test'],
@@ -144,8 +163,7 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
     );
     // These operational rehearsal halls are not part of the clean wizard
     // installation set; only halls explicitly made bookable count for setup.
-    $hall->forceFill(['is_bookable' => true, 'seating_price_revision' => 1,
-        'addon_catalog_revision' => 1])->save();
+    $hall->forceFill(['is_bookable' => false])->save();
     $secondHall->forceFill(['is_bookable' => false])->save();
 
     // Three original browser actors and the second hall exist ONLY in the

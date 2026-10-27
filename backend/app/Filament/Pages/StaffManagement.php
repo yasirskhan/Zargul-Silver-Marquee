@@ -66,7 +66,7 @@ final class StaffManagement extends Page
         abort_unless($this->companyId !== null && array_key_exists($this->companyId, $companies), 403);
         $this->refreshInvitations();
         $this->halls = DB::table('halls')->where('company_id', $this->companyId)
-            ->where('is_active', true)->where('is_bookable', true)
+            ->where('is_active', true)
             ->orderBy('name')->get(['id', 'name'])->map(fn ($row) => (array) $row)->all();
     }
 
@@ -76,7 +76,7 @@ final class StaffManagement extends Page
             && array_key_exists($this->companyId, $this->companies()), 403);
         $this->refreshInvitations();
         $this->halls = DB::table('halls')->where('company_id', $this->companyId)
-            ->where('is_active', true)->where('is_bookable', true)
+            ->where('is_active', true)
             ->orderBy('name')->get(['id', 'name'])->map(fn ($row) => (array) $row)->all();
     }
 
@@ -111,7 +111,7 @@ final class StaffManagement extends Page
             $this->reason = '';
             $this->refreshInvitations();
         $this->halls = DB::table('halls')->where('company_id', $this->companyId)
-            ->where('is_active', true)->where('is_bookable', true)
+            ->where('is_active', true)
             ->orderBy('name')->get(['id', 'name'])->map(fn ($row) => (array) $row)->all();
             Notification::make()->title('Staff invitation created')->success()->send();
         } catch (InvalidArgumentException|\Symfony\Component\HttpKernel\Exception\ConflictHttpException $exception) {
@@ -129,7 +129,7 @@ final class StaffManagement extends Page
         $this->message = 'Invitation revoked and active access deactivated.';
         $this->refreshInvitations();
         $this->halls = DB::table('halls')->where('company_id', $this->companyId)
-            ->where('is_active', true)->where('is_bookable', true)
+            ->where('is_active', true)
             ->orderBy('name')->get(['id', 'name'])->map(fn ($row) => (array) $row)->all();
     }
 }
