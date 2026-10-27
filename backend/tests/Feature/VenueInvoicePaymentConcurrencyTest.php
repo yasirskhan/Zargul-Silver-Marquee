@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\VenueInvoicePaymentService;
 use App\Services\VenueInvoiceService;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
@@ -22,6 +23,12 @@ use Tests\TestCase;
 final class VenueInvoicePaymentConcurrencyTest extends TestCase
 {
     use DatabaseMigrations;
+
+    protected function tearDown(): void
+    {
+        parent::tearDown();
+        Artisan::call('migrate:fresh');
+    }
 
     public function test_competing_processes_cannot_double_apply_a_deposit(): void
     {
