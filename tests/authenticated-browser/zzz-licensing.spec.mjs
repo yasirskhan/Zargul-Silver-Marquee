@@ -25,6 +25,8 @@ test('Owner verifies a signed license online and requests renewal review', async
   expect(windowResponse.ok()).toBeTruthy();
   test.setTimeout(240_000);
   await page.goto('/admin/login');
+  await page.waitForFunction(() => Boolean(window.Livewire?.all?.().some(component =>
+    component.el?.querySelector?.('input[type="email"]'))), null, { timeout: 30_000 });
   await page.locator('input[type="email"]').fill('browser-e2e-license-warning@example.test');
   await page.getByLabel(/Password/).fill('synthetic-license-warning-only');
   await page.getByRole('button', { name: /sign in|log in/i }).first().click();
