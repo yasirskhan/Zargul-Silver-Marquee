@@ -97,6 +97,8 @@ final class ZzzVenueInvoicePaymentConcurrencyTest extends TestCase
         config()->set('invoice_controls.tax_rate_bps', 0);
         config()->set('payment_controls.enabled', true);
         config()->set('finance_controls.posting_enabled', true);
+        $this->be($owner);
+        \Illuminate\Support\Facades\Auth::login($owner);
         $invoice = (string) Str::uuid();
         app(VenueInvoiceService::class)->issue($owner, $company->id, $quote,
             $invoice, 'Concurrent deposit source invoice');
