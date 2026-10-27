@@ -31,6 +31,11 @@ test('Owner verifies a signed license online and requests renewal review', async
   const code = page.locator('input[autocomplete="one-time-code"]:visible').first();
   await expect(code).toBeVisible({ timeout: 25_000 });
   await code.fill(totp('GEZDGNBVGY3TQOJQ'));
+  const confirm = page.getByRole('button', { name: 'Confirm sign in' });
+  if (await confirm.isVisible().catch(() => false)
+      && await confirm.isEnabled().catch(() => false)) {
+    await confirm.click();
+  }
   await page.waitForURL(url => !new URL(url).pathname.startsWith('/admin/login')
     && !new URL(url).pathname.startsWith('/admin/multi-factor-authentication'), { timeout: 25_000 });
   await page.goto('/admin/licensing');

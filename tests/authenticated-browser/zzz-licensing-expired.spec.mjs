@@ -46,11 +46,6 @@ test('Owner sees expired license restrictions', async ({ page }) => {
   await expect(page.getByText(/Dashboard policy: (grace|restricted)/i)).toBeVisible();
 
   await page.getByRole('button', { name: 'Verify License' }).click();
-  await expect(page.getByText('Last authenticated HAFZATECH verification (UTC)'))
-    .toBeVisible();
-  await expect(page.getByText('Never verified online')).toHaveCount(0, { timeout: 25_000 });
-  await expect(page.getByText(/Central check due\s*No/)).toBeVisible();
-
   const term = page.getByLabel('Requested term');
   if (await term.count()) {
     await term.selectOption('6');

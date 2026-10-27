@@ -15,8 +15,14 @@ $body = json_decode(file_get_contents('php://input') ?: '{}', true, 16, JSON_THR
 foreach (['installation_id','customer_id','request_time','nonce','known_revision','signature'] as $field) {
     if (!isset($body[$field])) { http_response_code(422); echo '{}'; exit; }
 }
-$dsn = 'pgsql:host=127.0.0.1;port=55432;dbname=venue_test';
-$db = new PDO($dsn, 'venue', 'x', [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+$host = getenv('DB_HOST') ?: '127.0.0.1';
+$port = getenv('DB_PORT') ?: '5432';
+$database = getenv('DB_DATABASE') ?: 'venue_test';
+$username = getenv('DB_USERNAME') ?: 'venue';
+$password = getenv('DB_PASSWORD');
+$dsn = sprintf('pgsql:host=%s;port=%s;dbname=%s', $host, $port, $database);
+$db = new PDO($dsn, $username, is_string($password) ? $password : '',
+    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
 $stmt = $db->prepare('SELECT ed25519_public_key FROM central_installation_identity WHERE singleton_id = 1');
 $stmt->execute();
 $publicText = $stmt->fetchColumn();
