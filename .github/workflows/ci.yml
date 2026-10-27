@@ -172,7 +172,7 @@ jobs:
           cp .env.example .env
           php artisan key:generate --force --no-interaction
       - name: Run focused central, support and private overview authorization regressions
-        run: php artisan test --no-ansi --exclude-group=phase9-finance-process --filter='Central.*Test|VenueOverviewLivewireTest'
+        run: php artisan test --no-ansi --filter='Central.*Test|VenueOverviewLivewireTest'
 
   laravel-postgres:
     runs-on: ubuntu-latest
@@ -236,21 +236,7 @@ jobs:
           DB_PASSWORD: venue
         run: php artisan migrate --force --no-interaction
       - name: Run tenant-isolation backend tests
-        run: php artisan test --no-ansi --exclude-group=phase9-finance-process
-      - name: Create isolated finance certification database
-        env:
-          PGPASSWORD: venue
-        run: createdb -h 127.0.0.1 -U venue venue_finance_test
-      - name: Certify competing financial deposits
-        env:
-          DB_CONNECTION: pgsql
-          DB_HOST: 127.0.0.1
-          DB_PORT: '5432'
-          DB_DATABASE: venue_finance_test
-          DB_USERNAME: venue
-          DB_PASSWORD: venue
-        run: php artisan test --no-ansi --group=phase9-finance-process
-
+        run: php artisan test --no-ansi
       - name: Verify CMS, MFA and shared cache/session migration rollback and replay
         env:
           DB_CONNECTION: pgsql
