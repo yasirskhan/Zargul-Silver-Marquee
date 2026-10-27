@@ -109,9 +109,9 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
         ['valid', 'MFRGGZDFMZTWQ2LK', 'GEZDGNBVGY3TQOJQ'],
     ] as [$suffix, $passwordSecret, $totpSecret]) {
         $windowOwner = \App\Models\User::query()->firstOrCreate(
-            ['email' => 'browser-e2e-license-'..'@example.test'],
-            ['name' => 'Synthetic License Owner '.strtoupper(),
-             'password' => 'synthetic-license-'..'-only', 'is_active' => true],
+            ['email' => 'browser-e2e-license-'.$suffix.'@example.test'],
+            ['name' => 'Synthetic License Owner '.strtoupper($suffix),
+             'password' => 'synthetic-license-'.$suffix.'-only', 'is_active' => true],
         );
         $windowOwner->markEmailAsVerified();
         $windowOwner->app_authentication_secret = $totpSecret;
