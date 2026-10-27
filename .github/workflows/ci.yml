@@ -249,9 +249,7 @@ jobs:
           DB_DATABASE: venue_finance_test
           DB_USERNAME: venue
           DB_PASSWORD: venue
-        run: |
-          php artisan migrate --force --no-interaction
-          php artisan test --no-ansi --group=phase9-finance-process
+        run: php artisan test --no-ansi --group=phase9-finance-process
 
       - name: Verify CMS, MFA and shared cache/session migration rollback and replay
         env:
