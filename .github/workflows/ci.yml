@@ -314,8 +314,11 @@ jobs:
       APP_ENV: testing
       APP_DEBUG: 'false'
       BROWSER_E2E_SEED: '1'
+      LOG_CHANNEL: 'single'
       VENUE_CENTRAL_ACTIVATION_ENABLED: 'true'
       VENUE_CENTRAL_MANUAL_CHECKS_ENABLED: 'true'
+      VENUE_CENTRAL_BASE_URL: 'http://127.0.0.1:9001'
+      CENTRAL_LOCAL_STATUS_TEST: 'true'
       # Isolated CI-only finance posting for synthetic cash closeout acceptance.
       # Config defaults and production remain OFF.
       VENUE_FINANCE_POSTING_ENABLED: 'true'
@@ -378,6 +381,12 @@ jobs:
           php artisan migrate --force --no-interaction
           php artisan filament:assets --no-interaction
           php artisan venuedesk:seed-browser-e2e
+      - name: Start isolated local central status endpoint
+        run: |
+          nohup env CENTRAL_LOCAL_STATUS_TEST=true php -S 127.0.0.1:9001 central/tests/local_status_server.php > /tmp/central-status.log 2>&1 </dev/null &
+          sleep 2
+          curl -s -o /dev/null http://127.0.0.1:9001/ || true
+
       - name: Start authenticated Laravel panel
         working-directory: backend
         run: |

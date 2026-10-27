@@ -20,6 +20,7 @@ function totp(secret) {
 }
 
 test('Owner sees expired license restrictions', async ({ page }) => {
+  await page.request.get('/__test/license-window/expired');
   test.setTimeout(240_000);
   await page.goto('/admin/login');
   await page.locator('input[type="email"]').fill('browser-e2e-license-owner@example.test');

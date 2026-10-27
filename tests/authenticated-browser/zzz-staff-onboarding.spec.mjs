@@ -51,6 +51,7 @@ function latestLogUrl(pattern) {
 }
 
 test('Owner invites staff who accepts verifies email enrols MFA and is revoked', async ({ page }) => {
+  await page.request.get('/__test/license-window/valid');
   test.setTimeout(600_000);
   await page.waitForTimeout(65_000);
   await signIn(page, 'browser-e2e-inventory-owner-c@example.test',

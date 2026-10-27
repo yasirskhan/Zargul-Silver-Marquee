@@ -34,6 +34,11 @@ Route::get('/install/owner/{token}', [\App\Http\Controllers\OwnerBootstrapContro
 Route::post('/install/owner/{token}', [\App\Http\Controllers\OwnerBootstrapController::class, 'accept'])
     ->where('token', '[a-f0-9]{64}')->middleware(['throttle:6,1'])->name('installation.owner.accept');
 
+if (app()->environment('testing') && env('CENTRAL_LOCAL_STATUS_TEST') === 'true') {
+    Route::get('/__test/license-window/{mode}', App\Http\Controllers\TestLicenseWindowController::class)
+        ->whereIn('mode', ['valid', 'warning', 'grace', 'expired']);
+}
+
 // Staff invitation acceptance: token-bound, single-use, rate limited.
 Route::get('/staff-invitation/{token}', [\App\Http\Controllers\StaffInvitationAcceptanceController::class, 'show'])
     ->where('token', '[a-f0-9]{64}')->name('staff.invitation.show');

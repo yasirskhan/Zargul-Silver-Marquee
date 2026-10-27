@@ -363,7 +363,8 @@ Artisan::command('venuedesk:test-license-window {mode}', function (string $mode)
     $expires = match ($mode) {
         'grace' => $now->sub(new \DateInterval('P1D')),
         'expired' => $now->sub(new \DateInterval('P10D')),
-        default => $now->add(new \DateInterval('P10D')),
+        'warning' => $now->add(new \DateInterval('P10D')),
+        default => $now->add(new \DateInterval('P1Y')),
     };
     $grant = [
         'api_version' => 'v1', 'issuer' => 'HAFZATECH', 'product' => 'VenueDesk',
