@@ -20,7 +20,9 @@ function totp(secret) {
 }
 
 test('Owner sees seven-day grace license state', async ({ page }) => {
-  await page.request.get('/__test/license-window/grace');
+  await page.waitForTimeout(65_000);
+  const windowResponse = await page.request.get('/__test/license-window/grace');
+  expect(windowResponse.ok()).toBeTruthy();
   test.setTimeout(240_000);
   await page.goto('/admin/login');
   await page.locator('input[type="email"]').fill('browser-e2e-license-grace@example.test');

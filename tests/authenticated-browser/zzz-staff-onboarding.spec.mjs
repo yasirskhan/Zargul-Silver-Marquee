@@ -67,7 +67,7 @@ test('Owner invites staff who accepts verifies email enrols MFA and is revoked',
   await page.getByLabel('Email').fill('staff-browser@example.test');
   await page.getByLabel('Role').selectOption('operations');
   await page.getByLabel('Reason').fill('Synthetic staff onboarding acceptance');
-  await page.getByLabel('Synthetic Test Hall').check();
+  await page.getByLabel('Synthetic Test Hall').first().check();
   await page.getByRole('button', { name: 'Create invitation' }).click();
   await expect(page.getByText('Invitation sent', { exact: false })).toBeVisible({ timeout: 20_000 });
 

@@ -20,7 +20,9 @@ function totp(secret) {
 }
 
 test('Owner verifies a signed license online and requests renewal review', async ({ page }) => {
-  await page.request.get('/__test/license-window/warning');
+  await page.waitForTimeout(65_000);
+  const windowResponse = await page.request.get('/__test/license-window/warning');
+  expect(windowResponse.ok()).toBeTruthy();
   test.setTimeout(240_000);
   await page.goto('/admin/login');
   await page.locator('input[type="email"]').fill('browser-e2e-license-warning@example.test');
