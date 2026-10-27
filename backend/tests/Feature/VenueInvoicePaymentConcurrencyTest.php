@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
@@ -21,6 +22,7 @@ use Tests\TestCase;
  * The company-row lock must serialize them: one receives a receipt, the
  * other must fail closed on the remaining balance. No double application.
  */
+#[Group('phase9-finance-process')]
 final class VenueInvoicePaymentConcurrencyTest extends TestCase
 {
     use DatabaseMigrations;
