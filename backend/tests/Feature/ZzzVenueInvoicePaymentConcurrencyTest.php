@@ -20,7 +20,7 @@ use Tests\TestCase;
  * The company-row lock must serialize them: one receives a receipt, the
  * other must fail closed on the remaining balance. No double application.
  */
-final class VenueInvoicePaymentConcurrencyTest extends TestCase
+final class ZzzVenueInvoicePaymentConcurrencyTest extends TestCase
 {
     use DatabaseMigrations;
 
