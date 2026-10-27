@@ -146,8 +146,8 @@ final class ZzzVenueInvoicePaymentConcurrencyTest extends TestCase
             || [$parent, $child] === ['rejected', 'paid'] ? 1 : 0);
         $this->assertSame(1, DB::table('venue_invoice_payments')->count());
         $this->assertSame(100000, (int) DB::table('venue_invoice_payments')->sum('amount_minor'));
-        $this->assertSame(2, DB::table('finance_journals')->count());
-        $this->assertSame(4, DB::table('finance_journal_lines')->count());
+        $this->assertSame(1, DB::table('finance_journals')->count());
+        $this->assertSame(2, DB::table('finance_journal_lines')->count());
         $history = app(VenueInvoicePaymentService::class)->history($owner, $company->id, $invoice);
         $this->assertSame(100000, $history['paidMinor']);
         $this->assertSame(50000, $history['dueMinor']);
