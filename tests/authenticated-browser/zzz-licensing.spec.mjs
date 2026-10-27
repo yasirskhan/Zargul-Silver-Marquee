@@ -27,8 +27,8 @@ test('Owner verifies a signed license online and requests renewal review', async
   await page.goto('/admin/login');
   await page.waitForFunction(() => Boolean(window.Livewire?.all?.().some(component =>
     component.el?.querySelector?.('input[type="email"]'))), null, { timeout: 30_000 });
-  await page.locator('input[type="email"]').fill('browser-e2e-license-warning@example.test');
-  await page.getByLabel(/Password/).fill('synthetic-license-warning-only');
+  await page.locator('input[type="email"]').fill('browser-e2e-license-owner@example.test');
+  await page.getByLabel(/Password/).fill('synthetic-license-owner-only');
   await page.getByRole('button', { name: /sign in|log in/i }).first().click();
   const code = page.locator('input[autocomplete="one-time-code"]:visible').first();
   await expect(code).toBeVisible({ timeout: 25_000 });
