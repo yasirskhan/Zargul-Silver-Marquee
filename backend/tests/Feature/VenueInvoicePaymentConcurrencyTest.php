@@ -165,7 +165,7 @@ final class VenueInvoicePaymentConcurrencyTest extends TestCase
         $this->assertSame(['totalMinor' => 150000, 'paidMinor' => 100000, 'dueMinor' => 50000],
             array_intersect_key($history, array_flip(['totalMinor', 'paidMinor', 'dueMinor'])));
 
-        $winner = array_search('paid', array_column($results, 'status'), true);
+        $winner = array_search('paid', $statuses, true);
         $winningPayment = $paymentIds[$winner];
         $winningReceipt = $results[$winner]['receipt'];
         $retry = app(VenueInvoicePaymentService::class)->record(
