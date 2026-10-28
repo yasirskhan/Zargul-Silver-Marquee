@@ -143,7 +143,10 @@ final class VenueInvoicePaymentConcurrencyTest extends TestCase
                 "Worker $worker unexpected status: ".json_encode($decoded));
             $results[$worker] = $decoded;
         }
-        $statuses = array_column($results, 'status');
+        $statuses = [];
+        foreach ($results as $worker => $result) {
+            $statuses[$worker] = $result['status'];
+        }
         $this->assertSame(1, count(array_keys($statuses, 'paid', true)));
         $this->assertSame(1, count(array_keys($statuses, 'rejected', true)));
 
