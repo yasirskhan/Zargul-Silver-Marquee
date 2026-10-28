@@ -434,6 +434,7 @@ final class WebsiteWorkspace extends Page
     {
         [$actor, $page] = $this->authorizeBranding('update');
         $this->normalizeBrandingForm();
+        $this->branding['layoutPreset'] ??= 'classic';
         $this->validate([
             'brandingReason' => ['required', 'string', 'min:3', 'max:500'],
             'branding.siteName' => ['required', 'string', 'max:120'],
