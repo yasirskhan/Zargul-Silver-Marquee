@@ -4,23 +4,17 @@ Repository `yasirskhan/Zargul-Silver-Marquee`, **only branch `chatgpt/phase0-fou
 
 ## Current verified baseline
 
-- **Final integrated baseline: `297b67b0c15608a2c82ad51afd8fdd69e24bf0cd`, [run 40153851545](https://github.com/yasirskhan/Zargul-Silver-Marquee/actions/runs/40153851545) — six jobs SUCCESS.**
-- Phase 0: `7ab6ff8`, CI 40020880262.
-- Phase 0.5: `63c6b7a`, CI 40050039945.
-- Phase 1: `4024399`, CI 40064675256.
-- Phase 2: `39a0315`, CI 40072138788.
-- Phase 3: `bf288cb`, CI 40075891670.
-- Phase 4: `1d4afb3`, CI 40090557799.
-- Phase 5: `ef6217b`, CI 40113341018.
-- Phase 6: `59beb42`, CI 40119020374.
-- Phase 7/7.1–7.3: `5735312`, CI 40120614543.
-- Phase 8 technical prep: `cb04416`, CI 40127753617; real pilot **BLOCKED EXTERNAL**.
-- Phase 9 first milestone: `59fb965`, CI 40138475496; `docs/PHASE9_CENTRAL_PORTAL.md`.
-  - `central/public/staff.php`: default-off, verified-HTTPS-host staff front controller with vendor-only email/password/TOTP login, secure session cookie, CSRF and delegation to the existing central staff portal router.
-  - External `CENTRAL_STAFF_KMS_BOOTSTRAP` supplies TOTP decryption/support-reply encryption; no KMS/signing secret in repo.
-  - `central/tests/staff_public_portal.php` proves default denial, trusted-host login UI, wrong-host denial, no secret output and fail-closed missing KMS.\n  - `central/tests/staff_portal_journey.php` proves real central PostgreSQL staff login + TOTP, secure cookie/CSRF, home, customer directory, logout and revoked-session denial via the operator HTTP composition.\n  - `VenueSetupWizard` is registered in the admin panel; authenticated Playwright owner journey saves company/contact/currency/timezone, two halls, hall programs, seating pricing and add-ons, reloads/resumes and verifies in_progress with no false completion; docs/PHASE9_INSTALLATION_WIZARD.md.
-  - Dashboard/customer directory/license queue/billing/support/audit endpoints are the existing role-scoped portal services; not yet exercised by a deployed authenticated browser.
-
+- **Phase 9 software/browser baseline: `68f075c`; all six branch jobs SUCCESS.**
+- Isolated competing-deposit certification is now part of Laravel CI: dedicated
+  `venue_finance_test`, migrations before records, two real PHP worker processes,
+  no `DatabaseMigrations` rollback of immutable finance journals.
+- Phase 9 evidence register: `docs/PHASE9_ACCEPTANCE.md`.
+- Earlier phase SHAs remain historical; GitHub source/tests/releases are authoritative.
+- Phase 9 installation, Staff/MFA, licensing warning/grace/expiry, signed Central
+  delivery/renewal, public maintenance 503 and financial process certification
+  are implemented and tested.
+- Phase 10 public-website design/productization and Phase 11 provider payment
+  settlement are NOT part of Phase 9 and remain open.
 ## External/operational gates (not fabricated)
 
 - Real staging pilot, backup restore, Owner/Manager UAT, operator/security signoff.
@@ -30,10 +24,12 @@ Repository `yasirskhan/Zargul-Silver-Marquee`, **only branch `chatgpt/phase0-fou
 
 ## Next executable work
 
-1. Authenticated browser journey for the gated central portal in an isolated test environment (login, dashboard, customer/installation directory, authorized/denied roles, logout).
-2. Complete the resumable installation wizard on `InstallationSetup`: owner/MFA, company/venue, halls/addresses/capacities, currency/timezone, programs/pricing, guest brackets, add-ons, branding/maps/footer, approved payment settings, staff permissions, review/complete; preserve installed data and make retries safe.
-3. Continue central license/billing/support and client licensing workflows; keep `CENTRAL_API_ENABLED`, `CENTRAL_STAFF_PUBLIC_PORTAL_ENABLED` and all release gates OFF until external approval.
-
+1. Phase 10: reconcile approved public-website design/mockup requirements and
+   implement remaining UI/productization work on the same branch.
+2. Phase 11: provider-side payment settlement/credentials and reconciliation;
+   do not fabricate provider acceptance.
+3. External release gates: staging pilot, restore drill, UAT, KMS/HSM, HTTPS/DNS,
+   operator/security sign-off. Keep all production switches OFF until approved.
 ## Rules and gates
 
 - All production release flags remain OFF until operator/security/restore acceptance.
