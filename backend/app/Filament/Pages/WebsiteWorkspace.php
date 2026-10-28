@@ -443,6 +443,7 @@ final class WebsiteWorkspace extends Page
             'branding.navigationOrder' => ['required', 'array', 'min:1', 'max:9'],
             'branding.themePreset' => ['required', 'string'],
             'branding.fontPreset' => ['required', 'string'],
+            'branding.layoutPreset' => ['required', 'in:classic,editorial,minimal'],
             'branding.logoMediaId' => ['nullable', 'uuid'],
             'branding.faviconMediaId' => ['nullable', 'uuid'],
         ]);

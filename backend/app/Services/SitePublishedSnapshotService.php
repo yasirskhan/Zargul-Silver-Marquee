@@ -90,9 +90,12 @@ final class SitePublishedSnapshotService
         }
 
         $halls = DB::table('halls')->where('company_id', $companyId)
-            ->where('is_active', true)->orderBy('name')->get(['id', 'name', 'capacity'])
+            ->where('is_active', true)->orderBy('name')
+            ->get(['id', 'name', 'capacity', 'address', 'phone'])
             ->map(fn ($hall): array => [
                 'id' => $hall->id, 'name' => $hall->name, 'capacity' => (int) $hall->capacity,
+                'address' => (string) ($hall->address ?? ''),
+                'phone' => (string) ($hall->phone ?? ''),
             ])->all();
 
         return [

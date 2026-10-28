@@ -76,6 +76,26 @@
             @endif
         @endforeach
     </section>
+@elseif ($type === 'halls')
+    <section class="site-section" aria-label="Venue halls">
+        <h2>{{ $data['title'] ?? 'Our halls' }}</h2>
+        @if (! empty($data['description']))
+            <p>{{ $data['description'] }}</p>
+        @endif
+        @forelse (($halls ?? []) as $hall)
+            <article class="hall-contact">
+                <h3>{{ $hall['name'] }}</h3>
+                <p>Capacity: {{ $hall['capacity'] }} guests</p>
+                @if ($hall['address'] !== '')
+                    <p>{{ $hall['address'] }}</p>
+                    <a href="https://www.google.com/maps/search/?api=1&amp;query={{ urlencode($hall['address']) }}"
+                        target="_blank" rel="noopener noreferrer">Get directions</a>
+                @endif
+            </article>
+        @empty
+            <p>Published hall details are not available yet.</p>
+        @endforelse
+    </section>
 @else
     <section class="site-section" aria-label="{{ ucfirst($type) }} information">
         @if (! empty($data['title']))

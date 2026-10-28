@@ -115,6 +115,15 @@
                         </select>
                     </label>
                     <label class="block space-y-1">
+                        <span class="text-sm font-medium">Structural layout</span>
+                        <select wire:model.live="branding.layoutPreset" class="w-full rounded border p-2 text-gray-900">
+                            <option value="classic">Classic cards</option>
+                            <option value="editorial">Editorial</option>
+                            <option value="minimal">Minimal</option>
+                        </select>
+                        <span class="text-xs">Approved structural template; publish branding separately to apply it.</span>
+                    </label>
+                    <label class="block space-y-1">
                         <span class="text-sm font-medium">Website logo</span>
                         <select wire:model.live="branding.logoMediaId" class="w-full rounded border p-2 text-gray-900">
                             <option value="">No logo selected</option>

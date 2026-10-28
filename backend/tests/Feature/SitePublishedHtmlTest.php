@@ -235,4 +235,32 @@ class SitePublishedHtmlTest extends TestCase
         $this->assertStringNotContainsString('<img ', $html);
         $this->assertStringNotContainsString('.png', $html);
     }
-}
+    public function test_phase10_layout_preset_and_hall_contacts_render_from_published_snapshot(): void
+    {
+        [$company, $owner, $site, $page] = $this->fixture();
+        DB::table('halls')->insert([
+            'id' => (string) Str::uuid(), 'company_id' => $company->id,
+            'name' => 'Garden Hall', 'slug' => 'garden-hall', 'capacity' => 180,
+            'address' => '12 Mall Road, Lahore', 'phone' => '+92 300 1234567',
+            'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        app(SiteBrandingService::class)->saveDraft($owner, $company->id, $site, [
+            'siteName' => 'Garden Events', 'tagline' => 'Celebrate outdoors',
+            'themePreset' => 'sage', 'fontPreset' => 'modern', 'layoutPreset' => 'editorial',
+            'logoMediaId' => null, 'faviconMediaId' => null,
+        ], 0, 'Owner approved editorial layout');
+        app(SiteBrandingService::class)->publish($owner, $company->id, $site, 1, 'Publish layout');
+        $pages = app(SitePagePublishingService::class);
+        $pages->saveDraft($owner, $company->id, $page, ['sections' => [[
+            'id' => 'halls', 'type' => 'halls', 'data' => ['title' => 'Garden halls'],
+        ]]], 0, 'Publish hall contacts');
+        $pages->publish($owner, $company->id, $page, 1, 'Publish hall page');
+
+        $html = app(SitePublishedHtmlService::class)->render($company->id, $site, '/');
+        $this->assertStringContainsString('class="theme-editorial"', $html);
+        $this->assertStringContainsString('Garden Hall', $html);
+        $this->assertStringContainsString('12 Mall Road, Lahore', $html);
+        $this->assertStringContainsString('google.com/maps/search', $html);
+        $this->assertStringContainsString('+92 300 1234567', $html);
+        $this->assertStringNotContainsString('<script', $html);
+    }}

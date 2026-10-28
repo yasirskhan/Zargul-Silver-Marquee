@@ -12,6 +12,7 @@
             'sage' => ['background' => '#e5eee8', 'foreground' => '#182b21', 'accent' => '#2e5e47'],
         ];
         $branding = $snapshot['branding'];
+        $layout = $branding['layoutPreset'] ?? 'classic';
         $palette = $palettes[$branding['themePreset']] ?? $palettes['silver'];
         $font = $branding['fontPreset'] === 'modern' ? 'system-ui, sans-serif' : 'Georgia, serif';
         // Only the configured published-domain renderer may emit image URLs;
@@ -72,6 +73,12 @@
         a:focus-visible { outline: 3px solid {{ $palette['accent'] }}; outline-offset: 4px; }
         .skip-link { position: absolute; left: 12px; top: -100px; z-index: 10; padding: 10px 16px; border-radius: 6px; background: {{ $palette['foreground'] }}; color: {{ $palette['background'] }}; font-weight: 700; }
         .skip-link:focus { top: 12px; }
+        .theme-editorial .site-section { border-width: 0 0 0 4px; border-radius: 0; padding-left: 28px; }
+        .theme-editorial .site-title { font-size: clamp(2rem, 6vw, 4rem); letter-spacing: -0.03em; }
+        .theme-minimal .site-section { border: 0; border-bottom: 1px solid {{ $palette['accent'] }}; border-radius: 0; padding-left: 0; padding-right: 0; }
+        .hall-contact-list { display: grid; gap: 12px; margin-top: 16px; }
+        .hall-contact { border-top: 1px solid {{ $palette['accent'] }}; padding-top: 10px; }
+        .hall-contact a { color: inherit; font-weight: 600; }
         .layout-columns { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; }
         .layout-column { grid-column: span var(--desktop-span); min-width: 0; }
         .site-section img, .brand-logo { display: block; max-width: 100%; height: auto; border-radius: 10px; }
@@ -94,7 +101,7 @@
         }
     </style>
 </head>
-<body>
+<body class="theme-{{ $layout }}">
     <a class="skip-link" href="#main-content">Skip to main content</a>
     <div class="shell">
         <header class="site-header" aria-label="Venue branding">
@@ -125,7 +132,7 @@
         <main id="main-content" tabindex="-1">
             <h1>{{ $snapshot['page']['title'] }}</h1>
             @foreach ($snapshot['page']['sections'] as $block)
-                @include('site.partials.published-block', ['block' => $block, 'media' => $snapshot['media'], 'mediaBase' => $mediaBase])
+                @include('site.partials.published-block', ['block' => $block, 'media' => $snapshot['media'], 'mediaBase' => $mediaBase, 'halls' => $snapshot['halls'] ?? []])
             @endforeach
         </main>
         @if ($canonicalUrl !== null)
@@ -187,6 +194,25 @@
         @endif
         <footer class="site-footer">
             <p>{{ ($branding['footerText'] ?? '') !== '' ? $branding['footerText'] : $branding['siteName'] }}</p>
+            @if (count($snapshot['halls'] ?? []) > 0)
+                <div class="hall-contact-list" aria-label="Hall contacts and locations">
+                    @foreach ($snapshot['halls'] as $hall)
+                        @if ($hall['address'] !== '' || $hall['phone'] !== '')
+                            <div class="hall-contact">
+                                <strong>{{ $hall['name'] }}</strong>
+                                @if ($hall['address'] !== '')
+                                    <p>{{ $hall['address'] }}</p>
+                                    <a href="https://www.google.com/maps/search/?api=1&amp;query={{ urlencode($hall['address']) }}"
+                                        target="_blank" rel="noopener noreferrer">Get directions</a>
+                                @endif
+                                @if ($hall['phone'] !== '')
+                                    <p>Phone: <a href="tel:{{ preg_replace('/[^0-9+]/', '', $hall['phone']) }}">{{ $hall['phone'] }}</a></p>
+                                @endif
+                            </div>
+                        @endif
+                    @endforeach
+                </div>
+            @endif
             @if ($canonicalUrl === null)
                 <p>Preview rendering only. Contact information, public media and booking services require separate release approval.</p>
             @endif

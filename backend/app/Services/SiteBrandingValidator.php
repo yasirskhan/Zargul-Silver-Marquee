@@ -26,13 +26,19 @@ final class SiteBrandingValidator
         $required = ['siteName', 'tagline', 'themePreset', 'fontPreset', 'logoMediaId', 'faviconMediaId'];
         // Older immutable branding revisions have no footerText field.
         // An optional, strictly plain-text addition preserves their validity.
-        $allowed = [...$required, 'footerText', 'navigationOrder', 'seoDescription'];
+        $allowed = [...$required, 'footerText', 'navigationOrder', 'seoDescription', 'layoutPreset'];
         if (array_is_list($branding) || array_diff(array_keys($branding), $allowed)
             || array_diff($required, array_keys($branding))) {
             throw new InvalidArgumentException('Unsupported or missing site branding properties.');
         }
         $this->text($branding['siteName'], 1, 120, 'Venue name');
         $this->text($branding['tagline'], 0, 240, 'Venue tagline');
+        if (array_key_exists('layoutPreset', $branding)) {
+            if (! is_string($branding['layoutPreset'])
+                || ! in_array($branding['layoutPreset'], ['classic', 'editorial', 'minimal'], true)) {
+                throw new InvalidArgumentException('Choose an approved website layout preset.');
+            }
+        }
         if (array_key_exists('footerText', $branding)) {
             $this->text($branding['footerText'], 0, 240, 'Footer message');
         }
