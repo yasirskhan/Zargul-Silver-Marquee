@@ -81,6 +81,9 @@
                                     <label class="block space-y-1"><span>Hall phone</span>
                                         <input wire:model="halls.{{ $index }}.phone" maxlength="32" class="w-full rounded-lg border p-3">
                                     </label>
+                                    <label class="block space-y-1"><span>WhatsApp (optional)</span>
+                                        <input wire:model="halls.{{ $index }}.whatsapp" maxlength="32" class="w-full rounded-lg border p-3" placeholder="+92 300 1234567">
+                                    </label>
                                 </div>
                                 @if (count($halls) > 1)
                                     <button type="button" wire:click="removeHall({{ $index }})" class="rounded-lg border px-3 py-2 text-sm">Remove hall</button>

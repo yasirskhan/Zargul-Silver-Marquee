@@ -40,18 +40,24 @@ final class SiteBrandingValidator
             }
             foreach ($contacts as $contact) {
                 if (! is_array($contact) || array_diff(array_keys($contact),
-                    ['id', 'name', 'capacity', 'address', 'phone'])) {
+                    ['id', 'name', 'capacity', 'address', 'phone', 'whatsapp'])) {
                     throw new InvalidArgumentException('Published hall contact properties are invalid.');
                 }
                 if (! is_string($contact['id']) || ! Str::isUuid($contact['id'])
                     || ! is_string($contact['name']) || ! is_int($contact['capacity'])
                     || $contact['capacity'] < 1 || $contact['capacity'] > 100000
-                    || ! is_string($contact['address']) || ! is_string($contact['phone'])) {
+                    || ! is_string($contact['address']) || ! is_string($contact['phone'])
+                    || ! is_string($contact['whatsapp'])) {
                     throw new InvalidArgumentException('Published hall contact values are invalid.');
                 }
                 $this->text($contact['name'], 1, 120, 'Hall name');
                 $this->text($contact['address'], 0, 240, 'Hall address');
                 $this->text($contact['phone'], 0, 32, 'Hall phone');
+                $this->text($contact['whatsapp'], 0, 32, 'Hall WhatsApp');
+                if ($contact['whatsapp'] !== ''
+                    && ! preg_match('/^\\+?[0-9][0-9 .-]{5,30}$/D', $contact['whatsapp'])) {
+                    throw new InvalidArgumentException('Hall WhatsApp number is invalid.');
+                }
             }
         }        if (array_key_exists('layoutPreset', $branding)) {
             if (! is_string($branding['layoutPreset'])

@@ -175,13 +175,14 @@ final class SiteBrandingService
     {
         return DB::table('halls')->where('company_id', $companyId)
             ->where('is_active', true)->orderBy('name')
-            ->get(['id', 'name', 'capacity', 'address', 'phone'])
+            ->get(['id', 'name', 'capacity', 'address', 'phone', 'whatsapp'])
             ->map(fn ($hall): array => [
                 'id' => (string) $hall->id,
                 'name' => (string) $hall->name,
                 'capacity' => (int) $hall->capacity,
                 'address' => (string) ($hall->address ?? ''),
                 'phone' => (string) ($hall->phone ?? ''),
+                'whatsapp' => (string) ($hall->whatsapp ?? ''),
             ])->all();
     }
     public function publishedBranding(string $companyId, string $websiteId): ?array

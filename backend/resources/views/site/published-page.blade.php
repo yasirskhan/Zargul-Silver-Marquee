@@ -208,6 +208,10 @@
                                 @if ($hall['phone'] !== '')
                                     <p>Phone: <a href="tel:{{ preg_replace('/[^0-9+]/', '', $hall['phone']) }}">{{ $hall['phone'] }}</a></p>
                                 @endif
+                                @if (($hall['whatsapp'] ?? '') !== '')
+                                    <p>WhatsApp: <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $hall['whatsapp']) }}"
+                                        target="_blank" rel="noopener noreferrer">{{ $hall['whatsapp'] }}</a></p>
+                                @endif
                             </div>
                         @endif
                     @endforeach

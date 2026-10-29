@@ -443,7 +443,8 @@ final class InstallationWizardService
                 DB::table('halls')->where('company_id', $companyId)->where('id', $hallId)
                     ->update(['name' => $hall['name'], 'capacity' => $hall['capacity'],
                         'address' => $hall['address'] ?: null,
-                        'phone' => $hall['phone'] ?: null, 'updated_at' => now()]);
+                        'phone' => $hall['phone'] ?: null,
+                        'whatsapp' => ($hall['whatsapp'] ?? '') ?: null, 'updated_at' => now()]);
             } else {
                 $base = Str::slug($hall['name']) ?: 'hall';
                 $slug = $base;
@@ -457,6 +458,7 @@ final class InstallationWizardService
                     'name' => $hall['name'], 'capacity' => $hall['capacity'],
                     'address' => $hall['address'] ?: null,
                     'phone' => $hall['phone'] ?: null,
+                    'whatsapp' => ($hall['whatsapp'] ?? '') ?: null,
                     'included_chairs' => 0, 'included_tables' => 0,
                     'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
                 ]);
@@ -543,16 +545,18 @@ final class InstallationWizardService
             $name = trim((string) ($hall['name'] ?? ''));
             $address = trim((string) ($hall['address'] ?? ''));
             $phone = trim((string) ($hall['phone'] ?? ''));
+            $whatsapp = trim((string) ($hall['whatsapp'] ?? ''));
             $capacity = filter_var($hall['capacity'] ?? null, FILTER_VALIDATE_INT);
             if (mb_strlen($name) < 2 || mb_strlen($name) > 120
-                || mb_strlen($address) > 240 || mb_strlen($phone) > 32
+                || mb_strlen($address) > 240 || mb_strlen($phone) > 32 || mb_strlen($whatsapp) > 32
                 || $capacity === false || $capacity < 1 || $capacity > 100000
-                || preg_match('/[<>[:cntrl:]]/u', $name.$address.$phone)) {
+                || preg_match('/[<>[:cntrl:]]/u', $name.$address.$phone.$whatsapp)
+                || ($whatsapp !== '' && ! preg_match('/^\\+?[0-9][0-9 .-]{5,30}$/D', $whatsapp))) {
                 throw new InvalidArgumentException('Each hall needs a valid name, address and capacity.');
             }
             $id = is_string($hall['id'] ?? null) && Str::isUuid($hall['id'])
                 ? $hall['id'] : null;
-            $clean[] = compact('id', 'name', 'address', 'phone', 'capacity');
+            $clean[] = compact('id', 'name', 'address', 'phone', 'whatsapp', 'capacity');
         }
 
         return $clean;

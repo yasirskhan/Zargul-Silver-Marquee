@@ -91,6 +91,10 @@
                     <a href="https://www.google.com/maps/search/?api=1&amp;query={{ urlencode($hall['address']) }}"
                         target="_blank" rel="noopener noreferrer">Get directions</a>
                 @endif
+                @if (($hall['whatsapp'] ?? '') !== '')
+                    <p><a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $hall['whatsapp']) }}"
+                        target="_blank" rel="noopener noreferrer">WhatsApp this hall</a></p>
+                @endif
             </article>
         @empty
             <p>Published hall details are not available yet.</p>

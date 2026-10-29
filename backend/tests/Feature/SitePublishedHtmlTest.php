@@ -242,6 +242,7 @@ class SitePublishedHtmlTest extends TestCase
             'id' => (string) Str::uuid(), 'company_id' => $company->id,
             'name' => 'Garden Hall', 'slug' => 'garden-hall', 'capacity' => 180,
             'address' => '12 Mall Road, Lahore', 'phone' => '+92 300 1234567',
+            'whatsapp' => '+92 300 7654321',
             'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
         ]);
         app(SiteBrandingService::class)->saveDraft($owner, $company->id, $site, [
@@ -262,6 +263,7 @@ class SitePublishedHtmlTest extends TestCase
         $this->assertStringContainsString('12 Mall Road, Lahore', $html);
         $this->assertStringContainsString('google.com/maps/search', $html);
         $this->assertStringContainsString('+92 300 1234567', $html);
+        $this->assertStringContainsString('https://wa.me/923007654321', $html);
         $this->assertStringNotContainsString('<script', $html);
     }
     public function test_hall_contact_changes_require_a_new_branding_publication(): void

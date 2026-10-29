@@ -48,7 +48,7 @@ final class VenueSetupWizard extends Page
     ];
 
     public array $halls = [
-        ['id' => null, 'name' => '', 'address' => '', 'phone' => '', 'capacity' => 100],
+        ['id' => null, 'name' => '', 'address' => '', 'phone' => '', 'whatsapp' => '', 'capacity' => 100],
     ];
 
     /** @var array<string,array<string,array<string,mixed>>> */
@@ -326,7 +326,7 @@ final class VenueSetupWizard extends Page
             'address' => '', 'currency' => 'PKR', 'timezone' => 'Asia/Karachi',
         ];
         $this->halls = [
-            ['id' => null, 'name' => '', 'address' => '', 'phone' => '', 'capacity' => 100],
+            ['id' => null, 'name' => '', 'address' => '', 'phone' => '', 'whatsapp' => '', 'capacity' => 100],
         ];
         $this->programs = [];
         $this->pricing = [];
@@ -382,7 +382,7 @@ final class VenueSetupWizard extends Page
     public function addHall(): void
     {
         abort_if($this->status === 'completed' || count($this->halls) >= 10, 403);
-        $this->halls[] = ['id' => null, 'name' => '', 'address' => '', 'phone' => '', 'capacity' => 100];
+        $this->halls[] = ['id' => null, 'name' => '', 'address' => '', 'phone' => '', 'whatsapp' => '', 'capacity' => 100];
     }
 
     public function removeHall(int $index): void
@@ -477,6 +477,7 @@ final class VenueSetupWizard extends Page
                 'halls.*.name' => ['required', 'string', 'min:2', 'max:120'],
                 'halls.*.address' => ['nullable', 'string', 'max:240'],
                 'halls.*.phone' => ['nullable', 'string', 'max:32'],
+                'halls.*.whatsapp' => ['nullable', 'string', 'max:32', 'regex:/^\\+?[0-9][0-9 .-]{5,30}$/'],
                 'halls.*.capacity' => ['required', 'integer', 'min:1', 'max:100000'],
             ],
             3 => [
