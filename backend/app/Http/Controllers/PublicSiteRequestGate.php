@@ -21,7 +21,8 @@ final class PublicSiteRequestGate
         // Isolated authenticated-browser fixtures may omit fixed IDs. This
         // fallback is impossible in production and still requires one active,
         // published website row.
-        if (app()->environment('testing')
+        if (config('public_site.test_fallback') === true
+            && app()->environment('testing')
             && (! is_string($companyId) || ! Str::isUuid($companyId)
                 || ! is_string($websiteId) || ! Str::isUuid($websiteId))) {
             $licensedCompany = DB::table('central_installation_activation')

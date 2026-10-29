@@ -20,7 +20,7 @@ test('published venue website renders all approved layouts at desktop tablet and
   const publicPage = await ctx.newPage();
   for (const [preset, bodyClass] of layouts) {
     await page.goto('/admin/website-workspace');
-    const select = page.locator('select[wire\\:model\\.live="branding.layoutPreset"]');
+    const select = page.locator('select:has(option[value="editorial"])').first();
     await expect(select).toBeVisible({timeout: 30_000});
     await select.selectOption(preset);
     const reason = page.locator('textarea[wire\\:model="brandingReason"]');

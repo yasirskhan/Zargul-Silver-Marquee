@@ -12,4 +12,6 @@ return [
     'require_verified_domain' => env('VENUE_PUBLIC_SITE_REQUIRE_VERIFIED_DOMAIN', false),
     // Separate operator approval required before allowing search engines.
     'indexing_enabled' => env('VENUE_PUBLIC_SITE_INDEXING_ENABLED', false),
+    // Isolated authenticated-browser fixture only; impossible in production.
+    'test_fallback' => env('VENUE_PUBLIC_SITE_TEST_FALLBACK', false),
 ];
