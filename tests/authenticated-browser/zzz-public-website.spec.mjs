@@ -19,7 +19,7 @@ test('published venue website renders all approved layouts at desktop tablet and
   ];
   const publicPage = await ctx.newPage();
   for (const [preset, bodyClass] of layouts) {
-    await page.goto('/admin/website-workspace');
+    await page.goto('/admin/website');
     const select = page.locator('select:has(option[value="editorial"])').first();
     await expect(select).toBeVisible({timeout: 30_000});
     await select.selectOption(preset);
