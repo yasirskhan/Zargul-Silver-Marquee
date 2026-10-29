@@ -304,4 +304,37 @@ class SitePublishedHtmlTest extends TestCase
         $updated = $reader->render($company->id, $site, '/');
         $this->assertStringContainsString('Unpublished changed address', $updated);
         $this->assertStringNotContainsString('Old approved address', $updated);
+    }
+    public function test_legacy_published_hall_contacts_without_whatsapp_still_render(): void
+    {
+        [$company, $owner, $site, $page] = $this->fixture();
+        $revision = (string) Str::uuid();
+        DB::table('site_branding_revisions')->insert([
+            'id' => $revision, 'company_id' => $company->id, 'website_id' => $site,
+            'revision_number' => 1,
+            'content' => json_encode([
+                'siteName' => 'Legacy Venue', 'tagline' => 'Old approved site',
+                'themePreset' => 'silver', 'fontPreset' => 'classic',
+                'logoMediaId' => null, 'faviconMediaId' => null,
+                'hallContacts' => [[
+                    'id' => (string) Str::uuid(), 'name' => 'Legacy Hall',
+                    'capacity' => 100, 'address' => 'Legacy address', 'phone' => '+92 300 0000000',
+                ]],
+            ], JSON_THROW_ON_ERROR),
+            'created_by' => $owner->id,
+        ]);
+        DB::table('websites')->where('company_id', $company->id)->where('id', $site)
+            ->update(['branding_published_revision_id' => $revision,
+                'branding_draft_revision' => 1]);
+        $pages = app(SitePagePublishingService::class);
+        $pages->saveDraft($owner, $company->id, $page, ['sections' => [[
+            'id' => 'halls', 'type' => 'halls', 'data' => ['title' => 'Legacy halls'],
+        ]]], 0, 'Legacy hall page');
+        $pages->publish($owner, $company->id, $page, 1, 'Publish legacy page');
+
+        $html = app(SitePublishedHtmlService::class)->render($company->id, $site, '/');
+        $this->assertStringContainsString('Legacy Hall', $html);
+        $this->assertStringContainsString('Legacy address', $html);
+        $this->assertStringContainsString('+92 300 0000000', $html);
+        $this->assertStringNotContainsString('wa.me/', $html);
     }}
