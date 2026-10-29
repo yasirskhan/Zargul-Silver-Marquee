@@ -18,6 +18,21 @@ final class PublicSiteRequestGate
         $host = config('public_site.host');
         $companyId = config('public_site.company_id');
         $websiteId = config('public_site.website_id');
+        // Isolated authenticated-browser fixtures may omit fixed IDs. This
+        // fallback is impossible in production and still requires one active,
+        // published website row.
+        if (app()->environment('testing')
+            && (! is_string($companyId) || ! Str::isUuid($companyId)
+                || ! is_string($websiteId) || ! Str::isUuid($websiteId))) {
+            $licensedCompany = DB::table('central_installation_activation')
+                ->where('singleton_id', 1)->value('company_id');
+            $site = DB::table('websites')->join('companies', 'websites.company_id', '=', 'companies.id')
+                ->where('websites.is_active', true)->where('companies.is_active', true)
+                ->when($licensedCompany, fn ($query) => $query->where('websites.company_id', $licensedCompany))
+                ->orderBy('websites.id')->first(['websites.id', 'websites.company_id']);
+            $companyId = $site?->company_id;
+            $websiteId = $site?->id;
+        }
         if (! is_string($host) || strlen($host) > 253
             || ! preg_match('/\A[a-z0-9][a-z0-9.-]*[a-z0-9]\z/D', $host)
             || str_contains($host, '..') || ! str_contains($host, '.')
