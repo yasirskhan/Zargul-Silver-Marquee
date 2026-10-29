@@ -26,14 +26,34 @@ final class SiteBrandingValidator
         $required = ['siteName', 'tagline', 'themePreset', 'fontPreset', 'logoMediaId', 'faviconMediaId'];
         // Older immutable branding revisions have no footerText field.
         // An optional, strictly plain-text addition preserves their validity.
-        $allowed = [...$required, 'footerText', 'navigationOrder', 'seoDescription', 'layoutPreset'];
+        $allowed = [...$required, 'footerText', 'navigationOrder', 'seoDescription', 'layoutPreset', 'hallContacts'];
         if (array_is_list($branding) || array_diff(array_keys($branding), $allowed)
             || array_diff($required, array_keys($branding))) {
             throw new InvalidArgumentException('Unsupported or missing site branding properties.');
         }
         $this->text($branding['siteName'], 1, 120, 'Venue name');
         $this->text($branding['tagline'], 0, 240, 'Venue tagline');
-        if (array_key_exists('layoutPreset', $branding)) {
+        if (array_key_exists('hallContacts', $branding)) {
+            $contacts = $branding['hallContacts'];
+            if (! is_array($contacts) || ! array_is_list($contacts) || count($contacts) > 50) {
+                throw new InvalidArgumentException('Published hall contacts are invalid.');
+            }
+            foreach ($contacts as $contact) {
+                if (! is_array($contact) || array_diff(array_keys($contact),
+                    ['id', 'name', 'capacity', 'address', 'phone'])) {
+                    throw new InvalidArgumentException('Published hall contact properties are invalid.');
+                }
+                if (! is_string($contact['id']) || ! Str::isUuid($contact['id'])
+                    || ! is_string($contact['name']) || ! is_int($contact['capacity'])
+                    || $contact['capacity'] < 1 || $contact['capacity'] > 100000
+                    || ! is_string($contact['address']) || ! is_string($contact['phone'])) {
+                    throw new InvalidArgumentException('Published hall contact values are invalid.');
+                }
+                $this->text($contact['name'], 1, 120, 'Hall name');
+                $this->text($contact['address'], 0, 240, 'Hall address');
+                $this->text($contact['phone'], 0, 32, 'Hall phone');
+            }
+        }        if (array_key_exists('layoutPreset', $branding)) {
             if (! is_string($branding['layoutPreset'])
                 || ! in_array($branding['layoutPreset'], ['classic', 'editorial', 'minimal'], true)) {
                 throw new InvalidArgumentException('Choose an approved website layout preset.');

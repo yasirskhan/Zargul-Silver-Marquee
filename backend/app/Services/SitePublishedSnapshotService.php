@@ -89,14 +89,10 @@ final class SitePublishedSnapshotService
             }
         }
 
-        $halls = DB::table('halls')->where('company_id', $companyId)
-            ->where('is_active', true)->orderBy('name')
-            ->get(['id', 'name', 'capacity', 'address', 'phone'])
-            ->map(fn ($hall): array => [
-                'id' => $hall->id, 'name' => $hall->name, 'capacity' => (int) $hall->capacity,
-                'address' => (string) ($hall->address ?? ''),
-                'phone' => (string) ($hall->phone ?? ''),
-            ])->all();
+        // Hall contacts are part of the approved branding revision. Never
+        // read live hall rows here: changing an address must require a new
+        // owner-approved publication.
+        $halls = $branding['hallContacts'] ?? [];
 
         return [
             'branding' => $branding,

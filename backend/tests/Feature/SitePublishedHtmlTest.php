@@ -263,4 +263,43 @@ class SitePublishedHtmlTest extends TestCase
         $this->assertStringContainsString('google.com/maps/search', $html);
         $this->assertStringContainsString('+92 300 1234567', $html);
         $this->assertStringNotContainsString('<script', $html);
+    }
+    public function test_hall_contact_changes_require_a_new_branding_publication(): void
+    {
+        [$company, $owner, $site, $page] = $this->fixture();
+        $hall = (string) Str::uuid();
+        DB::table('halls')->insert([
+            'id' => $hall, 'company_id' => $company->id,
+            'name' => 'Published Hall', 'slug' => 'published-hall', 'capacity' => 120,
+            'address' => 'Old approved address', 'phone' => '+92 300 1111111',
+            'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->brand($owner, $company->id, $site);
+        $pages = app(SitePagePublishingService::class);
+        $pages->saveDraft($owner, $company->id, $page, ['sections' => [[
+            'id' => 'halls', 'type' => 'halls', 'data' => ['title' => 'Our halls'],
+        ]]], 0, 'Publish hall contact baseline');
+        $pages->publish($owner, $company->id, $page, 1, 'Publish hall contact page');
+
+        $reader = app(SitePublishedHtmlService::class);
+        $this->assertStringContainsString('Old approved address', $reader->render($company->id, $site, '/'));
+
+        DB::table('halls')->where('id', $hall)->update([
+            'address' => 'Unpublished changed address', 'phone' => '+92 300 9999999',
+            'updated_at' => now(),
+        ]);
+        $unchanged = $reader->render($company->id, $site, '/');
+        $this->assertStringContainsString('Old approved address', $unchanged);
+        $this->assertStringNotContainsString('Unpublished changed address', $unchanged);
+
+        $branding = app(SiteBrandingService::class);
+        $branding->saveDraft($owner, $company->id, $site, [
+            'siteName' => 'Zargul Silver & Gold', 'tagline' => 'Events & celebrations',
+            'themePreset' => 'ivory', 'fontPreset' => 'modern',
+            'logoMediaId' => null, 'faviconMediaId' => null,
+        ], 1, 'Owner re-approves hall contact change');
+        $branding->publish($owner, $company->id, $site, 2, 'Publish changed contacts');
+        $updated = $reader->render($company->id, $site, '/');
+        $this->assertStringContainsString('Unpublished changed address', $updated);
+        $this->assertStringNotContainsString('Old approved address', $updated);
     }}

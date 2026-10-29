@@ -452,6 +452,14 @@ final class WebsiteWorkspace extends Page
             $actor, $page->company_id, $page->website_id,
             $this->branding, $this->expectedBrandingRevision, $this->brandingReason
         );
+        $saved = DB::table('site_branding_revisions')
+            ->where('company_id', $page->company_id)
+            ->where('website_id', $page->website_id)
+            ->where('revision_number', $this->expectedBrandingRevision)
+            ->value('content');
+        if (is_string($saved)) {
+            $this->branding = json_decode($saved, true, 512, JSON_THROW_ON_ERROR);
+        }
         $this->brandingReason = '';
         Notification::make()->title('Branding draft saved for review')->success()->send();
     }

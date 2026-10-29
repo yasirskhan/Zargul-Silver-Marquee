@@ -45,6 +45,7 @@ class SiteBrandingServiceTest extends TestCase
             'fontPreset' => 'classic',
             'logoMediaId' => null,
             'faviconMediaId' => null,
+            'hallContacts' => [],
         ];
     }
 

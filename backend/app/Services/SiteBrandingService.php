@@ -29,6 +29,9 @@ final class SiteBrandingService
     ): int {
         $this->authorize($actor, $companyId, false);
         $this->reason($reason);
+        // Freeze active hall contacts into the branding revision. Public
+        // rendering must never read live hall rows after publication.
+        $branding['hallContacts'] = $this->hallContacts($companyId);
         $this->validator->validate($branding);
 
         return DB::transaction(function () use (
@@ -168,6 +171,19 @@ final class SiteBrandingService
     }
 
     /** No draft fallback: unapproved branding is never publicly readable. */
+    private function hallContacts(string $companyId): array
+    {
+        return DB::table('halls')->where('company_id', $companyId)
+            ->where('is_active', true)->orderBy('name')
+            ->get(['id', 'name', 'capacity', 'address', 'phone'])
+            ->map(fn ($hall): array => [
+                'id' => (string) $hall->id,
+                'name' => (string) $hall->name,
+                'capacity' => (int) $hall->capacity,
+                'address' => (string) ($hall->address ?? ''),
+                'phone' => (string) ($hall->phone ?? ''),
+            ])->all();
+    }
     public function publishedBranding(string $companyId, string $websiteId): ?array
     {
         $website = DB::table('websites')->where('company_id', $companyId)
