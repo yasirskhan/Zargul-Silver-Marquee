@@ -61,7 +61,7 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
         $identity = app(\App\Services\CentralInstallationIdentity::class)->initialize();
         $customer = (string) \Illuminate\Support\Str::uuid();
         $license = (string) \Illuminate\Support\Str::uuid();
-        $domain = 'wizard.browser.test';
+        $domain = 'wizard.localhost';
         \Illuminate\Support\Facades\DB::table('central_installation_activation')->updateOrInsert(
             ['singleton_id' => 1],
             ['company_id' => $company->id, 'installation_id' => $identity['installation_id'],

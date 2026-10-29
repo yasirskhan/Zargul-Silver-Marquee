@@ -37,7 +37,7 @@ test('published venue website renders all approved layouts at desktop tablet and
       {width: 360, height: 800},
     ]) {
       await publicPage.setViewportSize(viewport);
-      await publicPage.goto('http://wizard.browser.test:8000/');
+      await publicPage.goto('http://wizard.localhost:8000/');
       await expect(publicPage.locator('body')).toHaveClass(new RegExp(bodyClass));
       await expect(publicPage.getByRole('heading', {name: 'Synthetic celebration venue'})).toBeVisible();
       await expect(publicPage.getByRole('link', {name: 'Halls'}).first()).toHaveAttribute('href', '/halls');
