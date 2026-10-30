@@ -17,7 +17,7 @@ final class TestSiteLayoutController
         $website = DB::table('websites')->where('name', 'Phase 10 Browser Fixture')
             ->where('is_active', true)->first();
         abort_if($website === null, 404);
-        $owner = User::query()->where('email', 'phase10-browser-owner@example.test')->first();
+        $owner = User::query()->where('email', 'browser-e2e-inventory-owner-c@example.test')->first();
         abort_if($owner === null, 404);
         Auth::login($owner);
         $draft = (int) $website->branding_draft_revision;
