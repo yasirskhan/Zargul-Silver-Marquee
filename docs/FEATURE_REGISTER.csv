@@ -39,8 +39,8 @@ CMS-009,Website publishing owner acceptance and restore tests,6,TECHNICALLY VERI
 UX-001,Role-scoped VenueDesk overview and daily quick navigation,1,Technically verified df1e5b8/4024399,VenueOverviewLivewireTest and InternalQuickSearchTest cover owner/admin aggregate manager own approvals operations assigned-hall only private links and no contact/finance leakage; final six-job 4024399 run40064675256
 LIC-001,Signed client licenses and hosted or self hosted activation,9,Approved not implemented,Central Control Center and verified install/grace/public maintenance guards
 SET-001,Resumable first time setup wizard,9,Approved not implemented,Owner MFA halls guest tiers wallets domains one time setup lock and existing client migration
-WEB-010,Distinct responsive website themes,10,PARTIAL — structural layout preset implemented; responsive browser acceptance pending,Structural templates and audited CMS brand settings
-WEB-011,Per hall contact location footer with maps,10,PARTIAL — published address phone directions implemented; WhatsApp/browser acceptance pending,Hall address phone optional WhatsApp safe Google Maps embed or directions
+WEB-010,Distinct responsive website themes,10,PASS — structural/colour/typography presets and responsive browser acceptance,Structural templates and audited CMS brand settings
+WEB-011,Per hall contact location footer with maps,10,PASS — immutable address phone WhatsApp maps directions and responsive browser acceptance,Hall address phone optional WhatsApp safe Google Maps embed or directions
 WEB-012,Central per client designer credit,10,Approved not implemented,Prefix linked text HTTPS URL left center right disabled flag and signed propagation
 BOOK-010,Public guest tiers and five percent held booking,10,Approved not implemented,Exact numeric guests one hall automatic selection versioned prices and verified deposited claim
 PAY-010,Per client manual wallet QR and official merchant API integrations,11,Approved not implemented,JazzCash Easypaisa Raast independent settings optional unified gateway and verified provider credentials

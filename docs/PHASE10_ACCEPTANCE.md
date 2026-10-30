@@ -8,8 +8,8 @@ Approved requirement IDs: `WEB-010`, `WEB-011`, `WEB-012`, `BOOK-010`.
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| WEB-010 — distinct responsive website themes | PARTIAL: approved structural `layoutPreset` (`classic`, `editorial`, `minimal`) added to branding validation, Owner Workspace, and the published renderer; colour/typography presets remain | `SiteBrandingValidator`, `WebsiteWorkspace`, `published-page.blade.php`; `SitePublishedHtmlTest::test_phase10_layout_preset_and_hall_contacts_render_from_published_snapshot` |
-| WEB-011 — per-hall contact, location and maps footer | PARTIAL: hall contacts are frozen into the approved branding revision; editing a live hall does not alter the public site until the Owner saves and publishes branding. Rendered as hall cards and footer contacts with safe directions and `tel:` links. WhatsApp is validated and rendered as a safe `wa.me` link; the Owner setup wizard captures it. | `SiteBrandingService`, `SitePublishedSnapshotService`, published Blade views; `SitePublishedHtmlTest::test_hall_contact_changes_require_a_new_branding_publication` |
+| WEB-010 — distinct responsive website themes | PASS: approved structural presets (`classic`, `editorial`, `minimal`) with colour/typography presets and responsive desktop/tablet/phone browser acceptance | `zzz-public-website.spec.mjs`, `SiteBrandingValidator`, `WebsiteWorkspace`, `published-page.blade.php` |
+| WEB-011 — per-hall contact, location and maps footer | PASS: immutable address/phone/WhatsApp, Maps directions, `tel:` and `wa.me` links, hall cards and responsive browser acceptance | `SiteBrandingService`, `SitePublishedSnapshotService`, `zzz-public-website.spec.mjs`, `SitePublishedHtmlTest` |
 | WEB-012 — central per-client designer credit | NOT STARTED | Requires an approved HAFZATECH-signed designer-credit field and safe propagation. Not fabricated locally. |
 | BOOK-010 — exact guest tiers, one-hall selection and 5% verified-payment hold | NOT STARTED | Requires approved guest-bracket pricing and a verified deposit claim integrated with booking holds. Existing enquiry is explicitly not a booking and takes no payment. |
 
