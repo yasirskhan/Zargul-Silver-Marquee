@@ -96,4 +96,39 @@ class CentralSignedGrantVerifierTest extends TestCase
         $service->verify($invalid,$grant['customer_id'],$grant['installation_id'],
             'venue.example.test',0,new DateTimeImmutable('2026-11-01T00:00:00Z'));
     }
-}
+    public function test_signed_designer_credit_is_validated_and_cannot_be_forged(): void
+    {
+        [$pair, $grant] = $this->sample();
+        $service = app(CentralSignedGrantVerifier::class);
+        $grant['designer_credit'] = [
+            'enabled' => true, 'prefix' => 'Website by',
+            'label' => 'HAFZATECH', 'url' => 'https://hafzatech.com',
+            'alignment' => 'center',
+        ];
+        $valid = $service->verify($this->sign($grant, $pair), $grant['customer_id'],
+            $grant['installation_id'], 'venue.example.test', 0,
+            new DateTimeImmutable('2026-11-01T00:00:00Z'));
+        $this->assertTrue($valid['grant']['designer_credit']['enabled']);
+
+        foreach ([
+            ['url' => 'javascript:alert(1)'],
+            ['url' => 'http://insecure.example.test'],
+            ['alignment' => 'justify'],
+            ['prefix' => '<script>'],
+        ] as $override) {
+            $forged = $grant;
+            $forged['designer_credit'] = array_replace($forged['designer_credit'], $override);
+            try {
+                $service->verify($this->sign($forged, $pair), $grant['customer_id'],
+                    $grant['installation_id'], 'venue.example.test', 0,
+                    new DateTimeImmutable('2026-11-01T00:00:00Z'));
+                $this->fail('Invalid designer credit was accepted.');
+            } catch (InvalidArgumentException) {}
+        }
+
+        $grant['designer_credit']['enabled'] = false;
+        $disabled = $service->verify($this->sign($grant, $pair), $grant['customer_id'],
+            $grant['installation_id'], 'venue.example.test', 0,
+            new DateTimeImmutable('2026-11-01T00:00:00Z'));
+        $this->assertFalse($disabled['grant']['designer_credit']['enabled']);
+    }}

@@ -109,6 +109,7 @@ final class CentralLicensingOverviewService
             'edition'=>$verified['grant']['edition'],
             'max_halls'=>$verified['grant']['limits']['max_halls'],
             'max_staff'=>$verified['grant']['limits']['max_staff'],
+            'designer_credit'=>$verified['grant']['designer_credit'] ?? null,
             ...$checks,
         ];
     }

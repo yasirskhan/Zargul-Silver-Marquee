@@ -337,4 +337,28 @@ class SitePublishedHtmlTest extends TestCase
         $this->assertStringContainsString('Legacy address', $html);
         $this->assertStringContainsString('+92 300 0000000', $html);
         $this->assertStringNotContainsString('wa.me/', $html);
+    }
+    public function test_signed_designer_credit_renders_only_when_enabled_and_safe(): void
+    {
+        [$company, $owner, $site, $page] = $this->fixture();
+        $this->brand($owner, $company->id, $site);
+        $pages = app(SitePagePublishingService::class);
+        $pages->saveDraft($owner, $company->id, $page, ['sections' => [[
+            'id' => 'intro', 'type' => 'text', 'data' => ['title' => 'Credit page'],
+        ]]], 0, 'Credit page content');
+        $pages->publish($owner, $company->id, $page, 1, 'Publish credit page');
+        $snapshot = app(\App\Services\SitePublishedSnapshotService::class)
+            ->project($company->id, $site, '/');
+        $credit = ['enabled' => true, 'prefix' => 'Website by',
+            'label' => 'HAFZATECH', 'url' => 'https://hafzatech.com', 'alignment' => 'center'];
+        $html = view('site.published-page', ['snapshot' => $snapshot,
+            'designerCredit' => $credit, 'canonicalUrl' => null, 'canIndex' => false])->render();
+        $this->assertStringContainsString('Website by', $html);
+        $this->assertStringContainsString('href="https://hafzatech.com"', $html);
+        $this->assertStringContainsString('rel="noopener noreferrer"', $html);
+        $this->assertStringContainsString('text-align: center', $html);
+        $credit['enabled'] = false;
+        $html = view('site.published-page', ['snapshot' => $snapshot,
+            'designerCredit' => $credit, 'canonicalUrl' => null, 'canIndex' => false])->render();
+        $this->assertStringNotContainsString('hafzatech.com', $html);
     }}

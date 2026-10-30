@@ -89,7 +89,31 @@ final class CentralSignedGrantVerifier
                 throw new InvalidArgumentException('Invalid signed module entitlement.');
             }
         }
-        $starts = self::utcInstant($grant['not_before'] ?? null);
+        if (array_key_exists('designer_credit', $grant)) {
+            $credit = $grant['designer_credit'];
+            if (! is_array($credit) || array_is_list($credit)
+                || array_diff(array_keys($credit),
+                    ['enabled', 'prefix', 'label', 'url', 'alignment'])
+                || ! is_bool($credit['enabled'] ?? null)
+                || ! is_string($credit['prefix'] ?? null)
+                || mb_strlen($credit['prefix']) > 40
+                || ! is_string($credit['label'] ?? null)
+                || mb_strlen($credit['label']) > 120
+                || ! is_string($credit['url'] ?? null)
+                || mb_strlen($credit['url']) > 500
+                || ! in_array($credit['alignment'] ?? null,
+                    ['left', 'center', 'right'], true)) {
+                throw new InvalidArgumentException('Invalid signed designer credit.');
+            }
+            if ($credit['enabled']) {
+                if (trim($credit['label']) === ''
+                    || ! preg_match('#^https://[A-Za-z0-9.-]+(?::[0-9]{1,5})?(?:/[^\s<>"\']*)?$#D',
+                        $credit['url'])
+                    || preg_match('/[<>"\']/u', $credit['prefix'])) {
+                    throw new InvalidArgumentException('Invalid enabled designer credit.');
+                }
+            }
+        }        $starts = self::utcInstant($grant['not_before'] ?? null);
         $ends = self::utcInstant($grant['expires_at'] ?? null);
         if ($starts >= $ends) throw new InvalidArgumentException('Invalid signed license term.');
         $nowUtc = $now->setTimezone(new DateTimeZone('UTC'));

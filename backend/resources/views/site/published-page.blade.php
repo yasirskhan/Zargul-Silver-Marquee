@@ -217,6 +217,12 @@
                     @endforeach
                 </div>
             @endif
+            @if (is_array($designerCredit ?? null) && ($designerCredit['enabled'] ?? false) === true)
+                <p class="designer-credit" style="text-align: {{ $designerCredit['alignment'] }}">
+                    @if ($designerCredit['prefix'] !== '')<span>{{ $designerCredit['prefix'] }}</span> @endif
+                    <a href="{{ $designerCredit['url'] }}" target="_blank" rel="noopener noreferrer">{{ $designerCredit['label'] }}</a>
+                </p>
+            @endif
             @if ($canonicalUrl === null)
                 <p>Preview rendering only. Contact information, public media and booking services require separate release approval.</p>
             @endif
