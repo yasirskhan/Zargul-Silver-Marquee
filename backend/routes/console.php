@@ -278,6 +278,102 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
         ]);
     }
 
+    // Independent Phase 10 published website fixture. It uses a separate
+    // website, Owner membership and halls so the CMS draft fixture above is
+    // never published or otherwise altered.
+    $phase10Owner = \App\Models\User::query()->firstOrCreate(
+        ['email' => 'phase10-browser-owner@example.test'],
+        ['name' => 'Phase 10 Browser Owner',
+            'password' => 'phase10-browser-owner-only', 'is_active' => true],
+    );
+    $phase10Owner->markEmailAsVerified();
+    $phase10Owner->app_authentication_secret = 'KRSXG5AUMVZWK4TT';
+    $phase10Owner->save();
+    \App\Models\CompanyMembership::query()->firstOrCreate(
+        ['company_id' => $company->id, 'user_id' => $phase10Owner->id],
+        ['role' => 'owner', 'is_active' => true],
+    );
+    $phase10Hall = \App\Models\Hall::query()->firstOrCreate(
+        ['company_id' => $company->id, 'slug' => 'phase10-browser-hall'],
+        ['name' => 'Phase 10 Grand Hall', 'capacity' => 240],
+    );
+    $phase10Hall->forceFill([
+        'address' => '100 Phase 10 Avenue, Lahore',
+        'phone' => '+92 300 5550001', 'whatsapp' => '+92 300 5550002',
+        'is_bookable' => false,
+    ])->save();
+    $phase10Site = \Illuminate\Support\Facades\DB::table('websites')
+        ->where('company_id', $company->id)->where('name', 'Phase 10 Browser Fixture')->first();
+    if ($phase10Site === null) {
+        $phase10SiteId = (string) \Illuminate\Support\Str::uuid();
+        \Illuminate\Support\Facades\DB::table('websites')->insert([
+            'id' => $phase10SiteId, 'company_id' => $company->id,
+            'name' => 'Phase 10 Browser Fixture',
+        ]);
+    } else {
+        $phase10SiteId = $phase10Site->id;
+    }
+    $phase10Home = \Illuminate\Support\Facades\DB::table('site_pages')
+        ->where('company_id', $company->id)->where('website_id', $phase10SiteId)
+        ->where('slug', '/')->first();
+    if ($phase10Home === null) {
+        $phase10HomeId = (string) \Illuminate\Support\Str::uuid();
+        \Illuminate\Support\Facades\DB::table('site_pages')->insert([
+            'id' => $phase10HomeId, 'company_id' => $company->id,
+            'website_id' => $phase10SiteId, 'slug' => '/',
+            'title' => 'Zzz Phase 10 Home', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+    } else {
+        $phase10HomeId = $phase10Home->id;
+    }
+    if (\Illuminate\Support\Facades\DB::table('site_pages')->where('id', $phase10HomeId)
+        ->value('published_revision_id') === null) {
+        \Illuminate\Support\Facades\Auth::login($phase10Owner);
+        $branding = app(\App\Services\SiteBrandingService::class);
+        $draft = (int) \Illuminate\Support\Facades\DB::table('websites')
+            ->where('id', $phase10SiteId)->value('branding_draft_revision');
+        $saved = $branding->saveDraft($phase10Owner, $company->id, $phase10SiteId, [
+            'siteName' => 'Phase 10 Browser Venue',
+            'tagline' => 'Independent published website fixture',
+            'themePreset' => 'sage', 'fontPreset' => 'modern',
+            'layoutPreset' => 'editorial', 'logoMediaId' => null,
+            'faviconMediaId' => null, 'footerText' => 'Phase 10 published footer',
+        ], $draft, 'Synthetic Phase 10 fixture publication');
+        $branding->publish($phase10Owner, $company->id, $phase10SiteId, $saved,
+            'Synthetic Phase 10 fixture publication');
+        $pages = app(\App\Services\SitePagePublishingService::class);
+        $savedPage = $pages->saveDraft($phase10Owner, $company->id, $phase10HomeId, [
+            'sections' => [
+                ['id' => 'hero', 'type' => 'hero', 'data' => [
+                    'title' => 'Phase 10 celebration venue',
+                    'subtitle' => 'Published responsive browser fixture']],
+                ['id' => 'halls', 'type' => 'halls', 'data' => ['title' => 'Our halls']],
+            ],
+        ], 0, 'Synthetic Phase 10 home page');
+        $pages->publish($phase10Owner, $company->id, $phase10HomeId, $savedPage,
+            'Synthetic Phase 10 home page');
+        $hallsPage = \Illuminate\Support\Facades\DB::table('site_pages')
+            ->where('company_id', $company->id)->where('website_id', $phase10SiteId)
+            ->where('slug', '/halls')->first();
+        if ($hallsPage === null) {
+            $hallsId = (string) \Illuminate\Support\Str::uuid();
+            \Illuminate\Support\Facades\DB::table('site_pages')->insert([
+                'id' => $hallsId, 'company_id' => $company->id,
+                'website_id' => $phase10SiteId, 'slug' => '/halls',
+                'title' => 'Zzz Phase 10 Halls', 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        } else {
+            $hallsId = $hallsPage->id;
+        }
+        $savedHalls = $pages->saveDraft($phase10Owner, $company->id, $hallsId, [
+            'sections' => [[
+                'id' => 'halls', 'type' => 'halls', 'data' => ['title' => 'Our halls'],
+            ]],
+        ], 0, 'Synthetic Phase 10 halls page');
+        $pages->publish($phase10Owner, $company->id, $hallsId, $savedHalls,
+            'Synthetic Phase 10 halls page');
+        \Illuminate\Support\Facades\Auth::logout();
+    }
     // Synthetic cross-actor approval ensures an owner login shows a real
     // tenant-scoped pending notice, without any actual expense or payment.
     $admin = \App\Models\User::query()->firstOrCreate(

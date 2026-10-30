@@ -36,6 +36,9 @@ Route::post('/install/owner/{token}', [\App\Http\Controllers\OwnerBootstrapContr
 
 // Test-only route; the controller independently enforces testing mode and
 // CENTRAL_LOCAL_STATUS_TEST before changing any license fixture.
+Route::get('/__test/site-layout/{layout}', App\Http\Controllers\TestSiteLayoutController::class)
+    ->whereIn('layout', ['classic', 'editorial', 'minimal']);
+
 Route::get('/__test/license-window/{mode}', App\Http\Controllers\TestLicenseWindowController::class)
     ->whereIn('mode', ['valid', 'warning', 'grace', 'expired']);
 

@@ -29,8 +29,9 @@ final class PublicSiteRequestGate
                 ->where('singleton_id', 1)->value('company_id');
             $site = DB::table('websites')->join('companies', 'websites.company_id', '=', 'companies.id')
                 ->where('websites.is_active', true)->where('companies.is_active', true)
+                ->where('websites.name', 'Phase 10 Browser Fixture')
                 ->when($licensedCompany, fn ($query) => $query->where('websites.company_id', $licensedCompany))
-                ->orderBy('websites.id')->first(['websites.id', 'websites.company_id']);
+                ->first(['websites.id', 'websites.company_id']);
             $companyId = $site?->company_id;
             $websiteId = $site?->id;
         }

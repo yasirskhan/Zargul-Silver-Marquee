@@ -344,6 +344,9 @@ jobs:
       LOG_CHANNEL: 'single'
       VENUE_CENTRAL_ACTIVATION_ENABLED: 'true'
       VENUE_CENTRAL_MANUAL_CHECKS_ENABLED: 'true'
+      VENUE_PUBLIC_SITE_ENABLED: 'true'
+      VENUE_PUBLIC_SITE_HOST: 'wizard.localhost'
+      VENUE_PUBLIC_SITE_TEST_FALLBACK: 'true'
       VENUE_CENTRAL_BASE_URL: 'http://127.0.0.1:9001'
       CENTRAL_LOCAL_STATUS_TEST: 'true'
       # Isolated CI-only finance posting for synthetic cash closeout acceptance.
