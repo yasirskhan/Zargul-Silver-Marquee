@@ -34,6 +34,9 @@ Route::post('/book/confirm', [\App\Http\Controllers\PublicBookingController::cla
     ->middleware('throttle:10,1')->name('public.booking.confirm');
 Route::get('/book/status', [\App\Http\Controllers\PublicBookingController::class, 'status'])
     ->middleware('throttle:20,1')->name('public.booking.status');
+Route::get('/__test/booking-fixture', [\App\Http\Controllers\TestBookingFixtureController::class, 'hall']);
+Route::post('/__test/booking-fixture/verify', [\App\Http\Controllers\TestBookingFixtureController::class, 'verify']);
+Route::post('/__test/booking-fixture/reset', [\App\Http\Controllers\TestBookingFixtureController::class, 'reset']);
 Route::get('/robots.txt', \App\Http\Controllers\PublishedVenueRobotsController::class);
 Route::get('/sitemap.xml', \App\Http\Controllers\PublishedVenueSitemapController::class);
 
