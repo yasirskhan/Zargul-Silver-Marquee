@@ -230,4 +230,30 @@ class PublicBookingQuoteTest extends TestCase
             ->quote($company->id, '2027-12-09', 'morning', 100);
         $this->assertCount(1, $remaining['halls']);
         $this->assertSame($hall->id, $remaining['halls'][0]['hallId']);
+    }
+    public function test_idempotency_rejects_changed_customer_and_expired_replay(): void
+    {
+        [$company, $hall, $owner] = $this->fixture();
+        config()->set('public_booking.holds_enabled', true);
+        $quote = app(PublicBookingQuoteService::class)->quote($company->id, '2027-12-10', 'noon', 100);
+        $holds = app(\App\Services\PublicBookingHoldService::class);
+        $key = (string) Str::uuid();
+        $first = $holds->create($company->id, $quote, $hall->id,
+            ['name' => 'Original Customer', 'email' => 'original@example.test'], $key);
+        try {
+            $holds->create($company->id, $quote, $hall->id,
+                ['name' => 'Different Customer', 'email' => 'different@example.test'], $key);
+            $this->fail('Changed customer reused the idempotency key.');
+        } catch (ConflictHttpException) {
+            $this->assertTrue(true);
+        }
+        DB::table('public_booking_holds')->where('id', $first['holdId'])
+            ->update(['expires_at' => now()->subMinute()]);
+        try {
+            $holds->create($company->id, $quote, $hall->id,
+                ['name' => 'Original Customer', 'email' => 'original@example.test'], $key);
+            $this->fail('Expired hold token was replayed.');
+        } catch (ConflictHttpException) {
+            $this->assertTrue(true);
+        }
     }}

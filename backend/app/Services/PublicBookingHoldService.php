@@ -35,6 +35,9 @@ final class PublicBookingHoldService
         $existing = DB::table('public_booking_holds')->where('company_id', $companyId)
             ->where('idempotency_key', $idempotencyKey)->first();
         if ($existing) {
+            if ($existing->expires_at <= now()) {
+                throw new ConflictHttpException('This hold has expired; start a new booking.');
+            }
             if ($existing->hall_id !== $hallId || $existing->quote_hash !== $quote['quoteHash']
                 || $existing->customer_name !== $name
                 || (string) $existing->customer_email !== $email
@@ -66,7 +69,13 @@ final class PublicBookingHoldService
             $existing = DB::table('public_booking_holds')->where('company_id', $companyId)
                 ->where('idempotency_key', $idempotencyKey)->first();
             if ($existing) {
-                if ($existing->hall_id !== $hallId || $existing->quote_hash !== $quote['quoteHash']) {
+                if ($existing->expires_at <= now()) {
+                    throw new ConflictHttpException('This hold has expired; start a new booking.');
+                }
+                if ($existing->hall_id !== $hallId || $existing->quote_hash !== $quote['quoteHash']
+                    || $existing->customer_name !== $name
+                    || (string) $existing->customer_email !== $email
+                    || (string) $existing->customer_phone !== $phone) {
                     throw new ConflictHttpException('This request key was already used for another hold.');
                 }
                 try {
