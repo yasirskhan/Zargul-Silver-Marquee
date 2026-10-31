@@ -13,7 +13,9 @@ final class CentralStaffDesignerCreditRenderer
         $latest=$history[0]['credit']??['enabled'=>false,'prefix'=>'','label'=>'',
             'url'=>'','alignment'=>'center'];
         $selected=static fn(string $v,string $current):string=>$v===$current?' selected':'';
-        $checked=($latest['enabled']??false)?' checked':'';
+        $enabled=($latest['enabled']??false)?'enabled':'disabled';
+        $selectedEnabled=$enabled==='enabled'?' selected':'';
+        $selectedDisabled=$enabled==='disabled'?' selected':'';
         $rows='';
         foreach ($history as $row) {
             $rows.='<tr><td>'.$e((string)$row['version']).'</td><td>'
@@ -30,7 +32,10 @@ final class CentralStaffDesignerCreditRenderer
             .'<input type="hidden" name="staff_csrf" value="'.$e($csrf).'">'
             .'<input type="hidden" name="license_id" value="'.$e($licenseId).'">'
             .'<input type="hidden" name="request_id" value="'.$e($requestId).'">'
-            .'<p><label><input type="checkbox" name="enabled" value="1"'.$checked.'> Enabled</label></p>'
+            .'<p><label>Credit state <select name="enabled">'
+            .'<option value="1"'.$selectedEnabled.'>Enabled</option>'
+            .'<option value="0"'.$selectedDisabled.'>Disabled</option>'
+            .'</select></label></p>'
             .'<p><label>Prefix <input name="prefix" maxlength="40" value="'.$e((string)$latest['prefix']).'"></label></p>'
             .'<p><label>Label <input name="label" maxlength="120" value="'.$e((string)$latest['label']).'"></label></p>'
             .'<p><label>HTTPS URL <input type="url" name="url" maxlength="500" value="'.$e((string)$latest['url']).'"></label></p>'

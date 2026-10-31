@@ -203,11 +203,14 @@ final class CentralStaffPortalHttpRouter
                     'license.issue_paid',null)) {
                 throw new RegistrationError('staff_portal_denied');
             }
+            $enabled=$fields['enabled']==='1';
             $credit=$this->designerCredit->configure($bearer,$fields['license_id'],
                 $fields['request_id'],[
-                    'enabled'=>$fields['enabled']==='1',
-                    'prefix'=>$fields['prefix'],'label'=>$fields['label'],
-                    'url'=>$fields['url'],'alignment'=>$fields['alignment'],
+                    'enabled'=>$enabled,
+                    'prefix'=>$enabled?$fields['prefix']:'',
+                    'label'=>$enabled?$fields['label']:'',
+                    'url'=>$enabled?$fields['url']:'',
+                    'alignment'=>$fields['alignment'],
                 ]);
             return ['kind'=>'private_designer_credit_html',
                 'html'=>CentralStaffDesignerCreditRenderer::form(

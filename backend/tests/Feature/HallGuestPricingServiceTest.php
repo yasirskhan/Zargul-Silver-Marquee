@@ -69,4 +69,26 @@ class HallGuestPricingServiceTest extends TestCase
             ['minGuests' => 1, 'maxGuests' => 500, 'priceMinor' => 200],
         ], 'PKR', 0, 'Stale update');
     }
-}
+    public function test_approved_pricing_revisions_cannot_be_updated_or_deleted(): void
+    {
+        [$company, $hall, $owner] = $this->fixture();
+        app(HallGuestPricingService::class)->configure($owner, $company->id, $hall->id, [
+            ['minGuests' => 1, 'maxGuests' => 500, 'priceMinor' => 100],
+        ], 'PKR', 0, 'Immutable tier baseline');
+        try {
+            DB::table('hall_guest_pricing_revisions')->update(['currency_code' => 'USD']);
+            $this->fail('Approved pricing revision was updated.');
+        } catch (\Illuminate\Database\QueryException) {
+            $this->assertTrue(true);
+        }
+    }
+
+    public function test_approved_pricing_revisions_cannot_be_deleted(): void
+    {
+        [$company, $hall, $owner] = $this->fixture();
+        app(HallGuestPricingService::class)->configure($owner, $company->id, $hall->id, [
+            ['minGuests' => 1, 'maxGuests' => 500, 'priceMinor' => 100],
+        ], 'PKR', 0, 'Immutable tier baseline');
+        $this->expectException(\Illuminate\Database\QueryException::class);
+        DB::table('hall_guest_pricing_revisions')->delete();
+    }}

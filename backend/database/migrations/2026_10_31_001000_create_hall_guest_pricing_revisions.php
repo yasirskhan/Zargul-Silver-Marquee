@@ -28,6 +28,15 @@ return new class extends Migration
         Schema::table('halls', function (Blueprint $table) {
             $table->unsignedInteger('guest_pricing_revision')->default(0);
         });
+        DB::unprepared(<<<'SQL'
+CREATE OR REPLACE FUNCTION hall_guest_pricing_immutable() RETURNS trigger AS $$
+BEGIN
+    RAISE EXCEPTION 'approved hall guest pricing history is immutable';
+END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER hall_guest_pricing_no_update_delete
+    BEFORE UPDATE OR DELETE ON hall_guest_pricing_revisions
+    FOR EACH ROW EXECUTE FUNCTION hall_guest_pricing_immutable();
+SQL);
     }
 
     public function down(): void
