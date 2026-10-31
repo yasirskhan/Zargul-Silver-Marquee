@@ -18,6 +18,8 @@ require dirname(__DIR__).'/src/PaidInvoiceEligibility.php';
 require dirname(__DIR__).'/src/LicenseTermCalendar.php';
 require dirname(__DIR__).'/src/PaidLicensePreparation.php';
 require dirname(__DIR__).'/src/PreparedSignedGrantValidator.php';
+require dirname(__DIR__).'/src/DesignerCreditPolicy.php';
+require dirname(__DIR__).'/src/CentralStaffDesignerCreditService.php';
 require dirname(__DIR__).'/src/SignedGrantFinalization.php';
 require dirname(__DIR__).'/src/InstallationStatusService.php';
 require dirname(__DIR__).'/src/SignedGrantDeliveryService.php';
