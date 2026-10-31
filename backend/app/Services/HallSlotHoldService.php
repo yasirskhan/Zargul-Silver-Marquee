@@ -71,6 +71,11 @@ final class HallSlotHoldService
                     ->where('company_id', $companyId)->where('hall_id', $hallId)->delete();
             }
 
+            if (DB::table('public_booking_holds')->where('company_id', $companyId)
+                ->where('hall_id', $hallId)->where('event_date', $eventDate)
+                ->where('program', $program)->where('expires_at', '>', now())->exists()) {
+                throw new ConflictHttpException('A public customer hold owns this slot.');
+            }
             $expiresAt = $now->copy()->addMinutes($durationMinutes);
             DB::table('hall_slot_claims')->insert([
                 'id' => $claimId, 'company_id' => $companyId, 'hall_id' => $hallId,

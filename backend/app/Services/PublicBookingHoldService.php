@@ -35,7 +35,10 @@ final class PublicBookingHoldService
         $existing = DB::table('public_booking_holds')->where('company_id', $companyId)
             ->where('idempotency_key', $idempotencyKey)->first();
         if ($existing) {
-            if ($existing->hall_id !== $hallId || $existing->quote_hash !== $quote['quoteHash']) {
+            if ($existing->hall_id !== $hallId || $existing->quote_hash !== $quote['quoteHash']
+                || $existing->customer_name !== $name
+                || (string) $existing->customer_email !== $email
+                || (string) $existing->customer_phone !== $phone) {
                 throw new ConflictHttpException('This request key was already used for another hold.');
             }
             try {
@@ -75,7 +78,7 @@ final class PublicBookingHoldService
                     'expiresAt' => \Illuminate\Support\Carbon::parse($existing->expires_at)->toIso8601String(),
                     'depositMinor' => (int) $existing->deposit_minor];
             }
-            DB::table('public_booking_holds')->where('expires_at', '<=', now())->delete();
+            $this->expire($companyId);
             $occupied = DB::table('hall_slot_claims')->where('company_id', $companyId)
                 ->where('hall_id', $hallId)->where('event_date', $hall['date'])
                 ->where('program', $hall['program'])
@@ -125,6 +128,21 @@ final class PublicBookingHoldService
         }, 3);
     }
 
+    private function expire(string $companyId): void
+    {
+        $rows = DB::table('public_booking_holds')->where('company_id', $companyId)
+            ->where('expires_at', '<=', now())->lockForUpdate()->get();
+        foreach ($rows as $row) {
+            DB::table('public_booking_hold_events')->insert([
+                'id' => (string) Str::uuid(), 'company_id' => $companyId,
+                'hold_id' => $row->id, 'action' => 'expired',
+                'snapshot' => json_encode(['depositMinor' => (int) $row->deposit_minor,
+                    'expiresAt' => $row->expires_at], JSON_THROW_ON_ERROR),
+                'occurred_at' => now(),
+            ]);
+            DB::table('public_booking_holds')->where('id', $row->id)->delete();
+        }
+    }
     /** @return array{holdId:string,status:string,depositMinor:int} */
     public function cancel(string $companyId, string $token): array
     {
@@ -138,6 +156,13 @@ final class PublicBookingHoldService
             if (! $hold) {
                 throw new ConflictHttpException('This hold is no longer available.');
             }
+            DB::table('public_booking_hold_events')->insert([
+                'id' => (string) Str::uuid(), 'company_id' => $companyId,
+                'hold_id' => $hold->id, 'action' => 'cancelled',
+                'snapshot' => json_encode(['depositMinor' => (int) $hold->deposit_minor],
+                    JSON_THROW_ON_ERROR),
+                'occurred_at' => now(),
+            ]);
             DB::table('public_booking_holds')->where('id', $hold->id)->delete();
             DB::table('audit_events')->insert([
                 'id' => (string) Str::uuid(), 'company_id' => $companyId,

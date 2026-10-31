@@ -124,6 +124,11 @@ final class VenueReservationService
         User $actor, string $companyId, string $hallId,
         string $date, string $program, string $claimId, string $reason,
     ): void {
+        if (DB::table('public_booking_holds')->where('company_id', $companyId)
+            ->where('hall_id', $hallId)->where('event_date', $date)
+            ->where('program', $program)->where('expires_at', '>', now())->exists()) {
+            throw new ConflictHttpException('A public customer hold owns this slot.');
+        }
         $existing = DB::table('hall_slot_claims')->where('company_id', $companyId)
             ->where('hall_id', $hallId)->where('event_date', $date)
             ->where('program', $program)->lockForUpdate()->first();
