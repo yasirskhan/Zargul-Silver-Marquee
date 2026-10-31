@@ -48,4 +48,32 @@ class HallPricingTiersLivewireTest extends TestCase
         $this->assertSame(300000, app(\App\Services\HallGuestPricingService::class)
             ->quote($company->id, $hall->id, 250)['priceMinor']);
     }
-}
+    public function test_manager_and_forged_cross_company_selection_are_denied(): void
+    {
+        $company = Company::create(['name' => 'Tier UI', 'slug' => 'tier-ui-2']);
+        $hall = Hall::create(['company_id' => $company->id, 'name' => 'Hall',
+            'slug' => 'tier-ui-hall-2', 'capacity' => 500]);
+        $owner = User::create(['name' => 'Owner', 'email' => 'tier-owner-2@example.test',
+            'password' => 'test-only']);
+        $owner->markEmailAsVerified();
+        CompanyMembership::create(['company_id' => $company->id,
+            'user_id' => $owner->id, 'role' => 'owner']);
+        $manager = User::create(['name' => 'Manager', 'email' => 'tier-manager@example.test',
+            'password' => 'test-only']);
+        $manager->markEmailAsVerified();
+        CompanyMembership::create(['company_id' => $company->id,
+            'user_id' => $manager->id, 'role' => 'manager']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->be($manager);
+        $this->assertFalse(HallPricingTiers::canAccess());
+
+        $foreignCompany = Company::create(['name' => 'Foreign', 'slug' => 'foreign-tier']);
+        $foreignHall = Hall::create(['company_id' => $foreignCompany->id,
+            'name' => 'Foreign Hall', 'slug' => 'foreign-tier-hall', 'capacity' => 100]);
+        $this->be($owner);
+        Livewire::test(HallPricingTiers::class)
+            ->set('companyId', $foreignCompany->id)
+            ->set('hallId', $foreignHall->id)
+            ->assertSet('companyId', $company->id)
+            ->assertSet('hallId', $hall->id);
+    }}

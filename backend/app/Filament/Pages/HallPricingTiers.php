@@ -7,6 +7,7 @@ use App\Models\CompanyMembership;
 use App\Models\Hall;
 use App\Models\User;
 use App\Services\HallGuestPricingService;
+use App\Services\TenantAccess;
 use BackedEnum;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
@@ -34,21 +35,30 @@ final class HallPricingTiers extends Page
     #[Locked]
     public int $expectedRevision = 0;
 
+    public static function canAccess(): bool
+    {
+        $actor = Filament::auth()->user();
+        return $actor instanceof User && $actor->is_active && $actor->hasVerifiedEmail()
+            && CompanyMembership::query()->where('user_id', $actor->id)
+                ->whereIn('role', ['owner', 'admin'])->where('is_active', true)
+                ->whereHas('company', fn ($q) => $q->where('is_active', true))->exists();
+    }
+
     public function mount(): void
     {
-        $this->companyId = array_key_first($this->companyOptions());
-        $this->hallId = array_key_first($this->hallOptions());
+        $this->guardSelection();
         $this->loadPricing();
     }
 
     public function updatedCompanyId(): void
     {
-        $this->hallId = array_key_first($this->hallOptions());
+        $this->guardSelection();
         $this->loadPricing();
     }
 
     public function updatedHallId(): void
     {
+        $this->guardSelection();
         $this->loadPricing();
     }
 
@@ -69,6 +79,8 @@ final class HallPricingTiers extends Page
     {
         $actor = Filament::auth()->user();
         abort_unless($actor instanceof User && $this->companyId && $this->hallId, 403);
+        abort_unless(array_key_exists($this->companyId, $this->companyOptions()), 403);
+        abort_unless(array_key_exists($this->hallId, $this->hallOptions()), 403);
         $this->validate([
             'reason' => ['required', 'string', 'min:3', 'max:500'],
             'currencyCode' => ['required', 'regex:/^[A-Z]{3}$/'],
@@ -97,17 +109,36 @@ final class HallPricingTiers extends Page
         $actor = Filament::auth()->user();
         if (! $actor instanceof User) return [];
         return CompanyMembership::query()->where('user_id', $actor->id)
-            ->where('is_active', true)->whereHas('company', fn ($q) => $q->where('is_active', true))
+            ->whereIn('role', ['owner', 'admin'])->where('is_active', true)
+            ->whereHas('company', fn ($q) => $q->where('is_active', true))
             ->with('company')->get()->mapWithKeys(fn ($m) => [$m->company_id => $m->company->name])->all();
     }
 
     public function hallOptions(): array
     {
         if (! $this->companyId) return [];
+        $actor = Filament::auth()->user();
+        if (! $actor instanceof User || ! array_key_exists($this->companyId, $this->companyOptions())) {
+            return [];
+        }
+        $access = app(TenantAccess::class);
         return Hall::query()->where('company_id', $this->companyId)
-            ->where('is_active', true)->orderBy('name')->pluck('name', 'id')->all();
+            ->where('is_active', true)->orderBy('name')->get()
+            ->filter(fn (Hall $hall): bool => $access->canConfigureHall($actor, $hall))
+            ->mapWithKeys(fn (Hall $hall): array => [$hall->id => $hall->name])->all();
     }
 
+    private function guardSelection(): void
+    {
+        $companies = $this->companyOptions();
+        if ($this->companyId === null || ! array_key_exists($this->companyId, $companies)) {
+            $this->companyId = array_key_first($companies);
+        }
+        $halls = $this->hallOptions();
+        if ($this->hallId === null || ! array_key_exists($this->hallId, $halls)) {
+            $this->hallId = array_key_first($halls);
+        }
+    }
     private function loadPricing(): void
     {
         $this->tiers = [];
