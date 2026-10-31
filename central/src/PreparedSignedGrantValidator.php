@@ -91,10 +91,23 @@ final class PreparedSignedGrantValidator
             }
         }
         $keys=array_keys($claim);sort($keys);
-        if($keys!==['api_version','approved_domains','customer_id','edition',
+        $allowed=['api_version','approved_domains','customer_id','edition',
             'expires_at','features','installation_id','issuer','license_id',
-            'limits','not_before','product','revision','term_months']) {
+            'limits','not_before','product','revision','term_months'];
+        if(array_key_exists('designer_credit',$claim))$allowed[]='designer_credit';
+        sort($allowed);
+        if($keys!==$allowed) {
             throw new RegistrationError('invalid_grant_claim');
+        }
+        $approvedCredit=CentralStaffDesignerCreditService::currentForLicense(
+            $this->db,(string)$row['license_id']);
+        if($approvedCredit===null) {
+            if(array_key_exists('designer_credit',$claim)) {
+                throw new RegistrationError('designer_credit_mismatch');
+            }
+        } elseif(!array_key_exists('designer_credit',$claim) ||
+            $claim['designer_credit']!==$approvedCredit) {
+            throw new RegistrationError('designer_credit_mismatch');
         }
         $start=(new DateTimeImmutable($row['begins_at']))->setTimezone(new DateTimeZone('UTC'))
             ->format('Y-m-d\TH:i:s\Z');

@@ -33,13 +33,18 @@ final class CentralStaffDesignerCreditService
                 !$this->authorization->permits($bearer,'license.issue_paid',$customer)) {
                 throw new RegistrationError('license_officer_required');
             }
-            $existing=$this->db->prepare('SELECT version,credit FROM central_license_designer_credits WHERE request_id=:request');
+            $existing=$this->db->prepare('SELECT license_id,version,credit
+                FROM central_license_designer_credits WHERE request_id=:request');
             $existing->execute(['request'=>$requestId]);
             $row=$existing->fetch(PDO::FETCH_ASSOC);
             if (is_array($row)) {
+                $stored=json_decode((string)$row['credit'],true,16,JSON_THROW_ON_ERROR);
+                if ((string)$row['license_id']!==$licenseId || $stored!==$clean) {
+                    throw new RegistrationError('designer_credit_request_conflict',409);
+                }
                 $this->db->commit();
                 return ['license_id'=>$licenseId,'version'=>(int)$row['version'],
-                    'credit'=>json_decode((string)$row['credit'],true,16,JSON_THROW_ON_ERROR)];
+                    'credit'=>$stored];
             }
             $version=(int)$this->db->query('SELECT COALESCE(MAX(version),0)+1 FROM central_license_designer_credits WHERE license_id='.$this->db->quote($licenseId))->fetchColumn();
             $id=self::uuidv4();
