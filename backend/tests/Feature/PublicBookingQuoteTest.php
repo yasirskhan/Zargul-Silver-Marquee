@@ -130,4 +130,55 @@ class PublicBookingQuoteTest extends TestCase
         $this->assertSame(0, DB::table('public_booking_holds')->count());
         $this->assertCount(1, app(PublicBookingQuoteService::class)
             ->quote($company->id, '2027-12-06', 'noon', 100)['halls']);
+    }
+    public function test_verified_synthetic_deposit_confirms_booking_atomically(): void
+    {
+        [$company, $hall, $owner] = $this->fixture();
+        config()->set('public_booking.holds_enabled', true);
+        config()->set('public_booking.synthetic_verifier_secret', str_repeat('s', 32));
+        $quote = app(PublicBookingQuoteService::class)->quote($company->id, '2027-12-07', 'evening', 200);
+        $hold = app(\App\Services\PublicBookingHoldService::class)->create($company->id, $quote, $hall->id,
+            ['name' => 'Synthetic Customer', 'email' => 'customer@example.test'], (string) Str::uuid());
+        $canonical = implode('|', [$company->id, $hold['holdId'], 'SYNTH-0001',
+            (string) $hold['depositMinor'], 'PKR', 'ci-verifier']);
+        $signature = hash_hmac('sha256', $canonical, str_repeat('s', 32));
+        $evidence = app(\App\Services\PublicBookingPaymentService::class)->verifySynthetic(
+            $company->id, $hold['holdId'], 'SYNTH-0001', $hold['depositMinor'], 'PKR',
+            'ci-verifier', $signature);
+        $this->assertNotEmpty($evidence['evidenceId']);
+        $confirmation = app(\App\Services\PublicBookingConfirmationService::class)
+            ->confirm($company->id, $hold['token']);
+        $this->assertSame($hold['depositMinor'], $confirmation['depositMinor']);
+        $this->assertSame(0, DB::table('public_booking_holds')->count());
+        $this->assertSame(1, DB::table('public_booking_confirmations')->count());
+        $this->assertSame(1, DB::table('public_booking_payment_evidence')->count());
+        $this->assertSame(1, DB::table('audit_events')
+            ->where('action', 'public_booking.confirmed')->count());
+        $this->expectException(ConflictHttpException::class);
+        app(\App\Services\PublicBookingConfirmationService::class)->confirm($company->id, $hold['token']);
+    }
+
+    public function test_synthetic_verifier_rejects_underpayment_and_forged_signature(): void
+    {
+        [$company, $hall, $owner] = $this->fixture();
+        config()->set('public_booking.holds_enabled', true);
+        config()->set('public_booking.synthetic_verifier_secret', str_repeat('s', 32));
+        $quote = app(PublicBookingQuoteService::class)->quote($company->id, '2027-12-08', 'noon', 100);
+        $hold = app(\App\Services\PublicBookingHoldService::class)->create($company->id, $quote, $hall->id,
+            ['name' => 'Synthetic Customer', 'email' => 'customer@example.test'], (string) Str::uuid());
+        $payment = app(\App\Services\PublicBookingPaymentService::class);
+        try {
+            $payment->verifySynthetic($company->id, $hold['holdId'], 'SYNTH-2',
+                $hold['depositMinor'] - 1, 'PKR', 'ci-verifier', str_repeat('a', 64));
+            $this->fail('Forged underpayment accepted.');
+        } catch (ConflictHttpException) {
+            $this->assertTrue(true);
+        }
+        try {
+            $payment->verifySynthetic($company->id, $hold['holdId'], 'SYNTH-3',
+                $hold['depositMinor'], 'USD', 'ci-verifier', str_repeat('a', 64));
+            $this->fail('Wrong currency accepted.');
+        } catch (ConflictHttpException) {
+            $this->assertTrue(true);
+        }
     }}

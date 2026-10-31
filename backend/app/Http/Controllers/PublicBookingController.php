@@ -103,6 +103,34 @@ final class PublicBookingController
         return view('site.booking.confirmed', ['hold' => $hold]);
     }
 
+    public function confirm(Request $request)
+    {
+        $this->guard();
+        $data = $request->validate(['token' => ['required', 'string', 'size:64']]);
+        try {
+            $confirmed = app(\App\Services\PublicBookingConfirmationService::class)
+                ->confirm($this->companyId(), $data['token']);
+        } catch (\Throwable $e) {
+            $safe = $e instanceof \InvalidArgumentException ||
+                $e instanceof \Symfony\Component\HttpKernel\Exception\HttpException
+                ? $e->getMessage() : 'Unable to confirm this booking.';
+            return back()->withErrors(['booking' => $safe]);
+        }
+
+        return view('site.booking.confirmed-booking', ['confirmation' => $confirmed]);
+    }
+
+    public function status(Request $request)
+    {
+        $this->guard();
+        $data = $request->validate(['token' => ['required', 'string', 'size:64']]);
+        $row = \Illuminate\Support\Facades\DB::table('public_booking_confirmations')
+            ->where('company_id', $this->companyId())
+            ->where('token_hash', hash('sha256', $data['token']))->first();
+        abort_if($row === null, 404);
+
+        return view('site.booking.status', ['booking' => $row]);
+    }
     public function cancel(Request $request)
     {
         $this->guard();

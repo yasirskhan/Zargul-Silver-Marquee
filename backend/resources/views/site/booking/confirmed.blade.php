@@ -10,5 +10,9 @@
 <input type="hidden" name="token" value="{{ $hold['token'] }}">
 <button type="submit">Cancel this temporary hold</button>
 </form>
+<form method="POST" action="/book/confirm">@csrf
+<input type="hidden" name="token" value="{{ $hold['token'] }}">
+<button type="submit">Confirm booking after verified deposit</button>
+</form>
 <p><a href="/book">Start another booking</a></p>
 </div></main></body></html>

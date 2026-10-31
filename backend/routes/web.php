@@ -30,6 +30,10 @@ Route::post('/book/submit', [\App\Http\Controllers\PublicBookingController::clas
     ->middleware('throttle:10,1')->name('public.booking.submit');
 Route::post('/book/cancel', [\App\Http\Controllers\PublicBookingController::class, 'cancel'])
     ->middleware('throttle:10,1')->name('public.booking.cancel');
+Route::post('/book/confirm', [\App\Http\Controllers\PublicBookingController::class, 'confirm'])
+    ->middleware('throttle:10,1')->name('public.booking.confirm');
+Route::get('/book/status', [\App\Http\Controllers\PublicBookingController::class, 'status'])
+    ->middleware('throttle:20,1')->name('public.booking.status');
 Route::get('/robots.txt', \App\Http\Controllers\PublishedVenueRobotsController::class);
 Route::get('/sitemap.xml', \App\Http\Controllers\PublishedVenueSitemapController::class);
 
