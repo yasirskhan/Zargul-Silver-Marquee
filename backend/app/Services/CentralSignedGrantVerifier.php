@@ -91,9 +91,12 @@ final class CentralSignedGrantVerifier
         }
         if (array_key_exists('designer_credit', $grant)) {
             $credit = $grant['designer_credit'];
+            $keys = ['alignment', 'enabled', 'label', 'prefix', 'url'];
+            $actualKeys = is_array($credit) && ! array_is_list($credit)
+                ? array_keys($credit) : [];
+            sort($actualKeys);
             if (! is_array($credit) || array_is_list($credit)
-                || array_diff(array_keys($credit),
-                    ['enabled', 'prefix', 'label', 'url', 'alignment'])
+                || $actualKeys !== $keys
                 || ! is_bool($credit['enabled'] ?? null)
                 || ! is_string($credit['prefix'] ?? null)
                 || mb_strlen($credit['prefix']) > 40
@@ -102,16 +105,28 @@ final class CentralSignedGrantVerifier
                 || ! is_string($credit['url'] ?? null)
                 || mb_strlen($credit['url']) > 500
                 || ! in_array($credit['alignment'] ?? null,
-                    ['left', 'center', 'right'], true)) {
+                    ['left', 'center', 'right'], true)
+                || preg_match('/[<>\x00-\x1F\x7F]/u', $credit['prefix'])
+                || preg_match('/[<>\x00-\x1F\x7F]/u', $credit['label'])
+                || preg_match('/[\x00-\x1F\x7F]/u', $credit['url'])) {
                 throw new InvalidArgumentException('Invalid signed designer credit.');
             }
             if ($credit['enabled']) {
+                $parts = parse_url($credit['url']);
+                $host = is_array($parts) ? ($parts['host'] ?? '') : '';
                 if (trim($credit['label']) === ''
-                    || ! preg_match('#^https://[A-Za-z0-9.-]+(?::[0-9]{1,5})?(?:/[^\s<>"\']*)?$#D',
-                        $credit['url'])
-                    || preg_match('/[<>"\']/u', $credit['prefix'])) {
+                    || ! is_array($parts) || ($parts['scheme'] ?? '') !== 'https'
+                    || isset($parts['user']) || isset($parts['pass'])
+                    || ! is_string($host) || strlen($host) > 253
+                    || ! str_contains($host, '.')
+                    || ! preg_match('/\A[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\z/D', $host)
+                    || str_contains($host, '..')
+                    || (isset($parts['port']) && ($parts['port'] < 1 || $parts['port'] > 65535))) {
                     throw new InvalidArgumentException('Invalid enabled designer credit.');
                 }
+            } elseif ($credit['prefix'] !== '' || $credit['label'] !== ''
+                || $credit['url'] !== '') {
+                throw new InvalidArgumentException('Disabled designer credit must not carry visible text.');
             }
         }        $starts = self::utcInstant($grant['not_before'] ?? null);
         $ends = self::utcInstant($grant['expires_at'] ?? null);

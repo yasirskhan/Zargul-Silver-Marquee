@@ -126,7 +126,8 @@ class CentralSignedGrantVerifierTest extends TestCase
             } catch (InvalidArgumentException) {}
         }
 
-        $grant['designer_credit']['enabled'] = false;
+        $grant['designer_credit'] = ['enabled' => false, 'prefix' => '',
+            'label' => '', 'url' => '', 'alignment' => 'center'];
         $disabled = $service->verify($this->sign($grant, $pair), $grant['customer_id'],
             $grant['installation_id'], 'venue.example.test', 0,
             new DateTimeImmutable('2026-11-01T00:00:00Z'));
