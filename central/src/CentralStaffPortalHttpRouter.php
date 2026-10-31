@@ -191,6 +191,7 @@ final class CentralStaffPortalHttpRouter
                 !is_string($fields['license_id']??null) ||
                 !is_string($fields['request_id']??null) ||
                 !is_string($fields['enabled']??null) ||
+                !in_array($fields['enabled'],['0','1'],true) ||
                 !is_string($fields['prefix']??null) ||
                 !is_string($fields['label']??null) ||
                 !is_string($fields['url']??null) ||

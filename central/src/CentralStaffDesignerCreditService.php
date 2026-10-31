@@ -39,7 +39,8 @@ final class CentralStaffDesignerCreditService
             $row=$existing->fetch(PDO::FETCH_ASSOC);
             if (is_array($row)) {
                 $stored=json_decode((string)$row['credit'],true,16,JSON_THROW_ON_ERROR);
-                if ((string)$row['license_id']!==$licenseId || $stored!==$clean) {
+                if ((string)$row['license_id']!==$licenseId ||
+                    self::canonical($stored)!==self::canonical($clean)) {
                     throw new RegistrationError('designer_credit_request_conflict',409);
                 }
                 $this->db->commit();
@@ -96,6 +97,12 @@ final class CentralStaffDesignerCreditService
         $q->execute(['id'=>$licenseId]);
         $value=$q->fetchColumn();
         return is_string($value) ? json_decode($value,true,16,JSON_THROW_ON_ERROR) : null;
+    }
+
+    private static function canonical(array $credit): array
+    {
+        ksort($credit);
+        return $credit;
     }
 
     private static function uuid(string $value): bool
