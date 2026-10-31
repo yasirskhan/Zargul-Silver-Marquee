@@ -101,6 +101,7 @@ jobs:
           php central/tests/staff_session_authorization.php
           php central/tests/staff_http_boundary.php
           php central/tests/staff_response_emitter.php
+          php central/tests/designer_credit_policy.php
           php central/tests/staff_operator_wiring.php
           php central/tests/staff_public_portal.php
           php central/tests/staff_portal_journey.php

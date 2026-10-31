@@ -40,7 +40,8 @@ final class CentralStaffPortalHttpRouter
         private readonly ?CentralStaffVendorPlanPublisher $planPublisher = null,
         private readonly ?CentralStaffVendorPlanCatalogReader $planCatalog = null,
         private readonly ?CentralStaffPortalHome $staffHome = null,
-        private readonly ?CentralStaffCustomerDirectory $customerDirectory = null
+        private readonly ?CentralStaffCustomerDirectory $customerDirectory = null,
+        private readonly ?CentralStaffDesignerCreditService $designerCredit = null
     ) {}
 
     /**
@@ -169,6 +170,51 @@ final class CentralStaffPortalHttpRouter
                     $rows,$fields['customer_id'],$csrfHeader)];
         }
 
+        if($uri==='/staff/licenses/designer-credit' && $this->designerCredit!==null) {
+            if(!$this->exactFields($fields,['license_id']) ||
+                !is_string($fields['license_id']??null) ||
+                !self::uuid($fields['license_id'])) {
+                throw new RegistrationError('invalid_designer_credit',422);
+            }
+            if(!$this->boundary->permitsMutation($server,$bearer,$csrfHeader,
+                    'license.issue_paid',null)) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            return ['kind'=>'private_designer_credit_html',
+                'html'=>CentralStaffDesignerCreditRenderer::form(
+                    $fields['license_id'],$csrfHeader,self::uuidv4(),
+                    $this->designerCredit->history($bearer,$fields['license_id']))];
+        }
+        if($uri==='/staff/licenses/designer-credit/configure' && $this->designerCredit!==null) {
+            if(!$this->exactFields($fields,['license_id','request_id','enabled',
+                    'prefix','label','url','alignment']) ||
+                !is_string($fields['license_id']??null) ||
+                !is_string($fields['request_id']??null) ||
+                !is_string($fields['enabled']??null) ||
+                !is_string($fields['prefix']??null) ||
+                !is_string($fields['label']??null) ||
+                !is_string($fields['url']??null) ||
+                !is_string($fields['alignment']??null) ||
+                !self::uuid($fields['license_id']) ||
+                !self::uuid($fields['request_id'])) {
+                throw new RegistrationError('invalid_designer_credit',422);
+            }
+            if(!$this->boundary->permitsMutation($server,$bearer,$csrfHeader,
+                    'license.issue_paid',null)) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            $credit=$this->designerCredit->configure($bearer,$fields['license_id'],
+                $fields['request_id'],[
+                    'enabled'=>$fields['enabled']==='1',
+                    'prefix'=>$fields['prefix'],'label'=>$fields['label'],
+                    'url'=>$fields['url'],'alignment'=>$fields['alignment'],
+                ]);
+            return ['kind'=>'private_designer_credit_html',
+                'html'=>CentralStaffDesignerCreditRenderer::form(
+                    $fields['license_id'],$csrfHeader,self::uuidv4(),
+                    $this->designerCredit->history($bearer,$fields['license_id']),
+                    'Designer credit version '.$credit['version'].' saved and audited.')];
+        }
         if($uri==='/staff/plans' && $this->planPublisher!==null) {
             if($fields!==[]) {
                 throw new RegistrationError('invalid_vendor_plan_request',422);

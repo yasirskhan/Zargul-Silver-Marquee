@@ -78,7 +78,9 @@ final class CentralStaffSignedGrantManifest
             }
         }
         $utc=new DateTimeZone('UTC');
-        return [
+        $credit=CentralStaffDesignerCreditService::currentForLicense(
+            $this->db,(string)$row['license_id']);
+        $claims=[
             'api_version'=>'v1',
             'issuer'=>'HAFZATECH',
             'product'=>'VenueDesk',
@@ -94,5 +96,10 @@ final class CentralStaffSignedGrantManifest
             'limits'=>['max_halls'=>$plan['max_halls'],'max_staff'=>$plan['max_staff']],
             'features'=>$plan['features'],
         ];
+        if ($credit !== null) {
+            $claims['designer_credit']=$credit;
+        }
+
+        return $claims;
     }
 }
