@@ -112,7 +112,10 @@ final class PublicBookingQuoteService
                     ->where('expires_at', '>', now())))->exists();
         if ($held || DB::table('public_booking_holds')->where('company_id', $companyId)
             ->where('hall_id', $hallId)->where('event_date', $date)
-            ->where('program', $program)->where('expires_at', '>', now())->exists()) {
+            ->where('program', $program)->where('expires_at', '>', now())->exists()
+            || DB::table('public_booking_confirmations')->where('company_id', $companyId)
+                ->where('hall_id', $hallId)->where('event_date', $date)
+                ->where('program', $program)->exists()) {
             return false;
         }
 

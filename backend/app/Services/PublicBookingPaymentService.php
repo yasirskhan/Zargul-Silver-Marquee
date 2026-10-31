@@ -13,6 +13,10 @@ final class PublicBookingPaymentService
     public function verifySynthetic(string $companyId, string $holdId, string $reference,
         int $amountMinor, string $currencyCode, string $verifier, string $signature): array
     {
+        if (config('public_booking.synthetic_test_boundary') !== true
+            || ! app()->environment('testing')) {
+            throw new ConflictHttpException('Synthetic payment verification is unavailable.');
+        }
         $secret = config('public_booking.synthetic_verifier_secret');
         if (! is_string($secret) || strlen($secret) < 32) {
             throw new ConflictHttpException('Synthetic payment verification is not enabled.');

@@ -35,7 +35,13 @@ final class PublicBookingConfirmationService
                 throw new ConflictHttpException('Independently verified deposit evidence is required.');
             }
             $quote = json_decode($hold->quote, true, 64, JSON_THROW_ON_ERROR);
-            $hallQuote = $quote['halls'][0] ?? null;
+            $hallQuote = null;
+            foreach (($quote['halls'] ?? []) as $candidate) {
+                if (($candidate['hallId'] ?? null) === $hold->hall_id) {
+                    $hallQuote = $candidate;
+                    break;
+                }
+            }
             $hall = DB::table('halls')->where('company_id', $companyId)
                 ->where('id', $hold->hall_id)->first();
             if (! $hallQuote || ! $hall || $hallQuote['hallId'] !== $hold->hall_id

@@ -136,6 +136,7 @@ class PublicBookingQuoteTest extends TestCase
         [$company, $hall, $owner] = $this->fixture();
         config()->set('public_booking.holds_enabled', true);
         config()->set('public_booking.synthetic_verifier_secret', str_repeat('s', 32));
+        config()->set('public_booking.synthetic_test_boundary', true);
         $quote = app(PublicBookingQuoteService::class)->quote($company->id, '2027-12-07', 'evening', 200);
         $hold = app(\App\Services\PublicBookingHoldService::class)->create($company->id, $quote, $hall->id,
             ['name' => 'Synthetic Customer', 'email' => 'customer@example.test'], (string) Str::uuid());
@@ -163,6 +164,7 @@ class PublicBookingQuoteTest extends TestCase
         [$company, $hall, $owner] = $this->fixture();
         config()->set('public_booking.holds_enabled', true);
         config()->set('public_booking.synthetic_verifier_secret', str_repeat('s', 32));
+        config()->set('public_booking.synthetic_test_boundary', true);
         $quote = app(PublicBookingQuoteService::class)->quote($company->id, '2027-12-08', 'noon', 100);
         $hold = app(\App\Services\PublicBookingHoldService::class)->create($company->id, $quote, $hall->id,
             ['name' => 'Synthetic Customer', 'email' => 'customer@example.test'], (string) Str::uuid());
@@ -181,4 +183,51 @@ class PublicBookingQuoteTest extends TestCase
         } catch (ConflictHttpException) {
             $this->assertTrue(true);
         }
+    }
+    public function test_second_eligible_hall_can_be_confirmed_and_then_blocks_new_quotes(): void
+    {
+        [$company, $hall, $owner] = $this->fixture();
+        $second = Hall::create(['company_id' => $company->id, 'name' => 'Second Hall',
+            'slug' => 'second-booking-hall', 'capacity' => 300, 'is_bookable' => true]);
+        DB::table('hall_guest_pricing_revisions')->insert([
+            'id' => (string) Str::uuid(), 'company_id' => $company->id, 'hall_id' => $second->id,
+            'revision_number' => 1, 'tiers' => json_encode([
+                ['minGuests' => 1, 'maxGuests' => 300, 'priceMinor' => 250000],
+            ], JSON_THROW_ON_ERROR), 'currency_code' => 'PKR', 'changed_by' => $owner->id,
+            'reason' => 'Second hall tiers', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('hall_program_rule_revisions')->insert([
+            'id' => (string) Str::uuid(), 'company_id' => $company->id, 'hall_id' => $second->id,
+            'revision_number' => 1, 'currency_code' => 'PKR', 'rules' => json_encode([
+                'morning' => ['start' => '09:00', 'end' => '13:00', 'rentalRateMinor' => 10000],
+                'noon' => ['start' => '13:00', 'end' => '17:00', 'rentalRateMinor' => 10000],
+                'evening' => ['start' => '18:00', 'end' => '23:00', 'rentalRateMinor' => 10000],
+            ], JSON_THROW_ON_ERROR), 'changed_by' => $owner->id, 'reason' => 'Second hall programs',
+            'created_at' => now(),
+        ]);
+        DB::table('halls')->where('id', $second->id)->update([
+            'guest_pricing_revision' => 1, 'program_rules_revision' => 1, 'addon_catalog_revision' => 0,
+        ]);
+        config()->set('public_booking.holds_enabled', true);
+        config()->set('public_booking.synthetic_verifier_secret', str_repeat('s', 32));
+        config()->set('public_booking.synthetic_test_boundary', true);
+        $quote = app(PublicBookingQuoteService::class)->quote($company->id, '2027-12-09', 'morning', 100);
+        $this->assertCount(2, $quote['halls']);
+        $holds = app(\App\Services\PublicBookingHoldService::class);
+        $hold = $holds->create($company->id, $quote, $second->id,
+            ['name' => 'Second Hall Customer', 'email' => 'second@example.test'], (string) Str::uuid());
+        $canonical = implode('|', [$company->id, $hold['holdId'], 'SYNTH-SECOND',
+            (string) $hold['depositMinor'], 'PKR', 'ci-verifier']);
+        app(\App\Services\PublicBookingPaymentService::class)->verifySynthetic($company->id,
+            $hold['holdId'], 'SYNTH-SECOND', $hold['depositMinor'], 'PKR', 'ci-verifier',
+            hash_hmac('sha256', $canonical, str_repeat('s', 32)));
+        $confirmed = app(\App\Services\PublicBookingConfirmationService::class)
+            ->confirm($company->id, $hold['token']);
+        $this->assertNotEmpty($confirmed['confirmationId']);
+        $this->assertSame($second->id, DB::table('public_booking_confirmations')
+            ->value('hall_id'));
+        $remaining = app(PublicBookingQuoteService::class)
+            ->quote($company->id, '2027-12-09', 'morning', 100);
+        $this->assertCount(1, $remaining['halls']);
+        $this->assertSame($hall->id, $remaining['halls'][0]['hallId']);
     }}

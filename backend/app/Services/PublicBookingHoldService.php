@@ -90,6 +90,9 @@ final class PublicBookingHoldService
                     ->where('program', $hall['program'])->where('status', 'confirmed')->exists()
                 || DB::table('public_booking_holds')->where('company_id', $companyId)
                     ->where('hall_id', $hallId)->where('event_date', $hall['date'])
+                    ->where('program', $hall['program'])->exists()
+                || DB::table('public_booking_confirmations')->where('company_id', $companyId)
+                    ->where('hall_id', $hallId)->where('event_date', $hall['date'])
                     ->where('program', $hall['program'])->exists();
             if ($occupied) {
                 throw new ConflictHttpException('Another customer has just taken this slot.');
