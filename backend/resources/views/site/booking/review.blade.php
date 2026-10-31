@@ -22,6 +22,7 @@
 @csrf
 <input type="hidden" name="quote" value="{{ $token }}">
 <input type="hidden" name="hall_id" value="{{ $hall['hallId'] }}">
+<input type="hidden" name="idempotency_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
 <label>Your name <input name="customer_name" required maxlength="120"></label>
 <label>Email <input type="email" name="email" maxlength="254"></label>
 <label>Phone <input name="phone" maxlength="32"></label>

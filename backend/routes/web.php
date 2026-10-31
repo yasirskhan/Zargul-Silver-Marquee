@@ -28,6 +28,8 @@ Route::post('/book/review', [\App\Http\Controllers\PublicBookingController::clas
     ->middleware('throttle:20,1')->name('public.booking.review');
 Route::post('/book/submit', [\App\Http\Controllers\PublicBookingController::class, 'submit'])
     ->middleware('throttle:10,1')->name('public.booking.submit');
+Route::post('/book/cancel', [\App\Http\Controllers\PublicBookingController::class, 'cancel'])
+    ->middleware('throttle:10,1')->name('public.booking.cancel');
 Route::get('/robots.txt', \App\Http\Controllers\PublishedVenueRobotsController::class);
 Route::get('/sitemap.xml', \App\Http\Controllers\PublishedVenueSitemapController::class);
 

@@ -1,0 +1,1 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Hold cancelled</title></head><body><main><h1>Temporary hold cancelled</h1><p>No booking or payment was created.</p><p><a href="/book">Start a new booking</a></p></main></body></html>

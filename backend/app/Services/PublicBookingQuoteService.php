@@ -21,23 +21,37 @@ final class PublicBookingQuoteService
             || count($addonCodes) > 20) {
             throw new InvalidArgumentException('Enter a valid event date, program and guest count.');
         }
-        $addonCodes = array_values(array_unique(array_filter($addonCodes,
-            fn ($code): bool => is_string($code) && preg_match('/^[a-z][a-z0-9_]{0,63}$/D', $code))));
+        foreach ($addonCodes as $code) {
+            if (! is_string($code) || preg_match('/^[a-z][a-z0-9_]{0,63}$/D', $code) !== 1) {
+                throw new InvalidArgumentException('An add-on selection is invalid.');
+            }
+        }
+        $addonCodes = array_values(array_unique($addonCodes));
         if (count($addonCodes) > 20) {
             throw new InvalidArgumentException('Too many add-ons selected.');
+        }
+        $today = (new \DateTimeImmutable('today'))->format('Y-m-d');
+        if ($date < $today) {
+            throw new InvalidArgumentException('Choose a future event date.');
         }
         $halls = DB::table('halls')->where('company_id', $companyId)
             ->where('is_active', true)->where('is_bookable', true)
             ->where('capacity', '>=', $guests)->orderBy('name')->get();
         $results = [];
         foreach ($halls as $hall) {
-            $availability = $this->availability($companyId, $hall->id, $date, $program);
-            if (! $availability) {
+            try {
+                $availability = $this->availability($companyId, $hall->id, $date, $program);
+                if (! $availability) {
+                    continue;
+                }
+                $guest = app(HallGuestPricingService::class)->quote($companyId, $hall->id, $guests);
+                $programRules = $this->programRule($companyId, $hall->id, $program);
+                $addons = $this->addons($companyId, $hall->id, $addonCodes, $guests);
+            } catch (ConflictHttpException|InvalidArgumentException) {
+                // One unconfigured or unavailable hall must not block other
+                // eligible halls. Only approved and fully priced halls quote.
                 continue;
             }
-            $guest = app(HallGuestPricingService::class)->quote($companyId, $hall->id, $guests);
-            $programRules = $this->programRule($companyId, $hall->id, $program);
-            $addons = $this->addons($companyId, $hall->id, $addonCodes, $guests);
             $lines = [[
                 'code' => 'guest_tier', 'label' => 'Guest package',
                 'amountMinor' => $guest['priceMinor'],
@@ -96,7 +110,9 @@ final class PublicBookingQuoteService
             ->where(fn ($q) => $q->where('status', 'confirmed')
                 ->orWhere(fn ($q) => $q->where('status', 'hold')
                     ->where('expires_at', '>', now())))->exists();
-        if ($held) {
+        if ($held || DB::table('public_booking_holds')->where('company_id', $companyId)
+            ->where('hall_id', $hallId)->where('event_date', $date)
+            ->where('program', $program)->where('expires_at', '>', now())->exists()) {
             return false;
         }
 

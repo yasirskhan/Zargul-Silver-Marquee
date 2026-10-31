@@ -81,4 +81,53 @@ class PublicBookingQuoteTest extends TestCase
         ]);        $this->expectException(ConflictHttpException::class);
         $service->quote($company->id, '2027-12-02', 'noon', 100);
     }
-}
+    public function test_past_dates_malformed_addons_and_unconfigured_halls_are_safe(): void
+    {
+        [$company, $hall, $owner] = $this->fixture();
+        $extra = Hall::create(['company_id' => $company->id, 'name' => 'Unpriced Hall',
+            'slug' => 'unpriced-hall', 'capacity' => 300, 'is_bookable' => true]);
+        $service = app(PublicBookingQuoteService::class);
+        $quote = $service->quote($company->id, '2027-12-03', 'morning', 50);
+        $this->assertCount(1, $quote['halls']);
+        $this->assertSame($hall->id, $quote['halls'][0]['hallId']);
+        try {
+            $service->quote($company->id, '2020-01-01', 'morning', 50);
+            $this->fail('Past date was accepted.');
+        } catch (\InvalidArgumentException) {}
+        try {
+            $service->quote($company->id, '2027-12-03', 'morning', 50, ['Bad Code!']);
+            $this->fail('Malformed add-on was accepted.');
+        } catch (\InvalidArgumentException) {}
+    }
+    public function test_public_hold_is_idempotent_blocks_competitors_and_can_be_cancelled(): void
+    {
+        [$company, $hall, $owner] = $this->fixture();
+        config()->set('public_booking.holds_enabled', true);
+        $service = app(PublicBookingQuoteService::class);
+        $quote = $service->quote($company->id, '2027-12-05', 'evening', 200);
+        $holds = app(\App\Services\PublicBookingHoldService::class);
+        $key = (string) Str::uuid();
+        $customer = ['name' => 'Synthetic Customer', 'email' => 'customer@example.test', 'phone' => ''];
+        $first = $holds->create($company->id, $quote, $hall->id, $customer, $key);
+        $this->assertSame(21000, $first['depositMinor']);
+        $retry = $holds->create($company->id, $quote, $hall->id, $customer, $key);
+        $this->assertSame($first['token'], $retry['token']);
+        $this->assertSame(1, DB::table('public_booking_holds')->count());
+
+        $this->expectException(ConflictHttpException::class);
+        $service->quote($company->id, '2027-12-05', 'evening', 200);
+    }
+
+    public function test_cancelled_hold_releases_slot(): void
+    {
+        [$company, $hall, $owner] = $this->fixture();
+        config()->set('public_booking.holds_enabled', true);
+        $quote = app(PublicBookingQuoteService::class)->quote($company->id, '2027-12-06', 'noon', 100);
+        $holds = app(\App\Services\PublicBookingHoldService::class);
+        $hold = $holds->create($company->id, $quote, $hall->id,
+            ['name' => 'Synthetic Customer', 'email' => 'customer@example.test'], (string) Str::uuid());
+        $holds->cancel($company->id, $hold['token']);
+        $this->assertSame(0, DB::table('public_booking_holds')->count());
+        $this->assertCount(1, app(PublicBookingQuoteService::class)
+            ->quote($company->id, '2027-12-06', 'noon', 100)['halls']);
+    }}
