@@ -6,7 +6,7 @@ on:
   pull_request:
 jobs:
   prototype-checks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -51,7 +51,7 @@ jobs:
           node --check assets/website-editor.mjs
 
   central-postgres:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16
@@ -135,7 +135,7 @@ jobs:
           php central/tests/vendor_verified_reversals.php
 
   licensing-postgres:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16
@@ -175,7 +175,7 @@ jobs:
         run: php artisan test --no-ansi --exclude-group=phase9-finance-process --filter='Central.*Test|VenueOverviewLivewireTest'
 
   laravel-postgres:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16
@@ -278,7 +278,7 @@ jobs:
 
 
   editor-browser-e2e:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -322,7 +322,7 @@ jobs:
           if-no-files-found: ignore
 
   authenticated-panel-e2e:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16
