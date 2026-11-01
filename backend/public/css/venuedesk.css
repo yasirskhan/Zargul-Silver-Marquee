@@ -29,3 +29,9 @@ body{font-family:'DM Sans',system-ui,sans-serif}
 .vd-actions a{border:1px solid var(--vd-line);background:#fff;padding:10px 14px;border-radius:3px;font-weight:600;font-size:.82rem}
 .vd-actions a:hover{border-color:var(--vd-gold);color:#8a6a3e}
 @media(max-width:800px){.vd-hero h1{font-size:2rem}.fi-page-title{font-size:1.9rem!important}}
+/* Contrast fixes for Filament item internals and hero action links. */
+.fi-sidebar-item-label,.fi-sidebar-item-icon,.fi-sidebar-group-label,.fi-sidebar button{color:#dce9df!important}
+.fi-sidebar-item.fi-active .fi-sidebar-item-label,.fi-sidebar-item.fi-active .fi-sidebar-item-icon{color:#172c23!important}
+.vd-actions a{color:var(--vd-forest)!important;background:#fff!important;border:1px solid #d8ddd5!important;text-decoration:none}
+.vd-actions a:hover{background:#f5f1e8!important;color:#6b512f!important}
+.vd-hero .vd-actions a{color:var(--vd-forest)!important}

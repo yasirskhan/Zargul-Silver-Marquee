@@ -124,12 +124,7 @@
         <div class="hall-grid">
             @forelse (($snapshot['halls'] ?? []) as $hall)
                 <article class="hall-card">
-                    @php $hallImageId = $galleryIds === [] ? null : $galleryIds[$loop->index % count($galleryIds)]; @endphp
-                    @if ($mediaBase!==null && $hallImageId!==null && isset($snapshot['media'][$hallImageId]))
-                        <img src="{{ $mediaBase.$hallImageId.'.webp' }}" alt="{{ $hall['name'] }} published venue photograph" loading="lazy">
-                    @else
-                        <div class="hall-media" role="img" aria-label="{{ $hall['name'] }} — published photograph unavailable" style="background:linear-gradient(135deg,#17372e,#caa56b)"></div>
-                    @endif
+                    <div class="hall-media" role="img" aria-label="{{ $hall['name'] }} — published hall photograph unavailable" style="background:linear-gradient(135deg,#17372e,#caa56b)"></div>
                     <div class="hall-caption"><div><h3>{{ $hall['name'] }}</h3><p>Up to {{ $hall['capacity'] }} guests</p>@if($hall['address']!=='')<p>{{ $hall['address'] }}</p>@endif
                         @if(($hall['phone']??'')!=='')<p><a href="tel:{{ preg_replace('/[^+0-9]/','',$hall['phone']) }}">{{ $hall['phone'] }}</a></p>@endif
                         @if(($hall['whatsapp']??'')!=='')<p><a href="https://wa.me/{{ preg_replace('/[^0-9]/','',$hall['whatsapp']) }}" rel="noopener noreferrer">{{ $hall['whatsapp'] }}</a></p>@endif
