@@ -1,9 +1,17 @@
 <x-filament-panels::page>
     <div class="space-y-6">
-        <p class="text-sm text-gray-600 dark:text-gray-300">
-            Your private VenueDesk workspace. Counts reflect only your current company and role.
-            Booking proposals are unconfirmed and do not reserve hall availability.
-        </p>
+        <section class="vd-hero">
+            <span class="eyebrow">VenueDesk · Zargul Silver Marquee</span>
+            <h1>Business Overview</h1>
+            <p>Your private operations workspace. Counts reflect only your current company and role. Booking proposals remain unconfirmed until approved.</p>
+            <div class="vd-actions">
+                <a href="{{ \App\Filament\Pages\HallCalendar::getUrl() }}">Calendar &amp; availability</a>
+                <a href="{{ \App\Filament\Pages\BookingProposals::getUrl() }}">New booking proposal</a>
+                <a href="{{ \App\Filament\Pages\FinanceDesk::getUrl() }}">Invoices &amp; payments</a>
+                <a href="{{ \App\Filament\Pages\ApprovalCenter::getUrl() }}">Approval Center</a>
+                <a href="{{ \App\Filament\Pages\WebsiteWorkspace::getUrl() }}">Website editor</a>
+            </div>
+        </section>
         <label class="block space-y-1">
             <span class="text-sm font-medium">Operating company</span>
             <select wire:model.live="companyId" class="w-full rounded-lg border p-3 text-gray-900">
