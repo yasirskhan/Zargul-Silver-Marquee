@@ -121,7 +121,8 @@
                     <div class="hall-media" role="img" aria-label="{{ $hall['name'] }}">Venue photograph</div>
                     <div class="hall-caption"><div><h3>{{ $hall['name'] }}</h3><p>Up to {{ $hall['capacity'] }} guests</p>@if($hall['address']!=='')<p>{{ $hall['address'] }}</p>@endif
                         @if(($hall['phone']??'')!=='')<p><a href="tel:{{ preg_replace('/[^+0-9]/','',$hall['phone']) }}">{{ $hall['phone'] }}</a></p>@endif
-                        @if(($hall['whatsapp']??'')!=='')<p><a href="https://wa.me/{{ preg_replace('/[^0-9]/','',$hall['whatsapp']) }}" rel="noopener noreferrer">WhatsApp</a></p>@endif
+                        @if(($hall['whatsapp']??'')!=='')<p><a href="https://wa.me/{{ preg_replace('/[^0-9]/','',$hall['whatsapp']) }}" rel="noopener noreferrer">{{ $hall['whatsapp'] }}</a></p>@endif
+                        @if($hall['address']!=='')<p><a href="https://www.google.com/maps/search/?api=1&amp;query={{ urlencode($hall['address']) }}" rel="noopener noreferrer">Get directions</a></p>@endif
                     </div><a href="/book" aria-label="Book {{ $hall['name'] }}">↗</a></div>
                 </article>
             @empty
