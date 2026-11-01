@@ -100,7 +100,7 @@
             <span class="eyebrow">Your moment, beautifully celebrated</span>
             <h1>{{ $branding['tagline'] ?: $branding['siteName'] }}</h1>
             <p>{{ $searchDescription }}</p>
-            <div class="button-row"><a href="/book" class="pill gold">Plan Your Event ↗</a><a href="#halls" class="pill transparent">Explore Our Halls</a></div>
+            <div class="button-row"><a href="/book" class="pill gold">Plan Your Event ↗</a><a href="#halls" class="pill transparent">Explore the venue</a></div>
         </div>
     </section>
     <section class="section intro">
