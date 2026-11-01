@@ -31,6 +31,7 @@
             if(isset($section['data']['imageId'])&&$section['data']['imageId']!==''){$galleryIds[]=$section['data']['imageId'];}
         }
         $galleryIds=array_values(array_unique($galleryIds));
+        $ogImageId=$branding['logoMediaId'];
     @endphp
     <title>{{ $searchTitle }}</title>
     <meta name="description" content="{{ $searchDescription }}">
@@ -43,6 +44,11 @@
         <meta property="og:title" content="{{ $searchTitle }}">
         <meta property="og:description" content="{{ $searchDescription }}">
         <meta property="og:url" content="{{ $canonicalUrl }}">
+        @if ($mediaBase!==null && $ogImageId!==null && isset($snapshot['media'][$ogImageId]))
+            <meta property="og:image" content="{{ rtrim($canonicalUrl, '/') }}{{ $mediaBase.$ogImageId.'.webp' }}">
+            <meta property="og:image:type" content="image/webp">
+            <meta property="og:image:alt" content="{{ $snapshot['media'][$ogImageId]['alt'] }}">
+        @endif
         <meta name="robots" content="{{ $canIndex?'index, follow':'noindex, nofollow' }}">
     @else
         <meta name="robots" content="noindex, nofollow">
@@ -79,13 +85,16 @@
     <a class="brand" href="/" aria-label="{{ $branding['siteName'] }} home"><span class="brand-mark">✦</span><span>{{ strtoupper($branding['siteName']) }}<b>{{ strtoupper($branding['tagline'] ?: 'WEDDINGS & CELEBRATIONS') }}</b><small>VENUEDESK PUBLISHED SITE</small></span></a>
     <button class="menu-toggle" type="button" aria-label="Toggle navigation" onclick="document.getElementById('site-nav').classList.toggle('open')">☰</button>
     <nav class="site-nav" id="site-nav" aria-label="Main navigation">
+        @if (count($snapshot['navigation']) > 1)
+            <span class="nav-label" style="font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:#caa56b">Published venue pages</span>
+        @endif
         @foreach ($snapshot['navigation'] as $link)
-            <a href="{{ $link['href'] }}">{{ $link['label'] }}</a>
+            <a href="{{ $link['href'] }}" @if($link['href']===$snapshot['page']['slug']) aria-current="page" @endif>{{ $link['label'] }}</a>
         @endforeach
         <a href="/book" class="pill gold">Check Availability</a>
     </nav>
 </header>
-<main id="main-content">
+<main id="main-content" tabindex="-1">
     <section class="hero">
         <div class="hero-content">
             <span class="eyebrow">Your moment, beautifully celebrated</span>
@@ -151,7 +160,7 @@
     @if ($canonicalUrl !== null)
         <section class="section enquiry" id="availability">
             <div class="enquiry-copy"><span class="eyebrow">Start your story</span><h2>Let's plan something unforgettable.</h2><p>Tell us the date and celebration you're planning. A private enquiry is not a confirmed booking.</p><p class="enquiry-hint">Three programs per day: Morning, Noon and Evening.</p></div>
-            <form method="POST" action="/enquiry" class="enquiry-form">
+            <form method="POST" action="/enquiry" class="enquiry-form" aria-label="Venue enquiry form">
                 @csrf
                 <h3>Check a date</h3>
                 <input type="hidden" name="request_key" value="{{ old('request_key', (string) \Illuminate\Support\Str::uuid()) }}">
@@ -164,7 +173,7 @@
                 <label>Expected guests<input type="number" name="guests" min="1" max="100000" required value="{{ old('guests') }}"></label>
                 <label>Message<textarea name="message" rows="3" maxlength="2000">{{ old('message') }}</textarea></label>
                 <label class="enquiry-consent"><input type="checkbox" name="consent" value="1" required> I consent to the venue using these details to respond.</label>
-                <button type="submit">Preview My Enquiry ↗</button>
+                <button type="submit">Enquire about your event ↗</button>
             </form>
         </section>
     @endif
