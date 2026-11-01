@@ -51,7 +51,18 @@ final class CentralStaffPortalHome
                 'changing operational or financial records.</p>'.
                 $action('/staff/audit/dashboard','Open audit dashboard').'</section>';
         }
-        // A staff member may hold ONLY a customer-scoped role; never infer
+        $ops = [
+            ['/staff/licenses/pending', 'Licenses', 'Review pending paid-license work. Issuance still requires its independent approval boundary.'],
+            ['/staff/support/tickets', 'Support', 'Open the authorized support queue and respond within the current scope.'],
+            ['/staff/billing/overview', 'Billing', 'Review invoice and payment status without issuing settlement from this page.'],
+            ['/staff/customers/directory', 'Customers', 'Find only the customer accounts your current Central role authorizes.'],
+        ];
+        $cards = '';
+        foreach ($ops as [$uri, $title, $copy]) {
+            $cards .= '<section aria-label="'.$title.' operations"><h2>'.$title.'</h2><p>'.$copy.'</p>'
+                .'<form method="post" action="'.$uri.'">'.$hidden.'<button type="submit">Open '.$title.'</button></form></section>';
+        }
+        $sections .= $cards;        // A staff member may hold ONLY a customer-scoped role; never infer
         // its privileges from null-scoped checks or enumerate customers here.
         // The target customer and permission are independently checked by
         // the existing /staff/dashboard protected route on each request.

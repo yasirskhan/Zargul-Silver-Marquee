@@ -61,6 +61,10 @@ class AdminPanelProvider extends PanelProvider
                 fn (): \Illuminate\Contracts\View\View => view('filament.hooks.venuedesk-theme'),
             )
             ->renderHook(
+                PanelsRenderHook::TOPBAR_START,
+                fn (): \Illuminate\Contracts\View\View => view('filament.hooks.venuedesk-topbar'),
+            )
+            ->renderHook(
                 PanelsRenderHook::PAGE_START,
                 fn (): \Illuminate\Contracts\View\View => view('filament.hooks.owner-approval-attention'),
             )
