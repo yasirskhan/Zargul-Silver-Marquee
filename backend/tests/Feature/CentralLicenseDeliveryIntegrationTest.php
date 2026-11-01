@@ -37,7 +37,8 @@ class CentralLicenseDeliveryIntegrationTest extends TestCase
     }
 
     private function grant(string $pair, string $license, string $installation,
-        string $customer, string $domain, int $revision, string $from, string $to): array
+        string $customer, string $domain, int $revision, string $from, string $to,
+        ?array $designerCredit = null): array
     {
         $claim = [
             'api_version' => 'v1', 'issuer' => 'HAFZATECH', 'product' => 'VenueDesk',
@@ -48,6 +49,9 @@ class CentralLicenseDeliveryIntegrationTest extends TestCase
             'limits' => ['max_halls' => 5, 'max_staff' => 20],
             'features' => ['booking' => true],
         ];
+        if ($designerCredit !== null) {
+            $claim['designer_credit'] = $designerCredit;
+        }
         $raw = json_encode($claim, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
 
         return ['key_id' => 'delivery-test', 'payload' => $this->b64($raw),
@@ -133,4 +137,66 @@ class CentralLicenseDeliveryIntegrationTest extends TestCase
         app(CentralVerifiedLicenseDeliveryService::class)->accept(
             $grant, $receipt, $customer, $domain, $nonce, $now);
     }
-}
+    public function test_signed_designer_credit_delivery_renders_on_the_public_footer(): void
+    {
+        config()->set('central_control.activation_enabled', true);
+        $identity = app(CentralInstallationIdentity::class)->initialize();
+        $customer = (string) Str::uuid();
+        $license = (string) Str::uuid();
+        $domain = 'credit-delivery.example.test';
+        $company = \App\Models\Company::create(['name' => 'Credit Delivery Venue',
+            'slug' => 'credit-delivery-venue']);
+        $owner = \App\Models\User::create(['name' => 'Owner',
+            'email' => 'credit-delivery@example.test', 'password' => 'test-only']);
+        $owner->markEmailAsVerified();
+        \App\Models\CompanyMembership::create(['company_id' => $company->id,
+            'user_id' => $owner->id, 'role' => 'owner']);
+        DB::table('central_installation_activation')->insert([
+            'singleton_id' => 1, 'company_id' => $company->id,
+            'installation_id' => $identity['installation_id'],
+            'customer_id' => $customer, 'approved_domain' => $domain,
+            'status' => 'registered_pending_license', 'central_registered_at' => now(),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $pair = sodium_crypto_sign_keypair();
+        config()->set('central_control.trusted_signing_public_keys', [
+            'delivery-test' => $this->b64(sodium_crypto_sign_publickey($pair)),
+        ]);
+        $now = new DateTimeImmutable('2026-11-01T00:00:00Z');
+        $nonce = $this->b64(random_bytes(32));
+        $credit = ['enabled' => true, 'prefix' => 'Website by',
+            'label' => 'HAFZATECH', 'url' => 'https://hafzatech.com',
+            'alignment' => 'center'];
+        $grant = $this->grant($pair, $license, $identity['installation_id'],
+            $customer, $domain, 1, '2026-10-01T00:00:00Z', '2027-10-01T00:00:00Z',
+            $credit);
+        app(CentralVerifiedLicenseDeliveryService::class)->accept($grant,
+            $this->receipt($pair, $identity['installation_id'], $customer, $nonce, 1,
+                '2026-11-01T00:00:00Z'), $customer, $domain, $nonce, $now);
+
+        $this->be($owner);
+        $site = (string) Str::uuid();
+        $page = (string) Str::uuid();
+        DB::table('websites')->insert(['id' => $site, 'company_id' => $company->id,
+            'name' => 'Credit Site']);
+        $branding = app(\App\Services\SiteBrandingService::class);
+        $saved = $branding->saveDraft($owner, $company->id, $site, [
+            'siteName' => 'Credit Site', 'tagline' => 'Signed credit',
+            'themePreset' => 'sage', 'fontPreset' => 'modern',
+            'logoMediaId' => null, 'faviconMediaId' => null,
+        ], 0, 'Signed credit branding');
+        $branding->publish($owner, $company->id, $site, $saved, 'Publish signed branding');
+        DB::table('site_pages')->insert(['id' => $page, 'company_id' => $company->id,
+            'website_id' => $site, 'slug' => '/', 'title' => 'Credit Home']);
+        $pages = app(\App\Services\SitePagePublishingService::class);
+        $pageSaved = $pages->saveDraft($owner, $company->id, $page, ['sections' => [[
+            'id' => 'hero', 'type' => 'text', 'data' => ['title' => 'Credit home'],
+        ]]], 0, 'Signed credit page');
+        $pages->publish($owner, $company->id, $page, $pageSaved, 'Publish signed page');
+        view()->share('errors', new \Illuminate\Support\ViewErrorBag());
+        $html = app(\App\Services\SitePublishedHtmlService::class)
+            ->render($company->id, $site, '/', 'https://'.$domain.'/');
+        $this->assertStringContainsString('Website by', $html);
+        $this->assertStringContainsString('href="https://hafzatech.com"', $html);
+        $this->assertStringContainsString('rel="noopener noreferrer"', $html);
+    }}
