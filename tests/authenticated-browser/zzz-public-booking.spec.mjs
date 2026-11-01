@@ -1,4 +1,4 @@
-﻿import {test, expect} from '@playwright/test';
+import {test, expect} from '@playwright/test';
 
 test('customer books a hall through quote hold verified deposit and status at three viewports', async ({page}) => {
   test.setTimeout(600_000);
@@ -28,11 +28,13 @@ test('customer books a hall through quote hold verified deposit and status at th
     await page.locator('input[name="email"]').fill('browser-booking@example.test');
     await page.getByRole('button', {name: 'Request temporary hold'}).click();
     await expect(page.getByRole('heading', {name: 'Temporary hold created'})).toBeVisible();
-    const holdId = await page.locator('#hold-id').textContent();
-    const token = await page.locator('#hold-token').textContent();
+    const bodyText = await page.locator('body').innerText();
+    const tokenMatch = bodyText.match(/cancellation token private:\s*([a-f0-9]{64})/i);
+    expect(tokenMatch).not.toBeNull();
+    const token = tokenMatch[1];
     const verified = await page.request.post('/__test/booking-fixture/verify', {form: {
       company_id: companyId,
-      hold_id: holdId,
+      token: token,
       reference: 'SYNTH-'+token.slice(0, 12),
     }});
     expect(verified.ok()).toBe(true);

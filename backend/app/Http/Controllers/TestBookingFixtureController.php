@@ -76,11 +76,18 @@ final class TestBookingFixtureController
     {
         $this->guard();
         $data = $request->validate([
-            'company_id' => ['required', 'uuid'], 'hold_id' => ['required', 'uuid'],
+            'company_id' => ['required', 'uuid'], 'hold_id' => ['nullable', 'uuid'],
+            'token' => ['nullable', 'string', 'size:64'],
             'reference' => ['required', 'string', 'max:120'],
         ]);
-        $hold = DB::table('public_booking_holds')->where('company_id', $data['company_id'])
-            ->where('id', $data['hold_id'])->firstOrFail();
+        $query = DB::table('public_booking_holds')->where('company_id', $data['company_id']);
+        if (! empty($data['token'])) {
+            $query->where('token_hash', hash('sha256', $data['token']));
+        } else {
+            $query->where('id', $data['hold_id']);
+        }
+        $hold = $query->firstOrFail();
+        $data['hold_id'] = $hold->id;
         $secret = (string) config('public_booking.synthetic_verifier_secret');
         $canonical = implode('|', [$data['company_id'], $data['hold_id'], $data['reference'],
             (string) $hold->deposit_minor, $hold->currency_code, 'ci-verifier']);
