@@ -51,18 +51,32 @@ final class CentralStaffPortalHome
                 'changing operational or financial records.</p>'.
                 $action('/staff/audit/dashboard','Open audit dashboard').'</section>';
         }
-        $ops = [
-            ['/staff/licenses/pending', 'Licenses', 'Review pending paid-license work. Issuance still requires its independent approval boundary.'],
-            ['/staff/support/tickets', 'Support', 'Open the authorized support queue and respond within the current scope.'],
-            ['/staff/billing/overview', 'Billing', 'Review invoice and payment status without issuing settlement from this page.'],
-            ['/staff/customers/directory', 'Customers', 'Find only the customer accounts your current Central role authorizes.'],
-        ];
-        $cards = '';
-        foreach ($ops as [$uri, $title, $copy]) {
-            $cards .= '<section aria-label="'.$title.' operations"><h2>'.$title.'</h2><p>'.$copy.'</p>'
-                .'<form method="post" action="'.$uri.'">'.$hidden.'<button type="submit">Open '.$title.'</button></form></section>';
+        $sections .= '<section aria-label="Customer selection">'
+            .'<h2>Find a customer</h2>'
+            .'<p>Search only within your current Central permissions, then open an authorized workspace.</p>'
+            .'<form method="post" action="/staff/customers/directory">'.$hidden
+            .'<label>Business name prefix <input name="search" maxlength="64" required></label>'
+            .'<button type="submit">Find authorized customers</button></form></section>';
+        if ($this->authorization->permits($bearer,'license.read_status',null)) {
+            $sections .= '<section aria-label="License operations"><h2>Licenses</h2>'
+                .'<p>Enter a customer ID you already know is within scope. Access is authorized again by the licensing service.</p>'
+                .'<form method="post" action="/staff/licenses/pending">'.$hidden
+                .'<label>Customer ID <input name="customer_id" required pattern="[0-9a-fA-F-]{36}" maxlength="36"></label>'
+                .'<button type="submit">Open pending licenses</button></form></section>';
         }
-        $sections .= $cards;        // A staff member may hold ONLY a customer-scoped role; never infer
+        if ($this->authorization->permits($bearer,'support.ticket.read',null)) {
+            $sections .= '<section aria-label="Support operations"><h2>Support</h2>'
+                .'<form method="post" action="/staff/support/tickets">'.$hidden
+                .'<label>Customer ID <input name="customer_id" required pattern="[0-9a-fA-F-]{36}" maxlength="36"></label>'
+                .'<button type="submit">Open support queue</button></form></section>';
+        }
+        if ($this->authorization->permits($bearer,'billing.invoice.read',null)) {
+            $sections .= '<section aria-label="Billing operations"><h2>Billing</h2>'
+                .'<form method="post" action="/staff/billing/overview">'.$hidden
+                .'<label>Customer ID <input name="customer_id" required pattern="[0-9a-fA-F-]{36}" maxlength="36"></label>'
+                .'<label>Invoice ID <input name="invoice_id" required pattern="[0-9a-fA-F-]{36}" maxlength="36"></label>'
+                .'<button type="submit">Open billing overview</button></form></section>';
+        }        // A staff member may hold ONLY a customer-scoped role; never infer
         // its privileges from null-scoped checks or enumerate customers here.
         // The target customer and permission are independently checked by
         // the existing /staff/dashboard protected route on each request.
