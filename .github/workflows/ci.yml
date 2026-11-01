@@ -348,6 +348,11 @@ jobs:
       VENUE_PUBLIC_SITE_ENABLED: 'true'
       VENUE_PUBLIC_SITE_HOST: 'wizard.localhost'
       VENUE_PUBLIC_SITE_TEST_FALLBACK: 'true'
+      VENUE_PUBLIC_BOOKING_ENABLED: 'true'
+      VENUE_PUBLIC_BOOKING_HOLDS_ENABLED: 'true'
+      VENUE_PUBLIC_BOOKING_HOLD_MINUTES: '15'
+      VENUE_SYNTHETIC_PAYMENT_TEST_BOUNDARY: 'true'
+      VENUE_SYNTHETIC_PAYMENT_VERIFIER_SECRET: 'synthetic-ci-verifier-secret-32-bytes-minimum'
       VENUE_CENTRAL_BASE_URL: 'http://127.0.0.1:9001'
       CENTRAL_LOCAL_STATUS_TEST: 'true'
       # Isolated CI-only finance posting for synthetic cash closeout acceptance.
@@ -418,6 +423,19 @@ jobs:
           sleep 2
           curl -s -o /dev/null http://127.0.0.1:9001/ || true
 
+      - name: Configure isolated public website and booking gates
+        working-directory: backend
+        run: |
+          cat >> .env <<'EOF'
+          VENUE_PUBLIC_SITE_ENABLED=true
+          VENUE_PUBLIC_SITE_HOST=wizard.localhost
+          VENUE_PUBLIC_SITE_TEST_FALLBACK=true
+          VENUE_PUBLIC_BOOKING_ENABLED=true
+          VENUE_PUBLIC_BOOKING_HOLDS_ENABLED=true
+          VENUE_PUBLIC_BOOKING_HOLD_MINUTES=15
+          VENUE_SYNTHETIC_PAYMENT_TEST_BOUNDARY=true
+          VENUE_SYNTHETIC_PAYMENT_VERIFIER_SECRET=synthetic-ci-verifier-secret-32-bytes-minimum
+          EOF
       - name: Start authenticated Laravel panel
         working-directory: backend
         run: |

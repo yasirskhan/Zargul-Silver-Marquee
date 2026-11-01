@@ -23,15 +23,15 @@ Route::get('/_venue-media/{pageSlug}/{mediaId}.webp',
 
 Route::get('/book', [\App\Http\Controllers\PublicBookingController::class, 'show'])->name('public.booking.start');
 Route::post('/book/quote', [\App\Http\Controllers\PublicBookingController::class, 'quote'])
-    ->middleware('throttle:20,1')->name('public.booking.quote');
+    ->middleware('throttle:60,1')->name('public.booking.quote');
 Route::post('/book/review', [\App\Http\Controllers\PublicBookingController::class, 'review'])
-    ->middleware('throttle:20,1')->name('public.booking.review');
+    ->middleware('throttle:60,1')->name('public.booking.review');
 Route::post('/book/submit', [\App\Http\Controllers\PublicBookingController::class, 'submit'])
-    ->middleware('throttle:10,1')->name('public.booking.submit');
+    ->middleware('throttle:30,1')->name('public.booking.submit');
 Route::post('/book/cancel', [\App\Http\Controllers\PublicBookingController::class, 'cancel'])
-    ->middleware('throttle:10,1')->name('public.booking.cancel');
+    ->middleware('throttle:30,1')->name('public.booking.cancel');
 Route::post('/book/confirm', [\App\Http\Controllers\PublicBookingController::class, 'confirm'])
-    ->middleware('throttle:10,1')->name('public.booking.confirm');
+    ->middleware('throttle:30,1')->name('public.booking.confirm');
 Route::get('/book/status', [\App\Http\Controllers\PublicBookingController::class, 'status'])
     ->middleware('throttle:20,1')->name('public.booking.status');
 Route::get('/__test/booking-fixture', [\App\Http\Controllers\TestBookingFixtureController::class, 'hall']);
