@@ -31,6 +31,11 @@
             if(isset($section['data']['imageId'])&&$section['data']['imageId']!==''){$galleryIds[]=$section['data']['imageId'];}
         }
         $galleryIds=array_values(array_unique($galleryIds));
+        $packageItems=[]; $serviceItems=[];
+        foreach($snapshot['page']['sections'] as $section){
+            if(($section['type']??'')==='packages' && is_array($section['data']['items']??null)){$packageItems=$section['data']['items'];}
+            if(($section['type']??'')==='services' && is_array($section['data']['items']??null)){$serviceItems=$section['data']['items'];}
+        }
         $ogImageId=$branding['logoMediaId'];
     @endphp
     <title>{{ $searchTitle }}</title>
@@ -61,9 +66,9 @@
         h1{font-size:clamp(3rem,6vw,6rem)}h2{font-size:clamp(2.4rem,4vw,3.8rem)}h3{font-size:1.7rem}
         .site-header{height:84px;position:absolute;top:0;left:0;right:0;z-index:10;display:flex;justify-content:space-between;align-items:center;padding:0 clamp(20px,5vw,80px);color:#fff;border-bottom:1px solid #ffffff30}
         .brand{display:flex;align-items:center;gap:12px;letter-spacing:.14em;font-size:.9rem}.brand b{display:block;font-size:.78rem;color:#e9ce9b}.brand small{display:block;font-size:.55rem;color:#eee;letter-spacing:.28em}.brand-mark{font-size:2rem;color:var(--gold)}
-        .site-nav{display:flex;align-items:center;gap:22px;font-size:.82rem}.site-nav a:hover{color:#e9ce9b}.menu-toggle{display:none}
+        .site-nav{display:flex;align-items:center;gap:22px;font-size:.82rem}.site-nav a:hover{color:#e9ce9b}.menu-toggle{display:none}.nav-toggle{display:none}
         .pill{display:inline-flex;align-items:center;justify-content:center;padding:12px 22px;border-radius:3px;font-size:.8rem;font-weight:700;border:1px solid transparent}.pill.gold{background:var(--gold);color:#172c23}.pill.transparent{border-color:#ffffffb3;color:#fff}
-        .hero{min-height:720px;position:relative;display:flex;align-items:center;background:linear-gradient(90deg,#07150fbb,#0b1d1533),url('{{ $mediaBase!==null && $branding['logoMediaId']!==null && isset($snapshot['media'][$branding['logoMediaId']]) ? $mediaBase.$branding['logoMediaId'].'.webp' : 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=2400&q=85' }}') center/cover;color:#fff}
+        .hero{min-height:720px;position:relative;display:flex;align-items:center;background:linear-gradient(125deg,#07150f 0%,#17372e 52%,#0b1d15 100%);color:#fff}
         .hero-content{z-index:1;max-width:820px;margin:60px clamp(24px,8vw,140px) 0}.hero-content p{max-width:560px;font-size:1.06rem;color:#f2f2e7;margin:18px 0 28px}
         .eyebrow{font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;color:#e6d2aa;font-weight:700}.eyebrow.dark{color:#9a784d}
         .section{padding:90px clamp(22px,7vw,130px)}.warm{background:var(--warm)}.intro{text-align:center}.section-copy{max-width:660px;color:var(--muted);margin:18px auto 0}
@@ -74,7 +79,7 @@
         .gallery-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.gallery-grid img{height:280px;width:100%;object-fit:cover}
         .enquiry{display:grid;grid-template-columns:1fr 1.1fr;gap:40px;background:var(--forest);color:#fff;align-items:center}.enquiry-form{background:#fff;color:var(--forest);padding:30px;box-shadow:0 16px 50px #0002}.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.enquiry-form label{display:flex;flex-direction:column;gap:6px;font-size:.78rem;font-weight:700;margin-bottom:12px}.enquiry-form input,.enquiry-form select,.enquiry-form textarea{background:#fcfbf9;border:1px solid #dddcd5;border-radius:4px;padding:11px;width:100%;font:inherit}.enquiry-form button{width:100%;border:0;padding:13px;background:var(--gold);font-weight:700;border-radius:4px}.enquiry-success,.enquiry-error{padding:10px;border-radius:5px}.enquiry-success{background:#edf7f0;color:#25543a}.enquiry-error{background:#fcebea;color:#a33}
         .contact{text-align:center}.footer{background:#10271f;color:#fff;display:flex;justify-content:space-between;gap:30px;flex-wrap:wrap;padding:38px clamp(22px,7vw,130px)}.footer p,.footer small{color:#c2d7ca;font-size:.84rem}.footer a{display:block;margin:4px 0}.designer-credit{text-align:center;padding:12px}
-        @media(max-width:800px){.site-header{height:70px;padding:0 18px}.site-nav{display:none;position:absolute;top:70px;left:12px;right:12px;background:var(--forest);flex-direction:column;align-items:stretch;padding:14px 20px;gap:8px}.site-nav.open{display:flex}.menu-toggle{display:block;background:transparent;border:0;color:#fff;font-size:1.7rem}.hero{min-height:620px}.section{padding:60px 20px}.hall-grid,.enquiry,.package-grid,.services-grid{grid-template-columns:1fr}.gallery-grid{grid-template-columns:repeat(3,1fr)}.gallery-grid img{height:150px}.form-row{grid-template-columns:1fr}.hero-content{margin:30px 22px 0}}
+        @media(max-width:800px){.site-header{height:70px;padding:0 18px}.site-nav{display:none;position:absolute;top:70px;left:12px;right:12px;background:var(--forest);flex-direction:column;align-items:stretch;padding:14px 20px;gap:8px}.menu-toggle{display:block;background:transparent;border:0;color:#fff;font-size:1.7rem;cursor:pointer}.nav-toggle:checked ~ .site-nav{display:flex}.hero{min-height:620px}.section{padding:60px 20px}.hall-grid,.enquiry,.package-grid,.services-grid{grid-template-columns:1fr}.gallery-grid{grid-template-columns:repeat(3,1fr)}.gallery-grid img{height:150px}.form-row{grid-template-columns:1fr}.hero-content{margin:30px 22px 0}}
         .cms-content .site-section{padding:22px 0;max-width:900px;margin:auto}
     </style>
 </head>
@@ -83,7 +88,8 @@
 @if ($canonicalUrl === null)<p class="demo-note" style="text-align:center;padding:8px;margin:0">Preview rendering only.</p>@endif
 <header class="site-header">
     <a class="brand" href="/" aria-label="{{ $branding['siteName'] }} home"><span class="brand-mark">✦</span><span>{{ strtoupper($branding['siteName']) }}<b>{{ strtoupper($branding['tagline'] ?: 'WEDDINGS & CELEBRATIONS') }}</b><small>VENUEDESK PUBLISHED SITE</small></span></a>
-    <button class="menu-toggle" type="button" aria-label="Toggle navigation" onclick="document.getElementById('site-nav').classList.toggle('open')">☰</button>
+    <input class="nav-toggle" type="checkbox" id="site-nav-toggle" aria-label="Toggle navigation">
+    <label class="menu-toggle" for="site-nav-toggle" aria-hidden="true">☰</label>
     <nav class="site-nav" id="site-nav" aria-label="Main navigation">
         @if (count($snapshot['navigation']) > 1)
             <span class="nav-label" style="font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:#caa56b">Published venue pages</span>
@@ -118,7 +124,12 @@
         <div class="hall-grid">
             @forelse (($snapshot['halls'] ?? []) as $hall)
                 <article class="hall-card">
-                    <div class="hall-media" role="img" aria-label="{{ $hall['name'] }}">Venue photograph</div>
+                    @php $hallImageId = $galleryIds === [] ? null : $galleryIds[$loop->index % count($galleryIds)]; @endphp
+                    @if ($mediaBase!==null && $hallImageId!==null && isset($snapshot['media'][$hallImageId]))
+                        <img src="{{ $mediaBase.$hallImageId.'.webp' }}" alt="{{ $hall['name'] }} published venue photograph" loading="lazy">
+                    @else
+                        <div class="hall-media" role="img" aria-label="{{ $hall['name'] }} — published photograph unavailable" style="background:linear-gradient(135deg,#17372e,#caa56b)"></div>
+                    @endif
                     <div class="hall-caption"><div><h3>{{ $hall['name'] }}</h3><p>Up to {{ $hall['capacity'] }} guests</p>@if($hall['address']!=='')<p>{{ $hall['address'] }}</p>@endif
                         @if(($hall['phone']??'')!=='')<p><a href="tel:{{ preg_replace('/[^+0-9]/','',$hall['phone']) }}">{{ $hall['phone'] }}</a></p>@endif
                         @if(($hall['whatsapp']??'')!=='')<p><a href="https://wa.me/{{ preg_replace('/[^0-9]/','',$hall['whatsapp']) }}" rel="noopener noreferrer">{{ $hall['whatsapp'] }}</a></p>@endif
@@ -133,17 +144,29 @@
     <section class="section" id="packages">
         <div class="section-head"><div><span class="eyebrow dark">Make it yours</span><h2>Celebrations for every occasion</h2></div></div>
         <div class="package-grid">
-            <article class="package"><span>01</span><h3>Nikkah & Intimate Gatherings</h3><p>Beautiful spaces, flexible seating and thoughtful details.</p><a href="/book">Book ↗</a></article>
-            <article class="package featured"><span>02</span><h3>Walima & Wedding Receptions</h3><p>Elegant celebrations with seating and service options.</p><a href="/book">Book ↗</a></article>
-            <article class="package"><span>03</span><h3>Mehndi & Festive Events</h3><p>Bring your celebration to life with sound and lighting.</p><a href="/book">Book ↗</a></article>
+            @if ($packageItems !== [])
+                @foreach ($packageItems as $index => $item)
+                    <article class="package @if($index===1) featured @endif"><span>{{ str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT) }}</span><h3>{{ $item['title'] ?? 'Celebration package' }}</h3><p>{{ $item['description'] ?? '' }}</p><a href="/book">Book ↗</a></article>
+                @endforeach
+            @else
+                <article class="package"><span>01</span><h3>Nikkah & Intimate Gatherings</h3><p>Beautiful spaces, flexible seating and thoughtful details.</p><a href="/book">Book ↗</a></article>
+                <article class="package featured"><span>02</span><h3>Walima & Wedding Receptions</h3><p>Elegant celebrations with seating and service options.</p><a href="/book">Book ↗</a></article>
+                <article class="package"><span>03</span><h3>Mehndi & Festive Events</h3><p>Bring your celebration to life with sound and lighting.</p><a href="/book">Book ↗</a></article>
+            @endif
         </div>
     </section>
     <section class="section warm" id="services">
         <div class="section-head"><div><span class="eyebrow dark">A personal touch</span><h2>Everything your event needs</h2></div></div>
         <div class="services-grid">
-            <div><span>♫</span><h3>Music & Sound</h3><p>Flexible sound arrangements.</p></div>
-            <div><span>✦</span><h3>Fancy Lighting</h3><p>Illumination matched to your celebration.</p></div>
-            <div><span>❀</span><h3>Stage & Decorations</h3><p>Elegant settings and event styling.</p></div>
+            @if ($serviceItems !== [])
+                @foreach ($serviceItems as $item)
+                    <div><span>✦</span><h3>{{ $item['title'] ?? 'Venue service' }}</h3><p>{{ $item['description'] ?? '' }}</p></div>
+                @endforeach
+            @else
+                <div><span>♫</span><h3>Music & Sound</h3><p>Flexible sound arrangements.</p></div>
+                <div><span>✦</span><h3>Fancy Lighting</h3><p>Illumination matched to your celebration.</p></div>
+                <div><span>❀</span><h3>Stage & Decorations</h3><p>Elegant settings and event styling.</p></div>
+            @endif
         </div>
     </section>
     <section class="section" id="gallery">

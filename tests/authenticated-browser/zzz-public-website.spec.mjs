@@ -38,6 +38,12 @@ test('published venue website renders all approved layouts at desktop tablet and
         .toHaveAttribute('href', 'tel:+923001234567');
       await expect(publicPage.getByRole('link', {name: '+92 300 7654321'}).first())
         .toHaveAttribute('href', 'https://wa.me/923007654321');
+      expect(await publicPage.locator('[onclick]').count()).toBe(0);
+      expect(await publicPage.locator('img[src*="images.unsplash.com"]').count()).toBe(0);
+      if (viewport.width < 500) {
+        await publicPage.locator('label.menu-toggle').click();
+        await expect(publicPage.getByRole('link', {name: 'Halls'}).first()).toBeVisible();
+      }
       const overflow = await publicPage.evaluate(() =>
         document.documentElement.scrollWidth > window.innerWidth + 1);
       expect(overflow, preset+' must not overflow horizontally at '+viewport.width+'px').toBe(false);

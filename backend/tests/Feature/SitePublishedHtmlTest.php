@@ -361,4 +361,21 @@ class SitePublishedHtmlTest extends TestCase
         $html = view('site.published-page', ['snapshot' => $snapshot,
             'designerCredit' => $credit, 'canonicalUrl' => null, 'canIndex' => false])->render();
         $this->assertStringNotContainsString('hafzatech.com', $html);
+    }
+    public function test_public_homepage_needs_no_inline_script_external_images_or_photo_placeholder(): void
+    {
+        [$company, $owner, $site, $page] = $this->fixture();
+        $this->brand($owner, $company->id, $site);
+        $pages = app(SitePagePublishingService::class);
+        $pages->saveDraft($owner, $company->id, $page, ['sections' => [[
+            'id' => 'intro', 'type' => 'text', 'data' => ['title' => 'Approved home'],
+        ]]], 0, 'Publish CSP-safe home');
+        $pages->publish($owner, $company->id, $page, 1, 'Publish CSP-safe home');
+        $html = app(SitePublishedHtmlService::class)->render($company->id, $site, '/');
+        $this->assertStringNotContainsString('onclick=', $html);
+        $this->assertStringNotContainsString('images.unsplash.com', $html);
+        $this->assertStringNotContainsString('Venue photograph', $html);
+        $this->assertStringContainsString('id="site-nav-toggle"', $html);
+        $this->assertStringContainsString('for="site-nav-toggle"', $html);
+        $this->assertStringContainsString('linear-gradient(125deg', $html);
     }}
