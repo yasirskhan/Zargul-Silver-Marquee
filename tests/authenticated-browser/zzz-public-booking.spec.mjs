@@ -12,7 +12,7 @@ test('customer books a hall through quote hold verified deposit and status at th
     {width: 768, height: 1024},
     {width: 360, height: 800},
   ]) {
-    await page.request.post('/__test/booking-fixture/reset');
+    await page.request.get('/__test/booking-fixture/reset');
     await page.setViewportSize(viewport);
     await page.goto('http://wizard.localhost:8000/book');
     await page.locator('input[name="event_date"]').fill('2027-12-12');
@@ -32,7 +32,7 @@ test('customer books a hall through quote hold verified deposit and status at th
     const tokenMatch = bodyText.match(/cancellation token private:\s*([a-f0-9]{64})/i);
     expect(tokenMatch).not.toBeNull();
     const token = tokenMatch[1];
-    const verified = await page.request.post('/__test/booking-fixture/verify', {form: {
+    const verified = await page.request.get('/__test/booking-fixture/verify', {params: {
       company_id: companyId,
       token: token,
       reference: 'SYNTH-'+token.slice(0, 12),
@@ -46,6 +46,6 @@ test('customer books a hall through quote hold verified deposit and status at th
     const overflow = await page.evaluate(() =>
       document.documentElement.scrollWidth > window.innerWidth + 1);
     expect(overflow, 'booking must not overflow at '+viewport.width+'px').toBe(false);
-    await page.request.post('/__test/booking-fixture/reset');
+    await page.request.get('/__test/booking-fixture/reset');
   }
 });

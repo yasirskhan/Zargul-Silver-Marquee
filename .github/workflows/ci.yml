@@ -173,7 +173,7 @@ jobs:
           cp .env.example .env
           php artisan key:generate --force --no-interaction
       - name: Run focused central, support and private overview authorization regressions
-        run: php artisan test --no-ansi --exclude-group=phase9-finance-process --filter='Central.*Test|VenueOverviewLivewireTest'
+        run: php artisan test --no-ansi --exclude-group=phase9-finance-process --exclude-group=phase9-booking-process --filter='Central.*Test|VenueOverviewLivewireTest'
 
   laravel-postgres:
     runs-on: ubuntu-24.04
@@ -237,7 +237,7 @@ jobs:
           DB_PASSWORD: venue
         run: php artisan migrate --force --no-interaction
       - name: Run tenant-isolation backend tests
-        run: php artisan test --no-ansi --exclude-group=phase9-finance-process
+        run: php artisan test --no-ansi --exclude-group=phase9-finance-process --exclude-group=phase9-booking-process
       - name: Create isolated finance certification database
         env:
           PGPASSWORD: venue
@@ -263,7 +263,9 @@ jobs:
           VENUE_INVOICE_APPROVED_TAX_BPS: '0'
           VENUE_CUSTOMER_PAYMENT_ENABLED: 'true'
           VENUE_FINANCE_POSTING_ENABLED: 'true'
-        run: php vendor/bin/phpunit -c phpunit.finance.xml --group=phase9-finance-process
+        run: |
+          php vendor/bin/phpunit -c phpunit.finance.xml --group=phase9-finance-process
+          php vendor/bin/phpunit -c phpunit.finance.xml --group=phase9-booking-process
 
       - name: Verify CMS, MFA and shared cache/session migration rollback and replay
         env:
