@@ -64,12 +64,15 @@ CREATE OR REPLACE FUNCTION public_booking_evidence_immutable() RETURNS trigger A
 BEGIN
     RAISE EXCEPTION 'public booking evidence is immutable';
 END; $$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS public_booking_hold_events_immutable ON public_booking_hold_events;
 CREATE TRIGGER public_booking_hold_events_immutable
     BEFORE UPDATE OR DELETE ON public_booking_hold_events
     FOR EACH ROW EXECUTE FUNCTION public_booking_evidence_immutable();
+DROP TRIGGER IF EXISTS public_booking_payment_events_immutable ON public_booking_payment_evidence;
 CREATE TRIGGER public_booking_payment_events_immutable
     BEFORE UPDATE OR DELETE ON public_booking_payment_evidence
     FOR EACH ROW EXECUTE FUNCTION public_booking_evidence_immutable();
+DROP TRIGGER IF EXISTS public_booking_confirmation_events_immutable ON public_booking_confirmation_events;
 CREATE TRIGGER public_booking_confirmation_events_immutable
     BEFORE UPDATE OR DELETE ON public_booking_confirmation_events
     FOR EACH ROW EXECUTE FUNCTION public_booking_evidence_immutable();
