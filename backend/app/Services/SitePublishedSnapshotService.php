@@ -71,7 +71,6 @@ final class SitePublishedSnapshotService
             }
         }
         $this->collectMedia($content['sections'], $mediaIds);
-        $media = $this->approvedMediaManifest($companyId, array_keys($mediaIds));
 
         // Publish-only navigation: links can never expose drafts, other
         // websites or unpublished pages. No arbitrary CMS URL is accepted.
@@ -93,6 +92,20 @@ final class SitePublishedSnapshotService
         // read live hall rows here: changing an address must require a new
         // owner-approved publication.
         $halls = $branding['hallContacts'] ?? [];
+        $hallImages = [];
+        if ($halls !== []) {
+            foreach (DB::table('hall_media')->where('company_id', $companyId)
+                ->whereIn('hall_id', array_column($halls, 'id'))->orderBy('sort_order')
+                ->get() as $row) {
+                $hallImages[$row->hall_id][] = ['mediaId' => $row->media_id];
+                $mediaIds[$row->media_id] = true;
+            }
+        }
+        $media = $this->approvedMediaManifest($companyId, array_keys($mediaIds));
+        foreach ($hallImages as $hallId => $images) {
+            $hallImages[$hallId] = array_values(array_filter($images,
+                fn (array $image): bool => isset($media[$image['mediaId']])));
+        }
 
         return [
             'branding' => $branding,
@@ -106,6 +119,7 @@ final class SitePublishedSnapshotService
             'media' => $media,
             'navigation' => $links,
             'halls' => $halls,
+            'hallImages' => $hallImages,
         ];
     }
 
