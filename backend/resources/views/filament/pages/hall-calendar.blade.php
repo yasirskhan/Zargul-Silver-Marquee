@@ -1,5 +1,10 @@
 <x-filament-panels::page>
     <div class="space-y-6">
+        <section class="vd-hero">
+            <span class="eyebrow">VenueDesk · Calendar &amp; availability</span>
+            <h1>Hall Calendar</h1>
+            <p>Internal occupancy by date and program. Confirmed slots are physically reserved; draft proposals never reserve availability.</p>
+        </section>
         <p class="text-sm text-gray-600 dark:text-gray-300">
             Internal, read-only hall occupancy. Three programs per date. A confirmed slot is physically reserved.
             Expired holds may require audited cleanup. No public availability or customer information is displayed.
@@ -45,6 +50,22 @@
         </div>
 
         @if ($loadedCompanyId === $companyId && $loadedHallId === $hallId && $projection !== [])
+            @php
+                $slotCounts = ['available' => 0, 'hold' => 0, 'confirmed' => 0, 'cleanup_required' => 0, 'unconfigured' => 0];
+                foreach ($projection['days'] as $projectionDay) {
+                    foreach (['morning', 'noon', 'evening'] as $projectionProgram) {
+                        $slotCounts[$projectionDay['programs'][$projectionProgram]['status']] =
+                            ($slotCounts[$projectionDay['programs'][$projectionProgram]['status']] ?? 0) + 1;
+                    }
+                }
+            @endphp
+            <div class="vd-metrics" aria-label="Calendar occupancy summary">
+                <div class="vd-metric"><b>{{ $slotCounts['available'] }}</b><span>Available programs</span></div>
+                <div class="vd-metric"><b>{{ $slotCounts['hold'] }}</b><span>On hold</span></div>
+                <div class="vd-metric"><b>{{ $slotCounts['confirmed'] }}</b><span>Confirmed claims</span></div>
+                <div class="vd-metric"><b>{{ $slotCounts['cleanup_required'] }}</b><span>Cleanup required</span></div>
+                <div class="vd-metric"><b>{{ $slotCounts['unconfigured'] }}</b><span>Unconfigured</span></div>
+            </div>
             <section class="space-y-4" aria-label="Hall occupancy projection">
                 <h2 class="text-lg font-semibold">Hall occupancy: {{ $projection['fromDate'] }} to {{ $projection['toDate'] }}</h2>
                 <p class="text-sm">{{ $projection['configured'] ? 'Hall programs configured.' : 'Programs unconfigured. No open slots.' }}
