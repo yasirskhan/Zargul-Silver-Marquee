@@ -34,14 +34,15 @@ final class HallMediaServiceTest extends TestCase
         $foreign = $this->media($other->id, $owner->id, 'Foreign image');
 
         $service = app(HallMediaService::class);
+        $this->assertCount(2, $service->availableMedia($owner, $company->id));
         $service->replace($owner, $company->id, $hall->id, [$first, $second], 'Owner selects hall photos');
-        $this->assertSame([$first, $second], $service->selectedMedia($company->id, $hall->id));
+        $this->assertSame([$first, $second], $service->selectedMedia($owner, $company->id, $hall->id));
         $this->assertSame(1, DB::table('audit_events')
             ->where('action', 'website.hall_photos_updated')->count());
 
         $this->expectException(\InvalidArgumentException::class);
         $service->replace($owner, $company->id, $hall->id, [$foreign], 'Attempt foreign image');
-        $this->assertNotSame($foreign, $service->selectedMedia($other->id, $foreignHall->id));
+        $this->assertNotSame($foreign, $service->selectedMedia($owner, $other->id, $foreignHall->id));
     }
 
     private function media(string $companyId, int $userId, string $alt): string
@@ -57,4 +58,38 @@ final class HallMediaServiceTest extends TestCase
 
         return $id;
     }
-}
+    public function test_cross_tenant_media_list_and_hall_selection_are_denied(): void
+    {
+        [$company, $owner, $hall] = $this->fixture();
+        $other = Company::create(['name' => 'Other Tenant', 'slug' => 'other-tenant']);
+        $otherHall = Hall::create(['company_id' => $other->id, 'name' => 'Other Hall',
+            'slug' => 'other-hall', 'capacity' => 50, 'is_active' => true]);
+        $service = app(HallMediaService::class);
+        try {
+            $service->availableMedia($owner, $other->id);
+            $this->fail('Cross-tenant media list was readable.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+        }
+        try {
+            $service->selectedMedia($owner, $company->id, $otherHall->id);
+            $this->fail('Cross-tenant hall selection was readable.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+        }
+    }
+
+    private function fixture(): array
+    {
+        $company = Company::create(['name' => 'Read Venue '.Str::uuid(),
+            'slug' => 'read-venue-'.Str::uuid()]);
+        $owner = User::create(['name' => 'Read Owner', 'email' => Str::uuid().'@example.test',
+            'password' => 'test-only']);
+        $owner->markEmailAsVerified();
+        CompanyMembership::create(['company_id' => $company->id, 'user_id' => $owner->id,
+            'role' => 'owner', 'is_active' => true]);
+        $hall = Hall::create(['company_id' => $company->id, 'name' => 'Read Hall',
+            'slug' => 'read-hall-'.Str::uuid(), 'capacity' => 80, 'is_active' => true]);
+
+        return [$company, $owner, $hall];
+    }}

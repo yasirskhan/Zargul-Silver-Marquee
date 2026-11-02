@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\CompanyMembership;
 use App\Models\Hall;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,8 @@ final class HallMediaService
     /** @return array<int,array{id:string,alt:string}> */
     public function availableMedia(User $actor, string $companyId): array
     {
+        $this->authorizeCompany($actor, $companyId);
+
         return DB::table('site_media')->where('company_id', $companyId)
             ->where('status', 'approved')->orderByDesc('created_at')->limit(100)->get()
             ->map(fn ($row): array => ['id' => $row->id,
@@ -24,12 +27,28 @@ final class HallMediaService
     }
 
     /** @return array<int,string> */
-    public function selectedMedia(string $companyId, string $hallId): array
+    public function selectedMedia(User $actor, string $companyId, string $hallId): array
     {
+        $hall = Hall::query()->where('company_id', $companyId)->where('id', $hallId)->first();
+        if (! $hall || ! $this->access->canConfigureHall($actor, $hall)) {
+            abort(403);
+        }
+
         return DB::table('hall_media')->where('company_id', $companyId)
             ->where('hall_id', $hallId)->orderBy('sort_order')->pluck('media_id')->all();
     }
 
+    private function authorizeCompany(User $actor, string $companyId): void
+    {
+        $member = CompanyMembership::query()->where('company_id', $companyId)
+            ->where('user_id', $actor->getKey())->where('is_active', true)
+            ->whereIn('role', ['owner', 'admin'])
+            ->whereHas('company', fn ($query) => $query->where('is_active', true))->exists();
+        if (! $member
+            || ! app(CentralVenueOperationsAccessGate::class)->allowsCompany($companyId)) {
+            abort(403);
+        }
+    }
     /** @param array<int,string> $mediaIds */
     public function replace(User $actor, string $companyId, string $hallId,
         array $mediaIds, string $reason): void
@@ -52,7 +71,7 @@ final class HallMediaService
             throw new InvalidArgumentException('Every selected image must be approved for this company.');
         }
         DB::transaction(function () use ($actor, $companyId, $hallId, $mediaIds, $reason): void {
-            $before = $this->selectedMedia($companyId, $hallId);
+            $before = $this->selectedMedia($actor, $companyId, $hallId);
             DB::table('hall_media')->where('company_id', $companyId)->where('hall_id', $hallId)->delete();
             foreach ($mediaIds as $index => $mediaId) {
                 DB::table('hall_media')->insert([

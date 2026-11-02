@@ -73,8 +73,13 @@ final class HallPhotos extends Page
     public function loadSelected(): void
     {
         $this->message = '';
+        $actor = Filament::auth()->user();
+        if (! $actor instanceof User) {
+            $this->selectedMediaIds = [];
+            return;
+        }
         $this->selectedMediaIds = $this->hallId
-            ? app(HallMediaService::class)->selectedMedia((string) $this->companyId, (string) $this->hallId)
+            ? app(HallMediaService::class)->selectedMedia($actor, (string) $this->companyId, (string) $this->hallId)
             : [];
     }
 
