@@ -1,5 +1,6 @@
 <x-filament-panels::page>
     <div class="space-y-6">
+        <x-venuedesk.header eyebrow="VenueDesk · Staff" title="Staff & Access" />
         <p class="text-sm">Staff access requires acceptance, email verification and MFA. Invitations never create a default password.</p>
 
         @if ($message)

@@ -1,5 +1,6 @@
 <x-filament-panels::page>
     <div class="space-y-6">
+        <x-venuedesk.header eyebrow="VenueDesk · Website" title="Website & CMS" />
         <p class="text-sm text-gray-600 dark:text-gray-300">
             Edit typed website sections, then save a draft for review. Only publishing changes the approved public snapshot.
         </p>

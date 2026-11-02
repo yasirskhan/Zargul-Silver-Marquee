@@ -1,5 +1,6 @@
 <x-filament-panels::page>
     <div class="space-y-6">
+        <x-venuedesk.header eyebrow="VenueDesk · Bookings" title="Booking Proposals" />
         <p class="text-sm text-gray-600 dark:text-gray-300">
             Internal booking proposals for owner/admin review and safe draft editing. These are NOT confirmed bookings or holds.
             Availability, prices, consent and booking approval must be checked separately. No customer contact is displayed.

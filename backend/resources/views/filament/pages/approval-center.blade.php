@@ -1,5 +1,6 @@
 <x-filament-panels::page>
     <div class="space-y-6">
+        <x-venuedesk.header eyebrow="VenueDesk · Approvals" title="Approval Center" />
         <p class="text-sm text-gray-600 dark:text-gray-300">
             Internal, company-scoped exception requests. A decision does not change a booking, invoice,
             price, payment or refund. No customer contact or Telegram message is sent from this page.
