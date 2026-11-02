@@ -15,6 +15,12 @@ final class CentralStaffSessionAuthorization
         private readonly CentralStaffAccess $access
     ) {}
 
+    public function permitsAnyScope(string $sessionBearer,string $capability): bool
+    {
+        $actor=$this->sessions->staffFor($sessionBearer);
+        if($actor===null)return false;
+        return $this->access->permitsAnyScope($actor,$capability,true);
+    }
     public function permits(string $sessionBearer,string $capability,
         ?string $customerId): bool
     {

@@ -57,20 +57,20 @@ final class CentralStaffPortalHome
             .'<form method="post" action="/staff/customers/directory">'.$hidden
             .'<label>Business name prefix <input name="search" maxlength="64" required></label>'
             .'<button type="submit">Find authorized customers</button></form></section>';
-        if ($this->authorization->permits($bearer,'license.read_status',null)) {
+        if ($this->authorization->permitsAnyScope($bearer,'license.read_status')) {
             $sections .= '<section aria-label="License operations"><h2>Licenses</h2>'
                 .'<p>Enter a customer ID you already know is within scope. Access is authorized again by the licensing service.</p>'
                 .'<form method="post" action="/staff/licenses/pending">'.$hidden
                 .'<label>Customer ID <input name="customer_id" required pattern="[0-9a-fA-F-]{36}" maxlength="36"></label>'
                 .'<button type="submit">Open pending licenses</button></form></section>';
         }
-        if ($this->authorization->permits($bearer,'support.ticket.read',null)) {
+        if ($this->authorization->permitsAnyScope($bearer,'support.ticket.read')) {
             $sections .= '<section aria-label="Support operations"><h2>Support</h2>'
                 .'<form method="post" action="/staff/support/tickets">'.$hidden
                 .'<label>Customer ID <input name="customer_id" required pattern="[0-9a-fA-F-]{36}" maxlength="36"></label>'
                 .'<button type="submit">Open support queue</button></form></section>';
         }
-        if ($this->authorization->permits($bearer,'billing.invoice.read',null)) {
+        if ($this->authorization->permitsAnyScope($bearer,'billing.invoice.read')) {
             $sections .= '<section aria-label="Billing operations"><h2>Billing</h2>'
                 .'<form method="post" action="/staff/billing/overview">'.$hidden
                 .'<label>Customer ID <input name="customer_id" required pattern="[0-9a-fA-F-]{36}" maxlength="36"></label>'

@@ -15,6 +15,26 @@ final class CentralStaffAccess
 {
     public function __construct(private readonly PDO $db) {}
 
+    /** True when any active grant role can perform the capability in some scope. */
+    public function permitsAnyScope(string $staffId, string $capability,
+        bool $trustedSessionMfaVerified): bool
+    {
+        if (!$trustedSessionMfaVerified) return false;
+        $stmt = $this->db->prepare(
+            "SELECT g.role FROM central_staff_users s
+             JOIN central_staff_role_grants g ON g.staff_id = s.id AND g.revoked_at IS NULL
+             WHERE s.id = :staff AND s.status = 'active' AND s.mfa_enrolled_at IS NOT NULL"
+        );
+        $stmt->execute(['staff' => $staffId]);
+        $roles = array_unique(array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'role'));
+        if (in_array('billing_officer', $roles, true)
+            && in_array('license_officer', $roles, true)) return false;
+        foreach ($roles as $role) {
+            if (StaffRolePermissions::roleAllows($role, $capability)) return true;
+        }
+
+        return false;
+    }
     public function permits(string $staffId, string $capability,
         ?string $customerId, bool $trustedSessionMfaVerified): bool
     {

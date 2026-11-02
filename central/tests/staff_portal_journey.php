@@ -143,6 +143,18 @@ try {
     $app->serve($home, $cookieBag, http_build_query(['staff_csrf' => $csrf]));
     journeyAssert(str_contains(end($bodies), 'Private HAFZATECH staff home'),
         'authenticated staff home not rendered');
+    $homeHtml=end($bodies);
+    journeyAssert(str_contains($homeHtml, 'action="/staff/customers/directory"')
+        && str_contains($homeHtml, 'name="search"'),
+        'customer search form missing required field');
+    if(str_contains($homeHtml, 'action="/staff/licenses/pending"')){
+        journeyAssert(str_contains($homeHtml, 'name="customer_id"'),
+            'license form missing customer_id');
+    }
+    if(str_contains($homeHtml, 'action="/staff/billing/overview"')){
+        journeyAssert(str_contains($homeHtml, 'name="invoice_id"'),
+            'billing form missing invoice_id');
+    }
 
     $headers = []; $bodies = [];
     $customers = $server; $customers['REQUEST_URI'] = '/staff/customers/directory';
