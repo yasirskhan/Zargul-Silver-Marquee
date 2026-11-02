@@ -1,6 +1,12 @@
 <x-filament-panels::page>
     <div class="space-y-6">
         <x-venuedesk.header eyebrow="VenueDesk · Approvals" title="Approval Center" />
+        <div class="vd-metrics" aria-label="Approval status summary">
+            <div class="vd-metric"><b>{{ $statusCounts['pending'] ?? 0 }}</b><span>Pending decisions</span></div>
+            <div class="vd-metric"><b>{{ $statusCounts['approved'] ?? 0 }}</b><span>Approved</span></div>
+            <div class="vd-metric"><b>{{ $statusCounts['rejected'] ?? 0 }}</b><span>Rejected</span></div>
+            <div class="vd-metric"><b>{{ count($entries) }}</b><span>Requests in this view</span></div>
+        </div>
         <p class="text-sm text-gray-600 dark:text-gray-300">
             Internal, company-scoped exception requests. A decision does not change a booking, invoice,
             price, payment or refund. No customer contact or Telegram message is sent from this page.

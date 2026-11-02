@@ -1,6 +1,11 @@
 <x-filament-panels::page>
     <div class="space-y-6">
         <x-venuedesk.header eyebrow="VenueDesk · Staff" title="Staff & Access" />
+        <div class="vd-metrics" aria-label="Staff and access summary">
+            <div class="vd-metric"><b>{{ count($invitations) }}</b><span>Invitations in this view</span></div>
+            <div class="vd-metric"><b>{{ count($halls) }}</b><span>Authorized halls</span></div>
+            <div class="vd-metric"><b>{{ count($hallIds) }}</b><span>Selected halls</span></div>
+        </div>
         <p class="text-sm">Staff access requires acceptance, email verification and MFA. Invitations never create a default password.</p>
 
         @if ($message)
