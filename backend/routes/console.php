@@ -77,7 +77,7 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
             'not_before' => now()->subDay()->toIso8601ZuluString(),
             'expires_at' => now()->addYear()->toIso8601ZuluString(),
             'limits' => ['max_halls' => 5, 'max_staff' => 20],
-            'features' => ['booking' => true],
+            'features' => ['booking' => true, 'inventory' => true, 'finance' => true],
         ];
         $raw = json_encode($grant, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
         app(\App\Services\CentralSignedLicenseCache::class)->accept([
@@ -472,7 +472,7 @@ Artisan::command('venuedesk:test-license-window {mode}', function (string $mode)
         'not_before' => $now->sub(new \DateInterval('P2Y'))->format('Y-m-d\TH:i:s\Z'),
         'expires_at' => $expires->format('Y-m-d\TH:i:s\Z'),
         'limits' => ['max_halls' => 5, 'max_staff' => 20],
-        'features' => ['booking' => true],
+        'features' => ['booking' => true, 'inventory' => true, 'finance' => true],
     ];
     $raw = json_encode($grant, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     app(\App\Services\CentralSignedLicenseCache::class)->accept([
