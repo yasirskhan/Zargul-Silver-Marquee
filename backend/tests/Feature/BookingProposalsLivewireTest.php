@@ -104,7 +104,8 @@ class BookingProposalsLivewireTest extends TestCase
             ->assertSet('intakeName', '')
             ->assertSet('intakeEmail', '')
             ->assertDontSee('Private New Customer')
-            ->assertDontSee('new-private@example.test');
+            ->assertDontSee('new-private@example.test')
+            ->assertSee('<b>1</b><span>Awaiting review</span>', false);
         $this->assertSame(2, DB::table('customer_profiles')->where('company_id', $company->id)->count());
         $this->assertSame(1, DB::table('booking_drafts')->where('company_id', $company->id)
             ->where('status', 'under_review')->count());

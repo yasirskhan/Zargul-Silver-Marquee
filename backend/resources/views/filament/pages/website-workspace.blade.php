@@ -1,6 +1,12 @@
 <x-filament-panels::page>
     <div class="space-y-6">
         <x-venuedesk.header eyebrow="VenueDesk · Website" title="Website & CMS" />
+        <div class="vd-metrics" aria-label="Website workspace summary">
+            <div class="vd-metric"><b>{{ count($sections) }}</b><span>Page sections in draft</span></div>
+            <div class="vd-metric"><b>{{ count($columnMediaSelections) }}</b><span>Selected media columns</span></div>
+            <div class="vd-metric"><b>{{ $pageId ? '1' : '0' }}</b><span>Page selected</span></div>
+            <div class="vd-metric"><b>{{ $branding['themePreset'] ?? '—' }}</b><span>Published theme</span></div>
+        </div>
         <p class="text-sm text-gray-600 dark:text-gray-300">
             Edit typed website sections, then save a draft for review. Only publishing changes the approved public snapshot.
         </p>

@@ -1,6 +1,12 @@
 <x-filament-panels::page>
     <div class="space-y-6">
         <x-venuedesk.header eyebrow="VenueDesk · Finance" title="Finance Review" />
+        <div class="vd-metrics" aria-label="Finance workspace summary">
+            <div class="vd-metric"><b>{{ count($previews) }}</b><span>Frozen internal previews</span></div>
+            <div class="vd-metric"><b>{{ count($journals) }}</b><span>Immutable journal records</span></div>
+            <div class="vd-metric"><b>{{ count($closeouts) }}</b><span>UTC cash closeouts</span></div>
+            <div class="vd-metric"><b>{{ count($dailyReconciliation) }}</b><span>Daily reconciliation rows</span></div>
+        </div>
         <p class="text-sm text-gray-700 dark:text-gray-300">
             Finance review is internal only. A rental-price preview is NOT an invoice, quote to a client,
             receipt, tax calculation or authorization to charge. Payments and refunds are NOT connected.

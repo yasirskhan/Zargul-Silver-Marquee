@@ -1,6 +1,12 @@
 <x-filament-panels::page>
     <div class="space-y-6" x-data="{ focused: true, area: 'overview' }">
         <x-venuedesk.header eyebrow="VenueDesk · Inventory" title="Hall Inventory" />
+        <div class="vd-metrics" aria-label="Inventory workspace summary">
+            <div class="vd-metric"><b>{{ count($catalog) }}</b><span>Catalog records</span></div>
+            <div class="vd-metric"><b>{{ count($positionReport) }}</b><span>Position report rows</span></div>
+            <div class="vd-metric"><b>{{ count($stocktakeHistory) }}</b><span>Stocktake history</span></div>
+            <div class="vd-metric"><b>{{ count($stocktakeVariance) }}</b><span>Variance rows</span></div>
+        </div>
         <p class="text-sm text-gray-600 dark:text-gray-300">
             Hall-owned inventory catalog and witnessed physical count records.
             Creating an item does not purchase inventory or change owned stock.

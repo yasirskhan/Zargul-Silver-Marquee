@@ -4,7 +4,7 @@
         @php
             $proposalStatusCounts = collect($entries)->countBy(fn ($entry) => (string) ($entry['status'] ?? 'unknown'));
             $proposalDrafts = (int) ($proposalStatusCounts['draft'] ?? 0);
-            $proposalReview = (int) ($proposalStatusCounts['submitted'] ?? 0);
+            $proposalReview = (int) ($proposalStatusCounts['under_review'] ?? 0);
         @endphp
         <div class="vd-metrics" aria-label="Booking proposal summary">
             <div class="vd-metric"><b>{{ count($entries) }}</b><span>Proposals in this view</span></div>
