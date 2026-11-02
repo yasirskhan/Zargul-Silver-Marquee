@@ -2,7 +2,7 @@
     <div class="space-y-6">
         <section class="vd-hero">
             <span class="eyebrow">VenueDesk · Calendar &amp; availability</span>
-            <h1>Hall Calendar</h1>
+            <div class="vd-hero-title" role="presentation">Hall Calendar</div>
             <p>Internal occupancy by date and program. Confirmed slots are physically reserved; draft proposals never reserve availability.</p>
         </section>
         <p class="text-sm text-gray-600 dark:text-gray-300">

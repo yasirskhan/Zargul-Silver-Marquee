@@ -39,3 +39,6 @@ body{font-family:'DM Sans',system-ui,sans-serif}
 .vd-commandbar-links{display:flex;gap:5px;flex-wrap:wrap}.vd-commandbar-links a{color:#dce9df!important;font-size:.73rem;padding:6px 9px;border-radius:3px}.vd-commandbar-links a:hover,.vd-commandbar-links a.active{background:#caa56b;color:#172c23!important;font-weight:700}
 .vd-bottom-nav{display:none}
 @media(max-width:900px){.vd-commandbar-links{display:none}.vd-bottom-nav{display:flex;position:fixed;z-index:45;left:0;right:0;bottom:0;background:#fff;border-top:1px solid #dbe5dc;justify-content:flex-start;overflow-x:auto;overscroll-behavior-x:contain;padding:6px 4px env(safe-area-inset-bottom);box-shadow:0 -8px 25px #0001;scrollbar-width:thin}.vd-bottom-nav a{display:flex;flex:0 0 46px;flex-direction:column;align-items:center;gap:2px;font-size:.58rem;color:#657369;text-decoration:none;min-width:46px;padding:5px 2px}.vd-bottom-nav a span{font-size:.72rem;font-weight:700;color:#9a784d}.vd-bottom-nav a.active{color:#17372e;font-weight:700}.fi-main{padding-bottom:70px!important}}
+.vd-hero-title{font-family:'Cormorant Garamond',serif;font-size:2.7rem;line-height:1.05;margin:6px 0;color:#fff}
+@media(max-width:800px){.vd-hero-title{font-size:2rem}}
+
