@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace Hafzatech\Central;
 
+use PDO;
+
 /**
  * INTERNAL private role-specific vendor dashboard, never a public session
  * source. Capabilities are always derived from current central MFA sessions,
