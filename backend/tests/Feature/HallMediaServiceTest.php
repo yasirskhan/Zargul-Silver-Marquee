@@ -42,7 +42,7 @@ final class HallMediaServiceTest extends TestCase
 
         $this->expectException(\InvalidArgumentException::class);
         $service->replace($owner, $company->id, $hall->id, [$foreign], 'Attempt foreign image');
-        $this->assertNotSame($foreign, $service->selectedMedia($owner, $other->id, $foreignHall->id));
+
     }
 
     private function media(string $companyId, int $userId, string $alt): string
