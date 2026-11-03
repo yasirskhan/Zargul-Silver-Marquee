@@ -175,7 +175,10 @@ try {
         VALUES (:id,:customer,:token,:domain,now()+interval '1 day')")
         ->execute(['id' => $enrollmentId, 'customer' => $customerId,
             'token' => hash('sha256', $installationId), 'domain' => 'overview-'.$enrollmentId.'.example.test']);
-    $db->prepare("INSERT INTO registered_installations
+    $db->prepare("INSERT INTO central_staff_role_grants(id,staff_id,role,customer_scope_id,reason)
+        VALUES(:grant,:staff,'license_officer',:customer,'Synthetic scoped license overview role')")
+        ->execute(['grant' => journeyId(), 'staff' => $id,
+            'customer' => $customerId]);    $db->prepare("INSERT INTO registered_installations
         (id,customer_id,enrollment_id,approved_domain,ed25519_public_key,status)
         VALUES (:id,:customer,:enrollment,:domain,:key,'active')")
         ->execute(['id' => $installationId, 'customer' => $customerId,
