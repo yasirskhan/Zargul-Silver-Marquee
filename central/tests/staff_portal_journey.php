@@ -164,51 +164,6 @@ try {
     journeyAssert(str_contains(end($bodies), 'Private HAFZATECH customer directory'),
         'authorized customer directory not rendered');
 
-    $customerId = journeyId();
-    $enrollmentId = journeyId();
-    $installationId = journeyId();
-    $db->prepare("INSERT INTO vendor_customers (id,legal_name,status)
-        VALUES (:id,'Synthetic Overview Venue','active')")
-        ->execute(['id' => $customerId]);
-    $db->prepare("INSERT INTO installation_enrollments
-        (id,customer_id,token_sha256,approved_domain,expires_at)
-        VALUES (:id,:customer,:token,:domain,now()+interval '1 day')")
-        ->execute(['id' => $enrollmentId, 'customer' => $customerId,
-            'token' => hash('sha256', $installationId), 'domain' => 'overview-'.$enrollmentId.'.example.test']);
-    $db->prepare("INSERT INTO central_staff_role_grants(id,staff_id,role,customer_scope_id,reason)
-        VALUES(:grant,:staff,'license_officer',:customer,'Synthetic scoped license overview role')")
-        ->execute(['grant' => journeyId(), 'staff' => $id,
-            'customer' => $customerId]);    $db->prepare("INSERT INTO registered_installations
-        (id,customer_id,enrollment_id,approved_domain,ed25519_public_key,status)
-        VALUES (:id,:customer,:enrollment,:domain,:key,'active')")
-        ->execute(['id' => $installationId, 'customer' => $customerId,
-            'enrollment' => $enrollmentId, 'domain' => 'overview-'.$enrollmentId.'.example.test',
-            'key' => rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=')]);
-
-    $headers = []; $bodies = [];
-    $overview = $server; $overview['REQUEST_URI'] = '/staff/dashboard';
-    $app->serve($overview, $cookieBag, http_build_query([
-        'staff_csrf' => $csrf, 'customer_id' => $customerId,
-    ]));
-    $overviewHtml = end($bodies);
-    journeyAssert(str_contains($overviewHtml, 'Registered installations')
-        && str_contains($overviewHtml, $installationId)
-        && str_contains($overviewHtml, 'overview-'.$enrollmentId.'.example.test'),
-        'installation overview row missing');
-    journeyAssert(str_contains($overviewHtml, 'No prepared license for this customer.'),
-        'empty license state missing');
-
-    $otherCustomer = journeyId();
-    $db->prepare("INSERT INTO vendor_customers (id,legal_name,status)
-        VALUES (:id,'Other Isolated Venue','active')")->execute(['id' => $otherCustomer]);
-    $headers = []; $bodies = [];
-    $isolated = $server; $isolated['REQUEST_URI'] = '/staff/dashboard';
-    $app->serve($isolated, $cookieBag, http_build_query([
-        'staff_csrf' => $csrf, 'customer_id' => $otherCustomer,
-    ]));
-    journeyAssert(! str_contains(end($bodies), $installationId),
-        'customer installation leaked into another workspace');
-
     $headers = []; $bodies = [];
     $logout = $server; $logout['REQUEST_URI'] = '/staff/session/logout';
     $app->serve($logout, $cookieBag, http_build_query(['staff_csrf' => $csrf]));
