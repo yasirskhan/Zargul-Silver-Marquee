@@ -14,7 +14,8 @@ final class CentralStaffPortalDashboard
     public function __construct(
         private readonly CentralStaffSessionAuthorization $authorization,
         private readonly CentralStaffCustomerLookup $customers,
-        private readonly ?CentralStaffVendorInvoiceIssuer $invoiceIssuer=null
+        private readonly ?CentralStaffVendorInvoiceIssuer $invoiceIssuer=null,
+        private readonly ?PDO $db=null
     ) {}
 
     public function render(string $sessionBearer,string $customerId,?string $csrf=null): string
@@ -36,6 +37,82 @@ final class CentralStaffPortalDashboard
             ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
         $id=htmlspecialchars($customer['id'],
             ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+        $overview='';
+        if($this->db!==null) {
+            $installations=$this->db->prepare(
+                'SELECT id,approved_domain,status FROM registered_installations
+                 WHERE customer_id=:customer ORDER BY created_at');
+            $installations->execute(['customer'=>$customerId]);
+            $installationRows=$installations->fetchAll(PDO::FETCH_ASSOC);
+            $overview.='<section aria-label="Registered installations"><h2>Installations</h2>';
+            if($installationRows===[]) {
+                $overview.='<p>No registered installation for this customer.</p>';
+            } else {
+                $overview.='<table><thead><tr><th>Installation</th><th>Domain</th><th>Status</th></tr></thead><tbody>';
+                foreach($installationRows as $row) {
+                    $overview.='<tr><td><code>'.htmlspecialchars((string)$row['id'],ENT_QUOTES).'</code></td><td>'
+                        .htmlspecialchars((string)$row['approved_domain'],ENT_QUOTES).'</td><td>'
+                        .htmlspecialchars((string)$row['status'],ENT_QUOTES).'</td></tr>';
+                }
+                $overview.='</tbody></table>';
+            }
+            $overview.='</section>';
+            if($licensing) {
+                $licenses=$this->db->prepare(
+                    'SELECT l.id,l.approved_domain,l.current_revision,r.expires_at,r.state
+                     FROM central_licenses l
+                     LEFT JOIN central_paid_license_revisions r
+                       ON r.license_id=l.id AND r.revision=l.current_revision
+                     WHERE l.customer_id=:customer ORDER BY l.created_at DESC');
+                $licenses->execute(['customer'=>$customerId]);
+                $overview.='<section aria-label="Licensed subscriptions"><h2>Licenses</h2>';
+                $licenseRows=$licenses->fetchAll(PDO::FETCH_ASSOC);
+                if($licenseRows===[]) {
+                    $overview.='<p>No prepared license for this customer.</p>';
+                } else {
+                    $overview.='<table><thead><tr><th>License</th><th>Domain</th><th>Revision</th><th>Expires</th><th>State</th></tr></thead><tbody>';
+                    foreach($licenseRows as $row) {
+                        $overview.='<tr><td><code>'.htmlspecialchars((string)$row['id'],ENT_QUOTES).'</code></td><td>'
+                            .htmlspecialchars((string)$row['approved_domain'],ENT_QUOTES).'</td><td>'
+                            .htmlspecialchars((string)$row['current_revision'],ENT_QUOTES).'</td><td>'
+                            .htmlspecialchars((string)($row['expires_at']??'—'),ENT_QUOTES).'</td><td>'
+                            .htmlspecialchars((string)($row['state']??'—'),ENT_QUOTES).'</td></tr>';
+                    }
+                    $overview.='</tbody></table>';
+                }
+                $overview.='</section>';
+            }
+            if($billing) {
+                $invoices=$this->db->prepare(
+                    'SELECT invoice_number,currency,total_minor,status,issued_at
+                     FROM central_vendor_invoices WHERE customer_id=:customer
+                     ORDER BY created_at DESC LIMIT 10');
+                $invoices->execute(['customer'=>$customerId]);
+                $overview.='<section aria-label="Subscription invoices"><h2>Recent invoices</h2>';
+                $invoiceRows=$invoices->fetchAll(PDO::FETCH_ASSOC);
+                if($invoiceRows===[]) {
+                    $overview.='<p>No subscription invoice for this customer.</p>';
+                } else {
+                    $overview.='<table><thead><tr><th>Invoice</th><th>Amount</th><th>Status</th><th>Issued</th></tr></thead><tbody>';
+                    foreach($invoiceRows as $row) {
+                        $overview.='<tr><td>'.htmlspecialchars((string)$row['invoice_number'],ENT_QUOTES).'</td><td>'
+                            .htmlspecialchars((string)$row['currency'].' '.$row['total_minor'],ENT_QUOTES).'</td><td>'
+                            .htmlspecialchars((string)$row['status'],ENT_QUOTES).'</td><td>'
+                            .htmlspecialchars((string)($row['issued_at']??'—'),ENT_QUOTES).'</td></tr>';
+                    }
+                    $overview.='</tbody></table>';
+                }
+                $overview.='</section>';
+            }
+            if($support) {
+                $tickets=$this->db->prepare(
+                    "SELECT count(*) FROM vendor_support_tickets
+                     WHERE customer_id=:customer AND status NOT IN ('resolved','closed')");
+                $tickets->execute(['customer'=>$customerId]);
+                $overview.='<section aria-label="Open support summary"><h2>Support</h2><p>'
+                    .(int)$tickets->fetchColumn().' open support ticket(s).</p></section>';
+            }
+        }
         $sections='';
         if ($billing) {
             $sections.='<section aria-label="Billing permissions">'.
@@ -132,7 +209,7 @@ final class CentralStaffPortalDashboard
         }
         return '<section aria-label="Private HAFZATECH staff dashboard">'.
             '<h1>HAFZATECH Staff</h1><p>Selected customer: '.$name.
-            ' ('.$id.')</p>'.$sections.$forms.'</section>';
+            ' ('.$id.')</p>'.$overview.$sections.$forms.'</section>';
     }
 
     private static function uuid():string

@@ -58,7 +58,7 @@ final class CentralStaffPortalOperatorWiring
             new CentralStaffInvoicePaymentOverview($db,$sessions,$auth),true);
         $customers=new CentralStaffCustomerLookup($db,$auth);
         $invoiceIssuer=new CentralStaffVendorInvoiceIssuer($db,$sessions,$auth,true);
-        $dashboard=new CentralStaffPortalDashboard($auth,$customers,$invoiceIssuer);
+        $dashboard=new CentralStaffPortalDashboard($auth,$customers,$invoiceIssuer,$db);
         $support=new CentralStaffSupportTicketQueue($db,$auth);
         $audit=new CentralStaffPortalAuditHistoryPage(
             new CentralStaffSessionAuditReader($db,$auth),
