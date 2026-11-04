@@ -39,6 +39,11 @@ final class CentralStaffPortalDashboard
             ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
         $id=htmlspecialchars($customer['id'],
             ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+        $recordCsrf = is_string($csrf) && preg_match('/^[0-9a-f]{64}$/D', $csrf) === 1
+            ? htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8') : null;
+        $recordFields = $recordCsrf === null ? ''
+            : '<input type="hidden" name="staff_csrf" value="'.$recordCsrf.'">'
+              .'<input type="hidden" name="customer_id" value="'.$id.'">';
         $overview='';
         if($this->db!==null) {
             $installations=$this->db->prepare(
@@ -50,11 +55,18 @@ final class CentralStaffPortalDashboard
             if($installationRows===[]) {
                 $overview.='<p>No registered installation for this customer.</p>';
             } else {
-                $overview.='<table><thead><tr><th>Installation</th><th>Domain</th><th>Status</th></tr></thead><tbody>';
+                $overview.='<table><thead><tr><th>Installation</th><th>Domain</th><th>Status</th><th>Action</th></tr></thead><tbody>';
                 foreach($installationRows as $row) {
                     $overview.='<tr><td><code>'.htmlspecialchars((string)$row['id'],ENT_QUOTES).'</code></td><td>'
                         .htmlspecialchars((string)$row['approved_domain'],ENT_QUOTES).'</td><td>'
-                        .htmlspecialchars((string)$row['status'],ENT_QUOTES).'</td></tr>';
+                        .htmlspecialchars((string)$row['status'],ENT_QUOTES).'</td><td>';
+                    if($support && $recordCsrf!==null) {
+                        $overview.='<form method="post" action="/staff/support/tickets">'.$recordFields
+                            .'<button type="submit">Open support</button></form>';
+                    } else {
+                        $overview.='—';
+                    }
+                    $overview.='</td></tr>';
                 }
                 $overview.='</tbody></table>';
             }
@@ -72,13 +84,20 @@ final class CentralStaffPortalDashboard
                 if($licenseRows===[]) {
                     $overview.='<p>No prepared license for this customer.</p>';
                 } else {
-                    $overview.='<table><thead><tr><th>License</th><th>Domain</th><th>Revision</th><th>Expires</th><th>State</th></tr></thead><tbody>';
+                    $overview.='<table><thead><tr><th>License</th><th>Domain</th><th>Revision</th><th>Expires</th><th>State</th><th>Action</th></tr></thead><tbody>';
                     foreach($licenseRows as $row) {
                         $overview.='<tr><td><code>'.htmlspecialchars((string)$row['id'],ENT_QUOTES).'</code></td><td>'
                             .htmlspecialchars((string)$row['approved_domain'],ENT_QUOTES).'</td><td>'
                             .htmlspecialchars((string)$row['current_revision'],ENT_QUOTES).'</td><td>'
                             .htmlspecialchars((string)($row['expires_at']??'—'),ENT_QUOTES).'</td><td>'
-                            .htmlspecialchars((string)($row['state']??'—'),ENT_QUOTES).'</td></tr>';
+                            .htmlspecialchars((string)($row['state']??'—'),ENT_QUOTES).'</td><td>';
+                        if($recordCsrf!==null) {
+                            $overview.='<form method="post" action="/staff/licenses/pending">'.$recordFields
+                                .'<button type="submit">Review revisions</button></form>';
+                        } else {
+                            $overview.='—';
+                        }
+                        $overview.='</td></tr>';
                     }
                     $overview.='</tbody></table>';
                 }
@@ -86,7 +105,7 @@ final class CentralStaffPortalDashboard
             }
             if($billing) {
                 $invoices=$this->db->prepare(
-                    'SELECT invoice_number,currency,total_minor,status,issued_at
+                    'SELECT id,invoice_number,currency,total_minor,status,issued_at
                      FROM central_vendor_invoices WHERE customer_id=:customer
                      ORDER BY created_at DESC LIMIT 10');
                 $invoices->execute(['customer'=>$customerId]);
@@ -95,12 +114,21 @@ final class CentralStaffPortalDashboard
                 if($invoiceRows===[]) {
                     $overview.='<p>No subscription invoice for this customer.</p>';
                 } else {
-                    $overview.='<table><thead><tr><th>Invoice</th><th>Amount</th><th>Status</th><th>Issued</th></tr></thead><tbody>';
+                    $overview.='<table><thead><tr><th>Invoice</th><th>Amount</th><th>Status</th><th>Issued</th><th>Action</th></tr></thead><tbody>';
                     foreach($invoiceRows as $row) {
                         $overview.='<tr><td>'.htmlspecialchars((string)$row['invoice_number'],ENT_QUOTES).'</td><td>'
                             .htmlspecialchars((string)$row['currency'].' '.$row['total_minor'],ENT_QUOTES).'</td><td>'
                             .htmlspecialchars((string)$row['status'],ENT_QUOTES).'</td><td>'
-                            .htmlspecialchars((string)($row['issued_at']??'—'),ENT_QUOTES).'</td></tr>';
+                            .htmlspecialchars((string)($row['issued_at']??'—'),ENT_QUOTES).'</td><td>';
+                        if($recordCsrf!==null) {
+                            $overview.='<form method="post" action="/staff/billing/overview">'.$recordFields
+                                .'<input type="hidden" name="invoice_id" value="'
+                                .htmlspecialchars((string)$row['id'],ENT_QUOTES).'">'
+                                .'<button type="submit">Billing overview</button></form>';
+                        } else {
+                            $overview.='—';
+                        }
+                        $overview.='</td></tr>';
                     }
                     $overview.='</tbody></table>';
                 }

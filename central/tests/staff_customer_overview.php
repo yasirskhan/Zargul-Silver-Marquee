@@ -107,6 +107,11 @@ try {
     ovAssert(!str_contains($html,'<script>Overview Venue</script>'),'unescaped customer name leaked');
     ovAssert(str_contains($html,'1 open support ticket'),'open support count missing');
     ovAssert(str_contains($html,'No prepared license'),'empty license state missing');
+    ovAssert(str_contains($html,'action="/staff/support/tickets"')
+        && str_contains($html,'Open support'),'installation support action missing');
+    ovAssert(str_contains($html,'action="/staff/licenses/pending"')
+        && str_contains($html,'Review revisions'),'license action missing');
+    ovAssert(!str_contains($html,'Recent invoices'),'billing section visible without permission');
 
     ovReject(fn()=>$app->serve($dash,$bag,http_build_query(['staff_csrf'=>$csrf,'customer_id'=>$customerB])));
     $db->prepare("UPDATE central_staff_role_grants SET revoked_at=now() WHERE staff_id=:staff")
