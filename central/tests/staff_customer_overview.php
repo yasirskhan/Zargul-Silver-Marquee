@@ -66,6 +66,9 @@ $db->prepare("INSERT INTO vendor_support_tickets(id,customer_id,installation_id,
     VALUES(:id,:customer,:installation,:client,decode(:subject,'hex'),:hash,'new')")
     ->execute(['id'=>ovId(),'customer'=>$customerA,'installation'=>$installations['alpha'][0],
         'client'=>ovId(),'subject'=>bin2hex(random_bytes(24)),'hash'=>hash('sha256','overview')]);
+$ticketNumber=(string)$db->query("SELECT ticket_number FROM vendor_support_tickets WHERE customer_id="
+    .$db->quote($customerA))->fetchColumn();
+ovAssert($ticketNumber!=='','support ticket fixture missing');
 
 $secret='overview-'.bin2hex(random_bytes(8));
 $staff=ovId();$email='central-overview-'.bin2hex(random_bytes(4)).'@example.test';
@@ -110,6 +113,22 @@ try {
     ovAssert(str_contains($html,'action="/staff/support/tickets"')
         && str_contains($html,'Installation support'),'installation support action missing');
     ovAssert(!str_contains($html,'Recent invoices'),'billing section visible without permission');
+
+    $headers=[];$bodies=[];$support=$server;$support['REQUEST_URI']='/staff/support/tickets';
+    $app->serve($support,$bag,http_build_query(['staff_csrf'=>$csrf,
+        'customer_id'=>$customerA,'installation_id'=>$installations['alpha'][0]]));
+    $supportHtml=end($bodies);
+    ovAssert(str_contains($supportHtml,$ticketNumber),'selected installation ticket missing');
+    ovAssert(!str_contains($supportHtml,$installations['beta'][0]),'foreign installation ticket leaked');
+
+    $foreign=$server;$foreign['REQUEST_URI']='/staff/support/tickets';
+    try {
+        $app->serve($foreign,$bag,http_build_query(['staff_csrf'=>$csrf,
+            'customer_id'=>$customerA,'installation_id'=>$installations['beta'][0]]));
+        throw new RuntimeException('Central overview: foreign installation was accepted');
+    } catch (RegistrationError $e) {
+        ovAssert($e->errorCode==='support_scope_denied','expected support_scope_denied');
+    }
 
     ovReject(fn()=>$app->serve($dash,$bag,http_build_query(['staff_csrf'=>$csrf,'customer_id'=>$customerB])));
     $db->prepare("UPDATE central_staff_role_grants SET revoked_at=now() WHERE staff_id=:staff")

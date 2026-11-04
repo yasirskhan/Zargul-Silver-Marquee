@@ -30,6 +30,15 @@ final class CentralStaffSupportTicketQueue
         if (!$this->authorization->permits($bearer,'support.ticket.read',$customerId)) {
             throw new RegistrationError('support_scope_denied');
         }
+        if($installationId!==null) {
+            $owned=$this->db->prepare(
+                'SELECT 1 FROM registered_installations
+                 WHERE id=:installation AND customer_id=:customer');
+            $owned->execute(['installation'=>$installationId,'customer'=>$customerId]);
+            if($owned->fetchColumn()===false) {
+                throw new RegistrationError('support_scope_denied');
+            }
+        }
         $sql="SELECT t.ticket_number,t.status,t.created_at
              FROM vendor_support_tickets t
              JOIN vendor_customers c
