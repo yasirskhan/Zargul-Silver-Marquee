@@ -21,6 +21,7 @@ final class CentralStaffInstallationDirectory
         if (preg_match('/^[a-f0-9]{64}$/D',$csrf)!==1) {
             throw new RegistrationError('invalid_installation_directory_request',422);
         }
+        $support=$this->authorization->permits($bearer,'support.ticket.read',$customerId);
         $query=$this->db->prepare(
             'SELECT id,approved_domain,status,created_at FROM registered_installations
              WHERE customer_id=:customer ORDER BY created_at DESC');
@@ -33,10 +34,15 @@ final class CentralStaffInstallationDirectory
         foreach($rows as $row) {
             $id=$e((string)$row['id']);
             $body.='<tr><td><code>'.$id.'</code></td><td>'.$e((string)$row['approved_domain'])
-                .'</td><td>'.$e((string)$row['status']).'</td><td>'
-                .'<form method="post" action="/staff/support/tickets">'.$proof
-                .'<input type="hidden" name="installation_id" value="'.$id.'">'
-                .'<button type="submit">Installation support</button></form></td></tr>';
+                .'</td><td>'.$e((string)$row['status']).'</td><td>';
+            if($support) {
+                $body.='<form method="post" action="/staff/support/tickets">'.$proof
+                    .'<input type="hidden" name="installation_id" value="'.$id.'">'
+                    .'<button type="submit">Installation support</button></form>';
+            } else {
+                $body.='—';
+            }
+            $body.='</td></tr>';
         }
         if($body==='') {
             $body='<tr><td colspan="4">No registered installation for this customer.</td></tr>';
