@@ -46,6 +46,15 @@ final class CentralStaffPortalPrivateResponse
             }
             return ['status'=>200,'headers'=>$headers,'cookies'=>[],'body'=>$html];
         }
+        if ($kind==='private_installations_html') {
+            $html=$internal['html']??null;
+            if(!is_string($html) || strlen($html)>262144 ||
+                !str_starts_with($html,
+                    '<section aria-label="Customer installation management">')) {
+                throw new RegistrationError('invalid_staff_response');
+            }
+            return ['status'=>200,'headers'=>$headers,'cookies'=>[],'body'=>$html];
+        }
         if ($kind==='private_staff_home_html') {
             $html=$internal['html']??null;
             if (!is_string($html) || strlen($html)>262144 ||
