@@ -53,7 +53,7 @@ nav[aria-label="Authorized staff navigation"] form,nav[aria-label="Authorized st
 button{background:var(--f);color:#fff;border:0;border-radius:4px;padding:10px 14px;font:inherit;font-weight:600;cursor:pointer}
 button:hover{background:#234b3d}input,select,textarea{border:1px solid #ccd5cd;border-radius:4px;padding:9px;font:inherit;width:100%;max-width:420px;background:#fff}
 label{display:block;margin:10px 0;font-weight:600;font-size:.86rem}table{width:100%;border-collapse:collapse;font-size:.86rem}th,td{text-align:left;padding:10px;border-bottom:1px solid var(--line)}th{font-size:.68rem;letter-spacing:.13em;text-transform:uppercase;color:#657369}
-.badge,.status{display:inline-block;background:#f5f1e8;border:1px solid #e2d4ba;color:#6b512f;border-radius:999px;padding:2px 9px;font-size:.7rem;font-weight:700}
+.central-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:14px 0}.metric-card{background:linear-gradient(160deg,#fff,#f7f4ec);border:1px solid var(--line);border-radius:5px;padding:16px}.metric-card strong{display:block;font-family:Georgia,serif;font-size:2rem;color:#17372e;line-height:1}.metric-card span{font-size:.74rem;color:#657369}.badge,.status{display:inline-block;background:#f5f1e8;border:1px solid #e2d4ba;color:#6b512f;border-radius:999px;padding:2px 9px;font-size:.7rem;font-weight:700}
 footer.central-foot{color:#657369;font-size:.75rem;padding:26px;text-align:center}
 @media(max-width:640px){.central-wrap{padding:18px 14px}nav[aria-label="Authorized staff navigation"]{grid-template-columns:1fr}section[aria-label]{padding:15px}}
 CSS;

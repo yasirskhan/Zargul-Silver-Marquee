@@ -87,7 +87,7 @@ final class CentralStaffPortalOperatorWiring
             new CentralStaffVendorInvoiceDirectory($db,$auth),
             new CentralStaffVendorPlanPublisher($db,$sessions,$auth,true),
             new CentralStaffVendorPlanCatalogReader($db,$auth),
-            new CentralStaffPortalHome($sessions,$auth),
+            new CentralStaffPortalHome($sessions,$auth,$db),
             new CentralStaffCustomerDirectory($db,$sessions,$auth),
             new CentralStaffDesignerCreditService($db,$sessions,$auth));
         return new CentralStaffPortalOperatorApp(

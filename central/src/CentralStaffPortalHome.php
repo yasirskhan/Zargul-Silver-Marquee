@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace Hafzatech\Central;
 
+use PDO;
+
 /**
  * Internal, role-driven starting point for a current vendor MFA staff session.
  * This is NOT a public endpoint, session issuer or permission elevation.
@@ -12,7 +14,8 @@ final class CentralStaffPortalHome
 {
     public function __construct(
         private readonly CentralStaffSessionService $sessions,
-        private readonly CentralStaffSessionAuthorization $authorization
+        private readonly CentralStaffSessionAuthorization $authorization,
+        private readonly ?PDO $db=null
     ) {}
 
     public function render(string $bearer,string $csrf):string
@@ -23,7 +26,21 @@ final class CentralStaffPortalHome
         if (preg_match('/^[a-f0-9]{64}$/D',$csrf)!==1) {
             throw new RegistrationError('invalid_staff_home_request',422);
         }
-        $proof=htmlspecialchars($csrf,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+        $metrics='';
+        if($this->db!==null && $this->authorization->permits($bearer,'audit.read',null)) {
+            $count=static function(PDO $db,string $sql):int {
+                return (int)$db->query($sql)->fetchColumn();
+            };
+            $metrics='<section aria-label="Central operations summary"><h2>Control Center overview</h2>'
+                .'<div class="central-metrics">'
+                .'<div class="metric-card"><strong>'.$count($this->db,'SELECT count(*) FROM vendor_customers').'</strong><span>Customers</span></div>'
+                .'<div class="metric-card"><strong>'.$count($this->db,"SELECT count(*) FROM registered_installations WHERE status='active'").'</strong><span>Active installations</span></div>'
+                .'<div class="metric-card"><strong>'.$count($this->db,'SELECT count(*) FROM central_licenses').'</strong><span>Licenses</span></div>'
+                .'<div class="metric-card"><strong>'.$count($this->db,"SELECT count(*) FROM central_vendor_invoices WHERE status='issued'").'</strong><span>Issued invoices</span></div>'
+                .'<div class="metric-card"><strong>'.$count($this->db,"SELECT count(*) FROM vendor_support_tickets WHERE status NOT IN ('resolved','closed')").'</strong><span>Open support tickets</span></div>'
+                .'<div class="metric-card"><strong>'.$count($this->db,"SELECT count(*) FROM central_staff_users WHERE status='active'").'</strong><span>Active staff</span></div>'
+                .'</div></section>';
+        }        $proof=htmlspecialchars($csrf,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
         $hidden='<input type="hidden" name="staff_csrf" value="'.$proof.'">';
         $action=static fn(string $uri,string $name):string=>
             '<form method="post" action="'.$uri.'">'.$hidden.
@@ -94,7 +111,7 @@ final class CentralStaffPortalHome
             '<button type="submit">Open customer workspace</button></form>'.
             '</section>';
         return '<section aria-label="Private HAFZATECH staff home">'.
-            '<h1>HAFZATECH Central Control Center</h1>'.
+            '<h1>HAFZATECH Central Control Center</h1>'.$metrics.
             '<p>Private, capability-based navigation. Financial settlement and '.
             'license signing require independent review and are not '.
             'available from this page.</p>'.
