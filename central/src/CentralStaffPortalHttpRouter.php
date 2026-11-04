@@ -354,9 +354,14 @@ final class CentralStaffPortalHttpRouter
                 'html'=>$this->dashboard->render($bearer,$customerId,$csrfHeader)];
         }
         if ($uri==='/staff/support/tickets' && $this->supportQueue!==null) {
-            if (!$this->exactFields($fields,['customer_id']) ||
+            $installationId = $fields['installation_id'] ?? null;
+            $allowedFields = $installationId === null
+                ? ['customer_id'] : ['customer_id','installation_id'];
+            if (!$this->exactFields($fields,$allowedFields) ||
                 !is_string($fields['customer_id']) ||
-                !self::uuid($fields['customer_id'])) {
+                !self::uuid($fields['customer_id']) ||
+                ($installationId !== null &&
+                    (!is_string($installationId) || !self::uuid($installationId)))) {
                 throw new RegistrationError('invalid_support_queue_request',422);
             }
             if (!$this->boundary->permitsMutation(
@@ -365,7 +370,7 @@ final class CentralStaffPortalHttpRouter
                 throw new RegistrationError('staff_portal_denied');
             }
             $rows=$this->supportQueue->listForCustomer(
-                $bearer,$fields['customer_id'],0,25);
+                $bearer,$fields['customer_id'],0,25,$installationId);
             return ['kind'=>'private_support_html',
                 'html'=>CentralStaffSupportQueueHtmlRenderer::render($rows)];
         }

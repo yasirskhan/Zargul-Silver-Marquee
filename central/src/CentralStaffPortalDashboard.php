@@ -62,7 +62,9 @@ final class CentralStaffPortalDashboard
                         .htmlspecialchars((string)$row['status'],ENT_QUOTES).'</td><td>';
                     if($support && $recordCsrf!==null) {
                         $overview.='<form method="post" action="/staff/support/tickets">'.$recordFields
-                            .'<button type="submit">Open support</button></form>';
+                            .'<input type="hidden" name="installation_id" value="'
+                            .htmlspecialchars((string)$row['id'],ENT_QUOTES).'">'
+                            .'<button type="submit">Installation support</button></form>';
                     } else {
                         $overview.='—';
                     }
@@ -93,7 +95,7 @@ final class CentralStaffPortalDashboard
                             .htmlspecialchars((string)($row['state']??'—'),ENT_QUOTES).'</td><td>';
                         if($recordCsrf!==null) {
                             $overview.='<form method="post" action="/staff/licenses/pending">'.$recordFields
-                                .'<button type="submit">Review revisions</button></form>';
+                                .'<button type="submit">All pending revisions</button></form>';
                         } else {
                             $overview.='—';
                         }

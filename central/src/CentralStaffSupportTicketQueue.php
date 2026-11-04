@@ -19,26 +19,31 @@ final class CentralStaffSupportTicketQueue
 
     /** @return array<int,array<string,mixed>> */
     public function listForCustomer(string $bearer,string $customerId,
-        int $offset=0,int $limit=25): array
+        int $offset=0,int $limit=25,?string $installationId=null): array
     {
         if (preg_match('/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/D',
             $customerId)!==1 || $offset<0 || $offset>10000 ||
-            $limit<1 || $limit>25) {
+            $limit<1 || $limit>25 || ($installationId!==null &&
+                preg_match('/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/D',$installationId)!==1)) {
             throw new RegistrationError('invalid_support_queue_request',422);
         }
         if (!$this->authorization->permits($bearer,'support.ticket.read',$customerId)) {
             throw new RegistrationError('support_scope_denied');
         }
-        $q=$this->db->prepare(
-            "SELECT t.ticket_number,t.status,t.created_at
+        $sql="SELECT t.ticket_number,t.status,t.created_at
              FROM vendor_support_tickets t
              JOIN vendor_customers c
                ON c.id=t.customer_id AND c.status='active'
-             WHERE t.customer_id=:customer
-             ORDER BY t.created_at DESC,t.id DESC
-             LIMIT :limit OFFSET :offset"
-        );
+             WHERE t.customer_id=:customer";
+        if($installationId!==null) {
+            $sql.=" AND t.installation_id=:installation";
+        }
+        $sql.=" ORDER BY t.created_at DESC,t.id DESC LIMIT :limit OFFSET :offset";
+        $q=$this->db->prepare($sql);
         $q->bindValue(':customer',$customerId,PDO::PARAM_STR);
+        if($installationId!==null) {
+            $q->bindValue(':installation',$installationId,PDO::PARAM_STR);
+        }
         $q->bindValue(':limit',$limit,PDO::PARAM_INT);
         $q->bindValue(':offset',$offset,PDO::PARAM_INT);
         $q->execute();

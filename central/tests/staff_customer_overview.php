@@ -108,7 +108,7 @@ try {
     ovAssert(str_contains($html,'1 open support ticket'),'open support count missing');
     ovAssert(str_contains($html,'No prepared license'),'empty license state missing');
     ovAssert(str_contains($html,'action="/staff/support/tickets"')
-        && str_contains($html,'Open support'),'installation support action missing');
+        && str_contains($html,'Installation support'),'installation support action missing');
     ovAssert(!str_contains($html,'Recent invoices'),'billing section visible without permission');
 
     ovReject(fn()=>$app->serve($dash,$bag,http_build_query(['staff_csrf'=>$csrf,'customer_id'=>$customerB])));
