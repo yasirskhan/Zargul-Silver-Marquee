@@ -72,6 +72,10 @@ final class CentralStaffPortalDashboard
                 }
                 $overview.='</tbody></table>';
             }
+            if($licensing && $recordCsrf!==null) {
+                $overview.='<form method="post" action="/staff/installations">'.$recordFields
+                    .'<button type="submit">Manage installations</button></form>';
+            }
             $overview.='</section>';
             if($licensing) {
                 $licenses=$this->db->prepare(

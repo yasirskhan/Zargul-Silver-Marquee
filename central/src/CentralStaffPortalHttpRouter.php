@@ -41,7 +41,8 @@ final class CentralStaffPortalHttpRouter
         private readonly ?CentralStaffVendorPlanCatalogReader $planCatalog = null,
         private readonly ?CentralStaffPortalHome $staffHome = null,
         private readonly ?CentralStaffCustomerDirectory $customerDirectory = null,
-        private readonly ?CentralStaffDesignerCreditService $designerCredit = null
+        private readonly ?CentralStaffDesignerCreditService $designerCredit = null,
+        private readonly ?CentralStaffInstallationDirectory $installationDirectory = null
     ) {}
 
     /**
@@ -353,7 +354,20 @@ final class CentralStaffPortalHttpRouter
             return ['kind'=>'private_dashboard_html',
                 'html'=>$this->dashboard->render($bearer,$customerId,$csrfHeader)];
         }
-        if ($uri==='/staff/support/tickets' && $this->supportQueue!==null) {
+        if ($uri==='/staff/installations' && $this->installationDirectory!==null) {
+            if (!$this->exactFields($fields,['customer_id']) ||
+                !is_string($fields['customer_id']) ||
+                !self::uuid($fields['customer_id'])) {
+                throw new RegistrationError('invalid_installation_directory_request',422);
+            }
+            if (!$this->boundary->permitsMutation($server,$bearer,$csrfHeader,
+                'license.read_status',$fields['customer_id'])) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            return ['kind'=>'private_installations_html',
+                'html'=>$this->installationDirectory->render(
+                    $bearer,$fields['customer_id'],$csrfHeader)];
+        }        if ($uri==='/staff/support/tickets' && $this->supportQueue!==null) {
             $installationId = $fields['installation_id'] ?? null;
             $allowedFields = $installationId === null
                 ? ['customer_id'] : ['customer_id','installation_id'];

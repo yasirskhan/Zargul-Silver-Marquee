@@ -30,7 +30,7 @@ foreach ([
     'CentralStaffVendorPlanPublisher', 'CentralStaffVendorPlanCatalogRenderer',
     'CentralStaffVendorPlanCatalogReader', 'CentralStaffPortalHome',
     'CentralStaffCustomerDirectory', 'CentralStaffCustomerDirectoryRenderer',
- 'DesignerCreditPolicy', 'CentralStaffDesignerCreditService', 'CentralStaffDesignerCreditRenderer',
+ 'DesignerCreditPolicy', 'CentralStaffDesignerCreditService', 'CentralStaffDesignerCreditRenderer','CentralStaffInstallationDirectory',
     'CentralStaffPortalHttpRouter', 'CentralStaffPortalPrivateResponse',
     'CentralStaffPortalFormRequest', 'CentralStaffPortalOperatorKernel',
     'CentralStaffPortalResponseEmitter', 'CentralStaffPortalOperatorApp',

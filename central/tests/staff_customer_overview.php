@@ -23,7 +23,7 @@ foreach ([
     'CentralStaffVendorInvoiceDirectory','CentralStaffVendorInvoiceDirectoryRenderer',
     'CentralStaffVendorPlanPublisher','CentralStaffVendorPlanCatalogRenderer','CentralStaffVendorPlanCatalogReader',
     'CentralStaffPortalHome','CentralStaffCustomerDirectory','CentralStaffCustomerDirectoryRenderer',
-    'DesignerCreditPolicy','CentralStaffDesignerCreditService','CentralStaffDesignerCreditRenderer',
+    'DesignerCreditPolicy','CentralStaffDesignerCreditService','CentralStaffDesignerCreditRenderer','CentralStaffInstallationDirectory',
     'CentralStaffPortalHttpRouter','CentralStaffPortalPrivateResponse','CentralStaffPortalFormRequest',
     'CentralStaffPortalOperatorKernel','CentralStaffPortalResponseEmitter','CentralStaffPortalOperatorApp',
     'CentralStaffPortalOperatorWiring',
@@ -129,6 +129,17 @@ try {
     } catch (RegistrationError $e) {
         ovAssert($e->errorCode==='support_scope_denied','expected support_scope_denied');
     }
+
+    $headers=[];$bodies=[];$installationsPage=$server;$installationsPage['REQUEST_URI']='/staff/installations';
+    $app->serve($installationsPage,$bag,http_build_query([
+        'staff_csrf'=>$csrf,'customer_id'=>$customerA]));
+    $installationsHtml=end($bodies);
+    ovAssert(str_contains($installationsHtml,'Customer installation management')
+        && str_contains($installationsHtml,$installations['alpha'][0])
+        && str_contains($installationsHtml,$installations['alpha'][1]),
+        'installation management directory missing record');
+    ovAssert(!str_contains($installationsHtml,$installations['beta'][0]),
+        'foreign customer installation visible');
 
     ovReject(fn()=>$app->serve($dash,$bag,http_build_query(['staff_csrf'=>$csrf,'customer_id'=>$customerB])));
     $db->prepare("UPDATE central_staff_role_grants SET revoked_at=now() WHERE staff_id=:staff")
