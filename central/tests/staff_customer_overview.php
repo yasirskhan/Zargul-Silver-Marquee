@@ -78,6 +78,8 @@ foreach ([['license_officer','license.read_status'],['support_agent','support.ti
         ->execute(['id'=>ovId(),'staff'=>$staff,'role'=>$role,'customer'=>$customerA]);
 }
 
+putenv('CENTRAL_STAFF_BOOTSTRAP_ENABLED=true');putenv('CENTRAL_STAFF_PORTAL_ENABLED=true');
+putenv('CENTRAL_STAFF_RESPONSE_EMITTER_ENABLED=true');
 $headers=[];$cookies=[];$bodies=[];
 $app=CentralStaffPortalOperatorWiring::build($db,str_repeat('o',32),
     static fn(string $v):string=>$v, static fn(string $v):string=>random_bytes(24).$v,
@@ -89,8 +91,6 @@ $server=['HTTPS'=>'on','SERVER_PORT'=>'443','HTTP_HOST'=>'lichall.hafzatech.com'
     'HTTP_ORIGIN'=>'https://lichall.hafzatech.com','HTTP_SEC_FETCH_SITE'=>'same-origin',
     'REQUEST_METHOD'=>'POST','REMOTE_ADDR'=>'192.0.2.221','CONTENT_TYPE'=>'application/x-www-form-urlencoded'];
 try {
-    putenv('CENTRAL_STAFF_BOOTSTRAP_ENABLED=true');putenv('CENTRAL_STAFF_PORTAL_ENABLED=true');
-    putenv('CENTRAL_STAFF_RESPONSE_EMITTER_ENABLED=true');
     $login=$server;$login['REQUEST_URI']='/staff/session/login';
     $app->serve($login,[],http_build_query(['email'=>$email,'password'=>'overview-pass','totp'=>ovOtp($secret)]));
     ovAssert(count($cookies)===1&&strlen($cookies[0][1])===64,'staff login failed');
