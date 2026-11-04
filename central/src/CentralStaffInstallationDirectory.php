@@ -42,7 +42,7 @@ final class CentralStaffInstallationDirectory
             $body='<tr><td colspan="4">No registered installation for this customer.</td></tr>';
         }
 
-        return '<section aria-label="Customer installation management">'
+        return '<section aria-label="Private HAFZATECH installation directory">'
             .'<h1>Installations</h1><p>Customer-scoped installations and authorized support actions.</p>'
             .'<table><thead><tr><th>Installation</th><th>Domain</th><th>Status</th><th>Action</th></tr></thead>'
             .'<tbody>'.$body.'</tbody></table>'

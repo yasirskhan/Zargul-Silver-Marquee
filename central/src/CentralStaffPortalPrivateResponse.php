@@ -50,7 +50,7 @@ final class CentralStaffPortalPrivateResponse
             $html=$internal['html']??null;
             if(!is_string($html) || strlen($html)>262144 ||
                 !str_starts_with($html,
-                    '<section aria-label="Customer installation management">')) {
+                    '<section aria-label="Private HAFZATECH installation directory">')) {
                 throw new RegistrationError('invalid_staff_response');
             }
             return ['status'=>200,'headers'=>$headers,'cookies'=>[],'body'=>$html];

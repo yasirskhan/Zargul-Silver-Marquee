@@ -134,7 +134,7 @@ try {
     $app->serve($installationsPage,$bag,http_build_query([
         'staff_csrf'=>$csrf,'customer_id'=>$customerA]));
     $installationsHtml=end($bodies);
-    ovAssert(str_contains($installationsHtml,'Customer installation management')
+    ovAssert(str_contains($installationsHtml,'Private HAFZATECH installation directory')
         && str_contains($installationsHtml,$installations['alpha'][0])
         && str_contains($installationsHtml,$installations['alpha'][1]),
         'installation management directory missing record');
