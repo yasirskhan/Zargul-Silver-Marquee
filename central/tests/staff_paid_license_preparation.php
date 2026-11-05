@@ -291,8 +291,9 @@ paidSessionAssert($queuePage['kind']==='private_license_html' &&
  str_contains($queuePage['html'],$prepared['license_id']) &&
  str_contains($queuePage['html'],'Awaiting isolated signer') &&
  !str_contains($queuePage['html'],$issuer) &&
- !str_contains($queuePage['html'],$issuerCsrf),
- 'authorized officer sees escaped scoped pending revision without session secrets');
+ str_contains($queuePage['html'],'name="staff_csrf"') &&
+ str_contains($queuePage['html'],$issuerCsrf),
+ 'authorized officer sees escaped scoped pending revision with CSRF proof and no session bearer');
 $queueWire=(new \Hafzatech\Central\CentralStaffPortalPrivateResponse(true))
  ->compose($queuePage);
 paidSessionAssert($queueWire['status']===200 &&
