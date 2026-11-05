@@ -11,7 +11,7 @@ namespace Hafzatech\Central;
 final class CentralStaffLicenseQueueHtmlRenderer
 {
     /** @param array<int,array<string,mixed>> $rows */
-    public static function render(array $rows, ?string $csrf = null): string
+    public static function render(array $rows, ?string $csrf = null, bool $canIssue = false): string
     {
         $escape=static fn(mixed $value):string=>htmlspecialchars(
             is_scalar($value)?(string)$value:'',
@@ -27,7 +27,9 @@ final class CentralStaffLicenseQueueHtmlRenderer
                 '</td><td>'.$escape($row['approved_domain']??'').
                 '</td><td>'.$escape($row['expires_at']??'').
                 '</td><td>Awaiting isolated signer</td><td>';
-            if($proof!=='' && $license!=='') {
+            if($canIssue && $proof!=='' &&
+                preg_match('/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/D',
+                    $license)===1) {
                 $items.='<form method="post" action="/staff/licenses/designer-credit">'.$proof
                     .'<input type="hidden" name="license_id" value="'.$license.'">'
                     .'<button type="submit">Designer credit</button></form>';

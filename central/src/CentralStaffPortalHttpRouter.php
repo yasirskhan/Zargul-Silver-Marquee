@@ -177,10 +177,7 @@ final class CentralStaffPortalHttpRouter
                 !self::uuid($fields['license_id'])) {
                 throw new RegistrationError('invalid_designer_credit',422);
             }
-            if(!$this->boundary->permitsMutation($server,$bearer,$csrfHeader,
-                    'license.issue_paid',null)) {
-                throw new RegistrationError('staff_portal_denied');
-            }
+
             return ['kind'=>'private_designer_credit_html',
                 'html'=>CentralStaffDesignerCreditRenderer::form(
                     $fields['license_id'],$csrfHeader,self::uuidv4(),
@@ -201,10 +198,7 @@ final class CentralStaffPortalHttpRouter
                 !self::uuid($fields['request_id'])) {
                 throw new RegistrationError('invalid_designer_credit',422);
             }
-            if(!$this->boundary->permitsMutation($server,$bearer,$csrfHeader,
-                    'license.issue_paid',null)) {
-                throw new RegistrationError('staff_portal_denied');
-            }
+
             $enabled=$fields['enabled']==='1';
             $credit=$this->designerCredit->configure($bearer,$fields['license_id'],
                 $fields['request_id'],[
@@ -309,9 +303,11 @@ final class CentralStaffPortalHttpRouter
             }
             $rows=$this->licenseQueue->listPending(
                 $bearer,$fields['customer_id'],0,25);
+            $canIssue=$this->boundary->permitsMutation($server,$bearer,$csrfHeader,
+                'license.issue_paid',$fields['customer_id']);
             return [
                 'kind'=>'private_license_html',
-                'html'=>CentralStaffLicenseQueueHtmlRenderer::render($rows,$csrfHeader)
+                'html'=>CentralStaffLicenseQueueHtmlRenderer::render($rows,$csrfHeader,$canIssue)
             ];
         }
         if ($uri==='/staff/customers/lookup' && $this->customers!==null) {
