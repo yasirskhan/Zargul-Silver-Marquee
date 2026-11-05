@@ -311,7 +311,7 @@ final class CentralStaffPortalHttpRouter
                 $bearer,$fields['customer_id'],0,25);
             return [
                 'kind'=>'private_license_html',
-                'html'=>CentralStaffLicenseQueueHtmlRenderer::render($rows)
+                'html'=>CentralStaffLicenseQueueHtmlRenderer::render($rows,$csrfHeader)
             ];
         }
         if ($uri==='/staff/customers/lookup' && $this->customers!==null) {
