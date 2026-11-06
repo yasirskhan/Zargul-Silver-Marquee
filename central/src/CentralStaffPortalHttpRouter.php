@@ -607,6 +607,16 @@ final class CentralStaffPortalHttpRouter
         return $actual===$names;
     }
 
+    private static function uuidv4(): string
+    {
+        $b=random_bytes(16);
+        $b[6]=chr((ord($b[6])&15)|64);
+        $b[8]=chr((ord($b[8])&63)|128);
+        $h=bin2hex($b);
+
+        return substr($h,0,8).'-'.substr($h,8,4).'-'.substr($h,12,4).'-'
+            .substr($h,16,4).'-'.substr($h,20);
+    }
     private static function uuid(string $id): bool
     {
         return preg_match(
