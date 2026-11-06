@@ -102,7 +102,6 @@ jobs:
           php central/tests/staff_http_boundary.php
           php central/tests/staff_response_emitter.php
           php central/tests/designer_credit_policy.php
-          php central/tests/designer_credit_routes.php
           php central/tests/staff_operator_wiring.php
           php central/tests/staff_public_portal.php
           php central/tests/staff_portal_journey.php
@@ -136,6 +135,7 @@ jobs:
           php central/tests/status_receipt_codec.php
           php central/tests/staff_paid_license_preparation.php
           php central/tests/vendor_verified_reversals.php
+          php central/tests/designer_credit_routes.php
 
   licensing-postgres:
     runs-on: ubuntu-24.04
