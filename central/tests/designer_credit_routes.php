@@ -37,6 +37,7 @@ function dcDeny(callable $fn):void {
     throw new RuntimeException('Designer credit route: expected denial');
 }
 function dcLogin($app,array $server,string $email,string $password,string $secret): array {
+    global $headers,$cookies,$bodies;
     $headers=[];$cookies=[];$bodies=[];
     $app->serve(array_merge($server,['REQUEST_URI'=>'/staff/session/login']),[],
         http_build_query(['email'=>$email,'password'=>$password,'totp'=>dcOtp($secret)]));
