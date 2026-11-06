@@ -178,7 +178,11 @@ final class CentralStaffPortalHttpRouter
                 throw new RegistrationError('invalid_designer_credit',422);
             }
 
-            return ['kind'=>'private_designer_credit_html',
+            $customer=$this->designerCredit->customerForLicense($fields['license_id']);
+            if($customer===null || !$this->boundary->permitsMutation(
+                    $server,$bearer,$csrfHeader,'license.issue_paid',$customer)) {
+                throw new RegistrationError('staff_portal_denied');
+            }            return ['kind'=>'private_designer_credit_html',
                 'html'=>CentralStaffDesignerCreditRenderer::form(
                     $fields['license_id'],$csrfHeader,self::uuidv4(),
                     $this->designerCredit->history($bearer,$fields['license_id']))];
@@ -199,7 +203,11 @@ final class CentralStaffPortalHttpRouter
                 throw new RegistrationError('invalid_designer_credit',422);
             }
 
-            $enabled=$fields['enabled']==='1';
+            $customer=$this->designerCredit->customerForLicense($fields['license_id']);
+            if($customer===null || !$this->boundary->permitsMutation(
+                    $server,$bearer,$csrfHeader,'license.issue_paid',$customer)) {
+                throw new RegistrationError('staff_portal_denied');
+            }            $enabled=$fields['enabled']==='1';
             $credit=$this->designerCredit->configure($bearer,$fields['license_id'],
                 $fields['request_id'],[
                     'enabled'=>$enabled,

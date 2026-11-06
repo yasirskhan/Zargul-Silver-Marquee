@@ -15,6 +15,16 @@ final class CentralStaffDesignerCreditService
     ) {}
 
     /** @return array{license_id:string,version:int,credit:array<string,mixed>} */
+    /** Trusted license-to-customer resolution for router authorization. */
+    public function customerForLicense(string $licenseId): ?string
+    {
+        if (preg_match('/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/D',
+            $licenseId)!==1) return null;
+        $q=$this->db->prepare('SELECT customer_id FROM central_licenses WHERE id=:id');
+        $q->execute(['id'=>$licenseId]);
+        $customer=$q->fetchColumn();
+        return is_string($customer) ? $customer : null;
+    }
     public function configure(string $bearer,string $licenseId,string $requestId,
         mixed $credit): array
     {
