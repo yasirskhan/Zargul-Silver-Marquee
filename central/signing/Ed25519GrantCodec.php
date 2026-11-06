@@ -35,7 +35,11 @@ final class Ed25519GrantCodec
             throw new InvalidArgumentException('Key id and isolated signer credentials are invalid.');
         }
         $fields=array_keys($grant); sort($fields);
-        $expected=self::FIELDS; sort($expected);
+        $expected=self::FIELDS;
+        if (array_key_exists('designer_credit',$grant)) {
+            $expected[]='designer_credit';
+        }
+        sort($expected);
         if ($fields !== $expected ||
             ($grant['api_version'] ?? null) !== 'v1' ||
             ($grant['issuer'] ?? null) !== 'HAFZATECH' ||
@@ -43,6 +47,10 @@ final class Ed25519GrantCodec
             !is_int($grant['revision'] ?? null) || $grant['revision'] < 1 ||
             !in_array($grant['term_months'] ?? null, [6,12], true)) {
             throw new InvalidArgumentException('Unapproved version or grant structure.');
+        }
+        if (array_key_exists('designer_credit',$grant)
+            && !self::validCredit($grant['designer_credit'])) {
+            throw new InvalidArgumentException('Unapproved designer credit claim.');
         }
         $raw=json_encode($grant,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);
         if (strlen($raw)>16384) throw new InvalidArgumentException('Oversized grant payload.');
@@ -52,6 +60,26 @@ final class Ed25519GrantCodec
         return ['key_id'=>$keyId, 'payload'=>self::url($raw), 'signature'=>self::url($sig)];
     }
 
+    private static function validCredit(mixed $credit): bool
+    {
+        if (!is_array($credit) || array_is_list($credit)) {
+            return false;
+        }
+        $keys=array_keys($credit); sort($keys);
+        if ($keys !== ['alignment','enabled','label','prefix','url']) {
+            return false;
+        }
+        return is_bool($credit['enabled'])
+            && is_string($credit['prefix']) && mb_strlen($credit['prefix']) <= 40
+            && is_string($credit['label']) && mb_strlen($credit['label']) <= 120
+            && is_string($credit['url']) && mb_strlen($credit['url']) <= 500
+            && in_array($credit['alignment'], ['left','center','right'], true)
+            && ($credit['enabled'] === false || (
+                trim($credit['label']) !== ''
+                && filter_var($credit['url'], FILTER_VALIDATE_URL) !== false
+                && str_starts_with($credit['url'], 'https://')
+            ));
+    }
     private static function url(string $bytes): string
     {
         return rtrim(strtr(base64_encode($bytes),'+/','-_'),'=');

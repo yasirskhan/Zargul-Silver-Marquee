@@ -39,4 +39,25 @@ try {
     Ed25519GrantCodec::sign($grant,'test',sodium_crypto_sign_secretkey($p));
     throw new RuntimeException('FAIL approved invalid license term');
 } catch(InvalidArgumentException $expected) {}
-echo "PASS: separate pure Ed25519 codec, grant schema, signature tampering and key length\n";
+$creditGrant=$grant; $creditGrant['term_months']=6;
+$creditGrant['designer_credit']=['enabled'=>true,'prefix'=>'Website by',
+    'label'=>'HAFZATECH','url'=>'https://hafzatech.com','alignment'=>'center'];
+$withCredit=Ed25519GrantCodec::sign($creditGrant,'test-rotation-key',
+    sodium_crypto_sign_secretkey($p));
+checkSignature(str_contains(base64_decode(strtr($withCredit['payload'],'-_','+/'),true),
+    'designer_credit'),'approved designer credit claim encoded');
+$badCredit=$creditGrant;
+$badCredit['designer_credit']['label']='';
+try {
+    Ed25519GrantCodec::sign($badCredit,'test-rotation-key',
+        sodium_crypto_sign_secretkey($p));
+    throw new RuntimeException('FAIL accepted invalid designer credit');
+} catch(InvalidArgumentException $expected) {}
+$extraCredit=$grant; $extraCredit['term_months']=6;
+$extraCredit['designer_credit']=['enabled'=>false,'prefix'=>'','label'=>'',
+    'url'=>'','alignment'=>'center','secret'=>'x'];
+try {
+    Ed25519GrantCodec::sign($extraCredit,'test-rotation-key',
+        sodium_crypto_sign_secretkey($p));
+    throw new RuntimeException('FAIL accepted extra designer credit field');
+} catch(InvalidArgumentException $expected) {}echo "PASS: separate pure Ed25519 codec, grant schema, signature tampering and key length\n";
