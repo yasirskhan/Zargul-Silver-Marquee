@@ -41,7 +41,7 @@ final class CentralStaffPortalPrivateResponse
             $html=$internal['html']??null;
             if(!is_string($html) || strlen($html)>524288 ||
                 !str_starts_with($html,'<!doctype html>') ||
-                !str_contains($html,'<title>Central')) {
+                !str_contains($html,'HAFZATECH Central')) {
                 throw new RegistrationError('invalid_staff_response');
             }
             return ['status'=>200,'headers'=>$headers,'cookies'=>[],'body'=>$html];
