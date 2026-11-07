@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 use Hafzatech\Central\CentralStaffPortalOperatorWiring;
 use Hafzatech\Central\RegistrationError;
+require dirname(__DIR__).'/src/InstallationRegistry.php';
 
 spl_autoload_register(static function(string $class):void{
     $prefix='Hafzatech\\Central\\';
