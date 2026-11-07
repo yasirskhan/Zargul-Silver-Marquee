@@ -199,4 +199,72 @@ class CentralLicenseDeliveryIntegrationTest extends TestCase
         $this->assertStringContainsString('Website by', $html);
         $this->assertStringContainsString('href="https://hafzatech.com"', $html);
         $this->assertStringContainsString('rel="noopener noreferrer"', $html);
+    }
+
+    public function test_web012_authentic_central_output_renders_signed_footer(): void
+    {
+        $fixture = getenv('WEB012_FIXTURE');
+        if (! is_string($fixture) || ! is_file($fixture)) {
+            $this->markTestSkipped('WEB012 integrated fixture was not provided.');
+        }
+        $data = json_decode((string) file_get_contents($fixture), true, 64, JSON_THROW_ON_ERROR);
+        config()->set('central_control.activation_enabled', true);
+        $company = \App\Models\Company::create(['name' => 'WEB012 Venue',
+            'slug' => 'web012-venue-'.Str::lower(Str::random(6))]);
+        $owner = \App\Models\User::create(['name' => 'WEB012 Owner',
+            'email' => 'web012-'.Str::lower(Str::random(8)).'@example.test',
+            'password' => 'test-only']);
+        $owner->markEmailAsVerified();
+        \App\Models\CompanyMembership::create(['company_id' => $company->id,
+            'user_id' => $owner->id, 'role' => 'owner']);
+        DB::table('central_installation_identity')->insert([
+            'singleton_id' => 1, 'installation_id' => $data['installation_id'],
+            'ed25519_public_key' => $data['grant_public_key'],
+            'encrypted_private_key' => \Illuminate\Support\Facades\Crypt::encryptString('unused-test-key'),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('central_installation_activation')->insert([
+            'singleton_id' => 1, 'company_id' => $company->id,
+            'installation_id' => $data['installation_id'],
+            'customer_id' => $data['customer_id'],
+            'approved_domain' => $data['domain'],
+            'status' => 'registered_pending_license',
+            'central_registered_at' => now(),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        config()->set('central_control.trusted_signing_public_keys', [
+            $data['signed_grant']['key_id'] => $data['grant_public_key'],
+        ]);
+        $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+        $accepted = app(CentralVerifiedLicenseDeliveryService::class)->accept(
+            $data['signed_grant'], $data['signed_receipt'],
+            $data['customer_id'], $data['domain'], $data['nonce'], $now);
+        $this->assertSame(1, $accepted['revision']);
+        $this->assertTrue($accepted['active']);
+
+        $this->be($owner);
+        $site = (string) Str::uuid();
+        $page = (string) Str::uuid();
+        DB::table('websites')->insert(['id' => $site, 'company_id' => $company->id,
+            'name' => 'WEB012 Site']);
+        $branding = app(\App\Services\SiteBrandingService::class);
+        $saved = $branding->saveDraft($owner, $company->id, $site, [
+            'siteName' => 'WEB012 Site', 'tagline' => 'Signed footer',
+            'themePreset' => 'ivory', 'fontPreset' => 'modern',
+            'logoMediaId' => null, 'faviconMediaId' => null,
+        ], 0, 'WEB012 signed branding');
+        $branding->publish($owner, $company->id, $site, $saved, 'WEB012 publish branding');
+        DB::table('site_pages')->insert(['id' => $page, 'company_id' => $company->id,
+            'website_id' => $site, 'slug' => '/', 'title' => 'WEB012 Home']);
+        $pages = app(\App\Services\SitePagePublishingService::class);
+        $pageSaved = $pages->saveDraft($owner, $company->id, $page, ['sections' => [[
+            'id' => 'hero', 'type' => 'text', 'data' => ['title' => 'WEB012 home'],
+        ]]], 0, 'WEB012 signed page');
+        $pages->publish($owner, $company->id, $page, $pageSaved, 'WEB012 publish page');
+        view()->share('errors', new \Illuminate\Support\ViewErrorBag());
+        $html = app(\App\Services\SitePublishedHtmlService::class)
+            ->render($company->id, $site, '/', 'https://'.$data['domain'].'/');
+        $this->assertStringContainsString('Website by', $html);
+        $this->assertStringContainsString('href="https://hafzatech.com"', $html);
+        $this->assertStringContainsString('rel="noopener noreferrer"', $html);
     }}

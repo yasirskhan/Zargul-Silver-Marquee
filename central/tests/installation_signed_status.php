@@ -191,6 +191,8 @@ try {
         'expires_at'=>'2027-10-01T00:00:00Z',
         'limits'=>['max_halls'=>2,'max_staff'=>12],
         'features'=>['booking'=>true],
+        'designer_credit'=>['enabled'=>true,'prefix'=>'Website by',
+            'label'=>'HAFZATECH','url'=>'https://hafzatech.com','alignment'=>'center'],
     ];
     $grantEnvelope=Ed25519GrantCodec::sign(
         $grantClaim,'worker-test-key',sodium_crypto_sign_secretkey($receiptKeys));
@@ -232,7 +234,17 @@ try {
         $receiptClaim['revision']===1 &&
         $receiptClaim['status']==='signed_revision_pending_delivery',
         'client receipt exactly matches the delivered signed paid revision');
-    signedCheckDeny(fn()=>$realCombined->check($paidRequest),'replayed_check');
+    $exportPath=getenv('WEB012_EXPORT_PATH');
+    if(is_string($exportPath) && $exportPath!=='') {
+        file_put_contents($exportPath,json_encode([
+            'customer_id'=>$customer,'installation_id'=>$installation,
+            'domain'=>'signed-status.example.test','nonce'=>$paidRequest['nonce'],
+            'signed_grant'=>$paidResponse['signed_grant'],
+            'signed_receipt'=>$paidResponse['signed_receipt'],
+            'grant_public_key'=>$keys['worker-test-key'],
+            'receipt_public_key'=>$keys['worker-test-key'],
+        ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES));
+    }    signedCheckDeny(fn()=>$realCombined->check($paidRequest),'replayed_check');
     // A tampered unsealed envelope cannot be returned as a grant, even if
     // the status worker itself can still produce a valid signed receipt.
     $tamperUnseal=static function(string $cipher)use($grantEnvelope):string {

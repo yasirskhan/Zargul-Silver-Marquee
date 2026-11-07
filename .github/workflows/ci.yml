@@ -506,3 +506,61 @@ jobs:
             test-results/
           retention-days: 3
           if-no-files-found: ignore
+
+  web012-integration:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: venue
+          POSTGRES_PASSWORD: venue
+          POSTGRES_DB: venue_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U venue -d venue_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      APP_ENV: testing
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: '5432'
+      DB_DATABASE: venue_test
+      DB_USERNAME: venue
+      DB_PASSWORD: venue
+      CENTRAL_DB_DSN: 'pgsql:host=127.0.0.1;port=5432;dbname=hafzatech_central_test'
+      CENTRAL_DB_USERNAME: venue
+      CENTRAL_DB_PASSWORD: venue
+      WEB012_FIXTURE: /tmp/web012.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_pgsql,pgsql,sodium
+          coverage: none
+      - name: Install backend dependencies
+        working-directory: backend
+        run: composer install --no-interaction --no-progress --prefer-dist
+      - name: Create independent Central database and schema
+        run: |
+          PGPASSWORD=venue createdb -h 127.0.0.1 -U venue hafzatech_central_test
+          for f in central/schema/*.sql; do
+            PGPASSWORD=venue psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U venue -d hafzatech_central_test -f "$f" >/dev/null
+          done
+      - name: Produce authentic signed grant and receipt from Central
+        run: |
+          WEB012_EXPORT_PATH="$WEB012_FIXTURE" php central/tests/installation_signed_status.php
+          test -s "$WEB012_FIXTURE"
+      - name: Migrate isolated VenueDesk database
+        working-directory: backend
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+          php artisan migrate --force --no-interaction
+      - name: Accept authentic output in VenueDesk and verify footer
+        working-directory: backend
+        run: php artisan test --no-ansi --filter=test_web012_authentic_central_output
