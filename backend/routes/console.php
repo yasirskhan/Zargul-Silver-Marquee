@@ -43,6 +43,18 @@ Artisan::command('venuedesk:seed-browser-e2e', function (): int {
         ['name' => 'Synthetic Test Hall', 'capacity' => 300],
     );
 
+    // Approved media fixture for the authenticated Hall Photos journey.
+    $mediaId = (string) \Illuminate\Support\Str::uuid();
+    \Illuminate\Support\Facades\DB::table('site_media')->updateOrInsert(
+        ['id' => $mediaId],
+        ['company_id' => $company->id,
+         'object_key' => 'site-media/'.$company->id.'/'.$mediaId.'.webp',
+         'mime_type' => 'image/webp', 'sha256' => hash('sha256', $mediaId),
+         'alt_text' => 'Synthetic approved hall photograph',
+         'metadata' => '{}', 'status' => 'approved', 'uploaded_by' => $owner->id,
+         'created_at' => now(), 'updated_at' => now()],
+    );
+
 
     if (getenv('VENUE_CENTRAL_ACTIVATION_ENABLED') === 'true') { 
         // Isolated signed-license fixture for the browser installation journey.

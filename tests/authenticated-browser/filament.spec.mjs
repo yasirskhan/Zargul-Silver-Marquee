@@ -385,6 +385,31 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   await expect(reloadedCrop.getByRole('spinbutton', { name: 'Focal X (%)' })).toHaveValue('35');
   await expect(reloadedCrop.getByRole('spinbutton', { name: 'Focal Y (%)' })).toHaveValue('65');
   await expect(reloadedCrop.locator('select')).toHaveValue('4:3');
+
+  // Hall Photos: select an approved company media asset and persist it through
+  // the real Livewire page. This is a browser journey, not a renderer check.
+  await page.goto('/admin/hall-photos');
+  await expect(page.getByRole('heading', { name: 'Hall Photography' })).toBeVisible();
+  await page.waitForFunction(
+    () => Boolean(window.Livewire?.all?.().length), null, { timeout: 30_000 }
+  );
+  const hallPhotos = page.locator('section[aria-label="Approved hall photographs"]');
+  const approvedImage = hallPhotos.locator('input[type="checkbox"]').first();
+  await expect(approvedImage).toBeVisible({ timeout: 20_000 });
+  await approvedImage.check();
+  await hallPhotos.locator('input[maxlength="500"]').fill('Owner assigns approved hall photography');
+  await hallPhotos.getByRole('button', { name: 'Save hall photography' }).click();
+  await expect(page.getByText('Hall photography saved')).toBeVisible({ timeout: 20_000 });
+  await page.reload();
+  await page.waitForFunction(
+    () => Boolean(window.Livewire?.all?.().length), null, { timeout: 30_000 }
+  );
+  await expect(page.locator('section[aria-label="Approved hall photographs"] input[type="checkbox"]').first())
+    .toBeChecked({ timeout: 20_000 });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.screenshot({ path: 'docs/evidence/admin-hall-photos-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: 'docs/evidence/admin-hall-photos-mobile.png', fullPage: true });
 });
 
 test('real owner configures hall schedule seating and add-ons without booking', async ({ page }) => {
