@@ -10,9 +10,9 @@ final class CentralStaffPortalReadPage
     {
         $e=static fn(string $v):string=>htmlspecialchars($v,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
         $proof=$e($csrf);
-        $nav=static function(string $key,string $href,string $label)use($active):string{
+        $nav=static function(string $key,string $href,string $label)use($active,$e):string{
             $current=$key===$active?' aria-current="page"':'';
-            return '<a href="'.$href.'"'.$current.'>'.$label.'</a>';
+            return '<a href="'.$href.'"'.$current.'>'.$e($label).'</a>';
         };
         return '<!doctype html><html lang="en"><head><meta charset="utf-8">'
             .'<meta name="viewport" content="width=device-width,initial-scale=1">'
