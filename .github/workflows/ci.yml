@@ -553,7 +553,7 @@ jobs:
           done
       - name: Produce authentic signed grant and receipt from Central
         run: |
-          WEB012_EXPORT_PATH="$WEB012_FIXTURE" php central/tests/installation_signed_status.php
+          WEB012_EXPORT_PATH="$WEB012_FIXTURE" php central/tests/staff_paid_license_preparation.php
           test -s "$WEB012_FIXTURE"
       - name: Migrate isolated VenueDesk database
         working-directory: backend

@@ -234,7 +234,8 @@ class CentralLicenseDeliveryIntegrationTest extends TestCase
             'created_at' => now(), 'updated_at' => now(),
         ]);
         config()->set('central_control.trusted_signing_public_keys', [
-            $data['signed_grant']['key_id'] => $data['grant_public_key'],
+            $data['grant_key_id'] => $data['grant_public_key'],
+            $data['receipt_key_id'] => $data['receipt_public_key'],
         ]);
         $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
         $accepted = app(CentralVerifiedLicenseDeliveryService::class)->accept(

@@ -209,6 +209,11 @@ $seal=static function(string $clear)use($vault):string{
 $finalize=new CentralStaffSignedGrantFinalization(
     $db,$sessions,new CentralStaffSessionAuthorization($sessions,$access),
     new Hafzatech\Central\SignedGrantFinalization($db,$validator,$seal));
+$creditService=new \Hafzatech\Central\CentralStaffDesignerCreditService(
+    $db,$sessions,new CentralStaffSessionAuthorization($sessions,$access));
+$configuredCredit=$creditService->configure($issuer,$prepared['license_id'],
+    paidSessionUuid(),['enabled'=>true,'prefix'=>'Website by','label'=>'HAFZATECH',
+        'url'=>'https://hafzatech.com','alignment'=>'center'])['credit'];
 $claim=[
     'api_version'=>'v1','issuer'=>'HAFZATECH','product'=>'VenueDesk',
     'license_id'=>$prepared['license_id'],'customer_id'=>$company,
@@ -216,6 +221,7 @@ $claim=[
     'edition'=>'synthetic_session_plan','approved_domains'=>['licensed-session.example.test'],
     'not_before'=>$prepared['from'],'expires_at'=>$prepared['expiry'],
     'limits'=>['max_halls'=>2,'max_staff'=>12],'features'=>['booking'=>true],
+    'designer_credit'=>$configuredCredit,
 ];
 $queue=new CentralStaffLicenseSigningQueue(
     $db,new CentralStaffSessionAuthorization($sessions,$access));
@@ -951,6 +957,40 @@ try {
         'authenticated installation receives exactly the finalized signed grant');
 } finally {
     putenv('CENTRAL_GRANT_DELIVERY_ENABLED=false');
+}
+$exportPath=getenv('WEB012_EXPORT_PATH');
+if(is_string($exportPath)&&$exportPath!=='') {
+    $receiptKeys=sodium_crypto_sign_keypair();
+    $receiptPublic=InstallationRegistry::base64Url(
+        sodium_crypto_sign_publickey($receiptKeys));
+    $statusService=new InstallationStatusService($db);
+    $statusSigner=static fn(array $claim):array=>Ed25519StatusReceiptCodec::sign(
+        $claim,'status-test-key',sodium_crypto_sign_secretkey($receiptKeys));
+    $trusted=['session-test-key'=>$public,'status-test-key'=>$receiptPublic];
+    $combined=new \Hafzatech\Central\CentralInstallationSignedStatusResponse(
+        $statusService,$statusSigner,$trusted,true,$delivery);
+    $nonce=InstallationRegistry::base64Url(random_bytes(32));
+    $time=gmdate('Y-m-d\TH:i:s\Z');
+    $message=implode("\n",['HAFZATECH-INSTALL-CHECK-V1',$installation,
+        $company,$time,$nonce,'0']);
+    $request=['installation_id'=>$installation,'customer_id'=>$company,
+        'request_time'=>$time,'nonce'=>$nonce,'known_revision'=>0,
+        'signature'=>InstallationRegistry::base64Url(sodium_crypto_sign_detached(
+            $message,sodium_crypto_sign_secretkey($installationKeys)))];
+    putenv('CENTRAL_GRANT_DELIVERY_ENABLED=true');
+    try {
+        $response=$combined->check($request);
+    } finally {
+        putenv('CENTRAL_GRANT_DELIVERY_ENABLED=false');
+    }
+    file_put_contents($exportPath,json_encode([
+        'customer_id'=>$company,'installation_id'=>$installation,
+        'domain'=>'licensed-session.example.test','nonce'=>$nonce,
+        'signed_grant'=>$response['signed_grant'],
+        'signed_receipt'=>$response['signed_receipt'],
+        'grant_key_id'=>'session-test-key','receipt_key_id'=>'status-test-key',
+        'grant_public_key'=>$public,'receipt_public_key'=>$receiptPublic,
+    ],JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES));
 }
 paidSessionDeny(fn()=>$delivery->fetch($deliveryRequest),'grant_delivery_not_enabled');
 // A revoked License Officer must also lose the pending queue capability.
