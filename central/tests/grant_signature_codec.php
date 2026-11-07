@@ -53,7 +53,28 @@ try {
         sodium_crypto_sign_secretkey($p));
     throw new RuntimeException('FAIL accepted invalid designer credit');
 } catch(InvalidArgumentException $expected) {}
-$extraCredit=$grant; $extraCredit['term_months']=6;
+$disabledDirty=$grant; $disabledDirty['term_months']=6;
+$disabledDirty['designer_credit']=['enabled'=>false,'prefix'=>'x','label'=>'',
+    'url'=>'','alignment'=>'center'];
+try {
+    Ed25519GrantCodec::sign($disabledDirty,'test-rotation-key',
+        sodium_crypto_sign_secretkey($p));
+    throw new RuntimeException('FAIL accepted nonempty disabled credit');
+} catch(InvalidArgumentException $expected) {}
+$controlCredit=$creditGrant;
+$controlCredit['designer_credit']['label']="Bad\x01Label";
+try {
+    Ed25519GrantCodec::sign($controlCredit,'test-rotation-key',
+        sodium_crypto_sign_secretkey($p));
+    throw new RuntimeException('FAIL accepted control characters');
+} catch(InvalidArgumentException $expected) {}
+$badHost=$creditGrant;
+$badHost['designer_credit']['url']='https://localhost';
+try {
+    Ed25519GrantCodec::sign($badHost,'test-rotation-key',
+        sodium_crypto_sign_secretkey($p));
+    throw new RuntimeException('FAIL accepted non-public credit host');
+} catch(InvalidArgumentException $expected) {}$extraCredit=$grant; $extraCredit['term_months']=6;
 $extraCredit['designer_credit']=['enabled'=>false,'prefix'=>'','label'=>'',
     'url'=>'','alignment'=>'center','secret'=>'x'];
 try {
