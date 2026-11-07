@@ -967,7 +967,7 @@ if(is_string($exportPath)&&$exportPath!=='') {
     $receiptKeys=sodium_crypto_sign_keypair();
     $receiptPublic=InstallationRegistry::base64Url(
         sodium_crypto_sign_publickey($receiptKeys));
-    $statusService=new InstallationStatusService($db);
+    $statusService=new \Hafzatech\Central\InstallationStatusService($db);
     $statusSigner=static fn(array $claim):array=>Ed25519StatusReceiptCodec::sign(
         $claim,'status-test-key',sodium_crypto_sign_secretkey($receiptKeys));
     $trusted=['session-test-key'=>$public,'status-test-key'=>$receiptPublic];
