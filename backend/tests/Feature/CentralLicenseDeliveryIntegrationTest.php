@@ -269,4 +269,41 @@ class CentralLicenseDeliveryIntegrationTest extends TestCase
         $this->assertStringContainsString('Website by', $html);
         $this->assertStringContainsString('href="https://hafzatech.com"', $html);
         $this->assertStringContainsString('rel="noopener noreferrer"', $html);
-    }}
+
+        $delivery = app(CentralVerifiedLicenseDeliveryService::class);
+        $beforeRevision = (int) DB::table('central_signed_license_cache')
+            ->where('singleton_id', 1)->value('revision');
+        $tampered = $data['signed_grant'];
+        $raw = base64_decode(strtr($tampered['payload'], '-_', '+/'), true);
+        $claims = json_decode($raw, true, 64, JSON_THROW_ON_ERROR);
+        $claims['designer_credit']['label'] = 'Altered Credit';
+        $tampered['payload'] = rtrim(strtr(base64_encode(
+            json_encode($claims, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)), '+/', '-_'), '=');
+        foreach ([
+            [$tampered, $data['signed_receipt'], $data['customer_id'], $data['domain']],
+            [$data['signed_grant'], $data['signed_receipt'], (string) Str::uuid(), $data['domain']],
+            [$data['signed_grant'], $data['signed_receipt'], $data['customer_id'], 'wrong.example.test'],
+        ] as [$grant, $receipt, $customer, $domain]) {
+            try {
+                $delivery->accept($grant, $receipt, $customer, $domain,
+                    $data['nonce'], $now);
+                $this->fail('Tampered or mismatched delivery was accepted.');
+            } catch (\InvalidArgumentException) {
+                $this->assertTrue(true);
+            }
+        }
+        $badReceipt = $data['signed_receipt'];
+        $badReceipt['signature'] = substr($badReceipt['signature'], 0, -2).'AA';
+        try {
+            $delivery->accept($data['signed_grant'], $badReceipt,
+                $data['customer_id'], $data['domain'], $data['nonce'], $now);
+            $this->fail('Tampered receipt was accepted.');
+        } catch (\InvalidArgumentException) {
+            $this->assertTrue(true);
+        }
+        $this->assertSame($beforeRevision,
+            (int) DB::table('central_signed_license_cache')
+                ->where('singleton_id', 1)->value('revision'),
+            'Failed deliveries advanced the VenueDesk license cache.');
+    }
+}
