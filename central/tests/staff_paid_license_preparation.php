@@ -47,6 +47,8 @@ foreach (['InstallationRegistry','StaffRolePermissions','CentralStaffAccess',
 }
 require dirname(__DIR__).'/src/InstallationStatusService.php';
 require dirname(__DIR__).'/src/SignedGrantDeliveryService.php';
+require dirname(__DIR__).'/src/CentralInstallationSignedStatusResponse.php';
+require dirname(__DIR__).'/signing/Ed25519StatusReceiptCodec.php';
 require dirname(__DIR__).'/signing/Ed25519GrantCodec.php';
 function paidSessionAssert(bool $ok, string $message): void {
     if (!$ok) throw new RuntimeException('Session-bound license: '.$message);
