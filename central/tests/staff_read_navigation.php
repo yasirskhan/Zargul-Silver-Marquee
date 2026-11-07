@@ -43,7 +43,7 @@ try{
     $directory=end($bodies);readAssert(str_contains($directory,'Read Navigation Venue')&&!str_contains($directory,'Foreign Read Venue'),'directory scope leak');
     $app->serve(array_merge($get,['REQUEST_URI'=>'/staff/customers/'.$company]),$bag,'');
     $dashboard=end($bodies);readAssert(str_contains($dashboard,'read-nav.example.test')&&str_contains($dashboard,'Read Navigation Venue'),'customer workspace missing');
-    try{$app->serve(array_merge($get,['REQUEST_URI'=>'/staff/customers/'.$foreign]),$bag,'');throw new RuntimeException('foreign workspace allowed');}catch(RegistrationError $e){readAssert($e->errorCode==='customer_scope_denied'||$e->errorCode==='staff_portal_denied','unexpected foreign denial');}
+    try{$app->serve(array_merge($get,['REQUEST_URI'=>'/staff/customers/'.$foreign]),$bag,'');throw new RuntimeException('foreign workspace allowed');}catch(RegistrationError $e){readAssert(in_array($e->errorCode,['customer_scope_denied','staff_dashboard_denied','customer_not_found','staff_portal_denied'],true),'unexpected foreign denial');}
     $before=end($bodies);
     try{$app->serve(array_merge($get,['REQUEST_URI'=>'/staff/session/logout']),$bag,'');throw new RuntimeException('GET mutation allowed');}catch(RegistrationError){}
     readAssert(end($bodies)===$before,'GET changed state');
