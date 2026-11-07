@@ -211,11 +211,7 @@ $seal=static function(string $clear)use($vault):string{
 $finalize=new CentralStaffSignedGrantFinalization(
     $db,$sessions,new CentralStaffSessionAuthorization($sessions,$access),
     new Hafzatech\Central\SignedGrantFinalization($db,$validator,$seal));
-$creditService=new \Hafzatech\Central\CentralStaffDesignerCreditService(
-    $db,$sessions,new CentralStaffSessionAuthorization($sessions,$access));
-$configuredCredit=$creditService->configure($issuer,$prepared['license_id'],
-    paidSessionUuid(),['enabled'=>true,'prefix'=>'Website by','label'=>'HAFZATECH',
-        'url'=>'https://hafzatech.com','alignment'=>'center'])['credit'];
+
 $claim=[
     'api_version'=>'v1','issuer'=>'HAFZATECH','product'=>'VenueDesk',
     'license_id'=>$prepared['license_id'],'customer_id'=>$company,
@@ -223,7 +219,6 @@ $claim=[
     'edition'=>'synthetic_session_plan','approved_domains'=>['licensed-session.example.test'],
     'not_before'=>$prepared['from'],'expires_at'=>$prepared['expiry'],
     'limits'=>['max_halls'=>2,'max_staff'=>12],'features'=>['booking'=>true],
-    'designer_credit'=>$configuredCredit,
 ];
 $queue=new CentralStaffLicenseSigningQueue(
     $db,new CentralStaffSessionAuthorization($sessions,$access));
@@ -272,8 +267,10 @@ $unusedBilling=new \Hafzatech\Central\CentralStaffPaymentEvidenceHttpAdapter(
   $db,$sessions,$queueAuth),false);
 $queuePortalOff=new \Hafzatech\Central\CentralStaffPortalHttpRouter(
  $queueBoundary,$unusedBilling);
+$creditService=new \Hafzatech\Central\CentralStaffDesignerCreditService(
+ $db,$sessions,$queueAuth);
 $queuePortal=new \Hafzatech\Central\CentralStaffPortalHttpRouter(
- $queueBoundary,$unusedBilling,true,$queue);
+ $queueBoundary,$unusedBilling,true,$queue,designerCredit:$creditService);
 $queueRequest=[
  'HTTPS'=>'on','SERVER_PORT'=>'443','HTTP_HOST'=>'lichall.hafzatech.com',
  'REQUEST_METHOD'=>'POST','REQUEST_URI'=>'/staff/licenses/pending',
@@ -309,7 +306,24 @@ paidSessionAssert($queueWire['status']===200 &&
  $queueWire['headers']['Cache-Control']==='no-store, private' &&
  str_contains($queueWire['headers']['Content-Security-Policy'],"default-src 'none'"),
  'private licensing response is cookie-free and cache-disabled');
-paidSessionDeny(fn()=>$queuePortal->dispatch(
+$designerRequest=$queueRequest;
+$designerRequest['REQUEST_URI']='/staff/licenses/designer-credit/configure';
+$designerResponse=$queuePortal->dispatch($designerRequest,$issuerCookie,[
+    'staff_csrf'=>$issuerCsrf,'license_id'=>$prepared['license_id'],
+    'request_id'=>paidSessionUuid(),'enabled'=>'1','prefix'=>'Website by',
+    'label'=>'HAFZATECH','url'=>'https://hafzatech.com','alignment'=>'center',
+],$issuerCsrf);
+paidSessionAssert(str_contains($designerResponse['html'],'Designer credit version 1'),
+    'protected Designer credit route did not save configuration');
+$creditAudit=$db->prepare('SELECT count(*) FROM central_designer_credit_audit WHERE license_id=:license');
+$creditAudit->execute(['license'=>$prepared['license_id']]);
+paidSessionAssert((int)$creditAudit->fetchColumn()===1,
+    'Designer credit route did not create immutable audit evidence');
+$configuredCredit=\Hafzatech\Central\CentralStaffDesignerCreditService::currentForLicense(
+    $db,$prepared['license_id']);
+paidSessionAssert(is_array($configuredCredit)&&$configuredCredit['label']==='HAFZATECH',
+    'Designer credit route did not persist approved policy');
+$claim['designer_credit']=$configuredCredit;paidSessionDeny(fn()=>$queuePortal->dispatch(
  $queueRequest,$billingCookie,['customer_id'=>$company],$billingCsrf),
  'staff_portal_denied');
 paidSessionDeny(fn()=>$queuePortal->dispatch(
