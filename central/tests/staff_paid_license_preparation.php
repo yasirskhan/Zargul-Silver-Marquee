@@ -984,10 +984,12 @@ if(is_string($exportPath)&&$exportPath!=='') {
         'signature'=>InstallationRegistry::base64Url(sodium_crypto_sign_detached(
             $message,sodium_crypto_sign_secretkey($installationKeys)))];
     putenv('CENTRAL_GRANT_DELIVERY_ENABLED=true');
+    putenv('CENTRAL_SIGNED_STATUS_ENABLED=true');
     try {
         $response=$combined->check($request);
     } finally {
         putenv('CENTRAL_GRANT_DELIVERY_ENABLED=false');
+        putenv('CENTRAL_SIGNED_STATUS_ENABLED=false');
     }
     file_put_contents($exportPath,json_encode([
         'customer_id'=>$company,'installation_id'=>$installation,
