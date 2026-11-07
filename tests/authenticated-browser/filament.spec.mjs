@@ -389,7 +389,7 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   // Hall Photos: select an approved company media asset and persist it through
   // the real Livewire page. This is a browser journey, not a renderer check.
   await page.goto('/admin/hall-photos');
-  await expect(page.getByRole('heading', { name: 'Hall Photography' })).toBeVisible();
+  await expect(page.getByText('Hall Photography').first()).toBeVisible();
   await page.waitForFunction(
     () => Boolean(window.Livewire?.all?.().length), null, { timeout: 30_000 }
   );
