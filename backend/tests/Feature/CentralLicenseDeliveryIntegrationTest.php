@@ -4,7 +4,8 @@ namespace Tests\Feature;
 
 use App\Services\CentralInstallationIdentity;
 use App\Services\CentralVerifiedLicenseDeliveryService;
-use DateTimeImmutable;`nuse DateTimeZone;
+use DateTimeImmutable;
+use DateTimeZone;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
