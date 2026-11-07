@@ -309,7 +309,7 @@ paidSessionAssert($queueWire['status']===200 &&
 $designerRequest=$queueRequest;
 $designerRequest['REQUEST_URI']='/staff/licenses/designer-credit/configure';
 $designerResponse=$queuePortal->dispatch($designerRequest,$issuerCookie,[
-    'staff_csrf'=>$issuerCsrf,'license_id'=>$prepared['license_id'],
+    'license_id'=>$prepared['license_id'],
     'request_id'=>paidSessionUuid(),'enabled'=>'1','prefix'=>'Website by',
     'label'=>'HAFZATECH','url'=>'https://hafzatech.com','alignment'=>'center',
 ],$issuerCsrf);
