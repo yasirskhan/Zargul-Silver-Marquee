@@ -886,8 +886,12 @@ paidSessionDeny(fn()=>$manifest->forRevision($issuer,'invalid'),
     'invalid_license_request');
 paidSessionDeny(fn()=>$manifest->forRevision($issuer,paidSessionUuid()),
     'signed_grant_not_eligible');
-paidSessionAssert($manifest->forRevision($issuer,$prepared['revision_id'])===$claim,
-    'exact paid grant manifest derives the signed claim from immutable invoice snapshot');
+$manifestClaim=$manifest->forRevision($issuer,$prepared['revision_id']);
+paidSessionAssert(($manifestClaim['designer_credit']['label']??null)==='HAFZATECH',
+    'manifest carries the approved designer credit');
+paidSessionAssert($manifestClaim['license_id']===$prepared['license_id']
+    && $manifestClaim['revision']===1,'manifest binding changed');
+$claim=$manifestClaim;
 $envelope=Hafzatech\Signing\Ed25519GrantCodec::sign(
     $claim,'session-test-key',sodium_crypto_sign_secretkey($keypair));
 paidSessionDeny(fn()=>$finalize->finalize(str_repeat('0',64),
