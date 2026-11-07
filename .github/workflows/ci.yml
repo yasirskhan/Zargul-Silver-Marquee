@@ -136,6 +136,7 @@ jobs:
           php central/tests/staff_paid_license_preparation.php
           php central/tests/vendor_verified_reversals.php
           php central/tests/designer_credit_routes.php
+          php central/tests/staff_read_navigation.php
 
   licensing-postgres:
     runs-on: ubuntu-24.04

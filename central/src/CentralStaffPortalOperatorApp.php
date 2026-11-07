@@ -21,7 +21,9 @@ final class CentralStaffPortalOperatorApp
         if(getenv('CENTRAL_STAFF_BOOTSTRAP_ENABLED')!=='true') {
             throw new RegistrationError('staff_bootstrap_not_enabled',503);
         }
-        $reply=$this->kernel->handle($server,$cookies,$rawFormBody);
+        $reply=strtoupper((string)($server['REQUEST_METHOD']??'POST'))==='GET'
+            ? $this->kernel->handleRead($server,$cookies)
+            : $this->kernel->handle($server,$cookies,$rawFormBody);
         $this->emitter->emit($reply);
     }
 }

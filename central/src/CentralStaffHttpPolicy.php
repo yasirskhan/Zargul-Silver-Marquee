@@ -24,6 +24,17 @@ final class CentralStaffHttpPolicy
             ($https==='' && (string)($server['SERVER_PORT']??'')==='443');
     }
 
+    /** Read-only GET navigation requires the same trusted TLS host and cookie. */
+    public static function staffReadAllowed(array $server): bool
+    {
+        if(!self::secureHost($server))return false;
+        if(strtoupper((string)($server['REQUEST_METHOD']??''))!=='GET')return false;
+        $path=parse_url((string)($server['REQUEST_URI']??'/'),PHP_URL_PATH);
+        if(!is_string($path) || !str_starts_with($path,'/staff'))return false;
+
+        return !str_contains((string)($server['REQUEST_URI']??''),'?')
+            && !str_contains((string)($server['REQUEST_URI']??''),'#');
+    }
     /** Fail-closed protection for every future state-changing /staff request. */
     public static function staffMutationAllowed(array $server): bool
     {

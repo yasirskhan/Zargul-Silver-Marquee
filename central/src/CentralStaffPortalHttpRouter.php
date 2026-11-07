@@ -42,7 +42,8 @@ final class CentralStaffPortalHttpRouter
         private readonly ?CentralStaffPortalHome $staffHome = null,
         private readonly ?CentralStaffCustomerDirectory $customerDirectory = null,
         private readonly ?CentralStaffDesignerCreditService $designerCredit = null,
-        private readonly ?CentralStaffInstallationDirectory $installationDirectory = null
+        private readonly ?CentralStaffInstallationDirectory $installationDirectory = null,
+        private readonly ?CentralStaffCsrfTokenService $csrfTokens = null
     ) {}
 
     /**
@@ -607,6 +608,52 @@ final class CentralStaffPortalHttpRouter
         return $actual===$names;
     }
 
+    /**
+     * Authenticated GET navigation. Read-only; every resource is re-authorized
+     * against the live MFA session and current grants. No query strings.
+     * @return array<string,mixed>
+     */
+    public function dispatchRead(array $server,array $cookies): array
+    {
+        if (!$this->enabled || !CentralStaffHttpPolicy::staffReadAllowed($server)) {
+            throw new RegistrationError('staff_portal_denied');
+        }
+        $uri=$server['REQUEST_URI']??null;
+        if(!is_string($uri) || strlen($uri)>256) {
+            throw new RegistrationError('staff_portal_denied');
+        }
+        $bearer=$cookies[CentralStaffHttpPolicy::COOKIE_NAME]??null;
+        if(!is_string($bearer) || preg_match('/^[a-f0-9]{64}$/D',$bearer)!==1) {
+            throw new RegistrationError('staff_portal_denied');
+        }
+        $csrf=$this->csrfTokens?->issue($bearer);
+        if(!is_string($csrf) || preg_match('/^[a-f0-9]{64}$/D',$csrf)!==1) {
+            throw new RegistrationError('staff_portal_denied');
+        }
+        $path=parse_url($uri,PHP_URL_PATH);
+        $content=null;$title=null;$active='home';
+        if($path==='/staff' || $path==='/staff/home') {
+            if($this->staffHome===null) throw new RegistrationError('staff_portal_denied');
+            $title='Control Center';$content=$this->staffHome->render($bearer,$csrf);
+        } elseif($path==='/staff/customers/directory') {
+            if($this->customerDirectory===null) throw new RegistrationError('staff_portal_denied');
+            $rows=$this->customerDirectory->search($bearer,'',20);
+            $title='Customers and installations';$active='customers';
+            $content=CentralStaffCustomerDirectoryRenderer::html($rows,$csrf,'');
+        } elseif(preg_match('#^/staff/customers/([0-9a-f-]{36})$#D',$path,$m)===1) {
+            if($this->dashboard===null) throw new RegistrationError('staff_portal_denied');
+            $title='Customer workspace';$active='customers';
+            $content=$this->dashboard->render($bearer,$m[1],$csrf);
+        } elseif(preg_match('#^/staff/customers/([0-9a-f-]{36})/installations$#D',$path,$m)===1) {
+            if($this->installationDirectory===null) throw new RegistrationError('staff_portal_denied');
+            $title='Customer installations';$active='customers';
+            $content=$this->installationDirectory->render($bearer,$m[1],$csrf);
+        } else {
+            throw new RegistrationError('staff_page_not_found',404);
+        }
+        $html=CentralStaffPortalReadPage::render($title,$content,$csrf,$active);
+        return ['kind'=>'private_read_html','html'=>$html];
+    }
     private static function uuidv4(): string
     {
         $b=random_bytes(16);

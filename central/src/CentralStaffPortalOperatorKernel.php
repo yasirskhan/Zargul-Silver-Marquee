@@ -20,6 +20,15 @@ final class CentralStaffPortalOperatorKernel
         private readonly bool $enabled=false
     ) {}
 
+    /** Read-only authenticated GET. No body, no mutation, no CSRF in URL. */
+    public function handleRead(array $server,array $cookies): array
+    {
+        if (!$this->enabled ||
+            getenv('CENTRAL_STAFF_PORTAL_ENABLED')!=='true') {
+            throw new RegistrationError('staff_operator_not_enabled',503);
+        }
+        return $this->writer->compose($this->router->dispatchRead($server,$cookies));
+    }
     /** @return array{status:int,headers:array<string,string>,cookies:array<int,array<string,mixed>>,body:string} */
     public function handle(array $server,array $cookies,string $rawBody): array
     {
