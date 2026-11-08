@@ -26,9 +26,7 @@ final class CentralStaffCustomerDirectoryRenderer
                 throw new RegistrationError('invalid_customer_directory_response');
             }
             $listing.='<li>'.$e($row['legal_name']).
-                '<form method="post" action="/staff/dashboard">'.$proof.
-                '<input type="hidden" name="customer_id" value="'.$e($row['id']).'">'.
-                '<button type="submit">Open workspace</button></form></li>';
+                ' <a href="/staff/customers/'.$e($row['id']).'">Open workspace</a></li>';
         }
         if($listing==='')$listing='<li>No accessible customers match the search.</li>';
         return '<section aria-label="Private HAFZATECH customer directory">'.
@@ -40,8 +38,7 @@ final class CentralStaffCustomerDirectoryRenderer
             'value="'.$e($prefix).'"></label>'.
             '<button type="submit">Find customers</button></form>'.
             '<ul>'.$listing.'</ul>'.
-            '<form method="post" action="/staff/home">'.$proof.
-            '<button type="submit">Back to staff home</button></form>'.
+            '<p><a href="/staff/home">Back to staff home</a></p>'.
             '</section>';
     }
 }

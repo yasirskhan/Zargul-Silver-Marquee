@@ -565,3 +565,79 @@ jobs:
       - name: Accept authentic output in VenueDesk and verify footer
         working-directory: backend
         run: php artisan test --no-ansi --filter=test_web012_authentic_central_output
+
+  central-browser-e2e:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: venue
+          POSTGRES_PASSWORD: venue
+          POSTGRES_DB: venue_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U venue -d venue_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CENTRAL_DB_DSN: 'pgsql:host=127.0.0.1;port=5432;dbname=hafzatech_central_test'
+      CENTRAL_DB_USERNAME: venue
+      CENTRAL_DB_PASSWORD: venue
+      CENTRAL_STAFF_PUBLIC_PORTAL_ENABLED: 'true'
+      CENTRAL_STAFF_BOOTSTRAP_ENABLED: 'true'
+      CENTRAL_STAFF_PORTAL_ENABLED: 'true'
+      CENTRAL_STAFF_RESPONSE_EMITTER_ENABLED: 'true'
+      CENTRAL_STAFF_KMS_BOOTSTRAP: ${{ github.workspace }}/central/tests/browser_bootstrap.php
+      CENTRAL_STAFF_THROTTLE_HMAC_KEY: central-browser-throttle-key-0123456789
+      CENTRAL_BROWSER_TRANSPORT: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_pgsql,pgsql,sodium
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned Playwright test tooling
+        run: npm install --no-save --no-audit --no-fund @playwright/test@1.56.1
+      - name: Install Chromium browser and dependencies
+        run: npx playwright install --with-deps chromium
+      - name: Create Central database, schema and synthetic operator
+        run: |
+          PGPASSWORD=venue createdb -h 127.0.0.1 -U venue hafzatech_central_test
+          for f in central/schema/*.sql; do
+            PGPASSWORD=venue psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U venue -d hafzatech_central_test -f "$f" >/dev/null
+          done
+          php central/tests/browser_seed.php
+      - name: Create disposable TLS certificate
+        run: |
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -keyout /tmp/central-key.pem -out /tmp/central-cert.pem \
+            -subj "/CN=lichall.hafzatech.com"
+      - name: Start isolated Central operator and TLS proxy
+        run: |
+          php -d auto_prepend_file=central/tests/browser_prepend.php \
+            -S 127.0.0.1:8099 -t central/public >/tmp/central-php.log 2>&1 &
+          TLS_KEY=/tmp/central-key.pem TLS_CERT=/tmp/central-cert.pem \
+            node tests/central-browser/proxy.mjs >/tmp/central-proxy.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -skf https://127.0.0.1:8443/staff/login >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/central-php.log /tmp/central-proxy.log
+          exit 1
+      - name: Run authenticated Central browser journey
+        run: npx playwright test --config=tests/central-browser/playwright.config.mjs
+      - name: Upload Central browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: central-browser-evidence
+          path: |
+            docs/evidence/central-*.png
+            test-results
