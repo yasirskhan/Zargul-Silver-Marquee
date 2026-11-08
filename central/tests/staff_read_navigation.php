@@ -36,6 +36,17 @@ try{
     $app->serve(array_merge($server,['REQUEST_URI'=>'/staff/session/login']),[],http_build_query(['email'=>$email,'password'=>$password,'totp'=>readOtp($secret)]));
     readAssert(count($cookies)===1,'login cookie missing');
     $bag=['__Host-HafzatechStaff'=>$cookies[0][1]];
+    $sessionService=new \Hafzatech\Central\CentralStaffSessionService($db,
+        new \Hafzatech\Central\CentralStaffCredentialVerifier(
+            new \Hafzatech\Central\CentralStaffPasswordVerifier($db),
+            new \Hafzatech\Central\CentralStaffMfaChallenge($db,static fn(string $v):string=>$v)),
+        new \Hafzatech\Central\CentralStaffLoginRateLimiter($db,str_repeat('r',32)));
+    $proofs=new \Hafzatech\Central\CentralStaffCsrfTokenService($db,$sessionService);
+    $firstProof=$proofs->issue($cookies[0][1]);
+    $secondProof=$proofs->issue($cookies[0][1]);
+    readAssert(is_string($firstProof)&&is_string($secondProof)&&$firstProof!==$secondProof,'proof rotation failed');
+    readAssert($proofs->accepts($cookies[0][1],$firstProof)&&
+        $proofs->accepts($cookies[0][1],$secondProof),'navigation invalidated an earlier tab proof');
     $get=$server;$get['REQUEST_METHOD']='GET';
     $app->serve(array_merge($get,['REQUEST_URI'=>'/staff/home']),$bag,'');
     $home=end($bodies);readAssert(str_contains($home,'Central Control Center')&&str_contains($home,'Customers &amp; installations'),'home navigation missing');
