@@ -275,7 +275,10 @@ final class CentralStaffPortalPrivateResponse
                 '<p>Authenticated. Private staff functions require separate '.
                 'current role and customer authorization.</p>'.
                 '<p><a href="/staff/home">Open Central Control Center</a></p>'.
-                '</main></body></html>';
+                '<form method="post" action="/staff/home">'.
+                '<input type="hidden" name="staff_csrf" value="'.$creds['csrf'].'">'.
+                '<button type="submit">Open with protected POST</button>'.
+                '</form></main></body></html>';
             return ['status'=>200,'headers'=>$headers,'cookies'=>[[
                 'name'=>CentralStaffHttpPolicy::COOKIE_NAME,
                 'value'=>$creds['cookie_value'],
