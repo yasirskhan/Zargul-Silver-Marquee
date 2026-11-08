@@ -19,7 +19,8 @@ spl_autoload_register(static function (string $class): void {
     if (! str_starts_with($class, $prefix)) return;
     $name = substr($class, strlen($prefix));
     if (preg_match('/^[A-Za-z0-9]+$/D', $name) !== 1) return;
-    $path = dirname(__DIR__).'/src/'.$name.'.php';
+    $file = $name === 'RegistrationError' ? 'InstallationRegistry' : $name;
+    $path = dirname(__DIR__).'/src/'.$file.'.php';
     if (is_file($path)) require $path;
 });
 
