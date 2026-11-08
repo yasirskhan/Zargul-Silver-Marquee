@@ -91,6 +91,8 @@ final class CentralStaffSessionService
                 'old'=>self::digest($token)]);
             $row=$q->fetch(PDO::FETCH_ASSOC);
             if(!$row){$this->db->rollBack();return null;}
+            $this->db->prepare('DELETE FROM central_staff_csrf_proofs WHERE session_id=:id')
+                ->execute(['id'=>$row['id']]);
             $this->audit($row['id'],$row['staff_id'],'rotated');
             $this->db->commit();return $new;
         }catch(\Throwable $e){

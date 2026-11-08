@@ -58,6 +58,15 @@ try{
     $before=end($bodies);
     try{$app->serve(array_merge($get,['REQUEST_URI'=>'/staff/session/logout']),$bag,'');throw new RuntimeException('GET mutation allowed');}catch(RegistrationError){}
     readAssert(end($bodies)===$before,'GET changed state');
+    for ($i=0;$i<25;$i++) { $proofs->issue($cookies[0][1]); }
+    $count=$db->prepare('SELECT count(*) FROM central_staff_csrf_proofs WHERE session_id=(SELECT id FROM central_staff_sessions WHERE token_hash=decode(:t,\'hex\'))');
+    $count->execute(['t'=>hash('sha256',$cookies[0][1])]);
+    readAssert((int)$count->fetchColumn()<=20,'CSRF proof history is not bounded');
+    $rotated=$sessionService->rotate($cookies[0][1]);
+    readAssert(is_string($rotated),'session rotation failed');
+    readAssert(!$proofs->accepts($rotated,$firstProof),'rotated bearer reused an old proof');
+    $fresh=$proofs->issue($rotated);
+    readAssert(is_string($fresh)&&$proofs->accepts($rotated,$fresh),'rotated session cannot issue a fresh proof');
 } finally {
     putenv('CENTRAL_STAFF_BOOTSTRAP_ENABLED=false');putenv('CENTRAL_STAFF_PORTAL_ENABLED=false');putenv('CENTRAL_STAFF_RESPONSE_EMITTER_ENABLED=false');
 }

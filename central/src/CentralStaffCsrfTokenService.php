@@ -24,6 +24,8 @@ final class CentralStaffCsrfTokenService
         if ($this->sessions->staffFor($sessionBearer) === null) return null;
         $proof = bin2hex(random_bytes(32));
         $hash = hash('sha256', $proof);
+        $this->db->beginTransaction();
+        try {
         $q = $this->db->prepare(
             "UPDATE central_staff_sessions SET csrf_hash=decode(:hash,'hex')
              WHERE token_hash=decode(:session,'hex') AND revoked_at IS NULL
@@ -32,7 +34,7 @@ final class CentralStaffCsrfTokenService
         );
         $q->execute(['hash'=>$hash,'session'=>hash('sha256',$sessionBearer)]);
         $id = $q->fetchColumn();
-        if ($id === false) return null;
+        if ($id === false) { $this->db->rollBack(); return null; }
         $this->db->prepare(
             "INSERT INTO central_staff_csrf_proofs(session_id,proof_hash)
              VALUES(:id,decode(:hash,'hex')) ON CONFLICT DO NOTHING"
@@ -45,7 +47,12 @@ final class CentralStaffCsrfTokenService
                  SELECT proof_hash FROM central_staff_csrf_proofs
                  WHERE session_id=:id ORDER BY created_at DESC LIMIT 20)"
         )->execute(['id'=>$id]);
+        $this->db->commit();
         return $proof;
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) $this->db->rollBack();
+            throw $e;
+        }
     }
 
     public function accepts(string $sessionBearer,string $submitted): bool
