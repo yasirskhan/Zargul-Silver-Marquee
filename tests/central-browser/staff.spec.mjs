@@ -1,11 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { createHmac } from 'node:crypto';
 const SECRET='JBSWY3DPEHPK3PXP';
-function base32(input){const a='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';let bits=0,v=0;const bytes=[];
- for(const c of input.toUpperCase().replace(/=+$/,'')){v=(v<<5)|a.indexOf(c);bits+=5;if(bits>=8){bits-=8;bytes.push((v>>>bits)&255);}}
- return Buffer.from(bytes);}
 function totp(){const c=Buffer.alloc(8);c.writeBigUInt64BE(BigInt(Math.floor(Date.now()/30000)));
- const d=createHmac('sha1',base32(SECRET)).update(c).digest();const o=d[19]&15;
+ const d=createHmac('sha1',Buffer.from(SECRET)).update(c).digest();const o=d[19]&15;
  return String((d.readUInt32BE(o)&0x7fffffff)%1000000).padStart(6,'0');}
 test('authenticated Central operator journey through the real entrypoint', async ({ page, request, context }) => {
   await page.goto('/staff/login');
