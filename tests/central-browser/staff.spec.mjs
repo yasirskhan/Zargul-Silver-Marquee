@@ -10,8 +10,10 @@ function totp(){const c=Buffer.alloc(8);c.writeBigUInt64BE(BigInt(Math.floor(Dat
 test('authenticated Central operator journey through the real entrypoint', async ({ page, request, context }) => {
   await page.goto('/staff/login');
   await expect(page.getByRole('heading', { name: 'HAFZATECH staff' })).toBeVisible();
-  const login = await request.post('/staff/session/login', { form: {
-    email: 'central-browser@example.test', password: 'central-browser-password', totp: totp() } });
+  const login = await request.post('/staff/session/login', {
+    headers: { Origin: 'https://lichall.hafzatech.com', 'Sec-Fetch-Site': 'same-origin' },
+    form: { email: 'central-browser@example.test',
+      password: 'central-browser-password', totp: totp() } });
   expect(login.status()).toBe(200);
   const setCookie = login.headers()['set-cookie'] || '';
   expect(setCookie).toContain('__Host-HafzatechStaff=');
