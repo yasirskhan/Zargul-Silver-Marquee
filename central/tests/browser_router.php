@@ -3,6 +3,8 @@ if (getenv('CENTRAL_BROWSER_TRANSPORT') === 'test') {
     $_SERVER['HTTPS'] = 'on';
     $_SERVER['SERVER_PORT'] = '443';
     $_SERVER['HTTP_HOST'] = 'lichall.hafzatech.com';
+    $_SERVER['HTTP_ORIGIN'] = 'https://lichall.hafzatech.com';
+    $_SERVER['HTTP_SEC_FETCH_SITE'] = 'same-origin';
 }
 $path = parse_url((string)($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
 if ($path === '/staff.css') {
