@@ -143,6 +143,8 @@ try {
     );
     $app->serve($server, $_COOKIE, (string) file_get_contents('php://input'));
 } catch (Throwable $error) {
-    error_log('Central staff portal request denied: '.get_class($error));
+    $reason = $error instanceof \Hafzatech\Central\RegistrationError
+        ? $error->errorCode : get_class($error);
+    error_log('Central staff portal request denied: '.$reason);
     centralStaffReply(403, '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Denied</title></head><body><main><h1>Staff request denied</h1></main></body></html>');
 }
