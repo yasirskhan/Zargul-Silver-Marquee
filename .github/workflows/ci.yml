@@ -625,7 +625,7 @@ jobs:
             -S 127.0.0.1:8099 -t central/public >/tmp/central-php.log 2>&1 &
           TLS_KEY=/tmp/central-key.pem TLS_CERT=/tmp/central-cert.pem \
             node tests/central-browser/proxy.mjs >/tmp/central-proxy.log 2>&1 &
-          for i in $(seq 1 30); do
+          for i in $(seq 1 90); do
             if curl -skf https://127.0.0.1:8443/staff/login >/dev/null; then exit 0; fi
             sleep 1
           done
