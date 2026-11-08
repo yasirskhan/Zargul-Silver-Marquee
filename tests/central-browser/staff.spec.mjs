@@ -19,7 +19,7 @@ test('authenticated Central operator journey through the real entrypoint', async
   const bearer = setCookie.match(/__Host-HafzatechStaff=([a-f0-9]{64})/)?.[1];
   expect(bearer).toBeTruthy();
   await context.addCookies([{ name: '__Host-HafzatechStaff', value: bearer,
-    domain: '127.0.0.1', path: '/', secure: false, httpOnly: true, sameSite: 'Strict' }]);
+    url: 'http://127.0.0.1:8099/', secure: true, httpOnly: true, sameSite: 'Strict' }]);
   await page.goto('/staff/home');
   await expect(page).toHaveURL(/\/staff\/home$/);
   await expect(page.getByRole('link', { name: 'Customers & installations' })).toBeVisible();
