@@ -1,0 +1,9 @@
+<?php
+$path = parse_url((string)($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+if ($path === '/staff.css') {
+    header('Content-Type: text/css; charset=utf-8');
+    header('Cache-Control: public, max-age=300');
+    readfile(dirname(__DIR__).'/public/staff.css');
+    return true;
+}
+require dirname(__DIR__).'/public/staff.php';

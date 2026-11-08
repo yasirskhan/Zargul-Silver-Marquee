@@ -617,9 +617,9 @@ jobs:
       - name: Start isolated Central operator
         run: |
           php -d auto_prepend_file=${{ github.workspace }}/central/tests/browser_prepend.php \
-            -S 127.0.0.1:8099 -t central/public >/tmp/central-php.log 2>&1 &
+            -S 127.0.0.1:8099 central/tests/browser_router.php >/tmp/central-php.log 2>&1 &
           for i in $(seq 1 60); do
-            if curl -sf http://127.0.0.1:8099/staff/login >/dev/null; then exit 0; fi
+            if curl -s http://127.0.0.1:8099/staff/login | grep -q 'HAFZATECH staff sign in'; then exit 0; fi
             sleep 1
           done
           cat /tmp/central-php.log
