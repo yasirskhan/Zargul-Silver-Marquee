@@ -4,6 +4,7 @@ export default defineConfig({
   use: { baseURL: 'http://127.0.0.1:8099', ignoreHTTPSErrors: true,
     viewport: { width: 1440, height: 900 }, screenshot: 'only-on-failure' },
   webServer: {
+    cwd: '../..',
     command: 'php -d auto_prepend_file=central/tests/browser_prepend.php -S 127.0.0.1:8099 central/tests/browser_router.php',
     url: 'http://127.0.0.1:8099/staff/login',
     reuseExistingServer: false,
