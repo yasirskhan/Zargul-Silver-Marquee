@@ -621,7 +621,7 @@ jobs:
             -subj "/CN=lichall.hafzatech.com"
       - name: Start isolated Central operator and TLS proxy
         run: |
-          php -d auto_prepend_file=central/tests/browser_prepend.php \
+          php -d auto_prepend_file=${{ github.workspace }}/central/tests/browser_prepend.php \
             -S 127.0.0.1:8099 -t central/public >/tmp/central-php.log 2>&1 &
           TLS_KEY=/tmp/central-key.pem TLS_CERT=/tmp/central-cert.pem \
             node tests/central-browser/proxy.mjs >/tmp/central-proxy.log 2>&1 &
