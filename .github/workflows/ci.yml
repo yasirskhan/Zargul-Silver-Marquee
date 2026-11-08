@@ -614,16 +614,6 @@ jobs:
             PGPASSWORD=venue psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U venue -d hafzatech_central_test -f "$f" >/dev/null
           done
           php central/tests/browser_seed.php
-      - name: Start isolated Central operator
-        run: |
-          php -d auto_prepend_file=${{ github.workspace }}/central/tests/browser_prepend.php \
-            -S 127.0.0.1:8099 central/tests/browser_router.php >/tmp/central-php.log 2>&1 &
-          for i in $(seq 1 60); do
-            if curl -s http://127.0.0.1:8099/staff/login | grep -q 'HAFZATECH staff sign in'; then exit 0; fi
-            sleep 1
-          done
-          cat /tmp/central-php.log
-          exit 1
       - name: Run authenticated Central browser journey
         run: npx playwright test --config=tests/central-browser/playwright.config.mjs
       - name: Upload Central browser evidence
