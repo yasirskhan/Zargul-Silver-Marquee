@@ -134,6 +134,9 @@ try {
         'login dashboard handoff missing');
     journeyAssert(! str_contains($body, $cookies[0][1]), 'session bearer leaked into HTML');
     preg_match('/name="staff_csrf" value="([a-f0-9]{64})"/', $body, $m);
+    if (! isset($m[1])) {
+        preg_match('/name="staff-csrf-token" content="([a-f0-9]{64})"/', $body, $m);
+    }
     $csrf = $m[1] ?? '';
     journeyAssert($csrf !== '', 'CSRF proof missing');
     $cookieBag = ['__Host-HafzatechStaff' => $cookies[0][1]];
