@@ -43,7 +43,8 @@ final class CentralStaffPortalHttpRouter
         private readonly ?CentralStaffCustomerDirectory $customerDirectory = null,
         private readonly ?CentralStaffDesignerCreditService $designerCredit = null,
         private readonly ?CentralStaffInstallationDirectory $installationDirectory = null,
-        private readonly ?CentralStaffCsrfTokenService $csrfTokens = null
+        private readonly ?CentralStaffCsrfTokenService $csrfTokens = null,
+        private readonly ?CentralStaffSessionService $sessions = null
     ) {}
 
     /**
@@ -635,6 +636,22 @@ final class CentralStaffPortalHttpRouter
         if($path==='/staff' || $path==='/staff/home') {
             if($this->staffHome===null) throw new RegistrationError('staff_portal_denied');
             $title='Control Center';$content=$this->staffHome->render($bearer,$csrf);
+        } elseif($path==='/staff/team' && $this->teamDashboard!==null) {
+            $title='Staff and permissions';$active='team';
+            $content=$this->teamDashboard->render($bearer,$csrf);
+        } elseif($path==='/staff/plans' && $this->planCatalog!==null) {
+            $rows=$this->planCatalog->recent($bearer,25);
+            $title='Subscriptions and plans';$active='plans';
+            $content=CentralStaffVendorPlanCatalogRenderer::form($csrf,$rows);
+        } elseif($path==='/staff/audit' && $this->auditHistory!==null && $this->sessions!==null) {
+            $subject=$this->sessions->staffFor($bearer);
+            if(!is_string($subject)) throw new RegistrationError('staff_portal_denied');
+            $title='Security and audit';$active='audit';
+            $content=$this->auditHistory->render($bearer,$subject);
+        } elseif($path==='/staff/staff' && $this->staffDirectory!==null) {
+            $rows=$this->staffDirectory->listStaff($bearer,0,25);
+            $title='Staff directory';$active='team';
+            $content=CentralStaffAccountDirectory::html($rows);
         } elseif($path==='/staff/customers/directory') {
             if($this->customerDirectory===null) throw new RegistrationError('staff_portal_denied');
             $rows=$this->customerDirectory->search($bearer,'',20);

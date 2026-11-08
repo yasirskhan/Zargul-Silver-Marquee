@@ -21,6 +21,9 @@ final class CentralStaffPortalReadPage
             .'</head><body><div class="shell"><aside><h2>HAFZATECH</h2><p>Central Control Center</p><nav>'
             .$nav('home','/staff/home','Control Center')
             .$nav('customers','/staff/customers/directory','Customers & installations')
+            .$nav('plans','/staff/plans','Subscriptions and plans')
+            .$nav('team','/staff/team','Staff and permissions')
+            .$nav('audit','/staff/audit','Security and audit')
             .'</nav><form method="post" action="/staff/session/logout">'
             .'<input type="hidden" name="staff_csrf" value="'.$proof.'">'
             .'<button type="submit">Sign out</button></form></aside>'
