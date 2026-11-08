@@ -9,7 +9,7 @@ function totp(){const c=Buffer.alloc(8);c.writeBigUInt64BE(BigInt(Math.floor(Dat
  return String((d.readUInt32BE(o)&0x7fffffff)%1000000).padStart(6,'0');}
 test('authenticated Central operator journey through the real entrypoint', async ({ page, request, context }) => {
   await page.goto('/staff/login');
-  await expect(page.getByText('HAFZATECH staff sign in')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'HAFZATECH staff' })).toBeVisible();
   const login = await request.post('/staff/session/login', { form: {
     email: 'central-browser@example.test', password: 'central-browser-password', totp: totp() } });
   expect(login.status()).toBe(200);
