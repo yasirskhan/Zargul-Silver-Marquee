@@ -41,7 +41,7 @@ $plan=[
    'Referrer-Policy'=>'no-referrer',
    'X-Frame-Options'=>'DENY',
    'Content-Security-Policy'=>
-     "default-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+     "default-src 'none'; style-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
  ],
  'cookies'=>[[
    'name'=>CentralStaffHttpPolicy::COOKIE_NAME,

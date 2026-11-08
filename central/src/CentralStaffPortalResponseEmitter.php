@@ -59,7 +59,7 @@ final class CentralStaffPortalResponseEmitter
             'Referrer-Policy'=>'no-referrer',
             'X-Frame-Options'=>'DENY',
             'Content-Security-Policy'=>
-                "default-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+                "default-src 'none'; style-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
         ];
         if ($headers!==$expected || count($cookies)>1) {
             throw new RegistrationError('invalid_staff_emission');

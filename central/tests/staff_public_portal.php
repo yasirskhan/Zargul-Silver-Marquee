@@ -75,4 +75,14 @@ if ($exit !== 0 || !str_contains($out, 'Staff KMS bootstrap is unavailable')) {
     throw new RuntimeException('POST without external KMS bootstrap was not denied');
 }
 
+$readWithoutBootstrap = '$_SERVER["HTTP_HOST"]="lichall.hafzatech.com";'
+    .'$_SERVER["HTTPS"]="on";$_SERVER["REQUEST_METHOD"]="GET";'
+    .'$_SERVER["REQUEST_URI"]="/staff/home";'.$include;
+[$exit, $out] = runStaff($readWithoutBootstrap, [
+    'CENTRAL_STAFF_PUBLIC_PORTAL_ENABLED' => 'true',
+]);
+if ($exit !== 0 || str_contains($out, 'Method not allowed')
+    || !str_contains($out, 'Staff KMS bootstrap is unavailable')) {
+    throw new RuntimeException('authenticated read route did not reach GET wiring');
+}
 echo "PASS: central staff front controller default-off, trusted host, login UI, no secret output, KMS fail-closed\n";
