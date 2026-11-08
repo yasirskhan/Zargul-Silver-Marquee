@@ -102,8 +102,9 @@ if ($method === 'GET' && $path === '/staff') {
     header('Location: /staff/login', true, 303);
     exit;
 }
-$readPath = $method === 'GET' && ($path === '/staff/home'
-    || str_starts_with((string) $path, '/staff/customers/'));
+$readPath = $method === 'GET' && in_array($path,
+    ['/staff/home','/staff/plans','/staff/team','/staff/audit','/staff/staff'],true)
+    || ($method === 'GET' && str_starts_with((string) $path, '/staff/customers/'));
 if (($method !== 'POST' && ! $readPath) || ! is_string($path) || ! str_starts_with($path, '/staff/')) {
     centralStaffReply(405, '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Method denied</title></head><body><main><h1>Method not allowed</h1></main></body></html>');
 }
