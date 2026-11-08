@@ -32,6 +32,6 @@ test('authenticated Central operator journey through the real entrypoint', async
   await expect(page.getByText('Foreign Central Venue')).toHaveCount(0);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/staff/home');
-  await page.getByRole('button', { name: 'Sign out' }).click();
+  await page.getByRole('button', { name: 'Sign out' }).first().click();
   await expect(page.getByText(/signed out|HAFZATECH staff sign in/i)).toBeVisible({ timeout: 20000 });
 });
