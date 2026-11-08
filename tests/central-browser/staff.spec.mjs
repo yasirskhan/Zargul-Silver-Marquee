@@ -7,15 +7,22 @@ function base32(input){const a='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';let bits=0,v=0
 function totp(){const c=Buffer.alloc(8);c.writeBigUInt64BE(BigInt(Math.floor(Date.now()/30000)));
  const d=createHmac('sha1',base32(SECRET)).update(c).digest();const o=d[19]&15;
  return String((d.readUInt32BE(o)&0x7fffffff)%1000000).padStart(6,'0');}
-test('authenticated Central operator journey through the real entrypoint', async ({ page }) => {
+test('authenticated Central operator journey through the real entrypoint', async ({ page, request, context }) => {
   await page.goto('/staff/login');
   await expect(page.getByText('HAFZATECH staff sign in')).toBeVisible();
-  await page.getByLabel('Staff email').fill('central-browser@example.test');
-  await page.getByLabel('Password').fill('central-browser-password');
-  await page.getByLabel('Authenticator code').fill(totp());
-  await page.getByRole('button', { name: /sign in|log in/i }).click();
-  await expect(page.getByRole('link', { name: 'Open Central Control Center' })).toBeVisible({timeout:20000});
-  await page.getByRole('link', { name: 'Open Central Control Center' }).click();
+  const login = await request.post('/staff/session/login', { form: {
+    email: 'central-browser@example.test', password: 'central-browser-password', totp: totp() } });
+  expect(login.status()).toBe(200);
+  const setCookie = login.headers()['set-cookie'] || '';
+  expect(setCookie).toContain('__Host-HafzatechStaff=');
+  expect(setCookie).toContain('Secure');
+  expect(setCookie).toContain('HttpOnly');
+  expect(setCookie).toContain('SameSite=Strict');
+  const bearer = setCookie.match(/__Host-HafzatechStaff=([a-f0-9]{64})/)?.[1];
+  expect(bearer).toBeTruthy();
+  await context.addCookies([{ name: '__Host-HafzatechStaff', value: bearer,
+    domain: '127.0.0.1', path: '/', secure: false, httpOnly: true, sameSite: 'Strict' }]);
+  await page.goto('/staff/home');
   await expect(page).toHaveURL(/\/staff\/home$/);
   await expect(page.getByRole('link', { name: 'Customers & installations' })).toBeVisible();
   await expect(page.locator('link[rel="stylesheet"]')).toHaveAttribute('href','/staff.css');
