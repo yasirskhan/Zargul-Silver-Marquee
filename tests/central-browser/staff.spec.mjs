@@ -14,6 +14,7 @@ test('authenticated Central operator journey through the real entrypoint', async
     headers: { Origin: 'https://lichall.hafzatech.com', 'Sec-Fetch-Site': 'same-origin' },
     form: { email: 'central-browser@example.test',
       password: 'central-browser-password', totp: totp() } });
+  console.log('LOGIN_STATUS', login.status(), (await login.text()).slice(0,300));
   expect(login.status()).toBe(200);
   const setCookie = login.headers()['set-cookie'] || '';
   expect(setCookie).toContain('__Host-HafzatechStaff=');
