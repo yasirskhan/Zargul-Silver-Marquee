@@ -4,16 +4,19 @@ const SECRET='JBSWY3DPEHPK3PXP';
 function totp(){const c=Buffer.alloc(8);c.writeBigUInt64BE(BigInt(Math.floor(Date.now()/30000)));
  const d=createHmac('sha1',Buffer.from(SECRET)).update(c).digest();const o=d[19]&15;
  return String((d.readUInt32BE(o)&0x7fffffff)%1000000).padStart(6,'0');}
-test('authenticated Central operator journey through the real entrypoint', async ({ page }) => {
+async function login(page, email) {
   await page.goto('/staff/login');
   await expect(page.getByRole('heading', { name: 'HAFZATECH staff' })).toBeVisible();
-  await page.getByLabel('Staff email').fill('central-browser@example.test');
+  await page.getByLabel('Staff email').fill(email);
   await page.getByLabel('Password').fill('central-browser-password');
   await page.getByLabel('Authenticator code').fill(totp());
   await page.getByRole('button', { name: /sign in/i }).click();
   await expect(page.getByRole('link', { name: 'Open Central Control Center' })).toBeVisible({ timeout: 20000 });
   await page.getByRole('link', { name: 'Open Central Control Center' }).click();
   await expect(page).toHaveURL(/\/staff\/home$/);
+}
+test('authenticated Central operator journey through the real entrypoint', async ({ page }) => {
+  await login(page, 'central-browser@example.test');
   await expect(page.getByRole('link', { name: 'Customers & installations' })).toBeVisible();
   await expect(page.locator('link[rel="stylesheet"]')).toHaveAttribute('href','/staff.css');
   await page.screenshot({ path: 'docs/evidence/central-home-desktop.png', fullPage: true });
@@ -25,12 +28,6 @@ test('authenticated Central operator journey through the real entrypoint', async
   await expect(page.getByText('central-browser.example.test').first()).toBeVisible();
   await expect(page.locator('section[aria-label="Registered installations"]')).toBeVisible();
   await page.screenshot({ path: 'docs/evidence/central-customer-desktop.png', fullPage: true });
-  await page.getByRole('link', { name: 'Customer billing' }).click();
-  await expect(page.locator('section[aria-label="Private HAFZATECH vendor invoices"]')).toBeVisible();
-  await page.screenshot({ path: 'docs/evidence/central-billing-desktop.png', fullPage: true });
-  await page.goto('/staff/customers/11111111-1111-4111-8111-111111111111/support');
-  await expect(page.locator('section[aria-label="Private HAFZATECH support queue"]')).toBeVisible();
-  await page.screenshot({ path: 'docs/evidence/central-support-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: 'docs/evidence/central-customer-mobile.png', fullPage: true });
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -72,4 +69,16 @@ test('authenticated Central operator journey through the real entrypoint', async
   await page.goto('/staff/home');
   await page.getByRole('button', { name: 'Sign out' }).first().click();
   await expect(page.getByText(/signed out|HAFZATECH staff sign in/i)).toBeVisible({ timeout: 20000 });
+});
+test('separate billing operator sees invoices and support but not staff administration', async ({ page }) => {
+  await login(page, 'central-billing@example.test');
+  await page.goto('/staff/customers/11111111-1111-4111-8111-111111111111/billing');
+  await expect(page.locator('section[aria-label="Private HAFZATECH vendor invoices"]')).toBeVisible();
+  await page.screenshot({ path: 'docs/evidence/central-billing-desktop.png', fullPage: true });
+  await page.goto('/staff/customers/11111111-1111-4111-8111-111111111111/support');
+  await expect(page.locator('section[aria-label="Private HAFZATECH support queue"]')).toBeVisible();
+  await page.screenshot({ path: 'docs/evidence/central-support-desktop.png', fullPage: true });
+  const denied = await page.goto('/staff/team');
+  expect(denied.status()).toBeGreaterThanOrEqual(400);
+  await expect(page.getByText('Private HAFZATECH team dashboard')).toHaveCount(0);
 });
