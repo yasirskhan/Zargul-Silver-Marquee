@@ -55,6 +55,9 @@ Route::post('/install/owner/{token}', [\App\Http\Controllers\OwnerBootstrapContr
 Route::get('/__test/site-layout/{layout}', App\Http\Controllers\TestSiteLayoutController::class)
     ->whereIn('layout', ['classic', 'editorial', 'minimal']);
 
+Route::get('/__test/marquee-hall-photo', App\Http\Controllers\TestMarqueeHallPhotoController::class);
+
+
 Route::get('/__test/license-window/{mode}', App\Http\Controllers\TestLicenseWindowController::class)
     ->whereIn('mode', ['valid', 'warning', 'grace', 'expired']);
 
