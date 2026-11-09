@@ -25,27 +25,44 @@ test('authenticated Central operator journey through the real entrypoint', async
   await expect(page.getByText('central-browser.example.test').first()).toBeVisible();
   await expect(page.locator('section[aria-label="Registered installations"]')).toBeVisible();
   await page.screenshot({ path: 'docs/evidence/central-customer-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: 'docs/evidence/central-customer-mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 900 });
+
   await page.goto('/staff/plans');
   await expect(page.locator('section[aria-label="Private HAFZATECH plan catalog"]')).toBeVisible();
   await page.screenshot({ path: 'docs/evidence/central-plans-desktop.png', fullPage: true });
-  await page.goto('/staff/team');
-  await expect(page.locator('section[aria-label="Private HAFZATECH team dashboard"]')).toBeVisible();
-  await page.screenshot({ path: 'docs/evidence/central-team-desktop.png', fullPage: true });
-  await page.goto('/staff/audit');
-  await expect(page.locator('section[aria-label="Private HAFZATECH staff audit"]')).toBeVisible();
-  await page.screenshot({ path: 'docs/evidence/central-audit-desktop.png', fullPage: true });
-  await page.goto('/staff/staff');
-  await expect(page.locator('section[aria-label="Private HAFZATECH staff directory"]')).toBeVisible();
-  await page.screenshot({ path: 'docs/evidence/central-staff-desktop.png', fullPage: true });
+  await page.getByLabel('Plan code').fill('browser_plan');
+  await page.getByLabel('Price in minor units').fill('12000');
+  await page.getByRole('button', { name: 'Publish next plan version' }).click();
+  await expect(page.getByText('Plan version published')).toBeVisible({ timeout: 20000 });
+  await page.goto('/staff/plans');
+  await expect(page.getByText('browser_plan').first()).toBeVisible({ timeout: 20000 });
+  await page.screenshot({ path: 'docs/evidence/central-plan-published-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/staff/plans');
   await page.screenshot({ path: 'docs/evidence/central-plans-mobile.png', fullPage: true });
-  await page.setViewportSize({ width: 1440, height: 900 });  await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: 'docs/evidence/central-customer-mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  await page.goto('/staff/team');
+  await expect(page.locator('section[aria-label="Private HAFZATECH team dashboard"]')).toBeVisible();
+  await page.screenshot({ path: 'docs/evidence/central-team-desktop.png', fullPage: true });
+  await page.getByLabel('Staff email').fill('central-pending@example.test');
+  await page.getByLabel('Display name').fill('Pending Central Operator');
+  await page.getByLabel('Reason').fill('Browser acceptance for pending staff');
+  await page.getByRole('button', { name: 'Prepare pending staff identity' }).click();
+  await expect(page.getByText('Pending staff identity prepared')).toBeVisible({ timeout: 20000 });
+  await page.goto('/staff/staff');
+  await expect(page.getByText('central-pending@example.test')).toBeVisible({ timeout: 20000 });
+  await page.screenshot({ path: 'docs/evidence/central-staff-desktop.png', fullPage: true });
+
+  await page.goto('/staff/audit');
+  await expect(page.locator('section[aria-label="Private HAFZATECH staff audit"]')).toBeVisible();
+  await page.screenshot({ path: 'docs/evidence/central-audit-desktop.png', fullPage: true });
+
   const foreign = await page.goto('/staff/customers/22222222-2222-4222-8222-222222222222');
   expect(foreign.status()).toBeGreaterThanOrEqual(400);
   await expect(page.getByText('Foreign Central Venue')).toHaveCount(0);
-  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/staff/home');
   await page.getByRole('button', { name: 'Sign out' }).first().click();
   await expect(page.getByText(/signed out|HAFZATECH staff sign in/i)).toBeVisible({ timeout: 20000 });
