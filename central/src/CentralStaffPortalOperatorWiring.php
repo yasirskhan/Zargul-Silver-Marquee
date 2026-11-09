@@ -6,6 +6,9 @@ namespace Hafzatech\Central;
 use Closure;
 use PDO;
 
+require_once __DIR__.'/CentralStaffLicenseDirectory.php';
+require_once __DIR__.'/CentralStaffLicenseDirectoryRenderer.php';
+
 /**
  * INTERNAL operator-only DI factory. Secrets supplied by an APPROVED external
  * vault/KMS runtime, never by the customer application or this repository.
