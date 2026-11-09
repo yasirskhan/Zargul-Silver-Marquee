@@ -6,7 +6,7 @@ use App\Models\User;
 use App\Services\SitePublishedHtmlService;
 use Illuminate\Support\Facades\DB;
 
-final class TestMarqueeHallPhotoController extends Controller
+final class TestMarqueeHallPhotoController
 {
     public function __invoke(SitePublishedHtmlService $html)
     {
