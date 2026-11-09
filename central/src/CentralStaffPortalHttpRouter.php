@@ -661,6 +661,19 @@ final class CentralStaffPortalHttpRouter
             if($this->dashboard===null) throw new RegistrationError('staff_portal_denied');
             $title='Customer workspace';$active='customers';
             $content=$this->dashboard->render($bearer,$m[1],$csrf);
+            $content.='<p><a href="/staff/customers/'.$m[1].'/billing">Customer billing</a> · '
+                .'<a href="/staff/customers/'.$m[1].'/support">Support tickets</a> · '
+                .'<a href="/staff/customers/'.$m[1].'/installations">Installations</a></p>';
+        } elseif(preg_match('#^/staff/customers/([0-9a-f-]{36})/billing$#D',$path,$m)===1) {
+            if($this->invoiceDirectory===null) throw new RegistrationError('staff_portal_denied');
+            $rows=$this->invoiceDirectory->listForCustomer($bearer,$m[1],25);
+            $title='Customer billing';$active='customers';
+            $content=CentralStaffVendorInvoiceDirectoryRenderer::render($rows,$m[1],$csrf);
+        } elseif(preg_match('#^/staff/customers/([0-9a-f-]{36})/support$#D',$path,$m)===1) {
+            if($this->supportQueue===null) throw new RegistrationError('staff_portal_denied');
+            $rows=$this->supportQueue->listForCustomer($bearer,$m[1],0,25);
+            $title='Customer support';$active='customers';
+            $content=CentralStaffSupportQueueHtmlRenderer::render($rows);
         } elseif(preg_match('#^/staff/customers/([0-9a-f-]{36})/installations$#D',$path,$m)===1) {
             if($this->installationDirectory===null) throw new RegistrationError('staff_portal_denied');
             $title='Customer installations';$active='customers';

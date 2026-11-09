@@ -25,6 +25,12 @@ test('authenticated Central operator journey through the real entrypoint', async
   await expect(page.getByText('central-browser.example.test').first()).toBeVisible();
   await expect(page.locator('section[aria-label="Registered installations"]')).toBeVisible();
   await page.screenshot({ path: 'docs/evidence/central-customer-desktop.png', fullPage: true });
+  await page.getByRole('link', { name: 'Customer billing' }).click();
+  await expect(page.locator('section[aria-label="Private HAFZATECH vendor invoices"]')).toBeVisible();
+  await page.screenshot({ path: 'docs/evidence/central-billing-desktop.png', fullPage: true });
+  await page.goto('/staff/customers/11111111-1111-4111-8111-111111111111/support');
+  await expect(page.locator('section[aria-label="Private HAFZATECH support queue"]')).toBeVisible();
+  await page.screenshot({ path: 'docs/evidence/central-support-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: 'docs/evidence/central-customer-mobile.png', fullPage: true });
   await page.setViewportSize({ width: 1440, height: 900 });
