@@ -594,6 +594,7 @@ jobs:
       CENTRAL_STAFF_THROTTLE_HMAC_KEY: central-browser-throttle-key-0123456789
       CENTRAL_BROWSER_TRANSPORT: test
       CENTRAL_VENDOR_PLAN_PUBLISH_ENABLED: 'true'
+      CENTRAL_STAFF_PROVISIONING_ENABLED: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
