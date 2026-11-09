@@ -30,7 +30,7 @@ final class CentralStaffPortalFormRequest
         }
         if ($raw==='') return [];
         $parts=explode('&',$raw);
-        if(count($parts)>8) {
+        if(count($parts)>16) {
             throw new RegistrationError('invalid_staff_form',422);
         }
         $fields=[];
