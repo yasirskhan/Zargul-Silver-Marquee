@@ -90,7 +90,8 @@ final class CentralStaffPortalOperatorWiring
             new CentralStaffPortalHome($sessions,$auth,$db),
             new CentralStaffCustomerDirectory($db,$sessions,$auth),
             new CentralStaffDesignerCreditService($db,$sessions,$auth),
-            new CentralStaffInstallationDirectory($db,$auth),$csrf,$sessions);
+            new CentralStaffInstallationDirectory($db,$auth),$csrf,$sessions,
+            new CentralStaffLicenseDirectory($db,$sessions,$auth));
         return new CentralStaffPortalOperatorApp(
             new CentralStaffPortalOperatorKernel(
                 $router,new CentralStaffPortalPrivateResponse(true),true),

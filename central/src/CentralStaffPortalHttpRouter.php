@@ -44,7 +44,8 @@ final class CentralStaffPortalHttpRouter
         private readonly ?CentralStaffDesignerCreditService $designerCredit = null,
         private readonly ?CentralStaffInstallationDirectory $installationDirectory = null,
         private readonly ?CentralStaffCsrfTokenService $csrfTokens = null,
-        private readonly ?CentralStaffSessionService $sessions = null
+        private readonly ?CentralStaffSessionService $sessions = null,
+        private readonly ?CentralStaffLicenseDirectory $licenseDirectory = null
     ) {}
 
     /**
@@ -661,9 +662,15 @@ final class CentralStaffPortalHttpRouter
             if($this->dashboard===null) throw new RegistrationError('staff_portal_denied');
             $title='Customer workspace';$active='customers';
             $content=$this->dashboard->render($bearer,$m[1],$csrf);
-            $content.='<p><a href="/staff/customers/'.$m[1].'/billing">Customer billing</a> · '
+            $content.='<p><a href="/staff/customers/'.$m[1].'/licensing">Licensing and renewals</a> · '
+                .'<a href="/staff/customers/'.$m[1].'/billing">Customer billing</a> · '
                 .'<a href="/staff/customers/'.$m[1].'/support">Support tickets</a> · '
                 .'<a href="/staff/customers/'.$m[1].'/installations">Installations</a></p>';
+        } elseif(preg_match('#^/staff/customers/([0-9a-f-]{36})/licensing$#D',$path,$m)===1) {
+            if($this->licenseDirectory===null) throw new RegistrationError('staff_portal_denied');
+            $rows=$this->licenseDirectory->listForCustomer($bearer,$m[1],50);
+            $title='Customer licensing';$active='customers';
+            $content=CentralStaffLicenseDirectoryRenderer::html($rows,$m[1]);
         } elseif(preg_match('#^/staff/customers/([0-9a-f-]{36})/billing$#D',$path,$m)===1) {
             if($this->invoiceDirectory===null) throw new RegistrationError('staff_portal_denied');
             $rows=$this->invoiceDirectory->listForCustomer($bearer,$m[1],25);
