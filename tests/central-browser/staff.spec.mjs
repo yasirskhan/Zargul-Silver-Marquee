@@ -103,6 +103,7 @@ test('role request requires an independent approver and never self-approves', as
   await page.getByRole('button', { name: 'Sign out' }).first().click();
   await expect(page.getByText(/signed out|HAFZATECH staff sign in/i)).toBeVisible({ timeout: 20000 });
 
+  await page.waitForTimeout(65_000);
   await login(page, 'central-approver@example.test');
   await page.goto('/staff/team');
   await page.getByRole('button', { name: 'Pending independent role reviews' }).click();
