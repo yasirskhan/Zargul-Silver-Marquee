@@ -37,6 +37,9 @@ final class HallPhotos extends Page
 
     public function mount(): void
     {
+        if ($this->companyId !== null && ! array_key_exists($this->companyId, $this->companyOptions())) {
+            abort(403);
+        }
         $this->companyId ??= array_key_first($this->companyOptions());
         $this->hallId ??= array_key_first($this->hallOptions());
         $this->loadSelected();

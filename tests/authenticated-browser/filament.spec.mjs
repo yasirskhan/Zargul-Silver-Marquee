@@ -415,6 +415,9 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   await page.screenshot({ path: 'docs/evidence/admin-hall-photos-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: 'docs/evidence/admin-hall-photos-mobile.png', fullPage: true });
+  const foreignHallPhotos = await page.goto(
+    '/admin/hall-photos?company=22222222-2222-4222-8222-222222222222');
+  expect(foreignHallPhotos.status()).toBe(403);
 });
 
 test('real owner configures hall schedule seating and add-ons without booking', async ({ page }) => {
