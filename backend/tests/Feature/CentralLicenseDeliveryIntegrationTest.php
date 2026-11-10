@@ -293,7 +293,7 @@ class CentralLicenseDeliveryIntegrationTest extends TestCase
             }
         }
         $badReceipt = $data['signed_receipt'];
-        $badReceipt['signature'] = substr($badReceipt['signature'], 0, -2).'AA';
+        $badReceipt['signature'] = 'AA'.substr($badReceipt['signature'], 2);
         try {
             $delivery->accept($data['signed_grant'], $badReceipt,
                 $data['customer_id'], $data['domain'], $data['nonce'], $now);
