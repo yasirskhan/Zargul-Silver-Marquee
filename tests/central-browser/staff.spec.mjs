@@ -4,19 +4,19 @@ const SECRET='JBSWY3DPEHPK3PXP';
 function totp(){const c=Buffer.alloc(8);c.writeBigUInt64BE(BigInt(Math.floor(Date.now()/30000)));
  const d=createHmac('sha1',Buffer.from(SECRET)).update(c).digest();const o=d[19]&15;
  return String((d.readUInt32BE(o)&0x7fffffff)%1000000).padStart(6,'0');}
-async function login(page, email) {
+async function login(page, email, secret) {
   await page.goto('/staff/login');
   await expect(page.getByRole('heading', { name: 'HAFZATECH staff' })).toBeVisible();
   await page.getByLabel('Staff email').fill(email);
   await page.getByLabel('Password').fill('central-browser-password');
-  await page.getByLabel('Authenticator code').fill(totp());
+  await page.getByLabel('Authenticator code').fill(totp(secret));
   await page.getByRole('button', { name: /sign in/i }).click();
   await expect(page.getByRole('link', { name: 'Open Central Control Center' })).toBeVisible({ timeout: 20000 });
   await page.getByRole('link', { name: 'Open Central Control Center' }).click();
   await expect(page).toHaveURL(/\/staff\/home$/);
 }
 test('authenticated Central operator journey through the real entrypoint', async ({ page }) => {
-  await login(page, 'central-browser@example.test');
+  await login(page, 'central-browser@example.test', 'JBSWY3DPEHPK3PXP');
   await expect(page.getByRole('link', { name: 'Customers & installations' })).toBeVisible();
   await expect(page.locator('link[rel="stylesheet"]')).toHaveAttribute('href','/staff.css');
   await page.screenshot({ path: 'docs/evidence/central-home-desktop.png', fullPage: true });
@@ -75,7 +75,7 @@ test('authenticated Central operator journey through the real entrypoint', async
   await expect(page.getByText(/signed out|HAFZATECH staff sign in/i)).toBeVisible({ timeout: 20000 });
 });
 test('separate billing operator sees invoices and support but not staff administration', async ({ page }) => {
-  await login(page, 'central-billing@example.test');
+  await login(page, 'central-billing@example.test', 'JBSWY3DPEHPK3PXP');
   await page.goto('/staff/customers/11111111-1111-4111-8111-111111111111/billing');
   await expect(page.locator('section[aria-label="Private HAFZATECH vendor invoices"]')).toBeVisible();
   await page.screenshot({ path: 'docs/evidence/central-billing-desktop.png', fullPage: true });
@@ -87,3 +87,32 @@ test('separate billing operator sees invoices and support but not staff administ
   await expect(page.getByText('Private HAFZATECH team dashboard')).toHaveCount(0);
 });
 
+
+test('role request requires an independent approver and never self-approves', async ({ page }) => {
+  await login(page, 'central-requester@example.test', 'KRSXG5AUMVZWK4TT');
+  await page.goto('/staff/team');
+  await page.getByLabel('Target staff ID').fill('abababab-abab-4bab-8bab-abababababab');
+  await page.getByLabel('Requested role').selectOption('support_agent');
+  await page.getByLabel('Customer scope ID').fill('11111111-1111-4111-8111-111111111111');
+  await page.getByLabel('Reason').fill('Independent browser role approval fixture');
+  await page.getByRole('button', { name: 'Submit for independent approval' }).click();
+  await expect(page.getByText('Role proposal recorded')).toBeVisible({ timeout: 20000 });
+  await page.goto('/staff/team');
+  await page.getByRole('button', { name: 'Pending independent role reviews' }).click();
+  await expect(page.getByText('central-target@example.test')).toHaveCount(0);
+  await page.goto('/staff/home');
+  await page.getByRole('button', { name: 'Sign out' }).first().click();
+  await expect(page.getByText(/signed out|HAFZATECH staff sign in/i)).toBeVisible({ timeout: 20000 });
+
+  await login(page, 'central-approver@example.test', 'MZXW6YTBOI234567');
+  await page.goto('/staff/team');
+  await page.getByRole('button', { name: 'Pending independent role reviews' }).click();
+  await expect(page.getByText('central-target@example.test')).toBeVisible({ timeout: 20000 });
+  await page.getByRole('button', { name: 'Record decision' }).first().click();
+  await expect(page.getByText(/Staff role request approved/i)).toBeVisible({ timeout: 20000 });
+  await page.goto('/staff/team');
+  await page.getByRole('button', { name: 'Pending independent role reviews' }).click();
+  await expect(page.getByText('central-target@example.test')).toHaveCount(0);
+  await page.goto('/staff/staff');
+  await expect(page.getByText('central-target@example.test')).toBeVisible();
+});
