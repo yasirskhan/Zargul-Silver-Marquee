@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { createHmac } from 'node:crypto';
 const SECRET='JBSWY3DPEHPK3PXP';
-function totp(){const c=Buffer.alloc(8);c.writeBigUInt64BE(BigInt(Math.floor(Date.now()/30000)));
- const d=createHmac('sha1',Buffer.from(SECRET)).update(c).digest();const o=d[19]&15;
+function totp(secret){const c=Buffer.alloc(8);c.writeBigUInt64BE(BigInt(Math.floor(Date.now()/30000)));
+ const d=createHmac('sha1',Buffer.from(secret)).update(c).digest();const o=d[19]&15;
  return String((d.readUInt32BE(o)&0x7fffffff)%1000000).padStart(6,'0');}
 async function login(page, email, secret) {
   await page.goto('/staff/login');
