@@ -595,6 +595,8 @@ jobs:
       CENTRAL_BROWSER_TRANSPORT: test
       CENTRAL_VENDOR_PLAN_PUBLISH_ENABLED: 'true'
       CENTRAL_STAFF_PROVISIONING_ENABLED: 'true'
+      CENTRAL_STAFF_ROLE_REQUEST_ENABLED: 'true'
+      CENTRAL_STAFF_ROLE_DECISIONS_ENABLED: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
