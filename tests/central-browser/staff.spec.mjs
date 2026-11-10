@@ -56,7 +56,7 @@ test('authenticated Central operator journey through the real entrypoint', async
   await page.screenshot({ path: 'docs/evidence/central-team-desktop.png', fullPage: true });
   await page.getByLabel('Staff email').fill('central-pending@example.test');
   await page.getByLabel('Display name').fill('Pending Central Operator');
-  await page.getByLabel('Reason').fill('Browser acceptance for pending staff');
+  await page.locator('form[action="/staff/team/create-pending"]').getByLabel('Reason').fill('Browser acceptance for pending staff');
   await page.getByRole('button', { name: 'Prepare pending staff identity' }).click();
   await expect(page.getByText('Pending staff identity prepared')).toBeVisible({ timeout: 20000 });
   await page.goto('/staff/staff');
@@ -95,7 +95,7 @@ test('role request requires an independent approver and never self-approves', as
   await page.getByLabel('Target staff ID').fill('abababab-abab-4bab-8bab-abababababab');
   await page.getByLabel('Requested role').selectOption('support_agent');
   await page.getByLabel('Customer scope ID').fill('11111111-1111-4111-8111-111111111111');
-  await page.getByLabel('Reason').fill('Independent browser role approval fixture');
+  await page.locator('form[action="/staff/team/role-request"]').getByLabel('Reason').fill('Independent browser role approval fixture');
   await page.getByRole('button', { name: 'Submit for independent approval' }).click();
   await expect(page.getByText('Role proposal recorded')).toBeVisible({ timeout: 20000 });
   await page.goto('/staff/team');
