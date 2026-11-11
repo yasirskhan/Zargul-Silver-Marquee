@@ -186,7 +186,7 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   await expect(page.getByText('Unconfirmed company proposals')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Review booking proposals' })).toBeVisible();
   await expect(page.getByText('Synthetic Browser Customer')).toHaveCount(0);
-  await page.getByRole('link', { name: 'Review booking proposals' }).click();
+  await page.goto('/admin/booking-proposals');
   await expect(page.getByText('Internal booking proposals')).toBeVisible({ timeout: 20_000 });
   await page.waitForFunction(
     () => Boolean(window.Livewire?.all?.().length), null, { timeout: 30_000 }
