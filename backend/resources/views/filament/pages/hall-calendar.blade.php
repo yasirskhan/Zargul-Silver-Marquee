@@ -10,6 +10,8 @@
             Expired holds may require audited cleanup. No public availability or customer information is displayed.
         </p>
 
+        <section class="vd-panel" aria-label="Calendar controls">
+        <div class="vd-panel-head"><h2>Calendar controls</h2><p>Company, hall, date and occupancy view.</p></div>
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <label class="block space-y-2">
                 <span class="text-sm font-medium">Company</span>
@@ -48,6 +50,7 @@
             <button type="button" wire:click="stepPeriod(1)" class="rounded-lg border px-4 py-2 text-sm">Next</button>
             @error('viewMode') <span role="alert" class="text-sm text-red-600">{{ $message }}</span> @enderror
         </div>
+        </section>
 
         @if ($loadedCompanyId === $companyId && $loadedHallId === $hallId && $projection !== [])
             @php
@@ -66,7 +69,7 @@
                 <div class="vd-metric"><b>{{ $slotCounts['cleanup_required'] }}</b><span>Cleanup required</span></div>
                 <div class="vd-metric"><b>{{ $slotCounts['unconfigured'] }}</b><span>Unconfigured</span></div>
             </div>
-            <section class="space-y-4" aria-label="Hall occupancy projection">
+            <section class="vd-panel space-y-4" aria-label="Hall occupancy projection">
                 <h2 class="text-lg font-semibold">Hall occupancy: {{ $projection['fromDate'] }} to {{ $projection['toDate'] }}</h2>
                 <p class="text-sm">{{ $projection['configured'] ? 'Hall programs configured.' : 'Programs unconfigured. No open slots.' }}
                     Last refreshed: {{ $projection['asOf'] }}.</p>

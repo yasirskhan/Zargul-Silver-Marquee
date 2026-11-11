@@ -21,7 +21,7 @@
         </label>
 
         @if ($loadedCompanyId === $companyId)
-            <section aria-label="Create frozen internal rental preview" class="space-y-3 rounded-xl border p-4">
+            <section aria-label="Create frozen internal rental preview" class="vd-panel space-y-3">
                 <h2 class="text-lg font-semibold">Freeze internal rental-price preview</h2>
                 <p class="text-sm">Uses the saved hall program's approved revision, never a fabricated rate.
                     Excludes unapproved addon quantities, tax, discounts and payment claims.</p>
@@ -72,7 +72,7 @@
                     @endforelse
                 </div>
             </section>
-            <section class="space-y-3 rounded-xl border p-4" aria-label="Daily immutable receipt reconciliation">
+            <section class="vd-panel space-y-3" aria-label="Daily immutable receipt reconciliation">
                 <h2 class="text-lg font-semibold">Daily invoice receipt and refund reconciliation (UTC)</h2>
                 <p class="text-xs">Read-only comparison of recorded cash/bank deposits and approved reversals with their existing ledger journals. Amounts in minor units; no payout or bank transfer is initiated.</p>
                 <label class="block space-y-1">
@@ -108,7 +108,7 @@
                     @endif
                 @endif
             </section>
-            <section aria-label="Controlled cash ledger and daily reconciliation" class="space-y-3 rounded-xl border p-4">
+            <section aria-label="Controlled cash ledger and daily reconciliation" class="vd-panel space-y-3">
                 <h2 class="text-lg font-semibold">Controlled cash ledger</h2>
                 @if (! $this->postingEnabled())
                     <p class="text-sm font-semibold">

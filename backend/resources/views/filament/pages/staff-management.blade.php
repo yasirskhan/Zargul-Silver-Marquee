@@ -12,7 +12,7 @@
             <p role="status" class="rounded border p-3 text-sm">{{ $message }}</p>
         @endif
 
-        <section class="space-y-3 rounded-xl border p-4">
+        <section class="vd-panel space-y-3">
             <h2 class="font-semibold">Invite staff</h2>
             <div class="grid gap-3 md:grid-cols-3">
                 <label class="space-y-1 text-sm"><span>Email</span>

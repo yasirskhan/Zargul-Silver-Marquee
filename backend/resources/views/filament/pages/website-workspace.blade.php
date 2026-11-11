@@ -29,7 +29,7 @@
             </label>
         </div>
         @if ($page = $this->currentPage())
-            <section class="space-y-3 rounded-xl border p-4" aria-label="Create an unpublished website page">
+            <section class="vd-panel space-y-3" aria-label="Create an unpublished website page">
                 <h2 class="text-lg font-semibold">Create a new website page</h2>
                 <p class="text-sm">New pages stay private until an authorized publisher approves the saved draft. Only pre-approved public paths can be created.</p>
                 <div class="grid gap-3 sm:grid-cols-2">
@@ -67,7 +67,7 @@
                     class="rounded-lg border px-3 py-2 text-sm">Reload latest draft</button>
             </section>
 
-            <section class="space-y-3 rounded-xl border p-4" aria-label="Draft page search settings">
+            <section class="vd-panel space-y-3" aria-label="Draft page search settings">
                 <h2 class="text-lg font-semibold">Page search title</h2>
                 <label class="block space-y-1">
                     <span class="text-sm font-medium">Search title override (optional)</span>
@@ -92,7 +92,7 @@
                 </div>
             </section>
 
-            <section class="space-y-4 rounded-xl border p-4" aria-label="Website branding">
+            <section class="vd-panel space-y-4" aria-label="Website branding">
                 <h2 class="text-lg font-semibold">Branding and theme</h2>
                 <p class="text-sm">Choose approved theme presets and company-owned images. Save a draft first; only an authorized publisher can approve changes for a future public release.</p>
                 <p class="text-xs">Branding draft revision: {{ $expectedBrandingRevision }}. {{ $loadedBrandingPublishedRevisionId ? 'An approved branding snapshot exists.' : 'No published branding yet.' }}</p>
@@ -155,7 +155,7 @@
                         class="w-full rounded border p-2 text-gray-900"
                         placeholder="A short approved venue message, not private contact details"></textarea>
                 </label>
-                <section class="space-y-3 rounded-lg border p-3" aria-label="Draft website navigation">
+                <section class="vd-panel space-y-3" aria-label="Draft website navigation">
                     <h3 class="font-semibold">Website menu</h3>
                     <p class="text-sm">Reorder or hide approved website paths. Unpublished pages stay hidden even when selected here. Save and publish branding separately to update the public menu.</p>
                     <div class="space-y-2">
@@ -197,7 +197,7 @@
                     <span class="text-xs">Appears in search metadata only after separate branding publication. Indexing still requires operator approval.</span>
                 </label>
                 @if ($this->canPublishCurrentPage())
-                    <section class="space-y-3 rounded-lg border p-3" aria-label="Private domain ownership">
+                    <section class="vd-panel space-y-3" aria-label="Private domain ownership">
                         <h3 class="font-semibold">Domain ownership</h3>
                         <p class="text-sm">Verify that you control a public DNS domain. Verification does not turn on the public website, publish drafts, or permit search indexing. Public launch still needs separate operator approval.</p>
                         <label class="block space-y-1">
@@ -282,7 +282,7 @@
                 @endif
             </section>
 
-            <section class="space-y-4 rounded-xl border p-4" aria-label="Website media library">
+            <section class="vd-panel space-y-4" aria-label="Website media library">
                 <h2 class="text-lg font-semibold">Media library</h2>
                 <p class="text-sm">Stage genuine venue images privately, then request owner or publisher approval before any publication. Uploading never puts a photo on the public website.</p>
                 <div class="grid gap-3 md:grid-cols-2">
@@ -378,7 +378,7 @@
                     <div wire:key="section-{{ $section['id'] ?? $index }}"
                         x-on:dragover.prevent="if ($event.dataTransfer.types.includes('application/x-venuedesk-section')) $event.dataTransfer.dropEffect = 'move'"
                         x-on:drop.prevent.stop="if ($event.dataTransfer.types.includes('application/x-venuedesk-section')) $wire.moveSectionTo(Number($event.dataTransfer.getData('application/x-venuedesk-section')), {{ $index }})"
-                        class="space-y-3 rounded-xl border p-4">
+                        class="vd-panel space-y-3">
                         <div class="flex flex-wrap items-center justify-between gap-2">
                             <div class="flex flex-wrap items-center gap-2">
                                 <span draggable="true" role="button" tabindex="0"
@@ -454,7 +454,7 @@
                                         <div wire:key="col-{{ $column['id'] ?? $columnIndex }}"
                                             x-on:dragover.prevent.stop="if ($event.dataTransfer.types.includes('application/x-venuedesk-column')) $event.dataTransfer.dropEffect = 'move'"
                                             x-on:drop.prevent.stop="if ($event.dataTransfer.types.includes('application/x-venuedesk-column')) { let parts = $event.dataTransfer.getData('application/x-venuedesk-column').split(':').map(Number); if (parts[0] === {{ $index }}) $wire.moveDesktopColumn({{ $index }}, parts[1], {{ $columnIndex }}); }"
-                                            class="space-y-2 rounded-lg border p-3">
+                                            class="vd-panel space-y-2">
                                             <div class="flex flex-wrap items-center gap-2">
                                                 <span draggable="true" aria-hidden="true"
                                                     title="Drag to reorder desktop columns; keyboard and touch use buttons"
@@ -501,7 +501,7 @@
                                             </div>
                                             @foreach (($column['blocks'] ?? []) as $blockIndex => $block)
                                                 <div wire:key="nested-block-{{ $block['id'] ?? $blockIndex }}"
-                                                    class="space-y-2 rounded-lg border p-3" aria-label="Content block {{ $blockIndex + 1 }} in column {{ $columnIndex + 1 }}">
+                                                    class="vd-panel space-y-2" aria-label="Content block {{ $blockIndex + 1 }} in column {{ $columnIndex + 1 }}">
                                                     <div class="flex flex-wrap items-center gap-2">
                                                         <p class="font-medium text-sm">{{ \Illuminate\Support\Str::headline($block['type'] ?? 'text') }} block {{ $blockIndex + 1 }}</p>
                                                         <button type="button" wire:click="moveColumnBlock({{ $index }}, {{ $columnIndex }}, {{ $blockIndex }}, {{ $columnIndex }}, {{ $blockIndex - 1 }})"
@@ -571,7 +571,7 @@
                 @endforelse
             </section>
 
-            <section class="space-y-3 rounded-xl border p-4" aria-label="Responsive draft preview">
+            <section class="vd-panel space-y-3" aria-label="Responsive draft preview">
                 <h2 class="text-lg font-semibold">Draft preview</h2>
                 <p class="text-sm">Authorized company images and safe typed text appear here. This draft is private and never public until an authorized publish; live booking data is not loaded.</p>
                 <div role="group" aria-label="Preview screen size" class="flex flex-wrap gap-2">
@@ -582,7 +582,7 @@
                 @include('filament.pages.partials.draft-preview', ['sections' => $sections, 'previewMode' => $previewMode])
             </section>
 
-            <section class="space-y-3 rounded-xl border p-4" aria-label="Save and publish">
+            <section class="vd-panel space-y-3" aria-label="Save and publish">
                 <label class="block space-y-2">
                     <span class="text-sm font-medium">Reason for this change (required)</span>
                     <textarea wire:model="reason" rows="2" maxlength="500" class="w-full rounded-lg border p-2 text-gray-900"

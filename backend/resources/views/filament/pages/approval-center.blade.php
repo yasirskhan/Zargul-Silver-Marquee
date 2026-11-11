@@ -20,7 +20,7 @@
             </select>
         </label>
 
-        <section class="space-y-2 rounded-xl border p-4" aria-label="Find a private approval by reference">
+        <section class="vd-panel space-y-2" aria-label="Find a private approval by reference">
             <label class="block space-y-1">
                 <span class="text-sm font-medium">Approval status</span>
                 <select wire:model.live="statusFilter" class="w-full rounded-lg border p-3 text-gray-900">
@@ -68,7 +68,7 @@
             @endif
         </section>
 
-        <section class="space-y-3 rounded-xl border p-4" aria-label="Create exception request">
+        <section class="vd-panel space-y-3" aria-label="Create exception request">
             <h2 class="font-semibold">Request approval</h2>
             <div class="grid gap-3 md:grid-cols-2">
                 <label class="block space-y-1"><span class="text-sm">Exception category</span>
@@ -103,7 +103,7 @@
         </section>
 
         @if ($loadedCompanyId === $companyId)
-            <section class="space-y-3" aria-label="Private approval inbox">
+            <section class="vd-panel space-y-3" aria-label="Private approval inbox">
                 <div class="rounded-lg border p-3 text-sm" aria-label="Approval status totals">
                     <p class="font-medium">Company approvals visible to your role</p>
                     <p>Pending: {{ $statusCounts['pending'] ?? 0 }} · Approved: {{ $statusCounts['approved'] ?? 0 }}
@@ -170,7 +170,7 @@
         @if ($selectedId && $loadedCompanyId === $companyId)
             @php($review = $this->selectedRequest())
             @if ($review)
-            <section class="space-y-3 rounded-xl border p-4" aria-label="Review selected approval">
+            <section class="vd-panel space-y-3" aria-label="Review selected approval">
                 <h2 class="font-semibold">Decide on request {{ $selectedId }}</h2>
                 <div class="space-y-1 rounded-lg border p-3 text-sm" aria-label="Selected exception details">
                     <p><strong>Exception:</strong> {{ str_replace('_', ' ', ucfirst($review['category'])) }}</p>
@@ -200,7 +200,7 @@
         @endif
 
         @if ($this->role() === 'owner' && $loadedCompanyId === $companyId)
-            <section class="space-y-3 rounded-xl border p-4" aria-label="Emergency approval delegation">
+            <section class="vd-panel space-y-3" aria-label="Emergency approval delegation">
             <section class="space-y-2 rounded-xl border p-3" aria-label="Private Telegram owner alerts">
                 <h3 class="font-semibold">Optional private Telegram alerts</h3>
                 <p class="text-sm">Link your own private chat using the bot. No customer contact,

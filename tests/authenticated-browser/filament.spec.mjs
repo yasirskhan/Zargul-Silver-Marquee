@@ -98,7 +98,7 @@ test('private proposal route requires authentication and does not reveal custome
 });
 
 test('real owner password and TOTP flow protects mobile proposal editing without booking', async ({ page }) => {
-  test.setTimeout(240_000);
+  test.setTimeout(420_000);
   // Other authenticated specs start against the same real login limiter.
   await page.waitForTimeout(65_000);
   await page.setViewportSize({ width: 360, height: 740 });
@@ -423,6 +423,23 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   const foreignHallPhotos = await page.goto(
     '/admin/hall-photos?company=22222222-2222-4222-8222-222222222222');
   expect(foreignHallPhotos.status()).toBe(403);
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  for (const [path, name] of [
+    ['/admin/hall-calendar', 'calendar'],
+    ['/admin/approval-center', 'approvals'],
+    ['/admin/finance-desk', 'finance'],
+    ['/admin/staff-management', 'staff'],
+    ['/admin/website-workspace', 'website'],
+    ['/admin/hall-inventory', 'inventory'],
+    ['/admin/audit-history', 'audit'],
+  ]) {
+    await page.goto(path);
+    await page.screenshot({ path: `docs/evidence/admin-${name}-desktop.png`, fullPage: true });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/admin/hall-calendar');
+  await page.screenshot({ path: 'docs/evidence/admin-calendar-mobile.png', fullPage: true });
 });
 
 test('real owner configures hall schedule seating and add-ons without booking', async ({ page }) => {
