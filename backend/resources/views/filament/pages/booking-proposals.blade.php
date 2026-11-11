@@ -16,7 +16,7 @@
             Internal booking proposals for owner/admin review and safe draft editing. These are NOT confirmed bookings or holds.
             Availability, prices, consent and booking approval must be checked separately. No customer contact is displayed.
         </p>
-        <section class="space-y-3 rounded-xl border p-4" aria-label="Private customer and proposal intake">
+        <section class="vd-panel space-y-3" aria-label="Private customer and proposal intake">
             <h2 class="text-lg font-semibold">Create customer and internal booking proposal</h2>
             <p class="text-xs">Owner/admin only. Choose an existing customer by exact private ID, or enter a new customer below. Personal contact information is encrypted and never shown in the proposal list. Submitting for review does not reserve a hall.</p>
             <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -125,7 +125,7 @@
             @error('fromDate') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
         </div>
         @if ($loadedCompanyId === $companyId)
-            <section class="space-y-4" aria-label="Private company proposal results">
+            <section class="vd-panel space-y-4" aria-label="Private company proposal results">
                 <p class="text-sm">Showing {{ count($entries) }} internal proposal(s), starting at {{ $offset + 1 }}.</p>
                 <div class="overflow-x-auto rounded-xl border">
                     <table class="w-full min-w-[850px] border-collapse text-left text-sm">

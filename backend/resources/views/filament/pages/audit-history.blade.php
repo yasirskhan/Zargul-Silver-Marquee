@@ -1,5 +1,8 @@
 <x-filament-panels::page>
     <div class="space-y-6">
+        <x-venuedesk.header eyebrow="VenueDesk · Audit" title="Activity & Audit" />
+        <section class="vd-panel space-y-3" aria-label="Audit filters">
+        <div class="vd-panel-head"><h2>Audit filters</h2><p>Exact identifiers and dates only.</p></div>
         <p class="text-sm text-gray-600 dark:text-gray-300">
             Owner/admin-only, read-only company audit history. Filters match exact identifiers.
             Some entries can contain sensitive business information. Encrypted owner export is available;
@@ -42,8 +45,9 @@
             </button>
             @error('filters') <p role="alert" class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
         </div>
+        </section>
 
-        <section aria-label="Encrypted audit export" class="space-y-3 rounded-xl border p-4">
+        <section aria-label="Encrypted audit export" class="vd-panel space-y-3">
             <h2 class="font-semibold">Encrypted audit export</h2>
             <p class="text-sm">
                 Downloads ciphertext only, encrypted with the application key. It contains no plaintext in the browser,

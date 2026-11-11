@@ -7,6 +7,8 @@
             <div class="vd-metric"><b>{{ count($stocktakeHistory) }}</b><span>Stocktake history</span></div>
             <div class="vd-metric"><b>{{ count($stocktakeVariance) }}</b><span>Variance rows</span></div>
         </div>
+        <section class="vd-panel space-y-3" aria-label="Inventory scope controls">
+        <div class="vd-panel-head"><h2>Inventory scope</h2><p>Company and hall ownership context.</p></div>
         <p class="text-sm text-gray-600 dark:text-gray-300">
             Hall-owned inventory catalog and witnessed physical count records.
             Creating an item does not purchase inventory or change owned stock.
@@ -31,6 +33,7 @@
                 </select>
             </label>
         </div>
+        </section>
 
 
         {{-- This workspace is presentation-only. Server-side per-hall permission, evidence and finance gates still authorize each Livewire action. --}}

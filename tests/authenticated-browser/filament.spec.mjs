@@ -425,21 +425,24 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   expect(foreignHallPhotos.status()).toBe(403);
 
   await page.setViewportSize({ width: 1440, height: 900 });
-  for (const [path, name] of [
-    ['/admin/hall-calendar', 'calendar'],
-    ['/admin/approval-center', 'approvals'],
-    ['/admin/finance-desk', 'finance'],
-    ['/admin/staff-management', 'staff'],
-    ['/admin/website-workspace', 'website'],
-    ['/admin/hall-inventory', 'inventory'],
-    ['/admin/audit-history', 'audit'],
+  for (const [path, name, section] of [
+    ['/admin/booking-proposals', 'bookings', 'section[aria-label="Private company proposal results"]'],
+    ['/admin/hall-calendar', 'calendar', 'section[aria-label="Hall occupancy projection"]'],
+    ['/admin/approval-center', 'approvals', 'section[aria-label="Private approval inbox"]'],
+    ['/admin/finance-desk', 'finance', 'section[aria-label="Daily immutable receipt reconciliation"]'],
+    ['/admin/staff-management', 'staff', 'main section'],
+    ['/admin/website-workspace', 'website', 'section[aria-label="Website branding"]'],
+    ['/admin/hall-inventory', 'inventory', 'section[aria-label="Inventory scope controls"]'],
+    ['/admin/audit-history', 'audit', 'section[aria-label="Audit filters"]'],
   ]) {
-    await page.goto(path);
+    const response = await page.goto(path);
+    expect(response.ok()).toBe(true);
+    await expect(page.locator(section).first()).toBeVisible({ timeout: 20000 });
     await page.screenshot({ path: `docs/evidence/admin-${name}-desktop.png`, fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: `docs/evidence/admin-${name}-mobile.png`, fullPage: true });
+    await page.setViewportSize({ width: 1440, height: 900 });
   }
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/admin/hall-calendar');
-  await page.screenshot({ path: 'docs/evidence/admin-calendar-mobile.png', fullPage: true });
 });
 
 test('real owner configures hall schedule seating and add-ons without booking', async ({ page }) => {
