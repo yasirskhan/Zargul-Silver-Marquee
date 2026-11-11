@@ -313,7 +313,7 @@ jobs:
               sudo mv "$source" /tmp/venuedesk-disabled-apt-feeds/
             done
       - name: Install Chromium browser and dependencies
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium || npx playwright install chromium
       - name: Exercise public website editor prototype in desktop and phone browsers
         run: npx playwright test --config=playwright.config.mjs
       - name: Upload browser diagnostics if tests fail
@@ -477,7 +477,7 @@ jobs:
               sudo mv "$source" /tmp/venuedesk-disabled-apt-feeds/
             done
       - name: Install Chromium for authenticated acceptance
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium || npx playwright install chromium
       - name: Browser verify owner password TOTP and proposal editing
         run: npx playwright test --config=playwright.auth.config.mjs
       - name: Save synthetic Phase 12 desktop and mobile evidence
@@ -610,7 +610,7 @@ jobs:
       - name: Install pinned Playwright test tooling
         run: npm install --no-save --no-audit --no-fund @playwright/test@1.56.1
       - name: Install Chromium browser and dependencies
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium || npx playwright install chromium
       - name: Create Central database, schema and synthetic operator
         run: |
           PGPASSWORD=venue createdb -h 127.0.0.1 -U venue hafzatech_central_test
