@@ -178,6 +178,11 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   await page.goto('/admin/overview');
   await expect(page.locator('section[aria-label="Private venue overview"]'))
     .toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('section[aria-label="VenueDesk quick actions"]')).toBeVisible();
+  await page.screenshot({ path: 'docs/evidence/admin-dashboard-mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.screenshot({ path: 'docs/evidence/admin-dashboard-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 360, height: 740 });
   await expect(page.getByText('Unconfirmed company proposals')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Review booking proposals' })).toBeVisible();
   await expect(page.getByText('Synthetic Browser Customer')).toHaveCount(0);

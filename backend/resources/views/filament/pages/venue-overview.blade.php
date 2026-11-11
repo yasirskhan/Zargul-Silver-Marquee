@@ -12,6 +12,21 @@
                 <a href="{{ \App\Filament\Pages\WebsiteWorkspace::getUrl() }}">Website editor</a>
             </div>
         </section>
+        <section class="vd-panel vd-quick-panel" aria-label="VenueDesk quick actions">
+            <div class="vd-panel-head"><h2>Quick actions</h2><p>Common desk tasks, using your current company and role.</p></div>
+            <div class="vd-quick-grid">
+                <a class="vd-action-card" href="{{ \App\Filament\Pages\HallCalendar::getUrl() }}"><strong>Check availability</strong><span>Calendar, holds and hall programs</span></a>
+                <a class="vd-action-card" href="{{ \App\Filament\Pages\BookingProposals::getUrl() }}"><strong>Create booking</strong><span>Internal proposal first, no instant reservation</span></a>
+                <a class="vd-action-card" href="{{ \App\Filament\Pages\FinanceDesk::getUrl() }}"><strong>Find invoice</strong><span>Invoices, payments and balances</span></a>
+                <a class="vd-action-card" href="{{ \App\Filament\Pages\ApprovalCenter::getUrl() }}"><strong>Review approvals</strong><span>Discounts and protected decisions</span></a>
+                <a class="vd-action-card" href="{{ \App\Filament\Pages\WebsiteWorkspace::getUrl() }}"><strong>Website editor</strong><span>Draft, media and publication</span></a>
+                <a class="vd-action-card" href="{{ \App\Filament\Pages\HallPhotos::getUrl() }}"><strong>Hall photography</strong><span>Approved images for each hall</span></a>
+            </div>
+        </section>
+        <section class="vd-panel vd-note-panel" aria-label="VenueDesk operations note">
+            <div class="vd-panel-head"><h2>Operations note</h2></div>
+            <p>Bookings, payments and approvals on this desk are backed by protected services. Opening a proposal does not reserve a hall, and viewing an invoice does not verify payment.</p>
+        </section>
         <label class="block space-y-1">
             <span class="text-sm font-medium">Operating company</span>
             <select wire:model.live="companyId" class="w-full rounded-lg border p-3 text-gray-900">
