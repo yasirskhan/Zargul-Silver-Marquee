@@ -15,12 +15,24 @@
         <section class="vd-panel vd-quick-panel" aria-label="VenueDesk quick actions">
             <div class="vd-panel-head"><h2>Quick actions</h2><p>Common desk tasks, using your current company and role.</p></div>
             <div class="vd-quick-grid">
-                <a class="vd-action-card" href="{{ \App\Filament\Pages\HallCalendar::getUrl() }}"><strong>Check availability</strong><span>Calendar, holds and hall programs</span></a>
-                <a class="vd-action-card" href="{{ \App\Filament\Pages\BookingProposals::getUrl() }}"><strong>Create booking</strong><span>Internal proposal first, no instant reservation</span></a>
-                <a class="vd-action-card" href="{{ \App\Filament\Pages\FinanceDesk::getUrl() }}"><strong>Find invoice</strong><span>Invoices, payments and balances</span></a>
-                <a class="vd-action-card" href="{{ \App\Filament\Pages\ApprovalCenter::getUrl() }}"><strong>Review approvals</strong><span>Discounts and protected decisions</span></a>
-                <a class="vd-action-card" href="{{ \App\Filament\Pages\WebsiteWorkspace::getUrl() }}"><strong>Website editor</strong><span>Draft, media and publication</span></a>
-                <a class="vd-action-card" href="{{ \App\Filament\Pages\HallPhotos::getUrl() }}"><strong>Hall photography</strong><span>Approved images for each hall</span></a>
+                @if (\App\Filament\Pages\HallCalendar::canAccess())
+                    <a class="vd-action-card" href="{{ \App\Filament\Pages\HallCalendar::getUrl(['company' => $companyId]) }}"><strong>Check availability</strong><span>Calendar, holds and hall programs</span></a>
+                @endif
+                @if (\App\Filament\Pages\BookingProposals::canAccess())
+                    <a class="vd-action-card" href="{{ \App\Filament\Pages\BookingProposals::getUrl(['company' => $companyId]) }}"><strong>Create booking</strong><span>Internal proposal first, no instant reservation</span></a>
+                @endif
+                @if (\App\Filament\Pages\FinanceDesk::canAccess())
+                    <a class="vd-action-card" href="{{ \App\Filament\Pages\FinanceDesk::getUrl(['company' => $companyId]) }}"><strong>Find invoice</strong><span>Invoices, payments and balances</span></a>
+                @endif
+                @if (\App\Filament\Pages\ApprovalCenter::canAccess())
+                    <a class="vd-action-card" href="{{ \App\Filament\Pages\ApprovalCenter::getUrl(['company' => $companyId]) }}"><strong>Review approvals</strong><span>Discounts and protected decisions</span></a>
+                @endif
+                @if (\App\Filament\Pages\WebsiteWorkspace::canAccess())
+                    <a class="vd-action-card" href="{{ \App\Filament\Pages\WebsiteWorkspace::getUrl(['company' => $companyId]) }}"><strong>Website editor</strong><span>Draft, media and publication</span></a>
+                @endif
+                @if (\App\Filament\Pages\HallPhotos::canAccess())
+                    <a class="vd-action-card" href="{{ \App\Filament\Pages\HallPhotos::getUrl(['company' => $companyId]) }}"><strong>Hall photography</strong><span>Approved images for each hall</span></a>
+                @endif
             </div>
         </section>
         <section class="vd-panel vd-note-panel" aria-label="VenueDesk operations note">

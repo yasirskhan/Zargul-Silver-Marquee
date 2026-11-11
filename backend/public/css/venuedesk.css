@@ -55,3 +55,30 @@ body{font-family:'DM Sans',system-ui,sans-serif}
 .vd-action-card span{font-size:.78rem;color:#60746a}
 .vd-note-panel p{margin:0;font-size:.86rem;color:#60746a;max-width:75ch}
 @media(max-width:640px){.vd-quick-grid{grid-template-columns:1fr}.vd-panel{padding:16px}}
+
+/* Shared operational module panels: align Filament bodies to admin.html. */
+.fi-page section.rounded-xl.border,
+.fi-page .rounded-xl.border.p-4,
+.fi-page article.rounded-xl.border{
+  background:#fff;border:1px solid #e3e7df;border-radius:16px;
+  box-shadow:0 8px 24px rgba(23,55,46,.05);padding:18px;
+}
+.fi-page section.rounded-xl.border h2,
+.fi-page section.rounded-xl.border h3{font-family:Georgia,serif;color:#17372e}
+.fi-page table{width:100%;border-collapse:collapse;font-size:.86rem}
+.fi-page table th{text-align:left;font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;color:#60746a;background:#f7f3e9}
+.fi-page table th,.fi-page table td{padding:10px 12px;border-bottom:1px solid #e8ece5}
+.fi-page table tbody tr:hover{background:#fcfaf5}
+.fi-page input:not([type=checkbox]):not([type=radio]),
+.fi-page select,.fi-page textarea{
+  border:1px solid #d9d1c1;border-radius:10px;background:#fff;color:#17372e;
+}
+.fi-page button:not(.fi-btn):not([role=tab]){
+  border-radius:10px;border:1px solid #cfc5b2;background:#fff;color:#17372e;
+  padding:9px 14px;font-weight:600;transition:border-color .15s ease,background .15s ease;
+}
+.fi-page button:not(.fi-btn):not([role=tab]):hover{border-color:#b38649;background:#fcfaf5}
+@media(max-width:640px){
+  .fi-page section.rounded-xl.border,.fi-page .rounded-xl.border.p-4,.fi-page article.rounded-xl.border{padding:14px;border-radius:12px}
+  .fi-page table{display:block;overflow-x:auto;white-space:nowrap}
+}

@@ -182,6 +182,9 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   await page.screenshot({ path: 'docs/evidence/admin-dashboard-mobile.png', fullPage: true });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.screenshot({ path: 'docs/evidence/admin-dashboard-desktop.png', fullPage: true });
+  await page.getByRole('link', { name: /Check availability/ }).click();
+  await expect(page).toHaveURL(/\/admin\/hall-calendar/);
+  await page.goto('/admin/overview');
   await page.setViewportSize({ width: 360, height: 740 });
   await expect(page.getByText('Unconfirmed company proposals')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Review booking proposals' })).toBeVisible();
