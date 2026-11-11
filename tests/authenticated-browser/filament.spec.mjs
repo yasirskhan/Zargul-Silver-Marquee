@@ -41,6 +41,18 @@ async function waitForLoginHydration(page) {
   null, { timeout: 30_000 });
 }
 
+async function closeMobileNavigation(page) {
+  const close = page.locator('.fi-topbar-close-sidebar-btn');
+  if (await close.isVisible().catch(() => false)) {
+    await close.click();
+    await expect(close).toBeHidden({ timeout: 5000 });
+  }
+}
+async function assertNoHorizontalOverflow(page) {
+  const overflow = await page.evaluate(() =>
+    document.documentElement.scrollWidth > window.innerWidth + 1);
+  expect(overflow).toBe(false);
+}
 async function signInWithTotp(page, email, password, secret, attempt = 0) {
   if (attempt > 2) throw new Error('Real MFA login was repeatedly throttled');
   await page.goto('/admin/login');
@@ -180,6 +192,13 @@ test('real owner password and TOTP flow protects mobile proposal editing without
     .toBeVisible({ timeout: 20_000 });
   await expect(page.locator('section[aria-label="VenueDesk quick actions"]')).toBeVisible();
   await page.screenshot({ path: 'docs/evidence/admin-dashboard-mobile.png', fullPage: true });
+  const openNavigation = page.locator('.fi-topbar-open-sidebar-btn');
+  if (await openNavigation.isVisible().catch(() => false)) {
+    await openNavigation.click();
+    await expect(page.locator('.fi-topbar-close-sidebar-btn')).toBeVisible();
+    await page.locator('.fi-topbar-close-sidebar-btn').click();
+    await expect(page.locator('.fi-topbar-open-sidebar-btn')).toBeVisible();
+  }
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.screenshot({ path: 'docs/evidence/admin-dashboard-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 360, height: 740 });
