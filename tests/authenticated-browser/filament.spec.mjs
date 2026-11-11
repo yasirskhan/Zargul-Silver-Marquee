@@ -429,9 +429,9 @@ test('real owner password and TOTP flow protects mobile proposal editing without
     ['/admin/booking-proposals', 'bookings', 'section[aria-label="Private company proposal results"]'],
     ['/admin/hall-calendar', 'calendar', 'section[aria-label="Hall occupancy projection"]'],
     ['/admin/approval-center', 'approvals', 'section[aria-label="Private approval inbox"]'],
-    ['/admin/finance-desk', 'finance', 'section[aria-label="Daily immutable receipt reconciliation"]'],
+    ['/admin/finance-review', 'finance', 'section[aria-label="Daily immutable receipt reconciliation"]'],
     ['/admin/staff-management', 'staff', 'main section'],
-    ['/admin/website-workspace', 'website', 'section[aria-label="Website branding"]'],
+    ['/admin/website', 'website', 'section[aria-label="Website branding"]'],
     ['/admin/hall-inventory', 'inventory', 'section[aria-label="Inventory scope controls"]'],
     ['/admin/audit-history', 'audit', 'section[aria-label="Audit filters"]'],
   ]) {
