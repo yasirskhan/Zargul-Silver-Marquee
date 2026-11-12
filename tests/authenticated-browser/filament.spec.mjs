@@ -42,10 +42,12 @@ async function waitForLoginHydration(page) {
 }
 
 async function closeMobileNavigation(page) {
-  const close = page.locator('.fi-topbar-close-sidebar-btn');
-  if (await close.isVisible().catch(() => false)) {
-    await close.click();
-    await expect(close).toBeHidden({ timeout: 5000 });
+  const overlay = page.locator('.fi-sidebar-close-overlay');
+  if (await overlay.isVisible().catch(() => false)) {
+    const viewport = page.viewportSize() ?? { width: 390, height: 844 };
+    // A real user taps outside the drawer. Use the far edge of the viewport.
+    await page.mouse.click(viewport.width - 10, Math.min(120, viewport.height - 10));
+    await expect(overlay).toBeHidden({ timeout: 5000 });
   }
   await expect(page.locator('.fi-sidebar-close-overlay')).toBeHidden();
 }
