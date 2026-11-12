@@ -90,3 +90,9 @@ body{font-family:'DM Sans',system-ui,sans-serif}
 /* Sidebar branding container must not block topbar controls beneath it. */
 .fi-sidebar-header-ctn{pointer-events:none}
 .fi-sidebar-header-ctn *{pointer-events:auto}
+
+@media (max-width: 1024px) {
+  .fi-topbar { position: relative; z-index: 40; }
+  .fi-sidebar-header, .fi-sidebar-header-ctn { pointer-events: none; }
+  .fi-sidebar-header > *, .fi-sidebar-header-ctn > * { pointer-events: auto; }
+}
