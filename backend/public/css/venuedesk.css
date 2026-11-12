@@ -82,3 +82,7 @@ body{font-family:'DM Sans',system-ui,sans-serif}
   .fi-page section.rounded-xl.border,.fi-page .rounded-xl.border.p-4,.fi-page article.rounded-xl.border{padding:14px;border-radius:12px}
   .fi-page table{display:block;overflow-x:auto;white-space:nowrap}
 }
+
+/* The sidebar header must not swallow topbar controls beneath it. */
+.fi-sidebar-header{pointer-events:none}
+.fi-sidebar-header>*{pointer-events:auto}

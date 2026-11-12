@@ -42,11 +42,13 @@ async function waitForLoginHydration(page) {
 }
 
 async function closeMobileNavigation(page) {
-  const close = page.locator('.fi-sidebar-open-collapse-sidebar-btn:visible, .fi-topbar-close-sidebar-btn:visible').first();
-  if (await close.isVisible().catch(() => false)) {
-    await close.click({ force: true });
-    await expect(close).toBeHidden({ timeout: 5000 });
+  const overlay = page.locator('.fi-sidebar-close-overlay');
+  if (await overlay.isVisible().catch(() => false)) {
+    const box = await overlay.boundingBox();
+    await overlay.click({ position: { x: Math.max(10, (box?.width ?? 390) - 20), y: 100 } });
+    await expect(overlay).toBeHidden({ timeout: 5000 });
   }
+  await expect(page.locator('.fi-sidebar-close-overlay')).toBeHidden();
 }
 async function assertNoHorizontalOverflow(page) {
   const overflow = await page.evaluate(() =>
@@ -191,13 +193,16 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   await expect(page.locator('section[aria-label="Private venue overview"]'))
     .toBeVisible({ timeout: 20_000 });
   await expect(page.locator('section[aria-label="VenueDesk quick actions"]')).toBeVisible();
+  await closeMobileNavigation(page);
+  await assertNoHorizontalOverflow(page);
   await page.screenshot({ path: 'docs/evidence/admin-dashboard-mobile.png', fullPage: true });
   const openNavigation = page.locator('.fi-topbar-open-sidebar-btn');
   if (await openNavigation.isVisible().catch(() => false)) {
     await openNavigation.click();
-    await expect(page.locator('.fi-sidebar-open-collapse-sidebar-btn:visible, .fi-topbar-close-sidebar-btn:visible').first()).toBeVisible();
-    await page.locator('.fi-sidebar-open-collapse-sidebar-btn:visible, .fi-topbar-close-sidebar-btn:visible').first().click({ force: true });
+    await expect(page.locator('.fi-sidebar-close-overlay')).toBeVisible();
+    await closeMobileNavigation(page);
     await expect(page.locator('.fi-topbar-open-sidebar-btn')).toBeVisible();
+    await expect(page.locator('.fi-sidebar-close-overlay')).toBeHidden();
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.screenshot({ path: 'docs/evidence/admin-dashboard-desktop.png', fullPage: true });
@@ -438,6 +443,8 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.screenshot({ path: 'docs/evidence/admin-hall-photos-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
+  await closeMobileNavigation(page);
+  await assertNoHorizontalOverflow(page);
   await page.screenshot({ path: 'docs/evidence/admin-hall-photos-mobile.png', fullPage: true });
   const foreignHallPhotos = await page.goto(
     '/admin/hall-photos?company=22222222-2222-4222-8222-222222222222');
@@ -459,6 +466,9 @@ test('real owner password and TOTP flow protects mobile proposal editing without
     await expect(page.locator(section).first()).toBeVisible({ timeout: 20000 });
     await page.screenshot({ path: `docs/evidence/admin-${name}-desktop.png`, fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
+    await closeMobileNavigation(page);
+    await assertNoHorizontalOverflow(page);
+    await expect(page.locator(section).first()).toBeVisible();
     await page.screenshot({ path: `docs/evidence/admin-${name}-mobile.png`, fullPage: true });
     await page.setViewportSize({ width: 1440, height: 900 });
   }
