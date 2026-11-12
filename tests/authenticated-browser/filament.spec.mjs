@@ -42,11 +42,10 @@ async function waitForLoginHydration(page) {
 }
 
 async function closeMobileNavigation(page) {
-  const overlay = page.locator('.fi-sidebar-close-overlay');
-  if (await overlay.isVisible().catch(() => false)) {
-    const box = await overlay.boundingBox();
-    await overlay.click({ position: { x: Math.max(10, (box?.width ?? 390) - 20), y: 100 } });
-    await expect(overlay).toBeHidden({ timeout: 5000 });
+  const close = page.locator('.fi-topbar-close-sidebar-btn');
+  if (await close.isVisible().catch(() => false)) {
+    await close.click();
+    await expect(close).toBeHidden({ timeout: 5000 });
   }
   await expect(page.locator('.fi-sidebar-close-overlay')).toBeHidden();
 }
