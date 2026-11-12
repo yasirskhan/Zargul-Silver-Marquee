@@ -96,3 +96,8 @@ body{font-family:'DM Sans',system-ui,sans-serif}
   .fi-sidebar-header, .fi-sidebar-header-ctn { pointer-events: none; }
   .fi-sidebar-header > *, .fi-sidebar-header-ctn > * { pointer-events: auto; }
 }
+
+@media (max-width: 1024px) {
+  .fi-sidebar { z-index: 20 !important; }
+  .fi-topbar { z-index: 30 !important; }
+}
