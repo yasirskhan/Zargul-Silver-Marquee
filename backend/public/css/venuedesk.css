@@ -86,3 +86,7 @@ body{font-family:'DM Sans',system-ui,sans-serif}
 /* The sidebar header must not swallow topbar controls beneath it. */
 .fi-sidebar-header{pointer-events:none}
 .fi-sidebar-header>*{pointer-events:auto}
+
+/* Sidebar branding container must not block topbar controls beneath it. */
+.fi-sidebar-header-ctn{pointer-events:none}
+.fi-sidebar-header-ctn *{pointer-events:auto}
