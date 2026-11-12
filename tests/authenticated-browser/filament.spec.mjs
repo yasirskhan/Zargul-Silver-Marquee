@@ -42,7 +42,7 @@ async function waitForLoginHydration(page) {
 }
 
 async function closeMobileNavigation(page) {
-  const close = page.locator('.fi-topbar-close-sidebar-btn');
+  const close = page.locator('.fi-sidebar-open-collapse-sidebar-btn:visible, .fi-topbar-close-sidebar-btn:visible').first();
   if (await close.isVisible().catch(() => false)) {
     await close.click();
     await expect(close).toBeHidden({ timeout: 5000 });
@@ -195,8 +195,8 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   const openNavigation = page.locator('.fi-topbar-open-sidebar-btn');
   if (await openNavigation.isVisible().catch(() => false)) {
     await openNavigation.click();
-    await expect(page.locator('.fi-topbar-close-sidebar-btn')).toBeVisible();
-    await page.locator('.fi-topbar-close-sidebar-btn').click();
+    await expect(page.locator('.fi-sidebar-open-collapse-sidebar-btn:visible, .fi-topbar-close-sidebar-btn:visible').first()).toBeVisible();
+    await page.locator('.fi-sidebar-open-collapse-sidebar-btn:visible, .fi-topbar-close-sidebar-btn:visible').first().click();
     await expect(page.locator('.fi-topbar-open-sidebar-btn')).toBeVisible();
   }
   await page.setViewportSize({ width: 1440, height: 900 });
