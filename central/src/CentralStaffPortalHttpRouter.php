@@ -436,7 +436,25 @@ final class CentralStaffPortalHttpRouter
                     $this->staffRoles->listForStaff(
                         $bearer,$fields['subject_staff_id']))];
         }
-        if ($uri==='/staff/support/reply' && $this->supportReply!==null) {
+        if ($uri==='/staff/billing/payment-evidence/decide') {
+            if(!$this->exactFields($fields,
+                    ['customer_id','evidence_id','decision','reason']) ||
+                !is_string($fields['customer_id']??null) ||
+                !is_string($fields['evidence_id']??null) ||
+                !is_string($fields['decision']??null) ||
+                !is_string($fields['reason']??null) ||
+                !self::uuid($fields['customer_id']) ||
+                !self::uuid($fields['evidence_id']) ||
+                !in_array($fields['decision'],['reviewed','rejected'],true) ||
+                mb_strlen($fields['reason'])<12 || mb_strlen($fields['reason'])>400) {
+                throw new RegistrationError('invalid_payment_evidence_review',422);
+            }
+            $result=$this->billing->decide($server,$bearer,$csrfHeader,
+                $fields['customer_id'],$fields['evidence_id'],
+                $fields['decision'],$fields['reason']);
+            return ['kind'=>'private_billing_review_html',
+                'html'=>CentralStaffBillingEvidenceRenderer::receipt($result)];
+        }        if ($uri==='/staff/support/reply' && $this->supportReply!==null) {
             if(!$this->exactFields($fields,
                     ['customer_id','ticket_id','message_id','body']) ||
                 !is_string($fields['customer_id']) ||
@@ -676,6 +694,10 @@ final class CentralStaffPortalHttpRouter
             $rows=$this->invoiceDirectory->listForCustomer($bearer,$m[1],25);
             $title='Customer billing';$active='customers';
             $content=CentralStaffVendorInvoiceDirectoryRenderer::render($rows,$m[1],$csrf);
+            $evidenceRows=$this->billing->pendingForPage($bearer,$m[1]);
+            if($evidenceRows!==[]) {
+                $content.=CentralStaffBillingEvidenceRenderer::html($evidenceRows,$m[1],$csrf);
+            }
         } elseif(preg_match('#^/staff/customers/([0-9a-f-]{36})/support$#D',$path,$m)===1) {
             if($this->supportQueue===null) throw new RegistrationError('staff_portal_denied');
             $rows=$this->supportQueue->listForCustomer($bearer,$m[1],0,25);
