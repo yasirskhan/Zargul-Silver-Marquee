@@ -78,7 +78,8 @@ test('separate billing operator sees invoices and support but not staff administ
   await login(page, 'central-billing@example.test', 'JBSWY3DPEHPK3PXP');
   await page.goto('/staff/customers/11111111-1111-4111-8111-111111111111/billing');
   await expect(page.locator('section[aria-label="Private HAFZATECH vendor invoices"]')).toBeVisible();
-  await page.screenshot({ path: 'docs/evidence/central-billing-desktop.png', fullPage: true });  await expect(page.getByText('BROWSER-CLAIM-0001')).toBeVisible();
+  await page.screenshot({ path: 'docs/evidence/central-billing-desktop.png', fullPage: true });
+  await expect(page.getByText('BROWSER-CLAIM-0001')).toBeVisible();
   await page.getByLabel('Decision').selectOption('reviewed');
   await page.getByLabel('Reason').fill('Synthetic evidence review only, not settlement');
   await page.getByRole('button', { name: 'Record evidence decision' }).click();
@@ -89,7 +90,8 @@ test('separate billing operator sees invoices and support but not staff administ
   await expect(page.locator('section[aria-label="Private HAFZATECH support queue"]')).toBeVisible();
   await page.getByLabel('Reply body').fill('Synthetic browser support reply');
   await page.getByRole('button', { name: 'Send encrypted reply' }).click();
-  await expect(page.getByText('Support reply recorded')).toBeVisible({ timeout: 20000 });  await page.goto('/staff/customers/11111111-1111-4111-8111-111111111111/support');
+  await expect(page.getByText('Support reply recorded')).toBeVisible({ timeout: 20000 });
+  await page.goto('/staff/customers/11111111-1111-4111-8111-111111111111/support');
   await expect(page.getByText('waiting_for_client')).toBeVisible();
   await page.screenshot({ path: 'docs/evidence/central-support-desktop.png', fullPage: true });
   const denied = await page.goto('/staff/team');

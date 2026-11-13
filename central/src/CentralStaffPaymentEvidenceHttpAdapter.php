@@ -35,6 +35,12 @@ final class CentralStaffPaymentEvidenceHttpAdapter
         return $this->queue->listPending($sessionCookie,$customerId,$offset,$limit);
     }
 
+    /** @return array<int,array<string,mixed>> */
+    public function pendingForPage(string $bearer,string $customerId): array
+    {
+        return $this->queue->listPending($bearer,$customerId,0,25);
+    }
+
     /**
      * Safe net-settlement summary from existing independently verified
      * immutable provider/bank evidence. Uploaded claims are never summed.
