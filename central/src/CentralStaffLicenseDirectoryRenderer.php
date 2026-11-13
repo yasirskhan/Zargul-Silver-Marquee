@@ -19,13 +19,17 @@ final class CentralStaffLicenseDirectoryRenderer
             if(is_string($csrf)&&preg_match('/^[a-f0-9]{64}$/D',$csrf)===1
                 && preg_match('/^[a-f0-9-]{36}$/D',$installation)===1 && $invoices!==[]){
                 $options='';
+                $notEligible=[];
                 foreach($invoices as $invoice){
                     $id=(string)($invoice['id']??'');
                     if(preg_match('/^[a-f0-9-]{36}$/D',$id)!==1)continue;
                     $eligible=(int)($invoice['settlement_eligible']??0)===1;
-                    $options.='<option value="'.$e($id).'"'.($eligible?'':' disabled').'>'
-                        .$e($invoice['invoice_number']??$id).' · '.$e($invoice['status']??'').' · '
-                        .($eligible?'settlement eligible':'not settlement eligible').'</option>';
+                    if(!$eligible){
+                        $notEligible[]=$e($invoice['invoice_number']??$id);
+                        continue;
+                    }
+                    $options.='<option value="'.$e($id).'">'
+                        .$e($invoice['invoice_number']??$id).' · '.$e($invoice['status']??'').' · settlement eligible</option>';
                 }
                 if($options!==''){
                     $renewal='<form method="post" action="/staff/licensing/prepare">'
@@ -34,6 +38,9 @@ final class CentralStaffLicenseDirectoryRenderer
                         .'<input type="hidden" name="installation_id" value="'.$e($installation).'">'
                         .'<label>Eligible invoice <select name="invoice_id">'.$options.'</select></label>'
                         .'<button type="submit">Prepare paid renewal</button></form>';
+                    if($notEligible!==[]){
+                        $renewal.='<p>Not settlement eligible: '.implode(', ',$notEligible).'.</p>';
+                    }
                 }
             }
             $body.='<tr><td>'.$e($row['approved_domain']??'').'</td><td>'

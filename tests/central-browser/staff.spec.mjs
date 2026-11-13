@@ -31,7 +31,7 @@ test('authenticated Central operator journey through the real entrypoint', async
   await page.getByRole('link', { name: 'Licensing and renewals' }).click();
   await expect(page.locator('section[aria-label="Private HAFZATECH customer licenses"]')).toBeVisible();
   await expect(page.getByText('central-browser.example.test').first()).toBeVisible();
-  await expect(page.locator('option', { hasText: 'not settlement eligible' })).toBeDisabled();
+  await expect(page.getByText('Not settlement eligible: BROWSER-INV-0002')).toBeVisible();
 
   await page.locator('input[name="staff_csrf"]').evaluate((el) => { el.value = '0'.repeat(64); });
   let denial = page.waitForResponse((r) =>
