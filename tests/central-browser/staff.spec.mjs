@@ -81,6 +81,9 @@ test('separate billing operator sees invoices and support but not staff administ
   await page.screenshot({ path: 'docs/evidence/central-billing-desktop.png', fullPage: true });
   await page.goto('/staff/customers/11111111-1111-4111-8111-111111111111/support');
   await expect(page.locator('section[aria-label="Private HAFZATECH support queue"]')).toBeVisible();
+  await page.getByLabel('Reply body').fill('Synthetic browser support reply');
+  await page.getByRole('button', { name: 'Send encrypted reply' }).click();
+  await expect(page.getByText('Support reply recorded')).toBeVisible({ timeout: 20000 });
   await page.screenshot({ path: 'docs/evidence/central-support-desktop.png', fullPage: true });
   const denied = await page.goto('/staff/team');
   expect(denied.status()).toBeGreaterThanOrEqual(400);

@@ -605,6 +605,7 @@ jobs:
       CENTRAL_STAFF_PROVISIONING_ENABLED: 'true'
       CENTRAL_STAFF_ROLE_REQUEST_ENABLED: 'true'
       CENTRAL_STAFF_ROLE_DECISIONS_ENABLED: 'true'
+      CENTRAL_STAFF_SUPPORT_REPLY_HTTP_ENABLED: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2

@@ -39,7 +39,7 @@ final class CentralStaffSupportTicketQueue
                 throw new RegistrationError('support_scope_denied');
             }
         }
-        $sql="SELECT t.ticket_number,t.status,t.created_at
+        $sql="SELECT t.id,t.ticket_number,t.status,t.created_at
              FROM vendor_support_tickets t
              JOIN vendor_customers c
                ON c.id=t.customer_id AND c.status='active'
