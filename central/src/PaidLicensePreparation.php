@@ -95,9 +95,13 @@ final class PaidLicensePreparation
                 );
                 $stmt->execute(['license'=>$licenseId]);
                 $last=$stmt->fetch(PDO::FETCH_ASSOC);
-                if(!$last || $last['state']!=='signed')
+                if(!$last && (int)$license['current_revision']===0) {
+                    $paidExpiry=null;
+                } elseif(!$last || $last['state']!=='signed') {
                     throw new RegistrationError('previous_revision_unsigned');
-                $paidExpiry=new DateTimeImmutable($last['expires_at']);
+                } else {
+                    $paidExpiry=new DateTimeImmutable($last['expires_at']);
+                }
             }
 
             $period=LicenseTermCalendar::paidTerm((int)$invoice['term_months'],$now,$paidExpiry);
