@@ -14,6 +14,22 @@ final class CentralStaffLicenseDirectory
     ) {}
 
     /** @return array<int,array<string,mixed>> */
+    public function invoicesForRenewal(string $bearer,string $customerId): array
+    {
+        if (preg_match('/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/D',
+            $customerId)!==1 ||
+            !$this->authorization->permits($bearer,'license.issue_paid',$customerId)) {
+            throw new RegistrationError('license_officer_required');
+        }
+        $q=$this->db->prepare(
+            "SELECT id,invoice_number,status FROM central_vendor_invoices
+             WHERE customer_id=:customer ORDER BY created_at DESC,id LIMIT 25"
+        );
+        $q->execute(['customer'=>$customerId]);
+
+        return $q->fetchAll(PDO::FETCH_ASSOC);
+    }
+    /** @return array<int,array<string,mixed>> */
     public function listForCustomer(string $bearer,string $customerId,int $limit=50): array
     {
         if(preg_match('/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/D',

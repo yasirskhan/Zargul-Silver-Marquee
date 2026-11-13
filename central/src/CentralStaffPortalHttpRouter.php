@@ -704,7 +704,8 @@ final class CentralStaffPortalHttpRouter
             if($this->licenseDirectory===null) throw new RegistrationError('staff_portal_denied');
             $rows=$this->licenseDirectory->listForCustomer($bearer,$m[1],50);
             $title='Customer licensing';$active='customers';
-            $invoices=$this->invoiceDirectory?->listForCustomer($bearer,$m[1],25) ?? [];
+            $invoices=$this->licensePreparation!==null
+                ?$this->licenseDirectory->invoicesForRenewal($bearer,$m[1]) : [];
             $proof=$this->licensePreparation!==null?$csrf:null;
             $content=CentralStaffLicenseDirectoryRenderer::html($rows,$m[1],$proof,$invoices);
         } elseif(preg_match('#^/staff/customers/([0-9a-f-]{36})/billing$#D',$path,$m)===1) {
