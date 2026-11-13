@@ -8,6 +8,10 @@ use PDO;
 
 require_once __DIR__.'/CentralStaffLicenseDirectory.php';
 require_once __DIR__.'/CentralStaffLicenseDirectoryRenderer.php';
+require_once __DIR__.'/PaidInvoiceEligibility.php';
+require_once __DIR__.'/PaidLicensePreparation.php';
+require_once __DIR__.'/CentralStaffPaidLicensePreparation.php';
+require_once __DIR__.'/CentralStaffLicensePreparationRenderer.php';
 
 /**
  * INTERNAL operator-only DI factory. Secrets supplied by an APPROVED external
