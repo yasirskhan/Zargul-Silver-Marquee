@@ -22,7 +22,7 @@ final class CentralStaffLicenseDirectoryRenderer
                 foreach($invoices as $invoice){
                     $id=(string)($invoice['id']??'');
                     if(preg_match('/^[a-f0-9-]{36}$/D',$id)!==1)continue;
-                    $eligible=($invoice['settlement_eligible']??false)===true;
+                    $eligible=(int)($invoice['settlement_eligible']??0)===1;
                     $options.='<option value="'.$e($id).'"'.($eligible?'':' disabled').'>'
                         .$e($invoice['invoice_number']??$id).' · '.$e($invoice['status']??'').' · '
                         .($eligible?'settlement eligible':'not settlement eligible').'</option>';

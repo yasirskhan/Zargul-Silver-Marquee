@@ -26,7 +26,7 @@ final class CentralStaffLicenseDirectory
             throw new RegistrationError('license_officer_required');
         }
         $q=$this->db->prepare(
-            "SELECT i.id,i.invoice_number,i.status,(SELECT count(*)>0 FROM central_vendor_verified_settlements s WHERE s.invoice_id=i.id AND s.currency=i.currency AND s.amount_minor=i.total_minor) AS settlement_eligible FROM central_vendor_invoices i
+            "SELECT i.id,i.invoice_number,i.status,(SELECT CASE WHEN EXISTS (SELECT 1 FROM central_vendor_verified_settlements s WHERE s.invoice_id=i.id AND s.currency=i.currency AND s.amount_minor=i.total_minor) THEN 1 ELSE 0 END) AS settlement_eligible FROM central_vendor_invoices i
              WHERE i.customer_id=:customer ORDER BY i.created_at DESC,i.id LIMIT 25"
         );
         $q->execute(['customer'=>$customerId]);
