@@ -17,6 +17,10 @@ final class CentralStaffSupportTicketQueue
         private readonly CentralStaffSessionAuthorization $authorization
     ) {}
 
+    public function canReply(string $bearer,string $customerId): bool
+    {
+        return $this->authorization->permits($bearer,'support.reply',$customerId);
+    }
     /** @return array<int,array<string,mixed>> */
     public function listForCustomer(string $bearer,string $customerId,
         int $offset=0,int $limit=25,?string $installationId=null): array

@@ -680,7 +680,8 @@ final class CentralStaffPortalHttpRouter
             if($this->supportQueue===null) throw new RegistrationError('staff_portal_denied');
             $rows=$this->supportQueue->listForCustomer($bearer,$m[1],0,25);
             $title='Customer support';$active='customers';
-            $content=CentralStaffSupportQueueHtmlRenderer::render($rows,$m[1],$csrf);
+            $replyProof=$this->supportQueue->canReply($bearer,$m[1])?$csrf:null;
+            $content=CentralStaffSupportQueueHtmlRenderer::render($rows,$m[1],$replyProof);
         } elseif(preg_match('#^/staff/customers/([0-9a-f-]{36})/installations$#D',$path,$m)===1) {
             if($this->installationDirectory===null) throw new RegistrationError('staff_portal_denied');
             $title='Customer installations';$active='customers';
