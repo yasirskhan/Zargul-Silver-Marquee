@@ -700,9 +700,9 @@ paidSessionDeny(fn()=>$supportReader->listForCustomer(
  $supportBearer,$company,0,26),'invalid_support_queue_request');
 $ticketRows=$supportReader->listForCustomer($supportBearer,$company);
 paidSessionAssert(count($ticketRows)===1 &&
- array_keys($ticketRows[0])===['ticket_number','status','created_at'] &&
+ array_keys($ticketRows[0])===['id','ticket_number','status','created_at'] &&
  $ticketRows[0]['status']==='new',
- 'support staff reads only authorized ticket number, status and creation time');
+ 'support staff reads authorized ticket id, number, status and creation time');
 paidSessionAssert($supportReader->listForCustomer(
  $supportBearer,$company,1)===[],
  'strict support metadata pagination');
