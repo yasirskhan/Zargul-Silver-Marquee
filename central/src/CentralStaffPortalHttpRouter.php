@@ -448,8 +448,13 @@ final class CentralStaffPortalHttpRouter
                 !self::uuid($fields['invoice_id'])) {
                 throw new RegistrationError('invalid_license_request',422);
             }
-            $result=$this->licensePreparation->prepare($bearer,
-                $fields['invoice_id'],$fields['installation_id'],new \DateTimeImmutable('now'));
+            if(!$this->boundary->permitsMutation($server,$bearer,$csrfHeader,
+                'license.issue_paid',$fields['customer_id'])) {
+                throw new RegistrationError('staff_portal_denied');
+            }
+            $result=$this->licensePreparation->prepareForCustomer($bearer,
+                $fields['customer_id'],$fields['invoice_id'],$fields['installation_id'],
+                new \DateTimeImmutable('now'));
             return ['kind'=>'private_license_prepare_html',
                 'html'=>CentralStaffLicensePreparationRenderer::receipt($result)];
         }        if ($uri==='/staff/billing/payment-evidence/decide') {
@@ -704,9 +709,11 @@ final class CentralStaffPortalHttpRouter
             if($this->licenseDirectory===null) throw new RegistrationError('staff_portal_denied');
             $rows=$this->licenseDirectory->listForCustomer($bearer,$m[1],50);
             $title='Customer licensing';$active='customers';
-            $invoices=$this->licensePreparation!==null
+            $canPrepare=$this->licensePreparation!==null
+                &&$this->licenseDirectory->canPrepare($bearer,$m[1]);
+            $invoices=$canPrepare
                 ?$this->licenseDirectory->invoicesForRenewal($bearer,$m[1]) : [];
-            $proof=$this->licensePreparation!==null?$csrf:null;
+            $proof=$canPrepare?$csrf:null;
             $content=CentralStaffLicenseDirectoryRenderer::html($rows,$m[1],$proof,$invoices);
         } elseif(preg_match('#^/staff/customers/([0-9a-f-]{36})/billing$#D',$path,$m)===1) {
             if($this->invoiceDirectory===null) throw new RegistrationError('staff_portal_denied');

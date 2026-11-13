@@ -31,10 +31,39 @@ test('authenticated Central operator journey through the real entrypoint', async
   await page.getByRole('link', { name: 'Licensing and renewals' }).click();
   await expect(page.locator('section[aria-label="Private HAFZATECH customer licenses"]')).toBeVisible();
   await expect(page.getByText('central-browser.example.test').first()).toBeVisible();
+  await expect(page.locator('option', { hasText: 'not settlement eligible' })).toBeDisabled();
+
+  await page.locator('input[name="staff_csrf"]').evaluate((el) => { el.value = '0'.repeat(64); });
+  let denial = page.waitForResponse((r) =>
+    r.url().endsWith('/staff/licensing/prepare') && r.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Prepare paid renewal' }).click();
+  expect((await denial).status()).toBeGreaterThanOrEqual(400);
+
+  await page.goto('/staff/customers/11111111-1111-4111-8111-111111111111/licensing');
+  await page.locator('input[name="customer_id"]').evaluate((el) => {
+    el.value = '22222222-2222-4222-8222-222222222222';
+  });
+  denial = page.waitForResponse((r) =>
+    r.url().endsWith('/staff/licensing/prepare') && r.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Prepare paid renewal' }).click();
+  expect((await denial).status()).toBeGreaterThanOrEqual(400);
+
+  await page.goto('/staff/customers/11111111-1111-4111-8111-111111111111/licensing');
+  await page.locator('input[name="installation_id"]').evaluate((el) => {
+    el.value = '99999999-9999-4999-8999-999999999999';
+  });
+  denial = page.waitForResponse((r) =>
+    r.url().endsWith('/staff/licensing/prepare') && r.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Prepare paid renewal' }).click();
+  expect((await denial).status()).toBeGreaterThanOrEqual(400);
+
+  await page.goto('/staff/customers/11111111-1111-4111-8111-111111111111/licensing');
   await page.getByLabel('Eligible invoice').selectOption({ index: 0 });
   await page.getByRole('button', { name: 'Prepare paid renewal' }).click();
   await expect(page.getByText('Paid license renewal prepared')).toBeVisible({ timeout: 20000 });
   await page.goto('/staff/customers/11111111-1111-4111-8111-111111111111/licensing');
+  await expect(page.getByText('awaiting_isolated_signer')).toBeVisible();
+  await expect(page.getByText('15151515-1515-4515-8515-151515151515')).toBeVisible();
   await expect(page.getByRole('cell', { name: '1', exact: true }).last()).toBeVisible();
   await page.screenshot({ path: 'docs/evidence/central-licensing-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });

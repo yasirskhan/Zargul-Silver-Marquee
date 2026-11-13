@@ -56,6 +56,29 @@ final class CentralStaffPaidLicensePreparation
         );
     }
 
+    /** @return array{license_id:string,revision_id:string,revision:int,from:string,expiry:string,state:string} */
+    public function prepareForCustomer(string $bearer,string $customerId,
+        string $invoiceId,string $installationId,DateTimeImmutable $now): array
+    {
+        foreach([$customerId,$invoiceId,$installationId] as $id){
+            if(!self::uuid($id)) throw new RegistrationError('invalid_license_request',422);
+        }
+        $q=$this->db->prepare(
+            'SELECT i.customer_id AS invoice_customer,
+                    l.customer_id AS installation_customer
+             FROM central_vendor_invoices i
+             LEFT JOIN registered_installations l ON l.id=:installation
+             WHERE i.id=:invoice'
+        );
+        $q->execute(['invoice'=>$invoiceId,'installation'=>$installationId]);
+        $bound=$q->fetch(PDO::FETCH_ASSOC);
+        if(!$bound || $bound['invoice_customer']!==$customerId ||
+            $bound['installation_customer']!==$customerId){
+            throw new RegistrationError('invalid_license_binding',422);
+        }
+
+        return $this->prepare($bearer,$invoiceId,$installationId,$now);
+    }
     private static function uuid(string $value): bool
     {
         return preg_match('/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/D', $value) === 1;

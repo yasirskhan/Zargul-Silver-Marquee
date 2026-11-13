@@ -22,8 +22,10 @@ final class CentralStaffLicenseDirectoryRenderer
                 foreach($invoices as $invoice){
                     $id=(string)($invoice['id']??'');
                     if(preg_match('/^[a-f0-9-]{36}$/D',$id)!==1)continue;
-                    $options.='<option value="'.$e($id).'">'.$e($invoice['invoice_number']??$id)
-                        .' · '.$e($invoice['status']??'').'</option>';
+                    $eligible=($invoice['settlement_eligible']??false)===true;
+                    $options.='<option value="'.$e($id).'"'.($eligible?'':' disabled').'>'
+                        .$e($invoice['invoice_number']??$id).' · '.$e($invoice['status']??'').' · '
+                        .($eligible?'settlement eligible':'not settlement eligible').'</option>';
                 }
                 if($options!==''){
                     $renewal='<form method="post" action="/staff/licensing/prepare">'
@@ -38,9 +40,11 @@ final class CentralStaffLicenseDirectoryRenderer
                 .$e($row['installation_status']??'').'</td><td>'
                 .$e($row['current_revision']??'').'</td><td>'.$e($row['term_months']??'').'</td><td>'
                 .$expiry.'</td><td>'.$e($row['revision_count']??'').'</td><td>'
-                .$e($row['pending_count']??'').'</td><td>'.$renewal.'</td></tr>';
+                .$e($row['pending_count']??'').'</td><td>'.$e($row['latest_revision_id']??'None')
+                .'</td><td>'.$e($row['latest_revision_state']??'None').'</td><td>'
+                .$e($row['latest_invoice_id']??'None').'</td><td>'.$renewal.'</td></tr>';
         }
-        if($body==='')$body='<tr><td colspan="8">No licenses recorded for this customer.</td></tr>';
+        if($body==='')$body='<tr><td colspan="11">No licenses recorded for this customer.</td></tr>';
         return '<section aria-label="Private HAFZATECH customer licenses">'
             .'<h2>Customer licenses and renewals</h2>'
             .'<p>Renewal preparation requires an independently verified paid invoice. '
@@ -48,7 +52,8 @@ final class CentralStaffLicenseDirectoryRenderer
             .'delivers or activates a license.</p>'
             .'<table><thead><tr><th>Approved domain</th><th>Installation</th>'
             .'<th>Current revision</th><th>Term</th><th>Expires</th>'
-            .'<th>Revisions</th><th>Awaiting signer</th><th>Renewal</th></tr></thead><tbody>'
+            .'<th>Revisions</th><th>Awaiting signer</th><th>Latest revision</th>'
+            .'<th>Revision state</th><th>Bound invoice</th><th>Renewal</th></tr></thead><tbody>'
             .$body.'</tbody></table>'
             .'<p><a href="/staff/customers/'.$e($customerId).'/billing">Customer billing</a> · '
             .'<a href="/staff/customers/'.$e($customerId).'/support">Support tickets</a></p></section>';

@@ -13,6 +13,10 @@ final class CentralStaffLicenseDirectory
         private readonly CentralStaffSessionAuthorization $authorization
     ) {}
 
+    public function canPrepare(string $bearer,string $customerId): bool
+    {
+        return $this->authorization->permits($bearer,'license.issue_paid',$customerId);
+    }
     /** @return array<int,array<string,mixed>> */
     public function invoicesForRenewal(string $bearer,string $customerId): array
     {
@@ -22,8 +26,8 @@ final class CentralStaffLicenseDirectory
             throw new RegistrationError('license_officer_required');
         }
         $q=$this->db->prepare(
-            "SELECT id,invoice_number,status FROM central_vendor_invoices
-             WHERE customer_id=:customer ORDER BY created_at DESC,id LIMIT 25"
+            "SELECT i.id,i.invoice_number,i.status,(SELECT count(*)>0 FROM central_vendor_verified_settlements s WHERE s.invoice_id=i.id AND s.currency=i.currency AND s.amount_minor=i.total_minor) AS settlement_eligible FROM central_vendor_invoices i
+             WHERE i.customer_id=:customer ORDER BY i.created_at DESC,i.id LIMIT 25"
         );
         $q->execute(['customer'=>$customerId]);
 
@@ -54,7 +58,13 @@ final class CentralStaffLicenseDirectory
                     (SELECT count(*) FROM central_paid_license_revisions r
                      WHERE r.license_id=l.id) AS revision_count,
                     (SELECT count(*) FROM central_paid_license_revisions r
-                     WHERE r.license_id=l.id AND r.state='awaiting_isolated_signer') AS pending_count
+                     WHERE r.license_id=l.id AND r.state='awaiting_isolated_signer') AS pending_count,
+                    (SELECT r.id FROM central_paid_license_revisions r
+                     WHERE r.license_id=l.id ORDER BY r.revision DESC LIMIT 1) AS latest_revision_id,
+                    (SELECT r.state FROM central_paid_license_revisions r
+                     WHERE r.license_id=l.id ORDER BY r.revision DESC LIMIT 1) AS latest_revision_state,
+                    (SELECT r.invoice_id FROM central_paid_license_revisions r
+                     WHERE r.license_id=l.id ORDER BY r.revision DESC LIMIT 1) AS latest_invoice_id
              FROM central_licenses l
              JOIN registered_installations i ON i.id=l.installation_id
                  AND i.customer_id=l.customer_id
