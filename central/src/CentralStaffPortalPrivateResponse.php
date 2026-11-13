@@ -37,7 +37,14 @@ final class CentralStaffPortalPrivateResponse
                 "default-src 'none'; style-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
         ];
 
-        if ($kind==='private_billing_review_html') {
+        if ($kind==='private_license_prepare_html') {
+            $html=$internal['html']??null;
+            if(!is_string($html) || strlen($html)>262144 ||
+                !str_starts_with($html,'<section aria-label="Private HAFZATECH license preparation receipt">')) {
+                throw new RegistrationError('invalid_staff_response');
+            }
+            return ['status'=>200,'headers'=>$headers,'cookies'=>[],'body'=>$html];
+        }        if ($kind==='private_billing_review_html') {
             $html=$internal['html']??null;
             if(!is_string($html) || strlen($html)>262144 ||
                 !str_starts_with($html,'<section aria-label="Private HAFZATECH payment evidence receipt">')) {

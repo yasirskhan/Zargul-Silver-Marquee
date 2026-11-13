@@ -27,7 +27,7 @@ final class CentralStaffLicenseDirectory
             throw new RegistrationError('license_directory_denied');
         }
         $q=$this->db->prepare(
-            "SELECT l.id,l.approved_domain,l.current_revision,l.created_at,
+            "SELECT l.id,l.installation_id,l.approved_domain,l.current_revision,l.created_at,
                     i.status AS installation_status,
                     (SELECT r.expires_at FROM central_paid_license_revisions r
                      WHERE r.license_id=l.id AND r.state='signed'

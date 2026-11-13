@@ -43,6 +43,7 @@ final class CentralStaffPortalHttpRouter
         private readonly ?CentralStaffCustomerDirectory $customerDirectory = null,
         private readonly ?CentralStaffDesignerCreditService $designerCredit = null,
         private readonly ?CentralStaffInstallationDirectory $installationDirectory = null,
+        private readonly ?CentralStaffPaidLicensePreparation $licensePreparation = null,
         private readonly ?CentralStaffCsrfTokenService $csrfTokens = null,
         private readonly ?CentralStaffSessionService $sessions = null,
         private readonly ?CentralStaffLicenseDirectory $licenseDirectory = null
@@ -436,7 +437,22 @@ final class CentralStaffPortalHttpRouter
                     $this->staffRoles->listForStaff(
                         $bearer,$fields['subject_staff_id']))];
         }
-        if ($uri==='/staff/billing/payment-evidence/decide') {
+        if ($uri==='/staff/licensing/prepare' && $this->licensePreparation!==null) {
+            if(!$this->exactFields($fields,
+                    ['customer_id','installation_id','invoice_id']) ||
+                !is_string($fields['customer_id']??null) ||
+                !is_string($fields['installation_id']??null) ||
+                !is_string($fields['invoice_id']??null) ||
+                !self::uuid($fields['customer_id']) ||
+                !self::uuid($fields['installation_id']) ||
+                !self::uuid($fields['invoice_id'])) {
+                throw new RegistrationError('invalid_license_request',422);
+            }
+            $result=$this->licensePreparation->prepare($bearer,
+                $fields['invoice_id'],$fields['installation_id'],new \DateTimeImmutable('now'));
+            return ['kind'=>'private_license_prepare_html',
+                'html'=>CentralStaffLicensePreparationRenderer::receipt($result)];
+        }        if ($uri==='/staff/billing/payment-evidence/decide') {
             if(!$this->exactFields($fields,
                     ['customer_id','evidence_id','decision','reason']) ||
                 !is_string($fields['customer_id']??null) ||
@@ -688,7 +704,9 @@ final class CentralStaffPortalHttpRouter
             if($this->licenseDirectory===null) throw new RegistrationError('staff_portal_denied');
             $rows=$this->licenseDirectory->listForCustomer($bearer,$m[1],50);
             $title='Customer licensing';$active='customers';
-            $content=CentralStaffLicenseDirectoryRenderer::html($rows,$m[1]);
+            $invoices=$this->invoiceDirectory?->listForCustomer($bearer,$m[1],25) ?? [];
+            $proof=$this->licensePreparation!==null?$csrf:null;
+            $content=CentralStaffLicenseDirectoryRenderer::html($rows,$m[1],$proof,$invoices);
         } elseif(preg_match('#^/staff/customers/([0-9a-f-]{36})/billing$#D',$path,$m)===1) {
             if($this->invoiceDirectory===null) throw new RegistrationError('staff_portal_denied');
             $rows=$this->invoiceDirectory->listForCustomer($bearer,$m[1],25);
