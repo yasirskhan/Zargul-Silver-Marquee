@@ -149,6 +149,7 @@ class InstallationWizardServiceTest extends TestCase
             'id' => $hallId, 'company_id' => $company->id, 'slug' => 'licensed-hall',
             'name' => 'Licensed Hall', 'capacity' => 100, 'is_active' => true,
             'program_rules_revision' => 1, 'seating_price_revision' => 1,
+            'guest_pricing_revision' => 1,
             'addon_catalog_revision' => 1, 'created_at' => now(), 'updated_at' => now(),
         ]);
         DB::table('websites')->insert([

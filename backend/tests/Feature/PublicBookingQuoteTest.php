@@ -65,7 +65,7 @@ class PublicBookingQuoteTest extends TestCase
         $this->get('http://venue.test/book')->assertOk()->assertSee('Book your event');
         $this->post('http://venue.test/book/quote', [
             'event_date' => '2027-12-01', 'program' => 'evening', 'guests' => 200,
-        ])->assertOk()->assertSee('Booking Hall')->assertSee('420,000');
+        ])->assertOk()->assertSee('Booking Hall')->assertSee('4,200.00');
     }
 
     public function test_confirmed_reservation_removes_hall_and_stale_price_is_rejected(): void

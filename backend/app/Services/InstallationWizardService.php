@@ -142,15 +142,17 @@ final class InstallationWizardService
                     if (! is_array($config)) {
                         throw new InvalidArgumentException('Configure seating pricing for every hall.');
                     }
+                    $config = $config;
+                    $seatingConfig = $config; unset($seatingConfig['guestPriceMinor']);
                     $current = $service->current($actor, $companyId, $hall['id']);
                     $revision = $service->configure(
-                        $actor, $companyId, $hall['id'], $config,
+                        $actor, $companyId, $hall['id'], $seatingConfig,
                         $state['company']['currency'], (int) ($current['revision'] ?? 0),
                         'Initial installation wizard seating and unit prices',
                     );
                     $saved[$hall['id']] = ['config' => $config, 'revision' => $revision];
-                    $guestCurrent=(int) DB::table('hall_guest_pricing_revisions')
-                        ->where('hall_id',$hall['id'])->max('revision_number');
+                    $guestCurrent=(int) DB::table('halls')->where('id',$hall['id'])
+                        ->value('guest_pricing_revision');
                     $guestRevision=app(HallGuestPricingService::class)->configure(
                         $actor,$companyId,$hall['id'],[
                             ['minGuests'=>1,'maxGuests'=>max(1,(int)$config['capacity']),
@@ -180,6 +182,8 @@ final class InstallationWizardService
                     if (! is_array($items)) {
                         throw new InvalidArgumentException('Configure the optional add-on list for every hall.');
                     }
+                    $config = $config;
+                    $seatingConfig = $config; unset($seatingConfig['guestPriceMinor']);
                     $current = $service->current($actor, $companyId, $hall['id']);
                     $revision = $service->configure(
                         $actor, $companyId, $hall['id'], $items,
