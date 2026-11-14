@@ -122,7 +122,8 @@ test('real owner saves and resumes installation wizard without false completion'
   await expect(page.getByText('3. Programs', { exact: true })).toBeVisible({ timeout: 25_000 });
   await page.getByRole('button', { name: 'Save and continue' }).click();
   await expect(page.getByText('4. Pricing', { exact: true })).toBeVisible({ timeout: 25_000 });
-  const guestPrices = page.getByLabel('Guest package price (PKR minor units)');
+  const guestPrices = page.locator('input[wire\\:model$=".guestPriceMinor"]');
+  await expect(guestPrices.first()).toBeVisible({ timeout: 25_000 });
   for (let i = 0; i < await guestPrices.count(); i += 1) {
     await guestPrices.nth(i).fill('15000000');
   }
