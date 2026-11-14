@@ -199,7 +199,7 @@ final class WebsiteWorkspace extends Page
         [$actor, $page] = $this->authorizeSelectedPage('update');
         $this->checkEditorSnapshot($page);
         $this->validate([
-            'newPageSlug' => ['required', 'in:'.implode(',',array_keys(SiteWorkspaceService::NEW_PAGE_PATHS))],
+            'newPageSlug' => ['required', 'string', 'max:120'],
             'newPageTitle' => ['required', 'string', 'min:3', 'max:120'],
             'newPageReason' => ['required', 'string', 'min:3', 'max:500'],
         ]);
@@ -207,7 +207,7 @@ final class WebsiteWorkspace extends Page
         try {
             $created = app(SiteWorkspaceService::class)->createPage(
                 $actor, $page->company_id, $page->website_id,
-                $this->createPageKey, $this->newPageSlug,
+                $this->createPageKey, '/'.ltrim($this->newPageSlug, '/'),
                 $this->newPageTitle, $this->newPageReason,
             );
         } catch (\InvalidArgumentException | ConflictHttpException $error) {
@@ -228,7 +228,7 @@ final class WebsiteWorkspace extends Page
         $actor = Filament::auth()->user();
         abort_unless($actor instanceof User && $this->companyId, 403);
         $this->validate([
-            'newPageSlug' => ['required', 'in:'.implode(',',array_keys(SiteWorkspaceService::NEW_PAGE_PATHS))],
+            'newPageSlug' => ['required', 'string', 'max:120'],
             'newPageTitle' => ['required', 'string', 'min:3', 'max:120'],
             'newPageReason' => ['required', 'string', 'min:3', 'max:500'],
         ]);
@@ -238,7 +238,7 @@ final class WebsiteWorkspace extends Page
         try {
             $created = app(SiteWorkspaceService::class)->createPage(
                 $actor, $this->companyId, (string) $website->id,
-                $this->createPageKey, $this->newPageSlug,
+                $this->createPageKey, '/'.ltrim($this->newPageSlug, '/'),
                 $this->newPageTitle, $this->newPageReason,
             );
         } catch (\InvalidArgumentException | ConflictHttpException $error) {

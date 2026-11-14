@@ -198,7 +198,9 @@ test('role request requires an independent approver and never self-approves', as
 });
 
 test('independent approver rejects a role request without granting it', async ({ page }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
+  // Arrive in a fresh TOTP step so the previous approval test's code cannot replay.
+  await page.waitForTimeout(31_000);
   await login(page, 'central-requester@example.test', 'KRSXG5AUMVZWK4TT');
   await page.goto('/staff/team');
   await page.getByLabel('Target staff ID').fill('abababab-abab-4bab-8bab-abababababab');
