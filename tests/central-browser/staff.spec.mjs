@@ -114,7 +114,9 @@ test('separate billing operator sees invoices and support but not staff administ
   await page.goto('/staff/customers/11111111-1111-4111-8111-111111111111/billing');
   await expect(page.locator('section[aria-label="Private HAFZATECH vendor invoices"]')).toBeVisible();
   await page.screenshot({ path: 'docs/evidence/central-billing-desktop.png', fullPage: true });
-  await expect(page.getByText('BROWSER-CLAIM-0001')).toBeVisible();  await page.locator('input[name="evidence_id"]').evaluate((el) => {
+  await expect(page.getByText('BROWSER-CLAIM-0001')).toBeVisible();
+  await page.getByLabel('Reason').fill('Forged evidence binding denial');
+  await page.locator('input[name="evidence_id"]').evaluate((el) => {
     el.value = '99999999-9999-4999-8999-999999999999';
   });
   let forged = page.waitForResponse((r) =>
