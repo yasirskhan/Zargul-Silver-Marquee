@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 namespace App\Services;
 
@@ -142,7 +142,7 @@ final class InstallationWizardService
                     if (! is_array($config)) {
                         throw new InvalidArgumentException('Configure seating pricing for every hall.');
                     }
-                    $config = $config;
+
                     $seatingConfig = $config; unset($seatingConfig['guestPriceMinor']);
                     $current = $service->current($actor, $companyId, $hall['id']);
                     $revision = $service->configure(
@@ -182,8 +182,6 @@ final class InstallationWizardService
                     if (! is_array($items)) {
                         throw new InvalidArgumentException('Configure the optional add-on list for every hall.');
                     }
-                    $config = $config;
-                    $seatingConfig = $config; unset($seatingConfig['guestPriceMinor']);
                     $current = $service->current($actor, $companyId, $hall['id']);
                     $revision = $service->configure(
                         $actor, $companyId, $hall['id'], $items,
