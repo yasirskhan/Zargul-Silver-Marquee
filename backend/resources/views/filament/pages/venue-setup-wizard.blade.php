@@ -134,7 +134,7 @@
                         @foreach ($halls as $hall)
                             <fieldset wire:key="wizard-pricing-{{ $hall['id'] }}" class="grid gap-3 rounded-lg border p-3 md:grid-cols-2">
                                 <legend class="px-1 font-medium">{{ $hall['name'] }} seating</legend>
-                                @foreach (['capacity' => 'Capacity', 'includedChairs' => 'Included chairs', 'includedTables' => 'Included tables', 'extraChairRateMinor' => 'Extra chair minor units', 'extraTableRateMinor' => 'Extra table minor units'] as $field => $label)
+                                @foreach (['capacity' => 'Capacity', 'includedChairs' => 'Included chairs', 'includedTables' => 'Included tables', 'extraChairRateMinor' => 'Extra chair minor units', 'extraTableRateMinor' => 'Extra table minor units', 'guestPriceMinor' => 'Guest package price (PKR minor units)'] as $field => $label)
                                     <label class="space-y-1 text-sm"><span>{{ $label }}</span>
                                         <input type="number" min="0" wire:model="pricing.{{ $hall['id'] }}.{{ $field }}" required class="w-full rounded border p-2">
                                     </label>

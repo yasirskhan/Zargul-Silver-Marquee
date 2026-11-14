@@ -48,6 +48,8 @@ final class InstallationReadinessService
                 fn ($hall): bool => (int) $hall->program_rules_revision > 0),
             'pricing' => $halls->count() >= 1 && $halls->every(
                 fn ($hall): bool => (int) $hall->seating_price_revision > 0),
+            'guestPricing' => $halls->count() >= 1 && $halls->every(
+                fn ($hall): bool => (int) $hall->guest_pricing_revision > 0),
             'addons' => $halls->count() >= 1 && $halls->every(
                 fn ($hall): bool => (int) $hall->addon_catalog_revision > 0),
             'branding' => DB::table('websites')->where('company_id', $companyId)

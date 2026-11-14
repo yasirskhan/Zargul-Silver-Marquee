@@ -4,7 +4,7 @@
 <body><main><div class="card">
 <h1>Temporary hold created</h1>
 <p>Your slot is held until <strong>{{ $hold['expiresAt'] }}</strong>. This is not a confirmed booking and no payment has been taken.</p>
-<p>Required 5% deposit: <strong>{{ number_format($hold['depositMinor']) }} PKR minor units</strong>.</p>
+<p>Required 5% deposit: <strong>{{ number_format($hold['depositMinor']/100, 2) }} PKR</strong>.</p>
 <p>Hold reference: <code id="hold-id">{{ $hold['holdId'] }}</code></p>
 <p>Keep this cancellation token private: <code id="hold-token">{{ $hold['token'] }}</code></p>
 <form method="POST" action="/book/cancel">@csrf

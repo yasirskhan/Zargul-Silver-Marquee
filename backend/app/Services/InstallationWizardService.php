@@ -149,6 +149,15 @@ final class InstallationWizardService
                         'Initial installation wizard seating and unit prices',
                     );
                     $saved[$hall['id']] = ['config' => $config, 'revision' => $revision];
+                    $guestCurrent=(int) DB::table('hall_guest_pricing_revisions')
+                        ->where('hall_id',$hall['id'])->max('revision_number');
+                    $guestRevision=app(HallGuestPricingService::class)->configure(
+                        $actor,$companyId,$hall['id'],[
+                            ['minGuests'=>1,'maxGuests'=>max(1,(int)$config['capacity']),
+                             'priceMinor'=>(int)$config['guestPriceMinor']],
+                        ],$state['company']['currency'],$guestCurrent,
+                        'Initial installation wizard guest package pricing');
+                    $saved[$hall['id']]['guestPricingRevision']=$guestRevision;
                 }
 
                 return ['pricing' => $saved];

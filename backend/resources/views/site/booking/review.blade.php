@@ -12,11 +12,11 @@
 <p>{{ $quote['date'] }} · {{ ucfirst($quote['program']) }} · {{ $quote['guests'] }} guests</p>
 <ul>
 @foreach ($hall['lines'] as $line)
-<li>{{ $line['label'] }} — {{ number_format($line['amountMinor']) }} {{ $hall['currencyCode'] }} minor units</li>
+<li>{{ $line['label'] }} — {{ number_format($line['amountMinor']/100, 2) }} {{ $hall['currencyCode'] }}</li>
 @endforeach
 </ul>
-<p class="price">Total: {{ number_format($hall['totalMinor']) }} {{ $hall['currencyCode'] }} minor units</p>
-<p><strong>Deposit required:</strong> {{ number_format((int) ceil($hall['totalMinor'] * 0.05)) }} {{ $hall['currencyCode'] }} minor units (5%)</p>
+<p class="price">Total: {{ number_format($hall['totalMinor']/100, 2) }} {{ $hall['currencyCode'] }}</p>
+<p><strong>Deposit required:</strong> {{ number_format((int) ceil($hall['totalMinor'] * 0.05)/100, 2) }} {{ $hall['currencyCode'] }} (5%)</p>
 <p>Your selections and price revisions are revalidated on every step. This page does not create a booking or take payment.</p>
 <form method="POST" action="/book/submit">
 @csrf

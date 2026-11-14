@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Pages\VenueOverview;
+use App\Filament\Pages\Enquiries;
 use App\Filament\Pages\ApprovalCenter;
 use App\Filament\Pages\OperationsPlanning;
 use App\Filament\Pages\InternalQuickSearch;
@@ -56,7 +57,7 @@ class AdminPanelProvider extends PanelProvider
             ->multiFactorAuthentication([
                 AppAuthentication::make()->recoverable(),
             ], isRequired: true)
-            ->pages([VenueOverview::class, InternalQuickSearch::class, OperationsPlanning::class, ApprovalCenter::class, FinanceDesk::class, AuditHistory::class, BookingProposals::class, VenueReservations::class, EventOperations::class, HallCalendar::class, HallInventory::class, HallPrograms::class, HallPricingTiers::class, PublicBookings::class, HallPhotos::class, WebsiteWorkspace::class, Licensing::class, HistoricalInvoices::class, InstallationSetup::class, VenueSetupWizard::class, StaffManagement::class, SupportInbox::class])
+            ->pages([VenueOverview::class, InternalQuickSearch::class, OperationsPlanning::class, ApprovalCenter::class, FinanceDesk::class, AuditHistory::class, BookingProposals::class, VenueReservations::class, EventOperations::class, HallCalendar::class, HallInventory::class, HallPrograms::class, HallPricingTiers::class, PublicBookings::class, HallPhotos::class, WebsiteWorkspace::class, Licensing::class, HistoricalInvoices::class, InstallationSetup::class, VenueSetupWizard::class, StaffManagement::class, SupportInbox::class, Enquiries::class])
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn (): \Illuminate\Contracts\View\View => view('filament.hooks.venuedesk-theme'),

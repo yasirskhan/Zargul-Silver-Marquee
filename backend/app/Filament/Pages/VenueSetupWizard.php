@@ -177,6 +177,7 @@ final class VenueSetupWizard extends Page
                 'capacity' => (int) $hall['capacity'],
                 'includedChairs' => 0, 'includedTables' => 0,
                 'extraChairRateMinor' => 0, 'extraTableRateMinor' => 0,
+                'guestPriceMinor' => 0,
             ];
             $this->addons[$id] = $this->addons[$id] ?? [[
                 'code' => 'catering_standard', 'name' => 'Catering package',
@@ -502,6 +503,7 @@ final class VenueSetupWizard extends Page
                 'pricing.*.includedTables' => ['required', 'integer', 'min:0', 'max:100000'],
                 'pricing.*.extraChairRateMinor' => ['required', 'integer', 'min:0'],
                 'pricing.*.extraTableRateMinor' => ['required', 'integer', 'min:0'],
+                'pricing.*.guestPriceMinor' => ['required', 'integer', 'min:1'],
             ],
             5 => [
                 'addons' => ['required', 'array'],

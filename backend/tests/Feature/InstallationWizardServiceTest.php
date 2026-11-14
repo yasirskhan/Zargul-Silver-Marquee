@@ -218,7 +218,7 @@ class InstallationWizardServiceTest extends TestCase
         $state = $service->savePricing($owner, $company->id, [
             $hallId => ['capacity' => 220, 'includedChairs' => 200,
                 'includedTables' => 20, 'extraChairRateMinor' => 500,
-                'extraTableRateMinor' => 2000],
+                'extraTableRateMinor' => 2000, 'guestPriceMinor' => 15000000],
         ], $state['revision']);
         $this->assertContains('pricing', $state['data']['completedStages']);
         $this->assertSame(1, (int) DB::table('halls')->where('id', $hallId)

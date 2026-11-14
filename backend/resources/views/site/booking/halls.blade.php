@@ -13,10 +13,10 @@
 <p class="meta">Capacity up to {{ $hall['capacity'] }} guests</p>
 <ul>
 @foreach ($hall['lines'] as $line)
-<li>{{ $line['label'] }} — {{ number_format($line['amountMinor']) }} {{ $hall['currencyCode'] }} minor units</li>
+<li>{{ $line['label'] }} — {{ number_format($line['amountMinor']/100, 2) }} {{ $hall['currencyCode'] }}</li>
 @endforeach
 </ul>
-<p class="price">Total: {{ number_format($hall['totalMinor']) }} {{ $hall['currencyCode'] }} minor units</p>
+<p class="price">Total: {{ number_format($hall['totalMinor']/100, 2) }} {{ $hall['currencyCode'] }}</p>
 <form method="POST" action="/book/review">
 @csrf
 <input type="hidden" name="quote" value="{{ $token }}">
