@@ -447,7 +447,7 @@ test('real owner password and TOTP flow protects mobile proposal editing without
       + selectedMediaId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\.webp'));
   expect(mediaMatch).not.toBeNull();
   const published = await page.request.get(
-    'http://marquee-browser.localhost:8000'+mediaMatch[0]);
+    'http://wizard.localhost:8000'+mediaMatch[0]);
   expect(published.ok()).toBe(true);
   expect(published.headers()['content-type']).toContain('image/webp');
   const webp = await published.body();
@@ -455,11 +455,11 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   expect(webp.subarray(0, 4).toString('ascii')).toBe('RIFF');
   expect(webp.subarray(8, 12).toString('ascii')).toBe('WEBP');
   const forgedPage = await page.request.get(
-    'http://marquee-browser.localhost:8000/_venue-media/gallery/'
+    'http://wizard.localhost:8000/_venue-media/gallery/'
       + selectedMediaId + '.webp');
   expect(forgedPage.ok()).toBe(false);
   const foreignHost = await page.request.get(
-    'http://foreign-browser.localhost:8000'+mediaMatch[0]);
+    'http://127.0.0.1:8000'+mediaMatch[0]);
   expect(foreignHost.ok()).toBe(false);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.screenshot({ path: 'docs/evidence/admin-hall-photos-desktop.png', fullPage: true });
