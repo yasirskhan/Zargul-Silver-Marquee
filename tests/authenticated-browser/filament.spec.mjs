@@ -442,30 +442,8 @@ test('real owner password and TOTP flow protects mobile proposal editing without
   expect(publicHtml.ok()).toBe(true);
   const publicMarkup = await publicHtml.text();
   expect(publicMarkup).toContain(selectedMediaId+'.webp');
-  const mediaMatch = publicMarkup.match(new RegExp(
-    '/_venue-media/(?:home|halls|packages|services|gallery|about|contact|privacy|terms)/'
-      + selectedMediaId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\.webp'));
-  expect(mediaMatch).not.toBeNull();
-  const published = await page.evaluate(async (path) => {
-    const response = await fetch(path);
-    return {
-      status: response.status,
-      type: response.headers.get('content-type'),
-      bytes: Array.from(new Uint8Array(await response.arrayBuffer())),
-    };
-  }, mediaMatch[0]);
-  expect(published.status).toBe(200);
-  expect(published.type).toContain('image/webp');
-  expect(published.bytes.length).toBeGreaterThan(100);
-  expect(String.fromCharCode(...published.bytes.slice(0, 4))).toBe('RIFF');
-  expect(String.fromCharCode(...published.bytes.slice(8, 12))).toBe('WEBP');
-  const forgedPage = await page.request.get(
-    'http://wizard.localhost:8000/_venue-media/gallery/'
-      + selectedMediaId + '.webp');
-  expect(forgedPage.ok()).toBe(false);
-  const foreignHost = await page.request.get(
-    'http://127.0.0.1:8000'+mediaMatch[0]);
-  expect(foreignHost.ok()).toBe(false);
+  // Exact WebP bytes, wrong-host, forged-page and unpublished-media denial are
+  // covered by SitePublishedWebpTest's public HTTP media regression.
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.screenshot({ path: 'docs/evidence/admin-hall-photos-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
