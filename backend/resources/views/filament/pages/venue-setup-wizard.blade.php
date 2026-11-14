@@ -25,8 +25,12 @@
         @else
             <ol class="flex flex-wrap gap-2 text-sm" aria-label="Setup steps">
                 @foreach ([1 => 'Company and venue', 2 => 'Halls', 3 => 'Programs', 4 => 'Pricing', 5 => 'Add-ons', 6 => 'Branding', 7 => 'Payments', 8 => 'Staff', 9 => 'Licensing', 10 => 'Review'] as $number => $label)
-                    <li class="rounded-lg border px-3 py-2 {{ $step === $number ? 'font-semibold' : '' }}">
-                        {{ $number }}. {{ $label }}
+                    <li>
+                        <button type="button" wire:click="goToStep({{ $number }})"
+                            @disabled($number > $step)
+                            class="rounded-lg border px-3 py-2 {{ $step === $number ? 'font-semibold' : '' }} disabled:opacity-50">
+                            {{ $number }}. {{ $label }}
+                        </button>
                     </li>
                 @endforeach
             </ol>

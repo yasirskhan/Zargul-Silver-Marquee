@@ -350,6 +350,15 @@ final class VenueSetupWizard extends Page
         $this->licenseMessage = null;
     }
 
+    /** Return to an already-saved earlier step for correction without losing data. */
+    public function goToStep(int $step): void
+    {
+        abort_if($this->status === 'completed', 403);
+        abort_unless($step >= 1 && $step <= 10 && $step <= $this->step, 403);
+        $this->resetErrorBag();
+        $this->step = $step;
+    }
+
     public function addBank(): void
     {
         abort_if($this->status === 'completed' || count($this->payments['banks'] ?? []) >= 5, 403);
