@@ -44,6 +44,12 @@ Route::get('/sitemap.xml', \App\Http\Controllers\PublishedVenueSitemapController
 Route::get('/email/verify/{id}/{hash}', \App\Http\Controllers\VerifyEmailController::class)
     ->middleware(['signed', 'throttle:6,1'])->name('verification.verify');
 
+// Token-gated browser start for the first company. The operator token is an
+// environment secret; this route does not exist when it is unset.
+Route::get('/install', [\App\Http\Controllers\InstallationStartController::class, 'show'])
+    ->middleware(['throttle:12,1'])->name('installation.start');
+Route::post('/install', [\App\Http\Controllers\InstallationStartController::class, 'store'])
+    ->middleware(['throttle:6,1'])->name('installation.start.store');
 // First-Owner bootstrap: operator-issued, one-time, rate limited.
 Route::get('/install/owner/{token}', [\App\Http\Controllers\OwnerBootstrapController::class, 'show'])
     ->where('token', '[a-f0-9]{64}')->name('installation.owner.show');
