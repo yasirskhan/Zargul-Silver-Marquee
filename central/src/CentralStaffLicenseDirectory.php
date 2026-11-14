@@ -64,7 +64,9 @@ final class CentralStaffLicenseDirectory
                     (SELECT r.state FROM central_paid_license_revisions r
                      WHERE r.license_id=l.id ORDER BY r.revision DESC LIMIT 1) AS latest_revision_state,
                     (SELECT r.invoice_id FROM central_paid_license_revisions r
-                     WHERE r.license_id=l.id ORDER BY r.revision DESC LIMIT 1) AS latest_invoice_id
+                     WHERE r.license_id=l.id ORDER BY r.revision DESC LIMIT 1) AS latest_invoice_id,
+                    (SELECT count(*) FROM central_license_issuance_audit a
+                     WHERE a.license_id=l.id) AS issuance_audit_count
              FROM central_licenses l
              JOIN registered_installations i ON i.id=l.installation_id
                  AND i.customer_id=l.customer_id

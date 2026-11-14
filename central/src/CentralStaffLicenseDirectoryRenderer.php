@@ -49,9 +49,10 @@ final class CentralStaffLicenseDirectoryRenderer
                 .$expiry.'</td><td>'.$e($row['revision_count']??'').'</td><td>'
                 .$e($row['pending_count']??'').'</td><td>'.$e($row['latest_revision_id']??'None')
                 .'</td><td>'.$e($row['latest_revision_state']??'None').'</td><td>'
-                .$e($row['latest_invoice_id']??'None').'</td><td>'.$renewal.'</td></tr>';
+                .$e($row['latest_invoice_id']??'None').'</td><td>'
+                .$e($row['issuance_audit_count']??'0').'</td><td>'.$renewal.'</td></tr>';
         }
-        if($body==='')$body='<tr><td colspan="11">No licenses recorded for this customer.</td></tr>';
+        if($body==='')$body='<tr><td colspan="12">No licenses recorded for this customer.</td></tr>';
         return '<section aria-label="Private HAFZATECH customer licenses">'
             .'<h2>Customer licenses and renewals</h2>'
             .'<p>Renewal preparation requires an independently verified paid invoice. '
@@ -60,7 +61,8 @@ final class CentralStaffLicenseDirectoryRenderer
             .'<table><thead><tr><th>Approved domain</th><th>Installation</th>'
             .'<th>Current revision</th><th>Term</th><th>Expires</th>'
             .'<th>Revisions</th><th>Awaiting signer</th><th>Latest revision</th>'
-            .'<th>Revision state</th><th>Bound invoice</th><th>Renewal</th></tr></thead><tbody>'
+            .'<th>Revision state</th><th>Bound invoice</th><th>Audit events</th>'
+            .'<th>Renewal</th></tr></thead><tbody>'
             .$body.'</tbody></table>'
             .'<p><a href="/staff/customers/'.$e($customerId).'/billing">Customer billing</a> · '
             .'<a href="/staff/customers/'.$e($customerId).'/support">Support tickets</a></p></section>';

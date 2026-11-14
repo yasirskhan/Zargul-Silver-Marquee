@@ -13,4 +13,14 @@ if ($path === '/staff.css') {
     readfile(dirname(__DIR__).'/public/staff.css');
     return true;
 }
-require dirname(__DIR__).'/public/staff.php';
+if ($path === '/__test/revoke-billing-role'
+    && getenv('CENTRAL_BROWSER_TRANSPORT') === 'test') {
+    $db = new PDO(getenv('CENTRAL_DB_DSN'), getenv('CENTRAL_DB_USERNAME'),
+        getenv('CENTRAL_DB_PASSWORD'), [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+    $db->prepare("UPDATE central_staff_role_grants SET revoked_at=now()
+        WHERE staff_id='dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+          AND role='billing_officer' AND revoked_at IS NULL")->execute();
+    header('Content-Type: text/plain');
+    echo 'revoked';
+    return true;
+}require dirname(__DIR__).'/public/staff.php';

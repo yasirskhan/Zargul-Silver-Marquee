@@ -64,7 +64,7 @@ test('authenticated Central operator journey through the real entrypoint', async
   await expect(page.getByText('Paid license renewal prepared')).toBeVisible({ timeout: 20000 });
   await page.goto('/staff/customers/11111111-1111-4111-8111-111111111111/licensing');
   await expect(page.getByText('awaiting_isolated_signer')).toBeVisible();
-  await expect(page.getByText('15151515-1515-4515-8515-151515151515')).toBeVisible();
+  await expect(page.getByText('15151515-1515-4515-8515-151515151515')).toBeVisible();  await expect(page.locator('tbody tr').first().locator('td').nth(10)).toHaveText('1');
   await expect(page.getByRole('cell', { name: '1', exact: true }).last()).toBeVisible();
   await page.screenshot({ path: 'docs/evidence/central-licensing-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -133,7 +133,12 @@ test('separate billing operator sees invoices and support but not staff administ
   await page.getByRole('button', { name: 'Record evidence decision' }).click();
   await expect(page.getByText('Payment evidence decision recorded')).toBeVisible({ timeout: 20000 });
   await page.goto('/staff/customers/11111111-1111-4111-8111-111111111111/billing');
-  await expect(page.getByText('BROWSER-CLAIM-0001')).toHaveCount(0);
+  await expect(page.getByText('BROWSER-CLAIM-0001')).toHaveCount(0);  await page.request.get('/__test/revoke-billing-role');
+  const revokedBilling = await page.goto(
+    '/staff/customers/11111111-1111-4111-8111-111111111111/billing');
+  expect(revokedBilling.status()).toBeGreaterThanOrEqual(400);
+  await expect(page.locator('section[aria-label="Private HAFZATECH vendor invoices"]'))
+    .toHaveCount(0);
   await page.goto('/staff/customers/11111111-1111-4111-8111-111111111111/support');
   await expect(page.locator('section[aria-label="Private HAFZATECH support queue"]')).toBeVisible();
   await page.getByLabel('Reply body').fill('Synthetic browser support reply');
@@ -174,6 +179,29 @@ test('role request requires an independent approver and never self-approves', as
   await decisionRow.getByLabel('Decision reason').fill('Independent browser approval');
   await decisionRow.getByRole('button', { name: 'Record decision' }).click();
   await expect(page.getByText(/Staff role request approved/i)).toBeVisible({ timeout: 20000 });
+
+  await page.goto('/staff/home');
+  await page.getByRole('button', { name: 'Sign out' }).first().click();
+  await login(page, 'central-requester@example.test', 'KRSXG5AUMVZWK4TT');
+  await page.goto('/staff/team');
+  await page.getByLabel('Target staff ID').fill('abababab-abab-4bab-8bab-abababababab');
+  await page.getByLabel('Requested role').selectOption('license_officer');
+  await page.getByLabel('Customer scope ID').fill('11111111-1111-4111-8111-111111111111');
+  await page.locator('form[action="/staff/team/role-request"]').getByLabel('Reason')
+    .fill('Independent browser role rejection fixture');
+  await page.getByRole('button', { name: 'Submit for independent approval' }).click();
+  await expect(page.getByText('Role proposal recorded')).toBeVisible({ timeout: 20000 });
+  await page.goto('/staff/home');
+  await page.getByRole('button', { name: 'Sign out' }).first().click();
+  await login(page, 'central-approver@example.test', 'MZXW6YTBOI234567');
+  await page.goto('/staff/team');
+  await page.getByRole('button', { name: 'Pending independent role reviews' }).click();
+  const rejectRow = page.locator('tr', { hasText: 'central-target@example.test' });
+  await rejectRow.getByLabel('Outcome').selectOption('rejected');
+  await rejectRow.getByLabel('Decision reason').fill('Independent browser rejection');
+  await rejectRow.getByRole('button', { name: 'Record decision' }).click();
+  await expect(page.getByText(/Staff role request rejected/i)).toBeVisible({ timeout: 20000 });
+
   await page.goto('/staff/team');
   await page.getByRole('button', { name: 'Pending independent role reviews' }).click();
   await expect(page.getByText('central-target@example.test')).toHaveCount(0);
