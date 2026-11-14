@@ -28,8 +28,7 @@
                 </select>
             </label>
         </div>
-        @if ($page = $this->currentPage())
-            <section class="vd-panel space-y-3" aria-label="Create an unpublished website page">
+        <section class="vd-panel space-y-3" aria-label="Create an unpublished website page">
                 <h2 class="text-lg font-semibold">Create a new website page</h2>
                 <p class="text-sm">New pages stay private until an authorized publisher approves the saved draft. Only pre-approved public paths can be created.</p>
                 <div class="grid gap-3 sm:grid-cols-2">
@@ -37,7 +36,7 @@
                         <span class="text-sm">Page path</span>
                         <select wire:model="newPageSlug" class="w-full rounded-lg border p-3 text-gray-900">
                             @foreach (\App\Services\SiteWorkspaceService::NEW_PAGE_PATHS as $path => $label)
-                                <option value="{{ ltrim($path, '/') }}">{{ $label }} ({{ $path }})</option>
+                                <option value="{{ $path }}">{{ $label }} ({{ $path }})</option>
                             @endforeach
                         </select>
                     </label>
@@ -58,6 +57,7 @@
                 <button type="button" wire:click="createNewPage" wire:loading.attr="disabled"
                     class="rounded-lg border px-4 py-2 font-semibold">Create unpublished page</button>
             </section>
+        @if ($page = $this->currentPage())
             <section class="space-y-2 rounded-xl border p-5" aria-label="Website page status">
                 <h2 class="text-lg font-semibold">{{ $page->title }}</h2>
                 <p class="text-sm">Path: {{ $page->slug }}</p>

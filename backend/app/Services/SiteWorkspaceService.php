@@ -16,6 +16,7 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 final class SiteWorkspaceService
 {
     public const NEW_PAGE_PATHS = [
+        '/' => 'Home',
         '/halls' => 'Halls',
         '/packages' => 'Packages',
         '/services' => 'Services',

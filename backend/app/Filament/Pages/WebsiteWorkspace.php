@@ -199,7 +199,7 @@ final class WebsiteWorkspace extends Page
         [$actor, $page] = $this->authorizeSelectedPage('update');
         $this->checkEditorSnapshot($page);
         $this->validate([
-            'newPageSlug' => ['required', 'in:halls,packages,services,gallery,about,contact,privacy,terms'],
+            'newPageSlug' => ['required', 'in:'.implode(',',array_keys(SiteWorkspaceService::NEW_PAGE_PATHS))],
             'newPageTitle' => ['required', 'string', 'min:3', 'max:120'],
             'newPageReason' => ['required', 'string', 'min:3', 'max:500'],
         ]);
@@ -207,7 +207,7 @@ final class WebsiteWorkspace extends Page
         try {
             $created = app(SiteWorkspaceService::class)->createPage(
                 $actor, $page->company_id, $page->website_id,
-                $this->createPageKey, '/'.$this->newPageSlug,
+                $this->createPageKey, $this->newPageSlug,
                 $this->newPageTitle, $this->newPageReason,
             );
         } catch (\InvalidArgumentException | ConflictHttpException $error) {
@@ -222,6 +222,35 @@ final class WebsiteWorkspace extends Page
         Notification::make()->title('New unpublished website page created')->success()->send();
     }
 
+    /** Create the first page when the website has no page yet. */
+    private function createFirstPage(): void
+    {
+        $actor = Filament::auth()->user();
+        abort_unless($actor instanceof User && $this->companyId, 403);
+        $this->validate([
+            'newPageSlug' => ['required', 'in:'.implode(',',array_keys(SiteWorkspaceService::NEW_PAGE_PATHS))],
+            'newPageTitle' => ['required', 'string', 'min:3', 'max:120'],
+            'newPageReason' => ['required', 'string', 'min:3', 'max:500'],
+        ]);
+        $website = DB::table('websites')->where('company_id', $this->companyId)
+            ->where('is_active', true)->first(['id']);
+        abort_if($website === null, 422, 'No active website is configured.');
+        try {
+            $created = app(SiteWorkspaceService::class)->createPage(
+                $actor, $this->companyId, (string) $website->id,
+                $this->createPageKey, $this->newPageSlug,
+                $this->newPageTitle, $this->newPageReason,
+            );
+        } catch (\InvalidArgumentException | ConflictHttpException $error) {
+            throw ValidationException::withMessages(['newPageSlug' => $error->getMessage()]);
+        }
+        $this->createPageKey = (string) Str::uuid();
+        $this->newPageTitle = '';
+        $this->newPageReason = '';
+        $this->pageId = $created;
+        $this->reloadDraft();
+        Notification::make()->title('New unpublished website page created')->success()->send();
+    }
     /** Reload only an authorized page's latest draft. This also abandons unsaved changes. */
     public function reloadDraft(): void
     {
