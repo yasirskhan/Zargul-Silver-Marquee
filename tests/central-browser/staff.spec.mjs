@@ -33,14 +33,15 @@ test('authenticated Central operator journey through the real entrypoint', async
   await expect(page.getByText('central-browser.example.test').first()).toBeVisible();
   await expect(page.getByText('Not settlement eligible: BROWSER-INV-0002')).toBeVisible();
 
-  await page.locator('input[name="staff_csrf"]').evaluate((el) => { el.value = '0'.repeat(64); });
+  const renewalForm = page.locator('form[action="/staff/licensing/prepare"]');
+  await renewalForm.locator('input[name="staff_csrf"]').evaluate((el) => { el.value = '0'.repeat(64); });
   let denial = page.waitForResponse((r) =>
     r.url().endsWith('/staff/licensing/prepare') && r.request().method() === 'POST');
   await page.getByRole('button', { name: 'Prepare paid renewal' }).click();
   expect((await denial).status()).toBeGreaterThanOrEqual(400);
 
   await page.goto('/staff/customers/11111111-1111-4111-8111-111111111111/licensing');
-  await page.locator('input[name="customer_id"]').evaluate((el) => {
+  await renewalForm.locator('input[name="customer_id"]').evaluate((el) => {
     el.value = '22222222-2222-4222-8222-222222222222';
   });
   denial = page.waitForResponse((r) =>
@@ -49,7 +50,7 @@ test('authenticated Central operator journey through the real entrypoint', async
   expect((await denial).status()).toBeGreaterThanOrEqual(400);
 
   await page.goto('/staff/customers/11111111-1111-4111-8111-111111111111/licensing');
-  await page.locator('input[name="installation_id"]').evaluate((el) => {
+  await renewalForm.locator('input[name="installation_id"]').evaluate((el) => {
     el.value = '99999999-9999-4999-8999-999999999999';
   });
   denial = page.waitForResponse((r) =>
