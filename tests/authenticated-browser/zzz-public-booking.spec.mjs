@@ -27,7 +27,8 @@ test('customer books a hall through quote hold verified deposit and status at th
     await page.locator('input[name="customer_name"]').fill('Browser Booking Customer');
     await page.locator('input[name="email"]').fill('browser-booking@example.test');
     await page.getByRole('button', {name: 'Request temporary hold'}).click();
-    await expect(page.getByRole('heading', {name: 'Temporary hold created'})).toBeVisible();
+    await expect(page.getByRole('heading', {name: 'Temporary hold created'})).toBeVisible();    await expect(page.locator('#hold-id')).toHaveText(
+      /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/);
     const bodyText = await page.locator('body').innerText();
     const tokenMatch = bodyText.match(/cancellation token private:\s*([a-f0-9]{64})/i);
     expect(tokenMatch).not.toBeNull();

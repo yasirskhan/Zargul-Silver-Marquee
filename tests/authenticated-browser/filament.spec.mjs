@@ -440,7 +440,27 @@ test('real owner password and TOTP flow protects mobile proposal editing without
     'section[aria-label="Approved hall photographs"] code').first().textContent()).trim();
   const publicHtml = await page.request.get('/__test/marquee-hall-photo');
   expect(publicHtml.ok()).toBe(true);
-  expect(await publicHtml.text()).toContain(selectedMediaId+'.webp');
+  const publicMarkup = await publicHtml.text();
+  expect(publicMarkup).toContain(selectedMediaId+'.webp');
+  const mediaMatch = publicMarkup.match(new RegExp(
+    '/_venue-media/(?:home|halls|packages|services|gallery|about|contact|privacy|terms)/'
+      + selectedMediaId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\.webp'));
+  expect(mediaMatch).not.toBeNull();
+  const published = await page.request.get(
+    'http://marquee-browser.localhost:8000'+mediaMatch[0]);
+  expect(published.ok()).toBe(true);
+  expect(published.headers()['content-type']).toContain('image/webp');
+  const webp = await published.body();
+  expect(webp.length).toBeGreaterThan(100);
+  expect(webp.subarray(0, 4).toString('ascii')).toBe('RIFF');
+  expect(webp.subarray(8, 12).toString('ascii')).toBe('WEBP');
+  const forgedPage = await page.request.get(
+    'http://marquee-browser.localhost:8000/_venue-media/gallery/'
+      + selectedMediaId + '.webp');
+  expect(forgedPage.ok()).toBe(false);
+  const foreignHost = await page.request.get(
+    'http://foreign-browser.localhost:8000'+mediaMatch[0]);
+  expect(foreignHost.ok()).toBe(false);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.screenshot({ path: 'docs/evidence/admin-hall-photos-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
