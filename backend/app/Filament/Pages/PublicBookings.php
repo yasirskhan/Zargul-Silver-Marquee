@@ -4,9 +4,11 @@ namespace App\Filament\Pages;
 
 use App\Models\CompanyMembership;
 use App\Models\User;
+use App\Services\PublicBookingFinanceBridge;
 use App\Services\TenantAccess;
 use BackedEnum;
 use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\DB;
@@ -46,6 +48,16 @@ final class PublicBookings extends Page
             ->with('company')->get()->mapWithKeys(fn ($m) => [$m->company_id => $m->company->name])->all();
     }
 
+    public function connectFinance(string $confirmationId): void
+    {
+        $actor = Filament::auth()->user();
+        abort_unless($actor instanceof User && $this->companyId, 403);
+        $result = app(PublicBookingFinanceBridge::class)
+            ->connect($actor, $this->companyId, $confirmationId);
+        Notification::make()->title($result['created']
+            ? 'Reservation, invoice and deposit receipt created'
+            : 'Booking finance records already exist')->success()->send();
+    }
     public function bookings(): array
     {
         $actor = Filament::auth()->user();
@@ -60,6 +72,20 @@ final class PublicBookings extends Page
             $hall = \App\Models\Hall::query()->where('company_id', $row->company_id)
                 ->where('id', $row->hall_id)->first();
             return $hall !== null && $access->canViewHall($actor, $hall);
+        })->map(function ($row): object {
+            $invoiceId=PublicBookingFinanceBridge::invoiceIdFor($row->id);
+            $invoice=DB::table('venue_invoices')->where('company_id',$row->company_id)
+                ->where('id',$invoiceId)->first(['id','invoice_number','total_minor','currency_code']);
+            if($invoice){
+                $paid=(int)DB::table('venue_invoice_payments')->where('company_id',$row->company_id)
+                    ->where('invoice_id',$invoiceId)->sum('amount_minor');
+                $refunded=(int)DB::table('venue_invoice_refunds')->where('company_id',$row->company_id)
+                    ->where('invoice_id',$invoiceId)->sum('amount_minor');
+                $invoice->paid_minor=$paid-$refunded;
+                $invoice->due_minor=(int)$invoice->total_minor-($paid-$refunded);
+            }
+            $row->finance=$invoice;
+            return $row;
         })->values()->all();
     }
 }
