@@ -12,6 +12,14 @@
                 <a href="{{ \App\Filament\Pages\WebsiteWorkspace::getUrl() }}">Website editor</a>
             </div>
         </section>
+        @if ($loadedCompanyId === $companyId && $summary !== [] && ($summary['canSeeCompanyProposals'] ?? false))
+            <section class="vd-metrics" aria-label="VenueDesk business metrics">
+                <div class="vd-metric"><b>{{ number_format($summary['confirmedUpcoming'] ?? 0) }}</b><span>Confirmed upcoming bookings</span></div>
+                <div class="vd-metric"><b>{{ number_format($summary['programSlotsToday'] ?? 0) }}</b><span>Program slots today</span></div>
+                <div class="vd-metric"><b>{{ number_format($summary['pendingApprovals'] ?? 0) }}</b><span>Pending approvals</span></div>
+                <div class="vd-metric"><b>{{ number_format(($summary['outstandingMinor'] ?? 0) / 100, 2) }}</b><span>PKR outstanding invoice balance</span></div>
+            </section>
+        @endif
         <section class="vd-panel vd-quick-panel" aria-label="VenueDesk quick actions">
             <div class="vd-panel-head"><h2>Quick actions</h2><p>Common desk tasks, using your current company and role.</p></div>
             <div class="vd-quick-grid">

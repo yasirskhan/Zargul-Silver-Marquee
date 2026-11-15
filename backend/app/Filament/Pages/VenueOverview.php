@@ -134,8 +134,28 @@ final class VenueOverview extends Page
         $weekFrom = now()->toDateString();
         $weekThrough = now()->addDays(6)->toDateString();
 
+        $today = now()->toDateString();
+        $confirmedUpcoming = $canOperate && $canSeeCompanyProposals
+            ? DB::table('venue_reservations')->where('company_id', $this->companyId)
+                ->whereIn('hall_id', $visibleHallIds)->where('status', 'confirmed')
+                ->where('event_date', '>=', $today)->count() : null;
+        $programSlotsToday = $canOperate && $canSeeCompanyProposals
+            ? count($visibleHallIds) * 3 : null;
+        $invoicedMinor = 0; $paidMinor = 0; $refundedMinor = 0;
+        if ($canSeeCompanyProposals) {
+            $invoicedMinor = (int) DB::table('venue_invoices')
+                ->where('company_id', $this->companyId)->sum('total_minor');
+            $paidMinor = (int) DB::table('venue_invoice_payments')
+                ->where('company_id', $this->companyId)->sum('amount_minor');
+            $refundedMinor = (int) DB::table('venue_invoice_refunds')
+                ->where('company_id', $this->companyId)->sum('amount_minor');
+        }
+        $outstandingMinor = max(0, $invoicedMinor - $paidMinor + $refundedMinor);
         $this->summary = [
             'role' => $role,
+            'confirmedUpcoming' => $confirmedUpcoming,
+            'programSlotsToday' => $programSlotsToday,
+            'outstandingMinor' => $canSeeCompanyProposals ? $outstandingMinor : null,
             'licenseRestricted' => config('central_control.activation_enabled') === true
                 && ! $canOperate,
             'visibleHalls' => $halls,
