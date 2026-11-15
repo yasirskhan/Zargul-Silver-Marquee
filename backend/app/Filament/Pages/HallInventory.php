@@ -660,7 +660,14 @@ final class HallInventory extends Page
                 }
             }
         }
-        $this->hallId = array_key_first($this->hallOptions());
+        $options = $this->hallOptions();
+        $withStock = DB::table('hall_inventory_positions')
+            ->where('company_id', $this->companyId)->pluck('hall_id')->all();
+        $preferred = null;
+        foreach ($withStock as $candidate) {
+            if (array_key_exists($candidate, $options)) { $preferred = $candidate; break; }
+        }
+        $this->hallId = $preferred ?? array_key_first($options);
         // A fresh authenticated session must initialize every protected
         // request/decision UUID, not only the catalog IDs. Hall switching
         // already uses the same reset to avoid cross-hall form leakage.
@@ -679,7 +686,14 @@ final class HallInventory extends Page
     {
         abort_unless($this->companyId !== null
             && array_key_exists($this->companyId, $this->companyOptions()), 403);
-        $this->hallId = array_key_first($this->hallOptions());
+        $options = $this->hallOptions();
+        $withStock = DB::table('hall_inventory_positions')
+            ->where('company_id', $this->companyId)->pluck('hall_id')->all();
+        $preferred = null;
+        foreach ($withStock as $candidate) {
+            if (array_key_exists($candidate, $options)) { $preferred = $candidate; break; }
+        }
+        $this->hallId = $preferred ?? array_key_first($options);
         $this->resetForms();
         $this->reloadCatalog();
     }
