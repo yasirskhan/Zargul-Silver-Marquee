@@ -90,7 +90,7 @@ final class VenueInvoicePaymentService
             throw new ConflictHttpException('Customer deposits require separate operator finance release.');
         }
         if (! Str::isUuid($invoiceId) || ! Str::isUuid($paymentId)
-            || ! in_array($method, ['cash','bank'], true) || $amountMinor < 1
+            || ! in_array($method, ['cash','bank','easypaisa','jazzcash'], true) || $amountMinor < 1
             || $amountMinor > 100000000000) {
             throw new InvalidArgumentException('Invalid invoice, payment ID, method or deposit amount.');
         }
@@ -99,7 +99,7 @@ final class VenueInvoicePaymentService
         if (mb_strlen($reason) < 3 || mb_strlen($reason) > 500
             || preg_match('/[<>@[:cntrl:]]/u', $reason)
             || ($method === 'cash' && $ref !== null)
-            || ($method === 'bank' && ($ref === null || mb_strlen($ref) < 4
+            || ($method !== 'cash' && ($ref === null || mb_strlen($ref) < 4
                 || mb_strlen($ref) > 120 || ! preg_match('/^[A-Za-z0-9._-]+$/D', $ref)))) {
             throw new InvalidArgumentException('An auditable reason and safe method reference are required.');
         }

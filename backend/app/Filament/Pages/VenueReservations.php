@@ -517,7 +517,7 @@ final class VenueReservations extends Page
         abort_unless(collect($this->issuedInvoices)->contains('id', $invoiceId), 403);
         $this->validate([
             'paymentAmountMinor' => ['required','integer','min:1','max:100000000000'],
-            'paymentMethod' => ['required','in:cash,bank'],
+            'paymentMethod' => ['required','in:cash,bank,easypaisa,jazzcash'],
             'paymentReference' => ['nullable','string','max:120'],
             'paymentReason' => ['required','string','min:3','max:500'],
         ]);

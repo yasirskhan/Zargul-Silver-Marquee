@@ -226,9 +226,11 @@
                                 <select wire:model.live="paymentMethod" class="w-full rounded-lg border p-2 text-gray-900">
                                     <option value="cash">Cash received</option>
                                     <option value="bank">Bank transfer reference</option>
+                                    <option value="easypaisa">Easypaisa reference</option>
+                                    <option value="jazzcash">JazzCash reference</option>
                                 </select>
                             </label>
-                            @if ($paymentMethod === 'bank')
+                            @if ($paymentMethod !== 'cash')
                                 <label class="block space-y-1"><span>Verified external transfer reference</span>
                                     <input wire:model="paymentReference" maxlength="120" class="w-full rounded-lg border p-2 text-gray-900">
                                 </label>
