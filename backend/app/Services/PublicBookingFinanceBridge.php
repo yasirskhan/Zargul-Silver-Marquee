@@ -43,7 +43,14 @@ final class PublicBookingFinanceBridge
         if (! $confirmation) {
             throw new AuthorizationException('Public booking is not in this company.');
         }
-        $hall = Hall::query()->where('company_id', $companyId)
+        if (config('booking_controls.confirmation_enabled') !== true
+            || config('quote_controls.issuance_enabled') !== true
+            || config('invoice_controls.issuance_enabled') !== true
+            || config('payment_controls.enabled') !== true
+            || config('finance_controls.posting_enabled') !== true
+            || !is_int(config('invoice_controls.tax_rate_bps'))) {
+            throw new ConflictHttpException('Booking finance release gates are closed.');
+        }        $hall = Hall::query()->where('company_id', $companyId)
             ->where('id', $confirmation->hall_id)->where('is_active', true)->first();
         if (! $hall || ! $this->access->canManageCustomerProfiles($actor, $companyId)
             || ! $this->access->canManageBookings($actor, $hall)) {
