@@ -301,7 +301,8 @@ final class ApprovalWorkflowService
                 'id' => $delegationId, 'company_id' => $companyId,
                 'granted_by' => $owner->getKey(), 'delegated_to' => $adminId,
                 'categories' => json_encode($categories, JSON_THROW_ON_ERROR),
-                'ceiling_minor' => $ceilingMinor, 'starts_at' => $start, 'ends_at' => $end,
+                'ceiling_minor' => $ceilingMinor, 'starts_at' => $start->toIso8601String(),
+                'ends_at' => $end->toIso8601String(),
                 'reason' => $reason, 'created_at' => now(), 'updated_at' => now(),
             ]);
             $this->delegationEvent($owner, $companyId, $delegationId, 'granted', $reason);
