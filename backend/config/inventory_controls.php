@@ -94,6 +94,7 @@ return [
     'purchase_evidence_upload_enabled' => (bool) env('VENUE_INVENTORY_PURCHASE_EVIDENCE_UPLOAD_ENABLED', false),
     // Only after independent review, both stored evidence files and CAS movement. OFF by default.
     'purchase_stock_posting_enabled' => (bool) env('VENUE_INVENTORY_PURCHASE_STOCK_POSTING_ENABLED', false),
+    'stocktake_adjustment_enabled' => (bool) env('VENUE_INVENTORY_STOCKTAKE_ADJUSTMENT_ENABLED', false),
     'opening_stock_posting_enabled' =>
         (bool) env('VENUE_INVENTORY_OPENING_POSTING_ENABLED', false),
 ];
