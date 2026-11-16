@@ -105,10 +105,9 @@ test('EXTERNAL_OUT MFA: independently witnessed owned dispatch, partial damaged 
   const back=a.locator('section[aria-label="Record outside owned stock return"]');
   await expect(back).toBeVisible({timeout:30000});
   await expect(back).toContainText(loanId);
-  await back.locator('input[type="checkbox"]').first().check();
-  await a.waitForTimeout(1200);
   await back.locator('input[wire\\:model^="externalOutReturnQuantities."]').fill('12');
-  await a.waitForTimeout(800);
+  await back.locator('input[wire\\:model^="externalOutReturnQuantities."]').press('Tab');
+  await a.waitForTimeout(1200);
   await inventoryUploadEvidence(a,back.locator('input[type="file"]'),syntheticEvidence);
   await a.waitForTimeout(1200);
   await back.getByRole('button',{name:'Record witnessed partner return only'}).click();
