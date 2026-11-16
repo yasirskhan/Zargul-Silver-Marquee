@@ -29,11 +29,11 @@ Route::post('/book/review', [\App\Http\Controllers\PublicBookingController::clas
 Route::post('/book/submit', [\App\Http\Controllers\PublicBookingController::class, 'submit'])
     ->middleware('throttle:30,1')->name('public.booking.submit');
 Route::get('/book/verify', [\App\Http\Controllers\PublicBookingController::class, 'verifyForm'])
-    ->middleware('throttle:30,1')->name('public.booking.verify');
+    ->middleware('throttle:120,1')->name('public.booking.verify');
 Route::post('/book/verify', [\App\Http\Controllers\PublicBookingController::class, 'verifyCode'])
-    ->middleware('throttle:10,1')->name('public.booking.verify.submit');
+    ->middleware('throttle:60,1')->name('public.booking.verify.submit');
 Route::post('/book/verify/resend', [\App\Http\Controllers\PublicBookingController::class, 'resendCode'])
-    ->middleware('throttle:4,1')->name('public.booking.verify.resend');Route::post('/book/cancel', [\App\Http\Controllers\PublicBookingController::class, 'cancel'])
+    ->middleware('throttle:10,1')->name('public.booking.verify.resend');Route::post('/book/cancel', [\App\Http\Controllers\PublicBookingController::class, 'cancel'])
     ->middleware('throttle:30,1')->name('public.booking.cancel');
 Route::post('/book/confirm', [\App\Http\Controllers\PublicBookingController::class, 'confirm'])
     ->middleware('throttle:30,1')->name('public.booking.confirm');
