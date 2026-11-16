@@ -24,9 +24,14 @@ test('customer books a hall through quote hold verified deposit and status at th
     await expect(hallCard).toContainText('Phase 10 Booking Hall');
     await hallCard.getByRole('button', {name: 'Review this hall'}).click();
     await expect(page.getByRole('heading', {name: 'Step 3 of 3 — review and request hold'})).toBeVisible();
-    await page.locator('input[name="customer_name"]').fill('Browser Booking Customer');
+    await page.locator('input[name="first_name"]').fill('Browser');
+    await page.locator('input[name="last_name"]').fill('Booking Customer');
     await page.locator('input[name="email"]').fill('browser-booking@example.test');
-    await page.getByRole('button', {name: 'Request temporary hold'}).click();
+    await page.locator('input[name="phone"]').fill('03001234567');
+    await page.getByRole('button', {name: 'Send verification code'}).click();
+    await expect(page.getByRole('heading', {name: 'Verify your email'})).toBeVisible();
+    await page.locator('input[name="code"]').fill('123456');
+    await page.getByRole('button', {name: 'Verify and hold my date'}).click();
     await expect(page.getByRole('heading', {name: 'Temporary hold created'})).toBeVisible();    await expect(page.locator('#hold-id')).toHaveText(
       /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/);
     const bodyText = await page.locator('body').innerText();

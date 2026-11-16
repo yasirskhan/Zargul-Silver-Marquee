@@ -9,4 +9,6 @@ return [
     // Synthetic-only independent verifier; production payment providers remain OFF.
     'synthetic_verifier_secret' => env('VENUE_SYNTHETIC_PAYMENT_VERIFIER_SECRET'),
     'synthetic_test_boundary' => env('VENUE_SYNTHETIC_PAYMENT_TEST_BOUNDARY', false),
+    // Testing-only fixed code; ignored outside the testing environment.
+    'test_verification_code' => env('VENUE_BOOKING_TEST_VERIFICATION_CODE'),
 ];

@@ -6,6 +6,8 @@ use App\Services\PublicBookingQuoteService;
 use App\Http\Controllers\PublicSiteRequestGate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Throwable;
 
 final class PublicBookingController
@@ -81,18 +83,26 @@ final class PublicBookingController
             'quote' => ['required', 'string', 'max:20000'],
             'hall_id' => ['required', 'uuid'],
             'idempotency_key' => ['required', 'uuid'],
-            'customer_name' => ['required', 'string', 'min:2', 'max:120'],
-            'email' => ['nullable', 'email', 'max:254'],
-            'phone' => ['nullable', 'string', 'max:32'],
+            'first_name' => ['required', 'string', 'min:1', 'max:60'],
+            'last_name' => ['required', 'string', 'min:1', 'max:60'],
+            'email' => ['required', 'email', 'max:254'],
+            'phone' => ['required', 'string', 'min:7', 'max:32'],
         ]);
         try {
             $quote = $this->open($data['quote'], $request);
-            $hold = app(\App\Services\PublicBookingHoldService::class)->create(
-                $this->companyId(), $quote, $data['hall_id'],
-                ['name' => $data['customer_name'], 'email' => $data['email'] ?? '',
-                    'phone' => $data['phone'] ?? ''],
-                $data['idempotency_key'],
-            );
+            $pending = [
+                'quote' => $quote, 'hall_id' => $data['hall_id'],
+                'first_name' => $data['first_name'], 'last_name' => $data['last_name'],
+                'email' => Str::lower(trim($data['email'])), 'phone' => $data['phone'],
+                'idempotency_key' => $data['idempotency_key'],
+            ];
+            if (! $this->emailIsVerified($pending['email'])) {
+                $request->session()->put('booking_pending', $pending);
+                $this->issueCode($pending['email']);
+
+                return redirect('/book/verify');
+            }
+            $hold = $this->createHold($pending);
         } catch (\Throwable $e) {
             $safe = $e instanceof \InvalidArgumentException ||
                 $e instanceof \Symfony\Component\HttpKernel\Exception\HttpException
@@ -101,6 +111,110 @@ final class PublicBookingController
         }
 
         return view('site.booking.confirmed', ['hold' => $hold]);
+    }
+
+    public function verifyForm(Request $request)
+    {
+        $this->guard();
+        $pending = $request->session()->get('booking_pending');
+        abort_unless(is_array($pending), 404);
+        $verification = $request->session()->get('booking_email_verification');
+        $seconds = isset($verification['last_sent'])
+            ? max(0, 120 - (now()->timestamp - (int) $verification['last_sent'])) : 0;
+
+        return view('site.booking.verify', [
+            'email' => $pending['email'], 'resendAfter' => $seconds,
+        ]);
+    }
+
+    public function verifyCode(Request $request)
+    {
+        $this->guard();
+        $data = $request->validate(['code' => ['required', 'digits:6']]);
+        $pending = $request->session()->get('booking_pending');
+        abort_unless(is_array($pending), 404);
+        $verification = $request->session()->get('booking_email_verification');
+        if (! is_array($verification) || ($verification['email'] ?? null) !== $pending['email']) {
+            return back()->withErrors(['code' => 'Request a new verification code.']);
+        }
+        if (now()->timestamp > (int) ($verification['expires_at'] ?? 0)) {
+            return back()->withErrors(['code' => 'This verification code expired. Request a new one.']);
+        }
+        if ((int) ($verification['attempts'] ?? 0) >= 5) {
+            return back()->withErrors(['code' => 'Too many attempts. Request a new code.']);
+        }
+        $request->session()->put('booking_email_verification',
+            array_merge($verification, ['attempts' => (int) ($verification['attempts'] ?? 0) + 1]));
+        if (! hash_equals((string) $verification['code_hash'], hash('sha256', $data['code']))) {
+            return back()->withErrors(['code' => 'That verification code is not correct.']);
+        }
+        try {
+            $hold = $this->createHold($pending);
+        } catch (\Throwable $e) {
+            return back()->withErrors(['code' => $e instanceof \Symfony\Component\HttpKernel\Exception\HttpException
+                || $e instanceof \InvalidArgumentException ? $e->getMessage() : 'Unable to create a temporary hold.']);
+        }
+        $request->session()->forget(['booking_pending', 'booking_email_verification']);
+
+        return view('site.booking.confirmed', ['hold' => $hold]);
+    }
+
+    public function resendCode(Request $request)
+    {
+        $this->guard();
+        $pending = $request->session()->get('booking_pending');
+        abort_unless(is_array($pending), 404);
+        $remaining = $this->issueCode($pending['email']);
+        if ($remaining > 0) {
+            return redirect('/book/verify')->withErrors([
+                'code' => 'Please wait '.$remaining.' seconds before requesting another code.']);
+        }
+
+        return redirect('/book/verify')->with('status', 'A new verification code was sent.');
+    }
+
+    private function createHold(array $pending): array
+    {
+        return app(\App\Services\PublicBookingHoldService::class)->create(
+            $this->companyId(), $pending['quote'], $pending['hall_id'],
+            ['name' => $pending['first_name'].' '.$pending['last_name'],
+                'email' => $pending['email'], 'phone' => $pending['phone']],
+            $pending['idempotency_key'],
+        );
+    }
+
+    private function emailIsVerified(string $email): bool
+    {
+        $verification = session('booking_email_verification');
+        return is_array($verification)
+            && ($verification['email'] ?? null) === $email
+            && isset($verification['verified_at'])
+            && now()->timestamp - (int) $verification['verified_at'] <= 1800;
+    }
+
+    private function issueCode(string $email): int
+    {
+        $existing = session('booking_email_verification');
+        $now = now()->timestamp;
+        if (is_array($existing) && ($existing['email'] ?? null) === $email
+            && isset($existing['last_sent']) && $now - (int) $existing['last_sent'] < 120) {
+            return 120 - ($now - (int) $existing['last_sent']);
+        }
+        $fixed = config('public_booking.test_verification_code');
+        $code = app()->environment('testing') && is_string($fixed) && preg_match('/^[0-9]{6}$/', $fixed)
+            ? $fixed : str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        session(['booking_email_verification' => [
+            'email' => $email, 'code_hash' => hash('sha256', $code),
+            'expires_at' => $now + 600, 'last_sent' => $now, 'attempts' => 0,
+        ]]);
+        try {
+            Mail::raw("Your Zargul booking verification code is {$code}. It expires in 10 minutes.",
+                fn ($message) => $message->to($email)->subject('Verify your Zargul booking email'));
+        } catch (\Throwable) {
+            // The code remains valid in-session if local SMTP is not configured.
+        }
+
+        return 0;
     }
 
     public function confirm(Request $request)

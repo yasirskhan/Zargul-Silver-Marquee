@@ -23,10 +23,11 @@
 <input type="hidden" name="quote" value="{{ $token }}">
 <input type="hidden" name="hall_id" value="{{ $hall['hallId'] }}">
 <input type="hidden" name="idempotency_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
-<label>Your name <input name="customer_name" required maxlength="120"></label>
-<label>Email <input type="email" name="email" maxlength="254"></label>
-<label>Phone <input name="phone" maxlength="32"></label>
-<p><button type="submit">Request temporary hold</button></p>
+<label>First name <input name="first_name" required maxlength="60" value="{{ old('first_name') }}"></label>
+<label>Last name <input name="last_name" required maxlength="60" value="{{ old('last_name') }}"></label>
+<label>Email <input type="email" name="email" required maxlength="254" value="{{ old('email') }}"></label>
+<label>Phone / WhatsApp <input name="phone" required minlength="7" maxlength="32" value="{{ old('phone') }}"></label>
+<p><button type="submit">Send verification code</button></p>
 </form>
 </div>
 </main></body></html>
