@@ -38,7 +38,7 @@ Route::post('/book/verify/resend', [\App\Http\Controllers\PublicBookingControlle
 Route::post('/book/confirm', [\App\Http\Controllers\PublicBookingController::class, 'confirm'])
     ->middleware('throttle:30,1')->name('public.booking.confirm');
 Route::get('/book/status', [\App\Http\Controllers\PublicBookingController::class, 'status'])
-    ->middleware('throttle:20,1')->name('public.booking.status');
+    ->middleware('throttle:120,1')->name('public.booking.status');
 Route::get('/__test/booking-fixture', [\App\Http\Controllers\TestBookingFixtureController::class, 'hall']);
 Route::get('/__test/booking-fixture/verify', [\App\Http\Controllers\TestBookingFixtureController::class, 'verify']);
 Route::get('/__test/booking-fixture/reset', [\App\Http\Controllers\TestBookingFixtureController::class, 'reset']);
