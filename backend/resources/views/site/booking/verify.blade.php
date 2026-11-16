@@ -6,10 +6,12 @@
 @if(session('status'))<div class="status">{{ session('status') }}</div>@endif
 @if($errors->any())<div class="error">{{ $errors->first() }}</div>@endif
 <form method="POST" action="/book/verify">@csrf
+<input type="hidden" name="pending" value="{{ $pendingToken }}">
 <label class="field">Verification code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code" autofocus></label>
 <button class="primary" type="submit">Verify and hold my date</button>
 </form>
 <form method="POST" action="/book/verify/resend" style="margin-top:14px;text-align:center">@csrf
+<input type="hidden" name="pending" value="{{ $pendingToken }}">
 <button class="link" id="resend" type="submit" <?= $resendAfter > 0 ? 'disabled' : '' ?>>Resend code <span id="count" <?= $resendAfter > 0 ? '' : 'hidden' ?>>({{ $resendAfter }}s)</span></button>
 </form>
 <p class="note">The code expires in 10 minutes. Temporary holds are released automatically if the code is not verified or payment is not completed in time.</p>
