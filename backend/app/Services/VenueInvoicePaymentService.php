@@ -104,7 +104,7 @@ final class VenueInvoicePaymentService
             throw new InvalidArgumentException('An auditable reason and safe method reference are required.');
         }
 
-        return DB::transaction(function () use ($actor, $companyId, $invoiceId, $paymentId,
+        $result = DB::transaction(function () use ($actor, $companyId, $invoiceId, $paymentId,
             $method, $amountMinor, $ref, $reason): array {
             if (config('payment_controls.enabled') !== true
                 || config('finance_controls.posting_enabled') !== true) {
@@ -189,5 +189,8 @@ final class VenueInvoicePaymentService
             ]);
             return $this->summary(DB::table('venue_invoice_payments')->where('id', $paymentId)->first());
         }, 3);
+        try { app(TenantEmailSettingsService::class)->sendInvoiceForCompany($companyId, $invoiceId); } catch (\Throwable) {}
+
+        return $result;
     }
 }

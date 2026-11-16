@@ -26,8 +26,8 @@ final class VenueDailyReconciliationService
         if ($date === false || $date->format('Y-m-d') !== $utcDate) {
             throw new InvalidArgumentException('Valid UTC reconciliation date required.');
         }
-        $start = $date->startOfDay()->toDateTimeString();
-        $end = $date->addDay()->startOfDay()->toDateTimeString();
+        $start = $date->startOfDay()->toIso8601String();
+        $end = $date->addDay()->startOfDay()->toIso8601String();
         $payments = DB::table('venue_invoice_payments')->where('company_id', $companyId)
             ->where('created_at', '>=', $start)->where('created_at', '<', $end)
             ->get(['id', 'journal_id', 'invoice_id', 'receipt_number', 'currency_code',

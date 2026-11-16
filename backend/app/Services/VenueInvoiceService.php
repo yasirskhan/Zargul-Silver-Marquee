@@ -53,7 +53,7 @@ final class VenueInvoiceService
             || preg_match('/[<>@[:cntrl:]]|https?:\/\/|www\./iu', $reason)) {
             throw new InvalidArgumentException('Safe plain-text invoice reason required.');
         }
-        return DB::transaction(function () use ($actor, $companyId, $quoteIssueId, $invoiceId, $reason): array {
+        $result = DB::transaction(function () use ($actor, $companyId, $quoteIssueId, $invoiceId, $reason): array {
             $taxBps = $this->gate();
             $company = DB::table('companies')->where('id', $companyId)->lockForUpdate()->first();
             if (! $company) {
@@ -128,6 +128,18 @@ final class VenueInvoiceService
             ]);
             return $this->summary(DB::table('venue_invoices')->where('id', $invoiceId)->first());
         }, 3);
+        $this->sendInvoiceEmail($companyId, $invoiceId);
+
+        return $result;
+    }
+
+    private function sendInvoiceEmail(string $companyId, string $invoiceId): void
+    {
+        try {
+            app(TenantEmailSettingsService::class)->sendInvoiceForCompany($companyId, $invoiceId);
+        } catch (\Throwable) {
+            // Invoice issuance must not fail because SMTP is not configured.
+        }
     }
 
     public function list(User $actor, string $companyId, string $reservationId): array
