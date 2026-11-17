@@ -80,7 +80,7 @@
                 </section>
             </div>
 
-            <details class="vd-details">
+            <section aria-label="Private venue overview"><details class="vd-details">
                 <summary>Your workspace · {{ ucfirst($summary['role']) }} — detailed counts</summary>
                 <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <div class="rounded-xl border p-4"><p class="text-sm">Halls visible to you</p><p class="text-3xl font-semibold">{{ $summary['visibleHalls'] }}</p><p class="text-xs">Based on current hall assignments and membership</p></div>
@@ -175,7 +175,7 @@
                         <a class="ml-3 underline" href="{{ \App\Filament\Pages\SupportInbox::getUrl(['company' => $companyId]) }}">Contact HAFZATECH Support</a>
                     </div>
                 @endif
-            </details>
+            </details></section>
 
             <section class="vd-panel vd-note-panel" aria-label="VenueDesk operations note" style="margin-top:16px">
                 <div class="vd-panel-head"><h2>Operations note</h2></div>
