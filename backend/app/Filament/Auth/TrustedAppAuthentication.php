@@ -17,7 +17,7 @@ final class TrustedAppAuthentication extends AppAuthentication
         $company=$service->companyFor($user);
         if($company===null)return true;
         if(!$service->requiresMfa($user,$company))return false;
-        return !$service->isTrusted($user);
+        return !$service->isTrusted($user,$company);
     }
 
     public function verifyCode(#[\SensitiveParameter] string $code,#[\SensitiveParameter] ?string $secret=null,bool $shouldPreventCodeReuse=false):bool

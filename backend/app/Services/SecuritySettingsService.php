@@ -39,7 +39,9 @@ final class SecuritySettingsService
 
     public function requiresMfa(User $user,string $companyId):bool
     {
-        if($user->mfa_required!==null)return (bool)$user->mfa_required;
+        $policy=DB::table('company_user_mfa_policies')->where('company_id',$companyId)
+            ->where('user_id',$user->getKey())->first(['mfa_required']);
+        if($policy)return (bool)$policy->mfa_required;
         $row=DB::table('tenant_security_settings')->where('company_id',$companyId)->first(['mfa_required']);
         return $row?(bool)$row->mfa_required:true;
     }
@@ -48,8 +50,11 @@ final class SecuritySettingsService
     {
         $this->authorize($owner,$companyId);
         abort_unless(DB::table('company_memberships')->where('company_id',$companyId)->where('user_id',$userId)->where('is_active',true)->exists(),403);
-        DB::table('users')->where('id',$userId)->update(['mfa_required'=>$required,'updated_at'=>now()]);
-        if($required===false)DB::table('trusted_devices')->where('user_id',$userId)->whereNull('revoked_at')->update(['revoked_at'=>now(),'updated_at'=>now()]);
+        if($required===null)DB::table('company_user_mfa_policies')->where('company_id',$companyId)->where('user_id',$userId)->delete();
+        else DB::table('company_user_mfa_policies')->updateOrInsert(
+            ['company_id'=>$companyId,'user_id'=>$userId],
+            ['id'=>(string)Str::uuid(),'mfa_required'=>$required,'updated_by'=>$owner->getKey(),'created_at'=>now(),'updated_at'=>now()]);
+        if($required===false)DB::table('trusted_devices')->where('user_id',$userId)->where('company_id',$companyId)->whereNull('revoked_at')->update(['revoked_at'=>now(),'updated_at'=>now()]);
         $this->audit($owner,$companyId,'tenant.user_mfa_policy_updated','user',$userId,['userId'=>$userId,'required'=>$required]);
     }
 
@@ -57,8 +62,11 @@ final class SecuritySettingsService
     {
         $this->authorize($owner,$companyId);
         return DB::table('company_memberships as m')->join('users as u','u.id','=','m.user_id')
+            ->leftJoin('company_user_mfa_policies as p',function($join)use($companyId):void{
+                $join->on('p.user_id','=','u.id')->on('p.company_id','=','m.company_id');
+            })
             ->where('m.company_id',$companyId)->where('m.is_active',true)->orderBy('u.name')
-            ->get(['u.id','u.name','u.email','u.mfa_required','u.app_authentication_secret'])
+            ->get(['u.id','u.name','u.email','p.mfa_required','u.app_authentication_secret'])
             ->map(fn($r)=>['id'=>(int)$r->id,'name'=>$r->name,'email'=>$r->email,
                 'override'=>$r->mfa_required===null?null:(bool)$r->mfa_required,
                 'enrolled'=>filled($r->app_authentication_secret)])->all();
@@ -69,13 +77,13 @@ final class SecuritySettingsService
         $companyId=$this->companyFor($user);if(!$companyId)return;
         $days=max(1,min(365,(int)(DB::table('tenant_security_settings')->where('company_id',$companyId)->value('trusted_device_days')??30)));
         $token=bin2hex(random_bytes(32));$id=(string)Str::uuid();
-        DB::table('trusted_devices')->insert(['id'=>$id,'user_id'=>$user->getKey(),'token_hash'=>hash('sha256',$token),
+        DB::table('trusted_devices')->insert(['id'=>$id,'user_id'=>$user->getKey(),'company_id'=>$companyId,'token_hash'=>hash('sha256',$token),
             'user_agent_hash'=>$this->uaHash(request()),'expires_at'=>now()->addDays($days),
             'last_used_at'=>now(),'created_at'=>now(),'updated_at'=>now()]);
         Cookie::queue(self::COOKIE,$id.':'.$token,$days*1440,'/',null,request()->isSecure(),true,false,'lax');
     }
 
-    public function isTrusted(?User $user,?Request $request=null):bool
+    public function isTrusted(?User $user,string $companyId,?Request $request=null):bool
     {
         if(!$user)return false;$request=$request??request();
         $raw=$request->cookie(self::COOKIE);
@@ -83,7 +91,7 @@ final class SecuritySettingsService
         [$id,$token]=explode(':',$raw,2);
         if(!Str::isUuid($id)||strlen($token)<32)return false;
         $row=DB::table('trusted_devices')->where('id',$id)->where('user_id',$user->getKey())
-            ->whereNull('revoked_at')->where('expires_at','>',now())->first();
+            ->where('company_id',$companyId)->whereNull('revoked_at')->where('expires_at','>',now())->first();
         if(!$row||!hash_equals((string)$row->token_hash,hash('sha256',$token)))return false;
         if(!$row->last_used_at||now()->diffInMinutes($row->last_used_at)>=60){
             DB::table('trusted_devices')->where('id',$id)->update(['last_used_at'=>now(),'updated_at'=>now()]);
@@ -96,7 +104,7 @@ final class SecuritySettingsService
         $this->authorize($actor,$companyId);
         $ids=DB::table('company_memberships')->where('company_id',$companyId)->where('is_active',true)->pluck('user_id');
         return DB::table('trusted_devices as d')->join('users as u','u.id','=','d.user_id')
-            ->whereIn('d.user_id',$ids)->orderByDesc('d.created_at')->limit(100)
+            ->whereIn('d.user_id',$ids)->where('d.company_id',$companyId)->orderByDesc('d.created_at')->limit(100)
             ->get(['d.id','u.name','u.email','d.expires_at','d.last_used_at','d.revoked_at'])
             ->map(fn($r)=>['id'=>$r->id,'name'=>$r->name,'email'=>$r->email,'expiresAt'=>$r->expires_at,
                 'lastUsedAt'=>$r->last_used_at,'revokedAt'=>$r->revoked_at])->all();
@@ -106,7 +114,7 @@ final class SecuritySettingsService
     {
         $this->authorize($actor,$companyId);
         $ids=DB::table('company_memberships')->where('company_id',$companyId)->where('is_active',true)->pluck('user_id');
-        $changed=DB::table('trusted_devices')->where('id',$deviceId)->whereIn('user_id',$ids)->whereNull('revoked_at')
+        $changed=DB::table('trusted_devices')->where('id',$deviceId)->whereIn('user_id',$ids)->where('company_id',$companyId)->whereNull('revoked_at')
             ->update(['revoked_at'=>now(),'updated_at'=>now()]);
         if($changed!==1)throw new AuthorizationException('Trusted device is outside this company.');
         $this->audit($actor,$companyId,'tenant.trusted_device_revoked','trusted_device',$deviceId,['revoked'=>true]);
