@@ -113,6 +113,19 @@ final class ApprovalWorkflowService
                 if (! $booking || ! in_array($booking->status, $allowedStates, true)) {
                     throw new ConflictHttpException('This proposal is unavailable for exception review.');
                 }
+                if ($category === 'discount') {
+                    $snapshot = DB::table('venue_quote_snapshots as q')
+                        ->join('venue_reservations as r', function ($join): void {
+                            $join->on('r.id', '=', 'q.reservation_id')
+                                ->on('r.company_id', '=', 'q.company_id');
+                        })->where('q.company_id', $companyId)
+                        ->where('r.source_draft_id', $bookingId)
+                        ->orderByDesc('q.created_at')->first(['q.subtotal_minor']);
+                    if ($snapshot && ! app(DiscountLimitService::class)->requiresApproval(
+                        $companyId, $membership->role, $amountMinor, (int) $snapshot->subtotal_minor)) {
+                        throw new ConflictHttpException('This discount is within the role limit and does not require approval.');
+                    }
+                }
                 if ($membership->role === 'manager'
                     && ! DB::table('hall_assignments')->where('company_id', $companyId)
                         ->where('membership_id', $membership->id)
