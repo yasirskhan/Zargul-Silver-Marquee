@@ -1,53 +1,29 @@
 <x-filament-panels::page>
-    <div class="space-y-6">
-        <section class="vd-hero">
-            <span class="eyebrow">VenueDesk · Zargul Silver Marquee</span>
-            <h1>Business Overview</h1>
-            <p>Your private operations workspace. Counts reflect only your current company and role. Booking proposals remain unconfirmed until approved.</p>
-            <div class="vd-actions">
-                <a href="{{ \App\Filament\Pages\HallCalendar::getUrl() }}">Calendar &amp; availability</a>
-                <a href="{{ \App\Filament\Pages\BookingProposals::getUrl() }}">New booking proposal</a>
-                <a href="{{ \App\Filament\Pages\FinanceDesk::getUrl() }}">Invoices &amp; payments</a>
-                <a href="{{ \App\Filament\Pages\ApprovalCenter::getUrl() }}">Approval Center</a>
-                <a href="{{ \App\Filament\Pages\WebsiteWorkspace::getUrl() }}">Website editor</a>
+    @php($ready = $loadedCompanyId === $companyId && $summary !== [])
+    <div class="space-y-5">
+        <header class="vd-pagehead">
+            <div>
+                <span class="vd-eyebrow">VenueDesk · Operations</span>
+                <h1>Business Overview</h1>
+                <p>Your private operations workspace. Counts reflect only your current company and role.</p>
             </div>
-        </section>
-        @if ($loadedCompanyId === $companyId && $summary !== [] && ($summary['canSeeCompanyProposals'] ?? false))
-            <section class="vd-metrics" aria-label="VenueDesk business metrics">
-                <div class="vd-metric"><b>{{ number_format($summary['confirmedUpcoming'] ?? 0) }}</b><span>Confirmed upcoming bookings</span></div>
-                <div class="vd-metric"><b>{{ number_format($summary['programSlotsToday'] ?? 0) }}</b><span>Program slots today</span></div>
-                <div class="vd-metric"><b>{{ number_format($summary['pendingApprovals'] ?? 0) }}</b><span>Pending approvals</span></div>
-                <div class="vd-metric"><b>{{ number_format(($summary['outstandingMinor'] ?? 0) / 100, 2) }}</b><span>PKR outstanding invoice balance</span></div>
-            </section>
-        @endif
-        <section class="vd-panel vd-quick-panel" aria-label="VenueDesk quick actions">
-            <div class="vd-panel-head"><h2>Quick actions</h2><p>Common desk tasks, using your current company and role.</p></div>
-            <div class="vd-quick-grid">
+            <div class="vd-actions">
                 @if (\App\Filament\Pages\HallCalendar::canAccess())
-                    <a class="vd-action-card" href="{{ \App\Filament\Pages\HallCalendar::getUrl(['company' => $companyId]) }}"><strong>Check availability</strong><span>Calendar, holds and hall programs</span></a>
+                    <a href="{{ \App\Filament\Pages\HallCalendar::getUrl(['company' => $companyId]) }}">Calendar &amp; availability</a>
                 @endif
                 @if (\App\Filament\Pages\BookingProposals::canAccess())
-                    <a class="vd-action-card" href="{{ \App\Filament\Pages\BookingProposals::getUrl(['company' => $companyId]) }}"><strong>Create booking</strong><span>Internal proposal first, no instant reservation</span></a>
+                    <a href="{{ \App\Filament\Pages\BookingProposals::getUrl(['company' => $companyId]) }}">New booking proposal</a>
                 @endif
                 @if (\App\Filament\Pages\FinanceDesk::canAccess())
-                    <a class="vd-action-card" href="{{ \App\Filament\Pages\FinanceDesk::getUrl(['company' => $companyId]) }}"><strong>Find invoice</strong><span>Invoices, payments and balances</span></a>
+                    <a href="{{ \App\Filament\Pages\FinanceDesk::getUrl(['company' => $companyId]) }}">Invoices &amp; payments</a>
                 @endif
                 @if (\App\Filament\Pages\ApprovalCenter::canAccess())
-                    <a class="vd-action-card" href="{{ \App\Filament\Pages\ApprovalCenter::getUrl(['company' => $companyId]) }}"><strong>Review approvals</strong><span>Discounts and protected decisions</span></a>
-                @endif
-                @if (\App\Filament\Pages\WebsiteWorkspace::canAccess())
-                    <a class="vd-action-card" href="{{ \App\Filament\Pages\WebsiteWorkspace::getUrl(['company' => $companyId]) }}"><strong>Website editor</strong><span>Draft, media and publication</span></a>
-                @endif
-                @if (\App\Filament\Pages\HallPhotos::canAccess())
-                    <a class="vd-action-card" href="{{ \App\Filament\Pages\HallPhotos::getUrl(['company' => $companyId]) }}"><strong>Hall photography</strong><span>Approved images for each hall</span></a>
+                    <a href="{{ \App\Filament\Pages\ApprovalCenter::getUrl(['company' => $companyId]) }}">Approval Center</a>
                 @endif
             </div>
-        </section>
-        <section class="vd-panel vd-note-panel" aria-label="VenueDesk operations note">
-            <div class="vd-panel-head"><h2>Operations note</h2></div>
-            <p>Bookings, payments and approvals on this desk are backed by protected services. Opening a proposal does not reserve a hall, and viewing an invoice does not verify payment.</p>
-        </section>
-        <label class="block space-y-1">
+        </header>
+
+        <label class="block max-w-sm space-y-1">
             <span class="text-sm font-medium">Operating company</span>
             <select wire:model.live="companyId" class="w-full rounded-lg border p-3 text-gray-900">
                 @foreach ($this->companyOptions() as $id => $name)
@@ -55,246 +31,79 @@
                 @endforeach
             </select>
         </label>
-        @if ($loadedCompanyId === $companyId && $summary !== [])
-            <section class="space-y-3" aria-label="Private venue overview">
-                <h2 class="font-semibold">Your workspace · {{ ucfirst($summary['role']) }}</h2>
-                @if ($summary['licenseRestricted'] ?? false)
-                    <div class="rounded-lg border p-4 space-y-2" role="status"
-                        aria-label="Venue licensing access">
-                        <p class="font-semibold">Venue operations are unavailable until a valid HAFZATECH-signed license or its approved management grace is active.</p>
-                        <p class="text-sm">Your bookings and financial records remain stored. Licensed business actions are restricted; authorized support and licensing access remain available.</p>
-                        @if (($summary['hafzatechSupportQueued'] ?? null) !== null)
-                            <a class="underline text-sm"
-                                href="{{ \App\Filament\Pages\Licensing::getUrl(['company' => $companyId]) }}">
-                                Open Licensing
-                            </a>
-                            <a class="underline text-sm ml-3"
-                                href="{{ \App\Filament\Pages\SupportInbox::getUrl(['company' => $companyId]) }}">
-                                Contact HAFZATECH Support
-                            </a>
-                        @endif
+
+        @if ($ready)
+            @if ($summary['licenseRestricted'] ?? false)
+                <section class="rounded-xl border p-4 space-y-2" role="status" aria-label="Venue licensing access">
+                    <p class="font-semibold">Venue operations are unavailable until a valid HAFZATECH-signed license or its approved management grace is active.</p>
+                    <p class="text-sm">Your bookings and financial records remain stored. Authorized support and licensing access remain available.</p>
+                    <a class="underline text-sm" href="{{ \App\Filament\Pages\Licensing::getUrl(['company' => $companyId]) }}">Open Licensing</a>
+                </section>
+            @endif
+
+            @if ($summary['canSeeCompanyProposals'])
+                <section class="vd-metrics" aria-label="VenueDesk business metrics">
+                    <div class="vd-metric"><span class="vd-bubble">✓</span><div><b>{{ number_format($summary['confirmedUpcoming'] ?? 0) }}</b><span>Confirmed upcoming bookings</span></div></div>
+                    <div class="vd-metric"><span class="vd-bubble">▦</span><div><b>{{ number_format($summary['programSlotsToday'] ?? 0) }}</b><span>Program slots today</span></div></div>
+                    <div class="vd-metric"><span class="vd-bubble">◈</span><div><b>{{ number_format($summary['pendingApprovals'] ?? 0) }}</b><span>Pending approvals</span></div></div>
+                    <div class="vd-metric"><span class="vd-bubble">₨</span><div><b>{{ number_format(($summary['outstandingMinor'] ?? 0) / 100, 2) }}</b><span>PKR outstanding invoice balance</span></div></div>
+                </section>
+            @endif
+
+            <div class="vd-dashboard-grid">
+                <section class="vd-panel" aria-label="Recent booking proposals">
+                    <div class="vd-panel-head"><h2>Recent booking proposals</h2><p>Draft and under review · not reservations</p></div>
+                    @if (($summary['recentProposals'] ?? []) !== [])
+                        <div class="overflow-x-auto"><table class="vd-table"><thead><tr><th>Date</th><th>Hall</th><th>Program</th><th>Status</th></tr></thead><tbody>
+                            @foreach ($summary['recentProposals'] as $proposal)
+                                <tr><td>{{ $proposal['eventDate'] }}</td><td>{{ $proposal['hallName'] }}</td><td>{{ ucfirst($proposal['program']) }}</td><td><span class="vd-badge {{ $proposal['status'] === 'under_review' ? 'warn' : '' }}">{{ str_replace('_',' ',$proposal['status']) }}</span></td></tr>
+                            @endforeach
+                        </tbody></table></div>
+                    @else
+                        <p class="text-sm text-gray-600">No draft proposals in your workspace.</p>
+                    @endif
+                </section>
+
+                <section class="vd-panel" aria-label="VenueDesk quick actions">
+                    <div class="vd-panel-head"><h2>Quick actions</h2><p>Common desk tasks, using your current company and role.</p></div>
+                    <div class="vd-quick-grid">
+                        @if (\App\Filament\Pages\HallCalendar::canAccess())<a class="vd-action-card" href="{{ \App\Filament\Pages\HallCalendar::getUrl(['company' => $companyId]) }}"><strong>Check availability</strong><span>Calendar, holds and hall programs</span></a>@endif
+                        @if (\App\Filament\Pages\BookingProposals::canAccess())<a class="vd-action-card" href="{{ \App\Filament\Pages\BookingProposals::getUrl(['company' => $companyId]) }}"><strong>Create booking</strong><span>Internal proposal first, no instant reservation</span></a>@endif
+                        @if (\App\Filament\Pages\FinanceDesk::canAccess())<a class="vd-action-card" href="{{ \App\Filament\Pages\FinanceDesk::getUrl(['company' => $companyId]) }}"><strong>Find invoice</strong><span>Invoices, payments and balances</span></a>@endif
+                        @if (\App\Filament\Pages\ApprovalCenter::canAccess())<a class="vd-action-card" href="{{ \App\Filament\Pages\ApprovalCenter::getUrl(['company' => $companyId]) }}"><strong>Review approvals</strong><span>Discounts and protected decisions</span></a>@endif
+                        @if (\App\Filament\Pages\WebsiteWorkspace::canAccess())<a class="vd-action-card" href="{{ \App\Filament\Pages\WebsiteWorkspace::getUrl(['company' => $companyId]) }}"><strong>Website editor</strong><span>Draft, media and publication</span></a>@endif
+                        @if (\App\Filament\Pages\HallPhotos::canAccess())<a class="vd-action-card" href="{{ \App\Filament\Pages\HallPhotos::getUrl(['company' => $companyId]) }}"><strong>Hall photography</strong><span>Approved images for each hall</span></a>@endif
                     </div>
-                @endif
-                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <div class="rounded-xl border p-4">
-                        <p class="text-sm">Halls visible to you</p>
-                        <p class="text-3xl font-semibold">{{ $summary['visibleHalls'] }}</p>
-                        <p class="text-xs">Based on current hall assignments and membership</p>
-                    </div>
-                    @if (($summary['hafzatechSupportUnread'] ?? null) !== null)
-                        <div class="rounded-xl border p-4" aria-label="Private HAFZATECH support inbox">
-                            <p class="text-sm">HAFZATECH support replies</p>
-                            <p class="text-3xl font-semibold">{{ $summary['hafzatechSupportUnread'] }}</p>
-                            <p class="text-xs">Unread messages for your enrolled company</p>
-                            <a class="text-xs underline"
-                                href="{{ \App\Filament\Pages\SupportInbox::getUrl(['company' => $companyId]) }}">
-                                Open your support inbox
-                            </a>
-                        </div>
-                    @endif
-                    @if (($summary['hafzatechSupportQueued'] ?? null) !== null)
-                        <div class="rounded-xl border p-4" aria-label="Local HAFZATECH support delivery backlog">
-                            <p class="text-sm">Local support requests awaiting delivery</p>
-                            <p class="text-3xl font-semibold">{{ $summary['hafzatechSupportQueued'] }}</p>
-                            <p class="text-xs">Queued locally — not confirmed received by HAFZATECH</p>
-                            <a class="text-xs underline"
-                                href="{{ \App\Filament\Pages\SupportInbox::getUrl(['company' => $companyId]) }}">
-                                Review queued support requests
-                            </a>
-                        </div>
-                    @endif
+                </section>
+            </div>
+
+            <details class="vd-details">
+                <summary>Your workspace · {{ ucfirst($summary['role']) }} — detailed counts</summary>
+                <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <div class="rounded-xl border p-4"><p class="text-sm">Halls visible to you</p><p class="text-3xl font-semibold">{{ $summary['visibleHalls'] }}</p><p class="text-xs">Based on current hall assignments and membership</p></div>
                     @if ($summary['canSeeCompanyProposals'])
-                        <div class="rounded-xl border p-4">
-                            <p class="text-sm">Halls needing program setup</p>
-                            <p class="text-3xl font-semibold">{{ $summary['hallsNeedingSetup'] }}</p>
-                            <p class="text-xs">Configure morning, noon and evening before confirming any booking</p>
-                            @if ($summary['hallsNeedingSetup'] > 0)
-                                <a class="text-xs underline"
-                                    href="{{ \App\Filament\Pages\HallPrograms::getUrl(['company' => $companyId, 'setup' => 'needed']) }}">
-                                    Configure halls missing program rules
-                                </a>
-                            @endif
-                        </div>
-                        <div class="rounded-xl border p-4">
-                            <p class="text-sm">Unconfirmed company proposals</p>
-                            <p class="text-3xl font-semibold">{{ $summary['drafts'] }}</p>
-                            <p class="text-xs">Draft or under review · not a reservation</p>
-                        </div>
+                        <div class="rounded-xl border p-4"><p class="text-sm">Halls needing program setup</p><p class="text-3xl font-semibold">{{ $summary['hallsNeedingSetup'] }}</p><p class="text-xs">Configure morning, noon and evening before confirming bookings</p></div>
+                        <div class="rounded-xl border p-4"><p class="text-sm">Unconfirmed company proposals</p><p class="text-3xl font-semibold">{{ $summary['drafts'] }}</p><p class="text-xs">Draft or under review · not a reservation</p></div>
+                        <div class="rounded-xl border p-4"><p class="text-sm">Proposals awaiting internal review</p><p class="text-3xl font-semibold">{{ $summary['reviewDrafts'] }}</p><p class="text-xs">Submitted draft requests only</p></div>
+                        <div class="rounded-xl border p-4"><p class="text-sm">Next 7 days · unconfirmed proposals</p><p class="text-3xl font-semibold">{{ $summary['upcomingDrafts'] }}</p><p class="text-xs">{{ $summary['upcomingFrom'] }} to {{ $summary['upcomingThrough'] }}</p></div>
                     @endif
-                    @if ($summary['canSeeCompanyProposals'])
-                        <div class="rounded-xl border p-4">
-                            <p class="text-sm">Proposals awaiting internal review</p>
-                            <p class="text-3xl font-semibold">{{ $summary['reviewDrafts'] }}</p>
-                            <p class="text-xs">Submitted draft requests only · not confirmed reservations</p>
-                            @if ($summary['reviewDrafts'] > 0)
-                                <a class="text-xs underline"
-                                    href="{{ \App\Filament\Pages\BookingProposals::getUrl(['company' => $companyId, 'status' => 'under_review']) }}">
-                                    Open internal proposal review queue
-                                </a>
-                            @endif
-                        </div>
-                    @endif
-                    @if ($summary['canSeeCompanyProposals'])
-                        <div class="rounded-xl border p-4">
-                            <p class="text-sm">Next 7 days · unconfirmed proposals</p>
-                            <p class="text-3xl font-semibold">{{ $summary['upcomingDrafts'] }}</p>
-                            <a class="text-xs underline"
-                                href="{{ \App\Filament\Pages\BookingProposals::getUrl(['company' => $companyId, 'from' => $summary['upcomingFrom'], 'to' => $summary['upcomingThrough']]) }}">
-                                Review upcoming drafts (not reserved)
-                            </a>
-                        </div>
-                    @endif
-                    @if ($summary['canPlan'])
-                        <div class="rounded-xl border p-4">
-                            <p class="text-sm">Setup planning tasks to review</p>
-                            <p class="text-3xl font-semibold">{{ $summary['plannedTasks'] }}</p>
-                            <p class="text-xs">Only your accessible halls · planning, not actual event readiness</p>
-                            @if ($summary['plannedTasks'] > 0)
-                                <a class="text-xs underline"
-                                    href="{{ \App\Filament\Pages\OperationsPlanning::getUrl(['company' => $companyId, 'status' => 'planned']) }}">
-                                    Review planned tasks
-                                </a>
-                            @endif
-                        </div>
-                    @endif
-                    @if ($summary['canReadApprovals'])
-                        <div class="rounded-xl border p-4">
-                            <p class="text-sm">Pending approval requests in your view</p>
-                            <p class="text-3xl font-semibold">{{ $summary['pendingApprovals'] }}</p>
-                            <p class="text-xs">Manager counts include only their own requests</p>
-                            @if ($summary['pendingApprovals'] > 0)
-                                <a class="text-xs underline"
-                                    href="{{ \App\Filament\Pages\ApprovalCenter::getUrl(['company' => $companyId, 'status' => 'pending']) }}">
-                                    Review pending approvals
-                                </a>
-                            @endif
-                        </div>
-                    @endif
+                    <div class="rounded-xl border p-4"><p class="text-sm">Pending approval requests</p><p class="text-3xl font-semibold">{{ $summary['pendingApprovals'] ?? 0 }}</p><p class="text-xs">Manager counts include only their own requests</p><a class="text-xs underline" href="{{ \App\Filament\Pages\ApprovalCenter::getUrl(['company' => $companyId]) }}">Review pending approvals</a></div>
                 </div>
-                <button type="button" wire:click="refreshSummary"
-                    class="rounded-lg border px-4 py-2 text-sm">Refresh overview</button>
-            </section>
-            @if ($summary['canReviewFinance'] && count($summary['recentPreviewReferences']) > 0)
-                <section class="space-y-3" aria-label="Recent nonbinding rental previews">
-                    <h2 class="font-semibold">Recent private rental previews</h2>
-                    <p class="text-xs">Owner/admin only · price snapshots are not invoices, bookings or payment authorizations.</p>
-                    <div class="grid gap-3 md:grid-cols-3">
-                        @foreach ($summary['recentPreviewReferences'] as $preview)
-                            <article wire:key="recent-preview-{{ $preview['id'] }}" class="space-y-2 rounded-xl border p-4 text-sm">
-                                <strong>{{ ucfirst($preview['program']) }} · internal frozen rental preview</strong>
-                                <p class="break-all text-xs">Preview {{ $preview['id'] }}</p>
-                                <a class="underline"
-                                    href="{{ \App\Filament\Pages\FinanceDesk::getUrl(['company' => $companyId, 'preview' => $preview['id']]) }}">
-                                    Review frozen internal preview
-                                </a>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($summary['canSeeCompanyProposals'] && count($summary['recentProposals']) > 0)
-                <section class="space-y-3" aria-label="Recent unconfirmed booking proposals">
-                    <h2 class="font-semibold">Recent unconfirmed proposals</h2>
-                    <p class="text-xs">Owner/admin only · internal requests, not held or confirmed reservations.</p>
-                    <div class="grid gap-3 md:grid-cols-3">
-                        @foreach ($summary['recentProposals'] as $proposal)
-                            <article wire:key="recent-proposal-{{ $proposal['id'] }}" class="space-y-2 rounded-xl border p-4 text-sm">
-                                <strong>{{ $proposal['hallName'] }}</strong>
-                                <p>{{ $proposal['eventDate'] }} {{ ucfirst($proposal['program']) }}</p>
-                                <p class="text-xs">Request state: {{ str_replace('_', ' ', $proposal['status']) }}</p>
-                                <a class="underline"
-                                    href="{{ \App\Filament\Pages\BookingProposals::getUrl(['company' => $companyId, 'proposal' => $proposal['id']]) }}">
-                                    Review this unconfirmed proposal
-                                </a>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($summary['canPlan'] && count($summary['recentPlans']) > 0)
-                <section class="space-y-3" aria-label="Recent internal planning tasks">
-                    <h2 class="font-semibold">Recent internal setup plans</h2>
-                    <p class="text-xs">Only your permitted halls. Planning never confirms a booking or records actual setup.</p>
-                    <div class="grid gap-3 md:grid-cols-3">
-                        @foreach ($summary['recentPlans'] as $plan)
-                            <article wire:key="recent-plan-{{ $plan['id'] }}" class="space-y-2 rounded-xl border p-4 text-sm">
-                                <strong>{{ $plan['title'] }}</strong>
-                                <p>{{ $plan['hallName'] }} · {{ $plan['eventDate'] }} {{ ucfirst($plan['program']) }}</p>
-                                <p class="text-xs">Internal status: {{ $plan['status'] }}</p>
-                                <a class="underline"
-                                    href="{{ \App\Filament\Pages\OperationsPlanning::getUrl(['company' => $companyId, 'proposal' => $plan['bookingId']]) }}">
-                                    Open this proposal's planning tasks
-                                </a>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($summary['visibleHalls'] > 0 && in_array($summary['role'], ['owner', 'admin', 'manager', 'reception'], true))
-                <a class="inline-flex rounded-lg border px-4 py-3 font-semibold underline"
-                    href="{{ \App\Filament\Pages\VenueReservations::getUrl(['company' => $companyId]) }}">
-                    Manage confirmed reservations
-                </a>
-            @endif
-            <section class="space-y-3" aria-label="Daily staff quick navigation">
-                <h2 class="font-semibold">Go directly to your work</h2>
-                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    @if ($summary['visibleHalls'] > 0)
-                        <a class="rounded-xl border p-4 underline" href="{{ \App\Filament\Pages\HallCalendar::getUrl(['company' => $companyId]) }}">
-                            Hall calendar · morning, noon and evening
-                        </a>
-                    @endif
-                    @if ($summary['canSeeCompanyProposals'])
-                        <a class="rounded-xl border p-4 underline"
-                            href="{{ \App\Filament\Pages\BookingProposals::getUrl(['company' => $companyId]) }}">
-                            Review booking proposals
-                        </a>
-                    @endif
-                    @if ($summary['canReadApprovals'])
-                        <a class="rounded-xl border p-4 underline"
-                            href="{{ \App\Filament\Pages\ApprovalCenter::getUrl(['company' => $companyId]) }}">
-                            Approval center
-                        </a>
-                    @endif
-                    @if ($summary['canReviewFinance'])
-                        <a class="rounded-xl border p-4 underline"
-                            href="{{ \App\Filament\Pages\FinanceDesk::getUrl(['company' => $companyId]) }}">
-                            Finance review · internal only
-                        </a>
-                    @endif
-                    @if ($summary['canPlan'])
-                        <a class="rounded-xl border p-4 underline"
-                            href="{{ \App\Filament\Pages\OperationsPlanning::getUrl(['company' => $companyId]) }}">
-                            Operations planning
-                        </a>
-                    @endif
-                    @if ($summary['canSearch'])
-                        <a class="rounded-xl border p-4 underline"
-                            href="{{ \App\Filament\Pages\InternalQuickSearch::getUrl(['company' => $companyId]) }}">
-                            Universal staff search
-                        </a>
-                    @endif
-                    @if ($summary['canManageHallRules'])
-                        <a class="rounded-xl border p-4 underline"
-                            href="{{ \App\Filament\Pages\HallPrograms::getUrl(['company' => $companyId]) }}">
-                            Hall program rules
-                        </a>
-                    @endif
-                    @if ($summary['canEditWebsite'])
-                        <a class="rounded-xl border p-4 underline"
-                            href="{{ \App\Filament\Pages\WebsiteWorkspace::getUrl(['company' => $companyId]) }}">
-                            Website editor
-                        </a>
-                    @endif
-                    @if ($summary['canReadAudit'])
-                        <a class="rounded-xl border p-4 underline"
-                            href="{{ \App\Filament\Pages\AuditHistory::getUrl(['company' => $companyId]) }}">
-                            Audit history
-                        </a>
-                    @endif
+                <div class="vd-actions mt-4">
+                    <a href="{{ \App\Filament\Pages\VenueReservations::getUrl(['company' => $companyId]) }}">Manage confirmed reservations</a>
+                    <a href="{{ \App\Filament\Pages\InternalQuickSearch::getUrl(['company' => $companyId]) }}">Universal staff search</a>
+                    <a href="{{ \App\Filament\Pages\HallPrograms::getUrl(['company' => $companyId]) }}">Hall program rules</a>
+                    <a href="{{ \App\Filament\Pages\WebsiteWorkspace::getUrl(['company' => $companyId]) }}">Website editor</a>
+                    <a href="{{ \App\Filament\Pages\AuditHistory::getUrl(['company' => $companyId]) }}">Audit history</a>
                 </div>
-                <p class="text-xs">Navigation does not grant permissions. Every destination verifies current access again.</p>
+            </details>
+
+            <section class="vd-panel vd-note-panel" aria-label="VenueDesk operations note" style="margin-top:16px">
+                <div class="vd-panel-head"><h2>Operations note</h2></div>
+                <p>Bookings, payments and approvals are backed by protected services. Opening a proposal does not reserve a hall, and viewing an invoice does not verify payment.</p>
             </section>
+        @else
+            <section class="vd-panel"><p>Refresh the overview to load the selected company.</p></section>
         @endif
     </div>
 </x-filament-panels::page>

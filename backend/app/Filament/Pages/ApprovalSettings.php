@@ -26,7 +26,7 @@ final class ApprovalSettings extends Page
     protected static string|\UnitEnum|null $navigationGroup='Configuration';
 
     #[Url(as:'company')] public ?string $companyId=null;
-    #[Locked] public array $limits=['owner'=>0,'admin'=>0,'manager'=>0];
+    public array $limits=['owner'=>0,'admin'=>0,'manager'=>0];
     public string $grantAdminId='';public string $grantCeiling='';public string $grantStarts='';public string $grantEnds='';
     public string $grantReason='';public string $revokeReason='';public ?string $telegramUrl=null;
 
