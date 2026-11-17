@@ -74,8 +74,11 @@ final class TenantEmailSettingsService
         $paid=(int)DB::table('venue_invoice_payments')->where('company_id',$companyId)->where('invoice_id',$invoiceId)->sum('amount_minor');
         $refunded=(int)DB::table('venue_invoice_refunds')->where('company_id',$companyId)->where('invoice_id',$invoiceId)->sum('amount_minor');
         $due=max(0,(int)$invoice->total_minor-($paid-$refunded));
+        $net=max(0,$paid-$refunded);
         $body="Invoice {$invoice->invoice_number}\nTotal: ".number_format($invoice->total_minor/100,2)." {$invoice->currency_code}"
-            ."\nPaid: ".number_format($paid/100,2)." {$invoice->currency_code}"
+            ."\nPayments received: ".number_format($paid/100,2)." {$invoice->currency_code}"
+            ."\nRefunds: ".number_format($refunded/100,2)." {$invoice->currency_code}"
+            ."\nNet paid: ".number_format($net/100,2)." {$invoice->currency_code}"
             ."\nOutstanding: ".number_format($due/100,2)." {$invoice->currency_code}\n\nZargul Silver Marquee";
         return $this->send($companyId,$email,'Invoice '.$invoice->invoice_number,$body);
     }
