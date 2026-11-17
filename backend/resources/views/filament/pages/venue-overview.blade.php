@@ -157,6 +157,14 @@
                         @if (($summary['plannedTasks'] ?? 0) > 0)
                             <p class="mt-2">Setup planning tasks to review</p>
                         @endif
+                        @if (($summary['canReviewFinance'] ?? false) && ($summary['recentPreviewReferences'] ?? []) !== [])
+                            <p class="mt-2 font-semibold">Recent private rental previews</p>
+                            <ul class="space-y-1">
+                                @foreach ($summary['recentPreviewReferences'] as $preview)
+                                    <li>Preview {{ $preview['id'] }} · <a class="underline" href="{{ \App\Filament\Pages\FinanceDesk::getUrl(['company' => $companyId]) }}">Review frozen internal preview</a></li>
+                                @endforeach
+                            </ul>
+                        @endif
                     </div>
                 </div>
 
