@@ -37,7 +37,10 @@
                 <section class="rounded-xl border p-4 space-y-2" role="status" aria-label="Venue licensing access">
                     <p class="font-semibold">Venue operations are unavailable until a valid HAFZATECH-signed license or its approved management grace is active.</p>
                     <p class="text-sm">Your bookings and financial records remain stored. Authorized support and licensing access remain available.</p>
-                    <a class="underline text-sm" href="{{ \App\Filament\Pages\Licensing::getUrl(['company' => $companyId]) }}">Open Licensing</a>
+                    @if (in_array($summary['role'] ?? '', ['owner','admin'], true))
+                        <a class="underline text-sm" href="{{ \App\Filament\Pages\Licensing::getUrl(['company' => $companyId]) }}">Open Licensing</a>
+                        <a class="ml-3 underline text-sm" href="{{ \App\Filament\Pages\SupportInbox::getUrl(['company' => $companyId]) }}">Contact HAFZATECH Support</a>
+                    @endif
                 </section>
             @endif
 
@@ -90,12 +93,80 @@
                     <div class="rounded-xl border p-4"><p class="text-sm">Pending approval requests</p><p class="text-3xl font-semibold">{{ $summary['pendingApprovals'] ?? 0 }}</p><p class="text-xs">Manager counts include only their own requests</p><a class="text-xs underline" href="{{ \App\Filament\Pages\ApprovalCenter::getUrl(['company' => $companyId]) }}">Review pending approvals</a></div>
                 </div>
                 <div class="vd-actions mt-4">
-                    <a href="{{ \App\Filament\Pages\VenueReservations::getUrl(['company' => $companyId]) }}">Manage confirmed reservations</a>
-                    <a href="{{ \App\Filament\Pages\InternalQuickSearch::getUrl(['company' => $companyId]) }}">Universal staff search</a>
-                    <a href="{{ \App\Filament\Pages\HallPrograms::getUrl(['company' => $companyId]) }}">Hall program rules</a>
-                    <a href="{{ \App\Filament\Pages\WebsiteWorkspace::getUrl(['company' => $companyId]) }}">Website editor</a>
-                    <a href="{{ \App\Filament\Pages\AuditHistory::getUrl(['company' => $companyId]) }}">Audit history</a>
+                    @if ($summary['canPlan'] ?? false)
+                        <a href="{{ \App\Filament\Pages\VenueReservations::getUrl(['company' => $companyId]) }}">Manage confirmed reservations</a>
+                    @endif
+                    @if ($summary['canSearch'] ?? false)
+                        <a href="{{ \App\Filament\Pages\InternalQuickSearch::getUrl(['company' => $companyId]) }}">Universal staff search</a>
+                    @endif
+                    @if ($summary['canManageHallRules'] ?? false)
+                        <a href="{{ \App\Filament\Pages\HallPrograms::getUrl(['company' => $companyId]) }}">Hall program rules</a>
+                    @endif
+                    @if ($summary['canEditWebsite'] ?? false)
+                        <a href="{{ \App\Filament\Pages\WebsiteWorkspace::getUrl(['company' => $companyId]) }}">Website editor</a>
+                    @endif
+                    @if ($summary['canReadAudit'] ?? false)
+                        <a href="{{ \App\Filament\Pages\AuditHistory::getUrl(['company' => $companyId]) }}">Audit history</a>
+                    @endif
                 </div>
+
+                <div class="mt-4 grid gap-3 md:grid-cols-2">
+                    <div class="rounded border p-3 text-sm">
+                        <p class="font-semibold">Owner shortcuts</p>
+                        <ul class="mt-1 space-y-1">
+                            @if ($summary['canSeeCompanyProposals'] ?? false)
+                                <li><a class="underline" href="{{ \App\Filament\Pages\BookingProposals::getUrl(['company' => $companyId]) }}">Review booking proposals</a></li>
+                                <li><a class="underline" href="{{ \App\Filament\Pages\BookingProposals::getUrl(['company' => $companyId]) }}">Open internal proposal review queue</a></li>
+                            @endif
+                            @if ($summary['canReadApprovals'] ?? false)
+                                <li><a class="underline" href="{{ \App\Filament\Pages\ApprovalCenter::getUrl(['company' => $companyId]) }}">Approval center</a> · <a class="underline" href="{{ \App\Filament\Pages\ApprovalCenter::getUrl(['company' => $companyId]) }}">Review pending approvals</a></li>
+                            @endif
+                            @if ($summary['canReviewFinance'] ?? false)
+                                <li>Finance review · internal only</li>
+                            @endif
+                            @if ($summary['canPlan'] ?? false)
+                                <li><a class="underline" href="{{ \App\Filament\Pages\OperationsPlanning::getUrl(['company' => $companyId]) }}">Operations planning</a></li>
+                                <li><a class="underline" href="{{ \App\Filament\Pages\HallCalendar::getUrl(['company' => $companyId]) }}">Hall calendar</a></li>
+                            @endif
+                        </ul>
+                    </div>
+                    <div class="rounded border p-3 text-sm">
+                        <p class="font-semibold">Halls and setup</p>
+                        <ul class="mt-1 space-y-1">
+                            @foreach (($summary['hallSetupRows'] ?? []) as $hall)
+                                <li>{{ $hall['name'] }} · {{ $hall['ready'] ? 'Ready Hall' : 'Needs Setup Hall' }}</li>
+                            @endforeach
+                            @if (($summary['hallsNeedingSetup'] ?? 0) > 0)
+                                <li><a class="underline" href="{{ \App\Filament\Pages\HallPrograms::getUrl(['company' => $companyId, 'setup' => 'needed']) }}">Configure halls missing program rules</a></li>
+                            @endif
+                        </ul>
+                        @if (($summary['recentPlans'] ?? []) !== [])
+                            <p class="mt-2 font-semibold">Recent internal setup plans</p>
+                            <ul class="space-y-1">
+                                @foreach ($summary['recentPlans'] as $plan)
+                                    <li>{{ $plan['title'] }} · {{ $plan['hallName'] }} · <a class="underline" href="{{ \App\Filament\Pages\OperationsPlanning::getUrl(['company' => $companyId]) }}">Open this proposal</a></li>
+                                @endforeach
+                            </ul>
+                        @endif
+                        @if (($summary['drafts'] ?? 0) > 0)
+                            <p class="mt-2">Recent unconfirmed proposals · <a class="underline" href="{{ \App\Filament\Pages\BookingProposals::getUrl(['company' => $companyId]) }}">Review this unconfirmed proposal</a></p>
+                        @endif
+                        @if (($summary['upcomingDrafts'] ?? 0) > 0)
+                            <p class="mt-2">Next 7 days · <a class="underline" href="{{ \App\Filament\Pages\BookingProposals::getUrl(['company' => $companyId]) }}">Review upcoming drafts (not reserved)</a></p>
+                        @endif
+                        @if (($summary['plannedTasks'] ?? 0) > 0)
+                            <p class="mt-2">Setup planning tasks to review</p>
+                        @endif
+                    </div>
+                </div>
+
+                @if (($summary['hafzatechSupportQueued'] ?? null) !== null)
+                    <div class="mt-3 rounded border p-3 text-sm">
+                        <p><strong>Local support requests awaiting delivery</strong> · Queued locally</p>
+                        <a class="underline" href="{{ \App\Filament\Pages\SupportInbox::getUrl(['company' => $companyId]) }}">Review queued support requests</a>
+                        <a class="ml-3 underline" href="{{ \App\Filament\Pages\SupportInbox::getUrl(['company' => $companyId]) }}">Contact HAFZATECH Support</a>
+                    </div>
+                @endif
             </details>
 
             <section class="vd-panel vd-note-panel" aria-label="VenueDesk operations note" style="margin-top:16px">

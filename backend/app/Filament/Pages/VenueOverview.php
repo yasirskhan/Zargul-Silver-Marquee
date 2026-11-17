@@ -159,6 +159,12 @@ final class VenueOverview extends Page
             'licenseRestricted' => config('central_control.activation_enabled') === true
                 && ! $canOperate,
             'visibleHalls' => $halls,
+            'hallSetupRows' => $canSeeCompanyProposals
+                ? Hall::query()->where('company_id', $this->companyId)
+                    ->whereIn('id', $visibleHallIds)->where('is_active', true)
+                    ->orderBy('name')->get(['id', 'name', 'program_rules_revision'])
+                    ->map(fn (Hall $row) => ['id' => $row->id, 'name' => $row->name,
+                        'ready' => (int) $row->program_rules_revision > 0])->all() : [],
             'hallsNeedingSetup' => $canSeeCompanyProposals
                 ? DB::table('halls')->where('company_id', $this->companyId)
                     ->whereIn('id', $visibleHallIds)
