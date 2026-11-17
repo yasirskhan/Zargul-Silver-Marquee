@@ -80,7 +80,7 @@
                 </section>
             </div>
 
-            <section aria-label="Private venue overview"><details class="vd-details">
+            <section aria-label="Private venue overview"><details class="vd-details" open>
                 <summary>Your workspace · {{ ucfirst($summary['role']) }} — detailed counts</summary>
                 <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <div class="rounded-xl border p-4"><p class="text-sm">Halls visible to you</p><p class="text-3xl font-semibold">{{ $summary['visibleHalls'] }}</p><p class="text-xs">Based on current hall assignments and membership</p></div>
