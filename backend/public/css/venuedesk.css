@@ -139,3 +139,19 @@ body{background:var(--vd-cream)}
 .vd-wizard-steps button[disabled]{opacity:.45}
 .vd-wizard-steps button[class*="font-semibold"]{background:#123d2d;color:#fff;border-color:#123d2d}
 .fi-page section[aria-label]{border-radius:11px;box-shadow:0 3px 15px #173b2910}
+
+/* Installation wizard two-column shell */
+.vd-wizard-layout{display:grid;grid-template-columns:255px minmax(0,1fr);gap:18px;align-items:start}
+.vd-wizard-side{background:linear-gradient(160deg,#163e30,#102f24);color:#e8efe7;border-radius:11px;padding:20px;position:sticky;top:80px}
+.vd-wizard-side h2{font-family:'Cormorant Garamond',serif;color:#fff;font-size:1.7rem;margin:4px 0}
+.vd-wizard-side p{color:#c7d7cb;font-size:12px}
+.vd-wizard-side .vd-wizard-steps{display:grid;gap:4px;margin:14px 0}
+.vd-wizard-steps button{width:100%;text-align:left;border:0;background:transparent;color:#d9e5db;padding:7px 8px;border-radius:6px;font-size:12px;display:flex;gap:8px;align-items:center}
+.vd-wizard-steps button span{width:21px;height:21px;border-radius:50%;background:#ffffff1f;display:grid;place-items:center;font-size:10px;font-weight:700}
+.vd-wizard-steps button.active{background:linear-gradient(110deg,#c3a14d,#ae8639);color:#fff}
+.vd-wizard-steps button.done{background:#ffffff12;color:#cfe2d4}
+.vd-wizard-side .vd-wizard-help{border-top:1px solid #ffffff1f;padding-top:12px;font-size:11px;color:#c7d7cb}
+.vd-wizard-side .vd-wizard-help strong{color:#f0dfab}
+.vd-wizard-main{min-width:0}
+.vd-wizard-main form>div:last-child{display:flex;gap:8px;flex-wrap:wrap}
+@media(max-width:900px){.vd-wizard-layout{grid-template-columns:1fr}.vd-wizard-side{position:static}.vd-wizard-steps{grid-template-columns:1fr 1fr}}

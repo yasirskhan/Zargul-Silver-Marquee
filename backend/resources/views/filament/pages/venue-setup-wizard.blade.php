@@ -25,18 +25,25 @@
                     class="inline-flex rounded-lg border px-4 py-2">Open hall configuration</a>
             </section>
         @else
-            <ol class="vd-wizard-steps" aria-label="Setup steps">
-                @foreach ([1 => 'Company and venue', 2 => 'Halls', 3 => 'Programs', 4 => 'Pricing', 5 => 'Add-ons', 6 => 'Branding', 7 => 'Payments', 8 => 'Staff', 9 => 'Licensing', 10 => 'Review'] as $number => $label)
-                    <li>
-                        <button type="button" wire:click="goToStep({{ $number }})"
-                            @disabled($number > $step)
-                            class="rounded-lg border px-3 py-2 {{ $step === $number ? 'font-semibold' : '' }} disabled:opacity-50">
-                            {{ $number }}. {{ $label }}
-                        </button>
-                    </li>
-                @endforeach
-            </ol>
-
+            <div class="vd-wizard-layout">
+                <aside class="vd-wizard-side">
+                    <span class="vd-eyebrow">Installation</span>
+                    <h2>Venue setup</h2>
+                    <p>Ten saved steps to launch your venue.</p>
+                    <ol class="vd-wizard-steps" aria-label="Setup steps">
+                        @foreach ([1 => 'Company and venue', 2 => 'Halls', 3 => 'Programs', 4 => 'Pricing', 5 => 'Add-ons', 6 => 'Branding', 7 => 'Payments', 8 => 'Staff', 9 => 'Licensing', 10 => 'Review'] as $number => $label)
+                            <li>
+                                <button type="button" wire:click="goToStep({{ $number }})"
+                                    @disabled($number > $step)
+                                    class="{{ $step === $number ? 'active' : '' }} {{ $step > $number ? 'done' : '' }} disabled:opacity-50">
+                                    <span>{{ $number }}</span>{{ $label }}
+                                </button>
+                            </li>
+                        @endforeach
+                    </ol>
+                    <div class="vd-wizard-help"><strong>Saved automatically</strong><p>Each step persists to PostgreSQL. You can return to a completed step without losing company data.</p></div>
+                </aside>
+                <div class="vd-wizard-main">
             <form wire:submit="saveAndContinue" class="space-y-4">
                 @if ($step === 1)
                     <section aria-label="Company and venue details" class="grid gap-4 rounded-xl border p-4 md:grid-cols-2">
@@ -376,6 +383,8 @@
                     @endif
                 </div>
             </form>
+                </div>
+            </div>
         @endif
     </div>
 </x-filament-panels::page>
