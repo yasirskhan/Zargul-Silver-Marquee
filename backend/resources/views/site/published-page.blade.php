@@ -68,7 +68,7 @@
         .brand{display:flex;align-items:center;gap:12px;letter-spacing:.14em;font-size:.9rem}.brand b{display:block;font-size:.78rem;color:#e9ce9b}.brand small{display:block;font-size:.55rem;color:#eee;letter-spacing:.28em}.brand-mark{font-size:2rem;color:var(--gold)}
         .site-nav{display:flex;align-items:center;gap:22px;font-size:.82rem}.site-nav a:hover{color:#e9ce9b}.menu-toggle{display:none}.nav-toggle{display:none}
         .pill{display:inline-flex;align-items:center;justify-content:center;padding:12px 22px;border-radius:3px;font-size:.8rem;font-weight:700;border:1px solid transparent}.pill.gold{background:var(--gold);color:#172c23}.pill.transparent{border-color:#ffffffb3;color:#fff}
-        .hero{min-height:720px;position:relative;display:flex;align-items:center;background:linear-gradient(90deg,#07150fd9,#253a2d38),url('/images/hall.jpg') center/cover;color:#fff}
+        .hero{min-height:720px;position:relative;display:flex;align-items:center;background:linear-gradient(125deg,#07150f 0%,#17372e 52%,#0b1d15 100%);background:linear-gradient(90deg,#07150fd9,#253a2d38),url('/images/hall.jpg') center/cover;color:#fff}
         .hero-content{z-index:1;max-width:820px;margin:60px clamp(24px,8vw,140px) 0}.hero-content p{max-width:560px;font-size:1.06rem;color:#f2f2e7;margin:18px 0 28px}
         .eyebrow{font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;color:#e6d2aa;font-weight:700}.eyebrow.dark{color:#9a784d}
         .section{padding:90px clamp(22px,7vw,130px)}.warm{background:var(--warm)}.intro{text-align:center}.section-copy{max-width:660px;color:var(--muted);margin:18px auto 0}
