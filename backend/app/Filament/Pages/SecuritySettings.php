@@ -73,7 +73,7 @@ final class SecuritySettings extends Page
     public function trustThisDevice():void
     {
         $actor=Filament::auth()->user();abort_unless($actor instanceof User,403);
-        app(SecuritySettingsService::class)->trustCurrentDevice($actor);
+        app(SecuritySettingsService::class)->trustCurrentDevice($actor,$this->companyId);
         Notification::make()->title('This device is now trusted')->body('Two-step authentication will be skipped on this device until it expires or is revoked.')->success()->send();
     }
     public function revokeDevice(string $id):void

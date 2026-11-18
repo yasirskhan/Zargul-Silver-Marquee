@@ -97,6 +97,51 @@ class VenueInvoiceServiceTest extends TestCase
         return [$company, $owner, $manager, $reservation, $quote];
     }
 
+    public function test_invoice_applies_within_limit_discount_and_requires_approval_above_it(): void
+    {
+        [$company, $owner, , $reservation, $quote] = $this->fixture();
+        config()->set('invoice_controls.issuance_enabled', true);
+        config()->set('invoice_controls.tax_rate_bps', 0);
+        app(\App\Services\DiscountLimitService::class)->save($owner, $company->id,
+            ['owner' => 2000, 'admin' => 1000, 'manager' => 500]);
+        $service = app(VenueInvoiceService::class);
+
+        $below = (string) Str::uuid();
+        $result = $service->issue($owner, $company->id, $quote, $below,
+            'Within-limit invoice discount', 15000);
+        $this->assertSame(135000, $result['totalMinor']);
+        $invoice = DB::table('venue_invoices')->where('id', $below)->first();
+        $this->assertSame(135000, (int) $invoice->subtotal_minor);
+        $this->assertStringContainsString('Approved discount', (string) $invoice->frozen_lines);
+
+        DB::table('companies')->where('slug','invoice-trial')->update(['slug'=>'invoice-trial-first']);
+        DB::table('users')->where('email','invoice-owner@example.test')->update(['email'=>'invoice-owner-first@example.test']);
+        DB::table('users')->where('email','invoice-manager@example.test')->update(['email'=>'invoice-manager-first@example.test']);
+        [$company2, $owner2, , $reservation2, $quote2] = $this->fixture();
+        config()->set('invoice_controls.issuance_enabled', true);
+        config()->set('invoice_controls.tax_rate_bps', 0);
+        app(\App\Services\DiscountLimitService::class)->save($owner2, $company2->id,
+            ['owner' => 2000, 'admin' => 1000, 'manager' => 500]);
+        $above = (string) Str::uuid();
+        try {
+            $service->issue($owner2, $company2->id, $quote2, $above,
+                'Above-limit invoice discount without approval', 45000);
+            $this->fail('Above-limit discount was invoiced without approval.');
+        } catch (ConflictHttpException) {
+            $this->assertSame(0, DB::table('venue_invoices')->where('id', $above)->count());
+        }
+        $approval = (string) Str::uuid();
+        DB::table('approval_requests')->insert([
+            'id' => $approval, 'company_id' => $company2->id,
+            'booking_id' => DB::table('venue_reservations')->where('id', $reservation2)->value('source_draft_id'),
+            'category' => 'discount', 'amount_minor' => 45000, 'currency' => 'PKR',
+            'reason' => 'Independent discount approval', 'requested_by' => $owner2->id,
+            'status' => 'approved', 'revision' => 2,
+        ]);
+        $approved = $service->issue($owner2, $company2->id, $quote2, $above,
+            'Approved above-limit invoice discount', 45000, $approval);
+        $this->assertSame(105000, $approved['totalMinor']);
+    }
     public function test_tax_rate_and_operator_release_are_mandatory_for_numbered_invoice(): void
     {
         [$company, $owner, , $reservation, $quote] = $this->fixture();

@@ -42,7 +42,7 @@ final class VenueInvoiceService
         return $tax;
     }
 
-    public function issue(User $actor, string $companyId, string $quoteIssueId, string $invoiceId, string $reason): array
+    public function issue(User $actor, string $companyId, string $quoteIssueId, string $invoiceId, string $reason, int $discountMinor = 0, ?string $discountApprovalId = null): array
     {
         $this->gate();
         if (! Str::isUuid($quoteIssueId) || ! Str::isUuid($invoiceId)) {
@@ -53,7 +53,7 @@ final class VenueInvoiceService
             || preg_match('/[<>@[:cntrl:]]|https?:\/\/|www\./iu', $reason)) {
             throw new InvalidArgumentException('Safe plain-text invoice reason required.');
         }
-        $result = DB::transaction(function () use ($actor, $companyId, $quoteIssueId, $invoiceId, $reason): array {
+        $result = DB::transaction(function () use ($actor, $companyId, $quoteIssueId, $invoiceId, $reason, $discountMinor, $discountApprovalId): array {
             $taxBps = $this->gate();
             $company = DB::table('companies')->where('id', $companyId)->lockForUpdate()->first();
             if (! $company) {
@@ -91,6 +91,35 @@ final class VenueInvoiceService
                 throw new ConflictHttpException('Reservation changed or quote source is not valid for invoice.');
             }
             $subtotal = (int) $quote->subtotal_minor;
+            $discount = max(0, $discountMinor);
+            if ($discount > 0) {
+                if ($discount >= $subtotal) {
+                    throw new ConflictHttpException('Discount must be less than the quoted subtotal.');
+                }
+                $role = DB::table('company_memberships')->where('company_id', $companyId)
+                    ->where('user_id', $actor->getKey())->where('is_active', true)->value('role');
+                $needsApproval = app(DiscountLimitService::class)
+                    ->requiresApproval($companyId, (string) $role, $discount, $subtotal);
+                if ($needsApproval) {
+                    if ($discountApprovalId === null || ! Str::isUuid($discountApprovalId)) {
+                        throw new ConflictHttpException('This discount exceeds the role limit and requires approval.');
+                    }
+                    $approval = DB::table('approval_requests')->where('company_id', $companyId)
+                        ->where('id', $discountApprovalId)->where('category', 'discount')
+                        ->where('status', 'approved')->first();
+                    if (! $approval || $approval->booking_id !== $reservation->source_draft_id
+                        || (int) $approval->amount_minor < $discount) {
+                        throw new ConflictHttpException('Approved discount authority is invalid for this invoice.');
+                    }
+                }
+                $lines = json_decode($quote->frozen_lines, true, 512, JSON_THROW_ON_ERROR);
+                $lines[] = ['code' => 'discount', 'name' => 'Approved discount', 'quantity' => 1,
+                    'rateMinor' => -$discount, 'amountMinor' => -$discount];
+                $frozenLines = json_encode($lines, JSON_THROW_ON_ERROR);
+                $subtotal -= $discount;
+            } else {
+                $frozenLines = $quote->frozen_lines;
+            }
             $taxMinor = intdiv($subtotal * $taxBps + 5000, 10000);
             $total = $subtotal + $taxMinor;
             if ($total > 100000000000) {
@@ -108,7 +137,7 @@ final class VenueInvoiceService
                 'reservation_id' => $reservation->id, 'customer_id' => $reservation->customer_id,
                 'number' => $number, 'invoice_number' => $reference,
                 'tax_rate_bps' => $taxBps, 'currency_code' => $quote->currency_code,
-                'frozen_lines' => $quote->frozen_lines,
+                'frozen_lines' => $frozenLines,
                 'subtotal_minor' => $subtotal, 'tax_minor' => $taxMinor,
                 'total_minor' => $total, 'reason' => $reason,
                 'issued_by' => $actor->getKey(), 'issued_at' => now(),

@@ -35,6 +35,7 @@ class SecuritySettingsServiceTest extends TestCase
         $this->assertTrue($service->requiresMfa($staff->fresh(),$company->id));
         $service->setUserMfa($owner,$company->id,$staff->id,false);
         $this->assertFalse($service->requiresMfa($staff->fresh(),$company->id));
+        session(['zargul_mfa_verified_at'=>now()->timestamp]);
         $service->trustCurrentDevice($owner);
         $raw=Cookie::queued(SecuritySettingsService::COOKIE)->getValue();
         $request=Request::create('/');$request->cookies->set(SecuritySettingsService::COOKIE,$raw);

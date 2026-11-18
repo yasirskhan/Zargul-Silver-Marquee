@@ -24,8 +24,7 @@ final class TrustedAppAuthentication extends AppAuthentication
     {
         $ok=parent::verifyCode($code,$secret,$shouldPreventCodeReuse);
         if($ok){
-            $user=Filament::auth()->user();
-            if($user instanceof User)app(SecuritySettingsService::class)->trustCurrentDevice($user);
+            session(['zargul_mfa_verified_at'=>now()->timestamp]);
         }
         return $ok;
     }

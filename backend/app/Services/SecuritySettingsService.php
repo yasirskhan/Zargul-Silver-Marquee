@@ -72,9 +72,16 @@ final class SecuritySettingsService
                 'enrolled'=>filled($r->app_authentication_secret)])->all();
     }
 
-    public function trustCurrentDevice(User $user):void
+    public function trustCurrentDevice(User $user,?string $companyId=null):void
     {
-        $companyId=$this->companyFor($user);if(!$companyId)return;
+        $companyId=$companyId??$this->companyFor($user);if(!$companyId)return;
+        if(!DB::table('company_memberships')->where('company_id',$companyId)->where('user_id',$user->getKey())->where('is_active',true)->exists()) {
+            throw new AuthorizationException('Active company membership required.');
+        }
+        $verifiedAt=(int)(session('zargul_mfa_verified_at')??0);
+        if($verifiedAt<1||now()->timestamp-$verifiedAt>600) {
+            throw new AuthorizationException('Verify MFA again before trusting this device.');
+        }
         $days=max(1,min(365,(int)(DB::table('tenant_security_settings')->where('company_id',$companyId)->value('trusted_device_days')??30)));
         $token=bin2hex(random_bytes(32));$id=(string)Str::uuid();
         DB::table('trusted_devices')->insert(['id'=>$id,'user_id'=>$user->getKey(),'company_id'=>$companyId,'token_hash'=>hash('sha256',$token),
