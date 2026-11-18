@@ -45,6 +45,14 @@ function centralStaffChrome(string $inner): string
 a{color:#8a6a3e}
 .central-top{background:linear-gradient(115deg,#10271f,#17372e);color:#fff;padding:20px clamp(18px,5vw,54px);display:flex;justify-content:space-between;align-items:center;gap:16px}
 .brand{font-family:Georgia,'Times New Roman',serif;font-size:1.55rem;letter-spacing:.06em;color:#fff;text-decoration:none}.brand b{color:var(--g);font-size:.62rem;letter-spacing:.22em;display:block;font-family:'DM Sans',sans-serif}
+.central-shell{display:grid;grid-template-columns:238px minmax(0,1fr);min-height:100vh}
+.central-side{background:linear-gradient(155deg,#163e30,#102f24);color:#e8efe7;padding:24px 14px;display:flex;flex-direction:column;gap:8px}
+.central-side .brand{font-size:1.2rem;padding:0 10px;margin-bottom:2px}
+.central-side .sub{font-size:9px;letter-spacing:.2em;color:#f0dfab;margin:0 10px 20px}
+.central-side a{color:#edf3ed;text-decoration:none;padding:10px 11px;border-radius:7px;font-size:13px;font-weight:600}
+.central-side a:hover{background:#ffffff15}
+.central-side a.active{background:linear-gradient(110deg,#c3a14d,#ae8639);color:#fff}
+.central-work{min-width:0}
 .central-wrap{max-width:1180px;margin:0 auto;padding:28px clamp(16px,4vw,42px)}
 h1{font-family:Georgia,'Times New Roman',serif;font-size:clamp(2rem,4vw,3.2rem);margin:0 0 8px;color:var(--f)}
 h2{font-family:Georgia,'Times New Roman',serif;font-size:1.7rem;margin:0 0 8px;color:var(--f)}
@@ -61,10 +69,15 @@ CSS;
     return '<!doctype html><html lang="en"><head><meta charset="utf-8">'
         .'<meta name="viewport" content="width=device-width, initial-scale=1">'
         .'<title>HAFZATECH Central</title><style>'.$css.'</style></head><body>'
-        .'<header class="central-top"><a class="brand" href="/staff">✦ HAFZATECH<b>CENTRAL CONTROL CENTER</b></a>'
+        .'<div class="central-shell"><aside class="central-side"><a class="brand" href="/staff/home">✦ HAFZATECH</a>'
+        .'<div class="sub">CENTRAL CONTROL CENTER</div>'
+        .'<a href="/staff/home">Dashboard</a><a href="/staff/plans">Plans &amp; pricing</a>'
+        .'<a href="/staff/staff">Staff &amp; access</a><a href="/staff/team">Role requests</a>'
+        .'<a href="/staff/audit">Security &amp; audit</a></aside>'
+        .'<div class="central-work"><header class="central-top"><a class="brand" href="/staff/home">✦ HAFZATECH<b>CENTRAL CONTROL CENTER</b></a>'
         .'<span style="font-size:.7rem;letter-spacing:.16em;color:#caa56b">VENDOR ONLY</span></header>'
         .'<main class="central-wrap">'.$inner.'</main>'
-        .'<footer class="central-foot">Separate vendor security boundary. No production signing or settlement is available from this interface.</footer>'
+        .'<footer class="central-foot">Separate vendor security boundary. No production signing or settlement is available from this interface.</footer></div></div>'
         .'</body></html>';
 }
 

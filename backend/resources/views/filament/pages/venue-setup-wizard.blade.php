@@ -1,9 +1,11 @@
 <x-filament-panels::page>
     <div class="space-y-6">
-        <p class="text-sm text-gray-600 dark:text-gray-300">
-            Only an active, verified company Owner can complete this setup. Each step is saved to PostgreSQL and can
-            be resumed without resetting existing halls or company data.
-        </p>
+        <header class="vd-pagehead">
+            <div><span class="vd-eyebrow">Installation · VenueDesk</span>
+                <h1>Venue setup</h1>
+                <p>Only an active, verified company Owner can complete this setup. Each step is saved to PostgreSQL and can be resumed without resetting existing halls or company data.</p>
+            </div>
+        </header>
 
         <label class="block max-w-sm space-y-1">
             <span class="text-sm font-medium">Operating company</span>
@@ -23,7 +25,7 @@
                     class="inline-flex rounded-lg border px-4 py-2">Open hall configuration</a>
             </section>
         @else
-            <ol class="flex flex-wrap gap-2 text-sm" aria-label="Setup steps">
+            <ol class="vd-wizard-steps" aria-label="Setup steps">
                 @foreach ([1 => 'Company and venue', 2 => 'Halls', 3 => 'Programs', 4 => 'Pricing', 5 => 'Add-ons', 6 => 'Branding', 7 => 'Payments', 8 => 'Staff', 9 => 'Licensing', 10 => 'Review'] as $number => $label)
                     <li>
                         <button type="button" wire:click="goToStep({{ $number }})"
