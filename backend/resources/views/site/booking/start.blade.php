@@ -1,36 +1,39 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Book your event</title>
-<style>
-*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:#f5f5f2;color:#17211b}
-main{max-width:960px;margin:auto;padding:32px 20px}.card{background:#fff;border:1px solid #cad5ce;border-radius:14px;padding:24px;margin:20px 0}
-h1{font-size:clamp(2rem,5vw,3.2rem);margin:0 0 8px}.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
-label{display:grid;gap:6px;font-weight:650}input,select{width:100%;padding:12px;border:1px solid #9fb0a5;border-radius:8px;font:inherit}
-button{padding:12px 20px;border:0;border-radius:8px;background:#23533d;color:#fff;font:inherit;font-weight:700;cursor:pointer}
-.error{color:#a01818;border:1px solid #a01818;padding:10px;border-radius:8px}.price{font-size:1.4rem;font-weight:800}
-@media(max-width:520px){main{padding:20px 12px}.card{padding:16px}}
-</style>
-</head>
-<body><main>
-<p><a href="/">Back to venue</a></p>
-<h1>Book your event</h1>
-<p>Step 1 of 3 — choose your date, program and guest count. Prices are calculated by the venue from approved published pricing.</p>
-<div class="card">
-@if ($errors->any())<p class="error" role="alert">{{ $errors->first() }}</p>@endif
-<form method="POST" action="/book/quote">
-@csrf
-<div class="grid">
-<label>Event date<input type="date" name="event_date" required value="{{ old('event_date') }}"></label>
-<label>Program<select name="program" required>
-<option value="morning" @selected(old('program')==='morning')>Morning</option>
-<option value="noon" @selected(old('program')==='noon')>Noon</option>
-<option value="evening" @selected(old('program')==='evening')>Evening</option>
-</select></label>
-<label>Exact guest count<input type="number" name="guests" min="1" max="100000" required value="{{ old('guests') }}"></label>
+@extends('site.booking.layout', ['title' => 'Book your event'])
+@section('content')
+<div class="bookwrap">
+    <span class="eyebrow">Plan your celebration</span>
+    <h1>Book your event</h1>
+    <p class="meta">Three daily programs · live approved pricing · temporary hold after email verification.</p>
+    <div class="steps"><span class="step active">1. Event details</span><span class="step">2. Choose hall</span><span class="step">3. Review &amp; verify</span></div>
+    <div class="booking-layout">
+        <section class="card">
+            <h2>Tell us about your event</h2>
+            @if ($errors->any())<p class="error" role="alert">{{ $errors->first() }}</p>@endif
+            <form method="POST" action="/book/quote">@csrf
+                <div class="fields">
+                    <label class="field">Event date<input type="date" name="event_date" required value="{{ old('event_date') }}"></label>
+                    <label class="field">Program<select name="program" required>
+                        <option value="morning" @selected(old('program')==='morning')>Morning</option>
+                        <option value="noon" @selected(old('program')==='noon')>Noon</option>
+                        <option value="evening" @selected(old('program')==='evening')>Evening</option>
+                    </select></label>
+                    <label class="field">Exact guest count<input type="number" name="guests" min="1" max="100000" required value="{{ old('guests') }}" placeholder="Number of guests"></label>
+                </div>
+                <div class="notice">Selecting a date does not reserve a hall. Availability and pricing are checked on the next step.</div>
+                <button class="btn gold" type="submit">See available halls and price</button>
+            </form>
+        </section>
+        <aside class="card">
+            <h2>How booking works</h2>
+            <div class="summary-lines">
+                <div><span>1</span><b>Choose date and program</b></div>
+                <div><span>2</span><b>Review an approved hall quote</b></div>
+                <div><span>3</span><b>Verify email and hold the slot</b></div>
+                <div><span>4</span><b>Venue verifies the deposit</b></div>
+                <div class="total"><span>Confirmation</span><b>After deposit verification</b></div>
+            </div>
+            <p class="meta" style="margin-top:12px">Temporary holds are released automatically if email verification or deposit confirmation does not complete in time.</p>
+        </aside>
+    </div>
 </div>
-<p><button type="submit">See available halls and price</button></p>
-</form>
-</div>
-</main></body></html>
+@endsection
