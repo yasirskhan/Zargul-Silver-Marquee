@@ -199,6 +199,20 @@
                             <textarea wire:model="invoiceIssueReason" rows="2" maxlength="500" class="w-full rounded-lg border p-3 text-gray-900"></textarea>
                         </label>
                         @error('invoiceIssueReason') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
+                        <div class="grid gap-3 md:grid-cols-2">
+                            <label class="block space-y-1"><span>Invoice discount (PKR minor units)</span>
+                                <input type="number" min="0" wire:model="invoiceDiscountMinor" class="w-full rounded-lg border p-3 text-gray-900">
+                            </label>
+                            <label class="block space-y-1"><span>Approved discount request (required above role limit)</span>
+                                <select wire:model="invoiceDiscountApprovalId" class="w-full rounded-lg border p-3 text-gray-900">
+                                    <option value="">No approval selected</option>
+                                    @foreach ($this->approvedDiscounts() as $discount)
+                                        <option value="{{ $discount['id'] }}">{{ $discount['reason'] }} · {{ number_format($discount['amountMinor']/100,2) }} PKR</option>
+                                    @endforeach
+                                </select>
+                            </label>
+                        </div>
+                        @error('invoiceDiscountMinor') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
                     @endif
                     @foreach ($quoteIssues as $document)
                         <article wire:key="quote-issued-{{ $document['id'] }}" class="space-y-1 rounded-lg border p-3 text-sm">

@@ -16,9 +16,24 @@ final class EnforceTwoFactorSetup
         if(!$user instanceof User)return $next($request);
         if(str_contains($request->path(),'multi-factor')||$request->is('*/logout')||$request->is('*/profile'))return $next($request);
         $service=app(SecuritySettingsService::class);
-        $company=$service->companyFor($user);
-        if($company===null||!$service->requiresMfa($user,$company))return $next($request);
-        if(filled($user->getAppAuthenticationSecret()))return $next($request);
-        return redirect()->guest(Filament::getProfileUrl());
+        $company=$service->activeCompanyFor($user,$request);
+        if($company===null)return $next($request);
+        $request->session()->put('active_company_id',$company);
+        if(!$service->requiresMfa($user,$company)){
+            $request->session()->put('zargul_mfa_company_id',$company);
+            return $next($request);
+        }
+        if(!filled($user->getAppAuthenticationSecret())){
+            return redirect()->guest(Filament::getProfileUrl());
+        }
+        if($request->session()->get('zargul_mfa_company_id')===$company)return $next($request);
+        if($service->isTrusted($user,$company,$request)){
+            $request->session()->put('zargul_mfa_company_id',$company);
+            return $next($request);
+        }
+        Auth::logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+        return redirect('/admin/login?company='.$company);
     }
 }

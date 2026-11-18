@@ -127,6 +127,17 @@ final class SecuritySettingsService
         $this->audit($actor,$companyId,'tenant.trusted_device_revoked','trusted_device',$deviceId,['revoked'=>true]);
     }
 
+    public function activeCompanyFor(User $user,?Request $request=null):?string
+    {
+        $request=$request??request();
+        $candidates=[$request->query('company'),session('active_company_id')];
+        foreach($candidates as $candidate){
+            if(is_string($candidate)&&Str::isUuid($candidate)&&DB::table('company_memberships')
+                ->where('company_id',$candidate)->where('user_id',$user->getKey())
+                ->where('is_active',true)->exists()) return $candidate;
+        }
+        return $this->companyFor($user);
+    }
     public function companyFor(User $user):?string
     {
         $id=DB::table('company_memberships')->where('user_id',$user->getKey())->where('is_active',true)

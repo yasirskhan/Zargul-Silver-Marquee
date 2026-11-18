@@ -80,6 +80,10 @@ final class VenueReservations extends Page
 
     public string $invoiceIssueReason = '';
 
+    public string $invoiceDiscountMinor = '0';
+
+    public string $invoiceDiscountApprovalId = '';
+
     #[Locked]
     public string $quoteIssueRequestKey = '';
 
@@ -429,6 +433,8 @@ final class VenueReservations extends Page
         $this->refundReason = '';
         $this->refundRequestKey = (string) Str::uuid();
         $this->invoiceIssueReason = '';
+        $this->invoiceDiscountMinor = '0';
+        $this->invoiceDiscountApprovalId = '';
         $this->invoiceRequestKey = (string) Str::uuid();
         $this->quoteIssuePurpose = '';
         $this->quoteIssueRequestKey = (string) Str::uuid();
@@ -547,20 +553,36 @@ final class VenueReservations extends Page
     }
 
     /** Create an audited numbered invoice ONLY from a currently listed immutable quote. */
+    public function approvedDiscounts(): array
+    {
+        if($this->selectedReservationId===null||$this->companyId===null)return [];
+        $draft=DB::table('venue_reservations')->where('company_id',$this->companyId)
+            ->where('id',$this->selectedReservationId)->value('source_draft_id');
+        if(!$draft)return [];
+        return DB::table('approval_requests')->where('company_id',$this->companyId)
+            ->where('booking_id',$draft)->where('category','discount')->where('status','approved')
+            ->orderByDesc('created_at')->get(['id','amount_minor','reason'])
+            ->map(fn($r)=>['id'=>$r->id,'amountMinor'=>(int)$r->amount_minor,'reason'=>$r->reason])->all();
+    }
     public function issueInvoice(string $numberedQuoteId): void
     {
         $actor = $this->authorizeLoaded();
         abort_unless($this->invoiceIssuanceEnabled() && $this->mayViewCustomerHistory()
             && $this->selectedReservationId !== null && Str::isUuid($numberedQuoteId), 403);
         abort_unless(collect($this->quoteIssues)->contains('id', $numberedQuoteId), 403);
-        $this->validate(['invoiceIssueReason' => ['required', 'string', 'min:3', 'max:500']]);
+        $this->validate(['invoiceIssueReason' => ['required', 'string', 'min:3', 'max:500'],
+            'invoiceDiscountMinor' => ['required','integer','min:0','max:100000000000']]);
         try {
             app(VenueInvoiceService::class)->issue($actor, $this->companyId,
-                $numberedQuoteId, $this->invoiceRequestKey, $this->invoiceIssueReason);
+                $numberedQuoteId, $this->invoiceRequestKey, $this->invoiceIssueReason,
+                (int) $this->invoiceDiscountMinor,
+                $this->invoiceDiscountApprovalId !== '' ? $this->invoiceDiscountApprovalId : null);
         } catch (ConflictHttpException | InvalidArgumentException $e) {
             throw ValidationException::withMessages(['invoiceIssueReason' => $e->getMessage()]);
         }
         $this->invoiceIssueReason = '';
+        $this->invoiceDiscountMinor = '0';
+        $this->invoiceDiscountApprovalId = '';
         $this->invoiceRequestKey = (string) Str::uuid();
         $this->issuedInvoices = app(VenueInvoiceService::class)->list(
             $actor, $this->companyId, $this->selectedReservationId);

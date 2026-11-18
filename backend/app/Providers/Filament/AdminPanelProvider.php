@@ -30,6 +30,7 @@ use App\Filament\Pages\VenueSetupWizard;
 use App\Filament\Pages\StaffManagement;
 use App\Filament\Pages\SupportInbox;
 use App\Filament\Auth\TrustedAppAuthentication;
+use App\Filament\Auth\Login as VenueLogin;
 use App\Http\Middleware\EnforceTwoFactorSetup;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -62,6 +63,7 @@ class AdminPanelProvider extends PanelProvider
             ->multiFactorAuthentication([
                 TrustedAppAuthentication::make()->recoverable(),
             ], isRequired: false)
+            ->login(VenueLogin::class)
             ->pages([VenueOverview::class, InternalQuickSearch::class, OperationsPlanning::class, ApprovalCenter::class, FinanceDesk::class, AuditHistory::class, BookingProposals::class, VenueReservations::class, EventOperations::class, HallCalendar::class, HallInventory::class, HallPrograms::class, HallPricingTiers::class, PublicBookings::class, HallPhotos::class, WebsiteWorkspace::class, Licensing::class, HistoricalInvoices::class, InstallationSetup::class, VenueSetupWizard::class, StaffManagement::class, SupportInbox::class, Enquiries::class, PaymentSettings::class, EmailSettings::class, SecuritySettings::class, ApprovalSettings::class])
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
