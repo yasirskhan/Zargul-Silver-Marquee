@@ -36,7 +36,7 @@
                                 <button type="button" wire:click="goToStep({{ $number }})"
                                     @disabled($number > $step)
                                     class="{{ $step === $number ? 'active' : '' }} {{ $step > $number ? 'done' : '' }} disabled:opacity-50">
-                                    <span>{{ $number }}</span>{{ $label }}
+                                    {{ $number }}. {{ $label }}
                                 </button>
                             </li>
                         @endforeach
