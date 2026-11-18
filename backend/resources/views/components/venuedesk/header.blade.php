@@ -1,8 +1,10 @@
 @props(['eyebrow' => 'VenueDesk', 'title' => 'Operational workspace'])
-<section class="vd-hero">
-    <span class="eyebrow">{{ $eyebrow }}</span>
-    <div class="vd-hero-title" role="presentation">{{ $title }}</div>
-    @if (trim($slot) !== '')
-        <p>{{ $slot }}</p>
-    @endif
-</section>
+<header class="vd-pagehead">
+    <div>
+        <span class="vd-eyebrow">{{ $eyebrow }}</span>
+        <h1>{{ $title }}</h1>
+        @if (trim($slot) !== '')
+            <p>{{ $slot }}</p>
+        @endif
+    </div>
+</header>
