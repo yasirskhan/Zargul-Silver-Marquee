@@ -88,7 +88,7 @@
                         <article class="vd-calendar-day" wire:key="day-tile-{{ $day['date'] }}">
                             <header><strong>{{ \Carbon\CarbonImmutable::parse($day['date'])->format('D j M') }}</strong><small>{{ $day['date'] }}</small></header>
                             @foreach (['morning' => 'Morning', 'noon' => 'Noon', 'evening' => 'Evening'] as $program => $label)
-                                @php($slot = $day['programs'][$program])
+                                @php $slot = $day['programs'][$program]; @endphp
                                 <span class="vd-slot {{ $slot['status'] }}">{{ $label }} · {{ str_replace('_',' ', $slot['status']) }}</span>
                             @endforeach
                         </article>
