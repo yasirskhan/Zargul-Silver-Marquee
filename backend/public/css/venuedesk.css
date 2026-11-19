@@ -168,3 +168,12 @@ body{background:var(--vd-cream)}
 
 .vd-status{display:inline-block;border-radius:999px;padding:3px 8px;font-size:10px;font-weight:700;text-transform:uppercase;background:#e8eee4;color:#3f5b48}
 .vd-status.confirmed{background:#d9eddf;color:#1c6135}.vd-status.hold{background:#f7ebc8;color:#866018}.vd-status.cancelled{background:#f7dade;color:#923043}
+
+/* Global VenueDesk operational form/table parity */
+.fi-page .fi-main table{width:100%;border-collapse:collapse;background:#fff;font-size:.82rem}
+.fi-page .fi-main table thead th{background:#eef2e9!important;color:#385244!important;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;padding:10px 12px!important;text-align:left;border-bottom:1px solid #e3e6dc}
+.fi-page .fi-main table tbody td{padding:11px 12px!important;border-top:1px solid #ebeee7;vertical-align:top}
+.fi-page .fi-main table tbody tr:hover td{background:#fbfcf9}
+.fi-page .fi-main input:not([type=checkbox]):not([type=radio]),.fi-page .fi-main select,.fi-page .fi-main textarea{border:1px solid #cfd8cd!important;border-radius:7px!important;background:#fff!important;min-height:40px;padding:9px 10px!important;color:#172b24!important}
+.fi-page .fi-main section.rounded-xl,.fi-page .fi-main section.rounded-lg{box-shadow:0 3px 15px #173b2910;border-color:#e3e4db!important;background:#fff}
+.fi-page .fi-main button.rounded-lg,.fi-page .fi-main a.rounded-lg{font-weight:650}
