@@ -1,5 +1,8 @@
 <x-filament-panels::page>
     <div class="space-y-6">
+        <x-venuedesk.header eyebrow="VenueDesk · Reservations" title="Reservations & bookings">
+            Confirmed reservations, temporary holds and internal proposals with hall-scoped authorization.
+        </x-venuedesk.header>
         <p class="text-sm">Private venue reservations. A confirmed reservation occupies exactly one
             hall/date/program slot. This panel does not create invoices, collect payments or submit public enquiries.</p>
         <label class="block space-y-1">
@@ -94,33 +97,36 @@
                 </button>
                 <a class="inline-flex underline" href="{{ \App\Filament\Pages\HallCalendar::getUrl(['company' => $companyId]) }}">Open hall calendar</a>
             </section>
-
-            <section class="space-y-3" aria-label="Current authorized venue reservations">
-                <h2 class="text-lg font-semibold">Reservations in permitted halls</h2>
-                <div class="grid gap-3 md:grid-cols-2">
+            <section class="vd-panel space-y-3" aria-label="Current authorized venue reservations">
+                <div class="vd-panel-head"><h2>Reservations in permitted halls</h2><p>Only halls assigned to your role are listed.</p></div>
+                <div class="overflow-x-auto">
+                    <table class="vd-table w-full text-left text-sm">
+                        <thead><tr><th>Date</th><th>Hall</th><th>Program</th><th>Guests</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody>
                     @forelse ($reservations as $row)
-                        <article wire:key="reservation-{{ $row['id'] }}" class="space-y-2 rounded-xl border p-4 text-sm">
-                            <strong>{{ $this->hallOptions()[$row['hallId']] ?? 'Hall' }} · {{ $row['date'] }} {{ ucfirst($row['program']) }}</strong>
-                            <p>{{ $row['guests'] }} guests · {{ ucfirst($row['status']) }} · revision {{ $row['revision'] }}</p>
-                            <p class="break-all text-xs">Reservation {{ $row['id'] }}</p>
+                        <tr wire:key="reservation-{{ $row['id'] }}">
+                            <td><strong>{{ $row['date'] }}</strong><small class="block">rev {{ $row['revision'] }}</small></td>
+                            <td>{{ $this->hallOptions()[$row['hallId']] ?? 'Hall' }}</td>
+                            <td>{{ ucfirst($row['program']) }}</td>
+                            <td>{{ $row['guests'] }}</td>
+                            <td><span class="vd-status {{ strtolower($row['status']) }}">{{ ucfirst($row['status']) }}</span></td>
+                            <td class="space-x-2 whitespace-nowrap">
                             @if ($this->mayViewCustomerHistory())
-                                <button type="button" wire:click="showCustomerHistory('{{ $row['customerId'] }}')"
-                                    class="rounded-lg border px-3 py-2 underline">Customer booking history</button>
+                                <button type="button" wire:click="showCustomerHistory('{{ $row['customerId'] }}')" class="underline">Customer booking history</button>
                             @endif
                             @if ($row['status'] === 'confirmed' && $this->mayRequestRefundApproval())
-                                <a class="inline-flex rounded-lg border px-3 py-2 underline"
-                                    href="{{ \App\Filament\Pages\ApprovalCenter::getUrl(['company' => $companyId, 'proposal' => $row['sourceDraftId'], 'category' => 'refund']) }}">
-                                    Request controlled refund review
-                                </a>
+                                <a class="underline" href="{{ \App\Filament\Pages\ApprovalCenter::getUrl(['company' => $companyId, 'proposal' => $row['sourceDraftId'], 'category' => 'refund']) }}">Refund review</a>
                             @endif
                             @if ($row['status'] === 'confirmed')
-                                <button type="button" wire:click="selectReservation('{{ $row['id'] }}')"
-                                    class="rounded-lg border px-3 py-2 underline">Manage reservation</button>
+                                <button type="button" wire:click="selectReservation('{{ $row['id'] }}')" class="underline">Manage</button>
                             @endif
-                        </article>
+                            </td>
+                        </tr>
                     @empty
-                        <p class="text-sm">No reservations in your permitted halls.</p>
+                        <tr><td colspan="6">No reservations in your permitted halls.</td></tr>
                     @endforelse
+                        </tbody>
+                    </table>
                 </div>
             </section>
             @if ($selectedCustomerId !== '' && $this->mayViewCustomerHistory())
