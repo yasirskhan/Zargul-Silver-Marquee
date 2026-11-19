@@ -12,13 +12,18 @@ final class InstallationStartController
     public function show()
     {
         $this->guard();
-        return response()->view('site.install.start', ['installed' => $this->installed()]);
+        if ($this->installed()) {
+            return redirect('/admin/login');
+        }
+        return response()->view('site.install.start', ['installed' => false]);
     }
 
     public function store(Request $request, OwnerBootstrapService $owners)
     {
         $this->guard();
-        abort_if($this->installed(), 410, 'This installation already has an Owner.');
+        if ($this->installed()) {
+            return redirect('/admin/login');
+        }
         $data = $request->validate([
             'operator_token' => ['required', 'string', 'max:256'],
             'company_name' => ['required', 'string', 'min:2', 'max:120'],
