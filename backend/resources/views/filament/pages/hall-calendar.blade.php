@@ -83,6 +83,18 @@
                 @php
                     $canViewDrafts = $this->canOpenDraftProposals();
                 @endphp
+                <div class="vd-calendar-grid" aria-label="Calendar day tiles">
+                    @foreach ($projection['days'] as $day)
+                        <article class="vd-calendar-day" wire:key="day-tile-{{ $day['date'] }}">
+                            <header><strong>{{ \Carbon\CarbonImmutable::parse($day['date'])->format('D j M') }}</strong><small>{{ $day['date'] }}</small></header>
+                            @foreach (['morning' => 'Morning', 'noon' => 'Noon', 'evening' => 'Evening'] as $program => $label)
+                                @php($slot = $day['programs'][$program])
+                                <span class="vd-slot {{ $slot['status'] }}">{{ $label }} · {{ str_replace('_',' ', $slot['status']) }}</span>
+                            @endforeach
+                        </article>
+                    @endforeach
+                </div>
+
                 <div class="overflow-x-auto rounded-xl border">
                     <table class="w-full min-w-[480px] border-collapse text-left text-sm">
                         <caption class="sr-only">Read-only morning, noon and evening occupancy status for each date</caption>

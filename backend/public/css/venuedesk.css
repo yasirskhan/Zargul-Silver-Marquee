@@ -155,3 +155,13 @@ body{background:var(--vd-cream)}
 .vd-wizard-main{min-width:0}
 .vd-wizard-main form>div:last-child{display:flex;gap:8px;flex-wrap:wrap}
 @media(max-width:900px){.vd-wizard-layout{grid-template-columns:1fr}.vd-wizard-side{position:static}.vd-wizard-steps{grid-template-columns:1fr 1fr}}
+
+/* Calendar day tiles */
+.vd-calendar-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:12px}
+.vd-calendar-day{border:1px solid #e3e4db;border-radius:9px;background:#fff;padding:10px}
+.vd-calendar-day header{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;color:#123d2d}
+.vd-calendar-day header small{font-size:10px;color:#7a887f}
+.vd-slot{display:block;border-radius:5px;padding:5px 6px;font-size:10px;font-weight:650;margin-top:4px;background:#eef2e9;color:#52665a}
+.vd-slot.available{background:#dff0e3;color:#1d6b38}.vd-slot.hold{background:#f8eccb;color:#8b6616}
+.vd-slot.confirmed{background:#f6dadd;color:#963342}.vd-slot.cleanup_required{background:#f8e1cc;color:#8b4b16}
+.vd-slot.unconfigured{background:#ececec;color:#66706a}
