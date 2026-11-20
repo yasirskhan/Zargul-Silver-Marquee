@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Models\CompanyMembership;
 use App\Models\User;
+use App\Services\CustomerProfileService;
 use App\Services\TenantAccess;
 use BackedEnum;
 use Filament\Facades\Filament;
@@ -27,6 +28,14 @@ final class CustomerDirectory extends Page
     #[Locked]
     public ?string $loadedCompanyId = null;
     public string $search = '';
+    public int $page = 1;
+    public int $perPage = 15;
+    #[Locked]
+    public ?string $selectedCustomerId = null;
+    public string $editName = '';
+    public string $editEmail = '';
+    public string $editPhone = '';
+    public string $editReason = '';
 
     public function getHeading(): string
     {
@@ -71,6 +80,19 @@ final class CustomerDirectory extends Page
         $this->loadedCompanyId = $this->companyId;
     }
 
+    public function updatedSearch(): void
+    {
+        $this->page = 1;
+    }
+
+    public function updatedCompanyId(): void
+    {
+        abort_unless(array_key_exists((string) $this->companyId, $this->companyOptions()), 403);
+        $this->page = 1;
+        $this->selectedCustomerId = null;
+    }
+
+    /** @return array<int,array<string,mixed>> */
     public function rows(): array
     {
         if ($this->loadedCompanyId === null) return [];
@@ -89,5 +111,76 @@ final class CustomerDirectory extends Page
                     'bookings' => $bookings, 'last' => $last, 'revision' => (int) $row->revision];
             })->filter(fn ($r) => $needle === '' || str_contains(mb_strtolower($r['name'].' '.$r['email'].' '.$r['phone']), $needle))
             ->values()->all();
+    }
+
+    public function pageRows(): array
+    {
+        return array_slice($this->rows(), max(0, ($this->page - 1) * $this->perPage), $this->perPage);
+    }
+
+    public function totalRows(): int
+    {
+        return count($this->rows());
+    }
+
+    public function openCustomer(string $customerId): void
+    {
+        abort_unless($this->loadedCompanyId !== null, 403);
+        $row = DB::table('customer_profiles')->where('company_id', $this->companyId)
+            ->where('id', $customerId)->where('is_active', true)->first();
+        abort_unless($row !== null, 404);
+        $this->selectedCustomerId = $customerId;
+        $this->editName = Crypt::decryptString($row->name_ciphertext);
+        $this->editEmail = $row->email_ciphertext ? Crypt::decryptString($row->email_ciphertext) : '';
+        $this->editPhone = $row->phone_ciphertext ? Crypt::decryptString($row->phone_ciphertext) : '';
+        $this->editReason = '';
+    }
+
+    public function selectedCustomer(): ?array
+    {
+        if ($this->selectedCustomerId === null) return null;
+        foreach ($this->rows() as $row) {
+            if ($row['id'] === $this->selectedCustomerId) {
+                $row['reservations'] = DB::table('venue_reservations')->where('company_id', $this->companyId)
+                    ->where('customer_id', $row['id'])->orderByDesc('event_date')->get()
+                    ->map(fn ($r) => ['id' => $r->id, 'date' => $r->event_date, 'program' => $r->program,
+                        'guests' => (int) $r->guests, 'status' => $r->status])->all();
+                return $row;
+            }
+        }
+        return null;
+    }
+
+    public function closeCustomer(): void
+    {
+        $this->selectedCustomerId = null;
+        $this->reset(['editName', 'editEmail', 'editPhone', 'editReason']);
+    }
+
+    public function saveCustomer(): void
+    {
+        $actor = Filament::auth()->user();
+        abort_unless($actor instanceof User && $this->selectedCustomerId !== null, 403);
+        $this->validate([
+            'editName' => ['required', 'string', 'min:2', 'max:120'],
+            'editEmail' => ['nullable', 'email', 'max:254'],
+            'editPhone' => ['nullable', 'string', 'min:7', 'max:32'],
+            'editReason' => ['required', 'string', 'min:3', 'max:500'],
+        ]);
+        $current = DB::table('customer_profiles')->where('company_id', $this->companyId)
+            ->where('id', $this->selectedCustomerId)->first();
+        abort_unless($current !== null, 404);
+        try {
+            app(CustomerProfileService::class)->update($actor, $this->companyId, $this->selectedCustomerId,
+                $this->editName, $this->editEmail !== '' ? $this->editEmail : null,
+                $this->editPhone !== '' ? $this->editPhone : null,
+                (int) $current->revision, $this->editReason);
+        } catch (\Throwable $e) {
+            $this->addError('editReason', $e->getMessage());
+            return;
+        }
+        $this->editReason = '';
+        $this->openCustomer($this->selectedCustomerId);
+        session()->flash('customer_saved', 'Customer profile updated.');
     }
 }
