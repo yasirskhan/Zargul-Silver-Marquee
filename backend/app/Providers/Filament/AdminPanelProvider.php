@@ -15,6 +15,7 @@ use App\Filament\Pages\FinanceDesk;
 use App\Filament\Pages\AuditHistory;
 use App\Filament\Pages\BookingProposals;
 use App\Filament\Pages\VenueReservations;
+use App\Filament\Pages\CustomerDirectory;
 use App\Filament\Pages\EventOperations;
 use App\Filament\Pages\HallCalendar;
 use App\Filament\Pages\HallInventory;
@@ -64,7 +65,7 @@ class AdminPanelProvider extends PanelProvider
                 TrustedAppAuthentication::make()->recoverable(),
             ], isRequired: false)
             ->login(VenueLogin::class)
-            ->pages([VenueOverview::class, InternalQuickSearch::class, OperationsPlanning::class, ApprovalCenter::class, FinanceDesk::class, AuditHistory::class, BookingProposals::class, VenueReservations::class, EventOperations::class, HallCalendar::class, HallInventory::class, HallPrograms::class, HallPricingTiers::class, PublicBookings::class, HallPhotos::class, WebsiteWorkspace::class, Licensing::class, HistoricalInvoices::class, InstallationSetup::class, VenueSetupWizard::class, StaffManagement::class, SupportInbox::class, Enquiries::class, PaymentSettings::class, EmailSettings::class, SecuritySettings::class, ApprovalSettings::class])
+            ->pages([VenueOverview::class, InternalQuickSearch::class, OperationsPlanning::class, ApprovalCenter::class, FinanceDesk::class, AuditHistory::class, BookingProposals::class, VenueReservations::class, CustomerDirectory::class, EventOperations::class, HallCalendar::class, HallInventory::class, HallPrograms::class, HallPricingTiers::class, PublicBookings::class, HallPhotos::class, WebsiteWorkspace::class, Licensing::class, HistoricalInvoices::class, InstallationSetup::class, VenueSetupWizard::class, StaffManagement::class, SupportInbox::class, Enquiries::class, PaymentSettings::class, EmailSettings::class, SecuritySettings::class, ApprovalSettings::class])
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn (): \Illuminate\Contracts\View\View => view('filament.hooks.venuedesk-theme'),
