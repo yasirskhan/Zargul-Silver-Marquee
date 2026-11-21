@@ -32,6 +32,8 @@ final class CustomerDirectory extends Page
     public int $perPage = 15;
     #[Locked]
     public ?string $selectedCustomerId = null;
+    #[Locked]
+    public int $selectedRevision = 0;
     public string $editName = '';
     public string $editEmail = '';
     public string $editPhone = '';
@@ -98,7 +100,7 @@ final class CustomerDirectory extends Page
         if ($this->loadedCompanyId === null) return [];
         $needle = mb_strtolower(trim($this->search));
         return DB::table('customer_profiles')->where('company_id', $this->companyId)
-            ->where('is_active', true)->orderByDesc('created_at')->limit(500)->get()
+            ->where('is_active', true)->orderByDesc('created_at')->get()
             ->map(function ($row) {
                 $name = Crypt::decryptString($row->name_ciphertext);
                 $email = $row->email_ciphertext ? Crypt::decryptString($row->email_ciphertext) : '';
@@ -130,6 +132,7 @@ final class CustomerDirectory extends Page
             ->where('id', $customerId)->where('is_active', true)->first();
         abort_unless($row !== null, 404);
         $this->selectedCustomerId = $customerId;
+        $this->selectedRevision = (int) $row->revision;
         $this->editName = Crypt::decryptString($row->name_ciphertext);
         $this->editEmail = $row->email_ciphertext ? Crypt::decryptString($row->email_ciphertext) : '';
         $this->editPhone = $row->phone_ciphertext ? Crypt::decryptString($row->phone_ciphertext) : '';
@@ -154,6 +157,7 @@ final class CustomerDirectory extends Page
     public function closeCustomer(): void
     {
         $this->selectedCustomerId = null;
+        $this->selectedRevision = 0;
         $this->reset(['editName', 'editEmail', 'editPhone', 'editReason']);
     }
 
@@ -167,14 +171,12 @@ final class CustomerDirectory extends Page
             'editPhone' => ['nullable', 'string', 'min:7', 'max:32'],
             'editReason' => ['required', 'string', 'min:3', 'max:500'],
         ]);
-        $current = DB::table('customer_profiles')->where('company_id', $this->companyId)
-            ->where('id', $this->selectedCustomerId)->first();
-        abort_unless($current !== null, 404);
+        abort_unless($this->selectedRevision >= 1, 409);
         try {
-            app(CustomerProfileService::class)->update($actor, $this->companyId, $this->selectedCustomerId,
+            $this->selectedRevision = app(CustomerProfileService::class)->update($actor, $this->companyId, $this->selectedCustomerId,
                 $this->editName, $this->editEmail !== '' ? $this->editEmail : null,
                 $this->editPhone !== '' ? $this->editPhone : null,
-                (int) $current->revision, $this->editReason);
+                $this->selectedRevision, $this->editReason);
         } catch (\Throwable $e) {
             $this->addError('editReason', $e->getMessage());
             return;

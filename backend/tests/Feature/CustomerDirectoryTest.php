@@ -25,8 +25,9 @@ class CustomerDirectoryTest extends TestCase
             $user->markEmailAsVerified();
             CompanyMembership::create(['company_id'=>$company->id,'user_id'=>$user->id,'role'=>$role]);
         }
+        $customerId=(string) \Illuminate\Support\Str::uuid();
         DB::table('customer_profiles')->insert([
-            'id'=>(string) \Illuminate\Support\Str::uuid(),'company_id'=>$company->id,
+            'id'=>$customerId,'company_id'=>$company->id,
             'name_ciphertext'=>Crypt::encryptString('Ayesha Khan'),
             'email_ciphertext'=>Crypt::encryptString('ayesha@example.test'),
             'phone_ciphertext'=>Crypt::encryptString('03001234567'),
@@ -37,7 +38,16 @@ class CustomerDirectoryTest extends TestCase
         Livewire::test(CustomerDirectory::class)
             ->assertSee('Customer directory')
             ->assertSee('Ayesha Khan')
-            ->assertSee('ayesha@example.test');
+            ->assertSee('ayesha@example.test')
+            ->call('openCustomer',$customerId)
+            ->assertSee('Reservation history')
+            ->set('editName','Ayesha Khan Updated')
+            ->set('editReason','Correct spelling after customer confirmation')
+            ->call('saveCustomer')
+            ->assertHasNoErrors();
+        $saved=DB::table('customer_profiles')->where('id',$customerId)->first();
+        $this->assertSame('Ayesha Khan Updated',Crypt::decryptString($saved->name_ciphertext));
+        $this->assertSame(2,(int)$saved->revision);
         $this->be($manager);
         Livewire::test(CustomerDirectory::class)->assertForbidden();
     }
