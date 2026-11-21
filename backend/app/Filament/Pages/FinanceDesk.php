@@ -259,6 +259,41 @@ final class FinanceDesk extends Page
             ->forDate($actor, $this->companyId, $this->reconciliationDate);
     }
 
+    public function exportJournalsCsv(): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $this->authorizeLoaded();
+        $rows = $this->journals;
+        return response()->streamDownload(function () use ($rows): void {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['journal_id', 'entry_type', 'currency', 'amount_minor', 'reversal_of']);
+            foreach ($rows as $row) {
+                fputcsv($out, [$row['id'] ?? '', $row['entry_type'] ?? '', $row['currency_code'] ?? '',
+                    $row['amount_minor'] ?? 0, $row['reversal_of'] ?? '']);
+            }
+            fclose($out);
+        }, 'finance-ledger-'.now()->format('Ymd-His').'.csv', ['Content-Type' => 'text/csv']);
+    }
+
+    public function exportReconciliationCsv(): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $this->authorizeLoaded();
+        $buckets = $this->dailyReconciliation['currencies'] ?? [];
+        $date = $this->reconciliationDate;
+        return response()->streamDownload(function () use ($buckets, $date): void {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['utc_date', 'currency', 'cash_received_minor', 'bank_received_minor',
+                'cash_refunded_minor', 'bank_refunded_minor', 'net_cash_minor', 'net_bank_minor',
+                'receipt_count', 'refund_count', 'ledger_matched']);
+            foreach ($buckets as $b) {
+                fputcsv($out, [$date, $b['currency'] ?? '', $b['cashReceivedMinor'] ?? 0,
+                    $b['bankReceivedMinor'] ?? 0, $b['cashRefundedMinor'] ?? 0,
+                    $b['bankRefundedMinor'] ?? 0, $b['netCashMinor'] ?? 0, $b['netBankMinor'] ?? 0,
+                    $b['receiptCount'] ?? 0, $b['refundCount'] ?? 0,
+                    ($b['ledgerMatched'] ?? false) ? 'yes' : 'no']);
+            }
+            fclose($out);
+        }, 'reconciliation-'.$date.'.csv', ['Content-Type' => 'text/csv']);
+    }
     public function createPreview(): void
     {
         $actor = $this->authorizeLoaded();

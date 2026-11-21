@@ -74,6 +74,7 @@
             </section>
             <section class="vd-panel space-y-3" aria-label="Daily immutable receipt reconciliation">
                 <h2 class="text-lg font-semibold">Daily invoice receipt and refund reconciliation (UTC)</h2>
+                <button type="button" wire:click="exportReconciliationCsv" class="rounded-lg border px-3 py-2 text-sm">Export reconciliation CSV</button>
                 <p class="text-xs">Read-only comparison of recorded cash/bank deposits and approved reversals with their existing ledger journals. Amounts in minor units; no payout or bank transfer is initiated.</p>
                 <label class="block space-y-1">
                     <span class="text-sm">UTC day</span>
@@ -110,6 +111,7 @@
             </section>
             <section aria-label="Controlled cash ledger and daily reconciliation" class="vd-panel space-y-3">
                 <h2 class="text-lg font-semibold">Controlled cash ledger</h2>
+                <button type="button" wire:click="exportJournalsCsv" class="rounded-lg border px-3 py-2 text-sm">Export ledger CSV</button>
                 @if (! $this->postingEnabled())
                     <p class="text-sm font-semibold">
                         Financial posting is disabled until operator-approved finance, currency, tax,
