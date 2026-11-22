@@ -52,6 +52,10 @@ final class FinanceDesk extends Page
 
     public string $reconciliationDate = '';
 
+    public string $reportFrom = '';
+
+    public string $reportTo = '';
+
     #[Locked]
     public ?array $lastCloseResult = null;
 
@@ -180,6 +184,8 @@ final class FinanceDesk extends Page
         $this->companyId = $requested ?? array_key_first($options);
         $this->closeDate = now('UTC')->toDateString();
         $this->reconciliationDate = now('UTC')->toDateString();
+        $this->reportFrom = now('UTC')->startOfMonth()->toDateString();
+        $this->reportTo = now('UTC')->toDateString();
         $this->initializeKeys();
         $this->refresh();
         if ($this->draftBookingId !== '') {
@@ -221,6 +227,8 @@ final class FinanceDesk extends Page
         $this->journalReason = '';
         $this->closeDate = now('UTC')->toDateString();
         $this->reconciliationDate = now('UTC')->toDateString();
+        $this->reportFrom = now('UTC')->startOfMonth()->toDateString();
+        $this->reportTo = now('UTC')->toDateString();
         $this->dailyReconciliation = [];
         $this->countedMinor = '';
         $this->closeReason = '';
@@ -261,14 +269,21 @@ final class FinanceDesk extends Page
 
     public function exportJournalsCsv(): \Symfony\Component\HttpFoundation\StreamedResponse
     {
-        $this->authorizeLoaded();
-        $rows = $this->journals;
+        $actor = $this->authorizeLoaded();
+        $rows = app(FinanceControlService::class)->journalExport($actor, $this->companyId);
         return response()->streamDownload(function () use ($rows): void {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['journal_id', 'entry_type', 'currency', 'amount_minor', 'reversal_of']);
+            fputcsv($out, ['journal_id', 'created_at', 'entry_type', 'currency', 'amount_minor', 'reversal_of', 'reason', 'account_code', 'side', 'line_amount_minor']);
             foreach ($rows as $row) {
-                fputcsv($out, [$row['id'] ?? '', $row['entry_type'] ?? '', $row['currency_code'] ?? '',
-                    $row['amount_minor'] ?? 0, $row['reversal_of'] ?? '']);
+                if ($row['lines'] === []) {
+                    fputcsv($out, [$row['id'], $row['createdAt'], $row['entryType'], $row['currency'],
+                        $row['amountMinor'], $row['reversalOf'] ?? '', $row['reason'], '', '', '']);
+                }
+                foreach ($row['lines'] as $line) {
+                    fputcsv($out, [$row['id'], $row['createdAt'], $row['entryType'], $row['currency'],
+                        $row['amountMinor'], $row['reversalOf'] ?? '', $row['reason'],
+                        $line['account'], $line['side'], $line['amountMinor']]);
+                }
             }
             fclose($out);
         }, 'finance-ledger-'.now()->format('Ymd-His').'.csv', ['Content-Type' => 'text/csv']);
@@ -278,7 +293,7 @@ final class FinanceDesk extends Page
     {
         $this->authorizeLoaded();
         $buckets = $this->dailyReconciliation['currencies'] ?? [];
-        $date = $this->reconciliationDate;
+        $date = (string) ($this->dailyReconciliation['utcDate'] ?? $this->reconciliationDate);
         return response()->streamDownload(function () use ($buckets, $date): void {
             $out = fopen('php://output', 'w');
             fputcsv($out, ['utc_date', 'currency', 'cash_received_minor', 'bank_received_minor',
@@ -293,6 +308,54 @@ final class FinanceDesk extends Page
             }
             fclose($out);
         }, 'reconciliation-'.$date.'.csv', ['Content-Type' => 'text/csv']);
+    }
+    public function refreshReport(): void
+    {
+        $this->authorizeLoaded();
+        $this->validate([
+            'reportFrom' => ['required', 'date_format:Y-m-d'],
+            'reportTo' => ['required', 'date_format:Y-m-d', 'after_or_equal:reportFrom'],
+        ]);
+    }
+
+    /** Company-scoped period financial summary from immutable finance sources. */
+    public function financialSummary(): array
+    {
+        if ($this->loadedCompanyId === null) {
+            return [];
+        }
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $this->reportFrom)
+            || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $this->reportTo)) {
+            return [];
+        }
+        $from = $this->reportFrom.' 00:00:00';
+        $to = $this->reportTo.' 23:59:59';
+        $invoiceIds = DB::table('venue_invoices')->where('company_id', $this->companyId)
+            ->whereBetween('issued_at', [$from, $to])->pluck('id');
+        $invoiced = (int) DB::table('venue_invoices')->where('company_id', $this->companyId)
+            ->whereIn('id', $invoiceIds)->sum('total_minor');
+        $paid = $invoiceIds->isEmpty() ? 0 : (int) DB::table('venue_invoice_payments')
+            ->where('company_id', $this->companyId)->whereIn('invoice_id', $invoiceIds)->sum('amount_minor');
+        $refunded = $invoiceIds->isEmpty() ? 0 : (int) DB::table('venue_invoice_refunds')
+            ->where('company_id', $this->companyId)->whereIn('invoice_id', $invoiceIds)->sum('amount_minor');
+        $periodPayments = (int) DB::table('venue_invoice_payments')->where('company_id', $this->companyId)
+            ->whereBetween('created_at', [$from, $to])->sum('amount_minor');
+        $periodRefunds = (int) DB::table('venue_invoice_refunds')->where('company_id', $this->companyId)
+            ->whereBetween('created_at', [$from, $to])->sum('amount_minor');
+        $cash = (int) DB::table('venue_invoice_payments')->where('company_id', $this->companyId)
+            ->whereBetween('created_at', [$from, $to])->where('method', 'cash')->sum('amount_minor');
+        $bank = $periodPayments - $cash;
+        $expenses = (int) DB::table('finance_journals')->where('company_id', $this->companyId)
+            ->whereBetween('created_at', [$from, $to])
+            ->whereIn('entry_type', ['expense', 'cash_expense'])->sum('amount_minor');
+        return [
+            'invoiceCount' => $invoiceIds->count(), 'invoicedMinor' => $invoiced,
+            'paidMinor' => $paid, 'refundedMinor' => $refunded,
+            'outstandingMinor' => max(0, $invoiced - $paid + $refunded),
+            'periodPaymentsMinor' => $periodPayments, 'periodRefundsMinor' => $periodRefunds,
+            'netCollectedMinor' => $periodPayments - $periodRefunds,
+            'cashMinor' => $cash, 'bankMinor' => $bank, 'expensesMinor' => $expenses,
+        ];
     }
     public function createPreview(): void
     {

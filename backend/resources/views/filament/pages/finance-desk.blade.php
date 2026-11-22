@@ -21,6 +21,23 @@
         </label>
 
         @if ($loadedCompanyId === $companyId)
+            @php($summary = $this->financialSummary())
+            <section class="vd-panel space-y-3" aria-label="Financial reporting period">
+                <div class="vd-panel-head"><h2>Financial summary</h2><p>Invoices issued in the selected period. Payments and refunds are actual recorded settlements.</p></div>
+                <div class="flex flex-wrap items-end gap-3">
+                    <label class="block space-y-1"><span class="text-sm">From (UTC)</span><input type="date" wire:model="reportFrom" class="rounded-lg border p-2"></label>
+                    <label class="block space-y-1"><span class="text-sm">To (UTC)</span><input type="date" wire:model="reportTo" class="rounded-lg border p-2"></label>
+                    <button type="button" wire:click="refreshReport" class="rounded-lg border px-4 py-2 font-semibold">Apply period</button>
+                </div>
+                <div class="vd-metrics" aria-label="Period financial totals">
+                    <div class="vd-metric"><b>{{ number_format($summary['invoicedMinor']/100,2) }}</b><span>Invoiced PKR</span></div>
+                    <div class="vd-metric"><b>{{ number_format($summary['periodPaymentsMinor']/100,2) }}</b><span>Payments received</span></div>
+                    <div class="vd-metric"><b>{{ number_format($summary['periodRefundsMinor']/100,2) }}</b><span>Refunds</span></div>
+                    <div class="vd-metric"><b>{{ number_format($summary['outstandingMinor']/100,2) }}</b><span>Outstanding PKR</span></div>
+                    <div class="vd-metric"><b>{{ number_format($summary['netCollectedMinor']/100,2) }}</b><span>Net collected</span></div>
+                </div>
+                <p class="text-xs">Cash {{ number_format($summary['cashMinor']/100,2) }} · Bank {{ number_format($summary['bankMinor']/100,2) }} · Expenses recorded {{ number_format($summary['expensesMinor']/100,2) }} · {{ $summary['invoiceCount'] }} invoice(s) issued.</p>
+            </section>
             <section aria-label="Create frozen internal rental preview" class="vd-panel space-y-3">
                 <h2 class="text-lg font-semibold">Freeze internal rental-price preview</h2>
                 <p class="text-sm">Uses the saved hall program's approved revision, never a fabricated rate.

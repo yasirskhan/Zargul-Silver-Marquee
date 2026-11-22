@@ -155,6 +155,34 @@ final class FinanceControlService
             ->map(fn ($row) => (array) $row)->all();
     }
 
+    /** Company-scoped export of immutable journals with their ledger lines. */
+    public function journalExport(User $actor, string $companyId, int $limit = 10000): array
+    {
+        $this->authorize($actor, $companyId);
+        if ($limit < 1 || $limit > 20000) {
+            throw new InvalidArgumentException('Invalid ledger export size.');
+        }
+        $journals = DB::table('finance_journals')->where('company_id', $companyId)
+            ->orderBy('created_at')->orderBy('id')->limit($limit)
+            ->get(['id', 'entry_type', 'currency_code', 'amount_minor', 'reversal_of',
+                'reason', 'created_at']);
+        $ids = $journals->pluck('id')->all();
+        $lines = $ids === [] ? collect() : DB::table('finance_journal_lines')
+            ->where('company_id', $companyId)->whereIn('journal_id', $ids)
+            ->orderBy('journal_id')->orderBy('account_code')
+            ->get(['journal_id', 'account_code', 'side', 'amount_minor'])
+            ->groupBy('journal_id');
+        return $journals->map(fn ($row) => [
+            'id' => $row->id, 'entryType' => $row->entry_type,
+            'currency' => $row->currency_code, 'amountMinor' => (int) $row->amount_minor,
+            'reversalOf' => $row->reversal_of, 'reason' => $row->reason,
+            'createdAt' => (string) $row->created_at,
+            'lines' => $lines->get($row->id, collect())->map(fn ($line) => [
+                'account' => $line->account_code, 'side' => $line->side,
+                'amountMinor' => (int) $line->amount_minor,
+            ])->all(),
+        ])->all();
+    }
     /** Company-scoped, policy-checked UTC cash-count history; no payout actions. */
     public function closeouts(User $actor, string $companyId, int $limit = 30): array
     {
