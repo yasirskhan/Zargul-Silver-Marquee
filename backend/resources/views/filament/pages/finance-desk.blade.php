@@ -39,7 +39,7 @@
                             <div class="vd-metric"><b>{{ number_format($bucket['outstandingMinor']/100,2) }}</b><span>Outstanding</span></div>
                             <div class="vd-metric"><b>{{ number_format($bucket['netCollectedMinor']/100,2) }}</b><span>Net collected</span></div>
                         </div>
-                        <p class="text-xs">Cash {{ number_format($bucket['cashMinor']/100,2) }} · Bank {{ number_format($bucket['bankMinor']/100,2) }} · Expenses recorded {{ number_format($bucket['expensesMinor']/100,2) }} · {{ $bucket['invoiceCount'] }} invoice(s) issued.</p>
+                        <p class="text-xs">Cash {{ number_format($bucket['cashMinor']/100,2) }} · Bank {{ number_format($bucket['bankMinor']/100,2) }} · Expenses recorded {{ number_format($bucket['expensesMinor']/100,2) }} · {{ $bucket['invoiceCount'] }} invoice(s) issued · prior-invoice payments {{ number_format($bucket['priorInvoicePaymentsMinor']/100,2) }}.</p>
                     </div>
                 @empty
                     <p class="text-sm">No invoices were issued in this period.</p>

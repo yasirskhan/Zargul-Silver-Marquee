@@ -270,19 +270,21 @@ final class FinanceDesk extends Page
     public function exportJournalsCsv(): \Symfony\Component\HttpFoundation\StreamedResponse
     {
         $actor = $this->authorizeLoaded();
-        $rows = app(FinanceControlService::class)->journalExport($actor, $this->companyId);
-        return response()->streamDownload(function () use ($rows): void {
+        $companyId = $this->companyId;
+        return response()->streamDownload(function () use ($actor, $companyId): void {
             $out = fopen('php://output', 'w');
             fputcsv($out, ['journal_id', 'created_at', 'entry_type', 'currency', 'amount_minor', 'reversal_of', 'reason', 'account_code', 'side', 'line_amount_minor']);
-            foreach ($rows as $row) {
-                if ($row['lines'] === []) {
-                    fputcsv($out, [$row['id'], $row['createdAt'], $row['entryType'], $row['currency'],
-                        $row['amountMinor'], $row['reversalOf'] ?? '', $row['reason'], '', '', '']);
-                }
-                foreach ($row['lines'] as $line) {
-                    fputcsv($out, [$row['id'], $row['createdAt'], $row['entryType'], $row['currency'],
-                        $row['amountMinor'], $row['reversalOf'] ?? '', $row['reason'],
-                        $line['account'], $line['side'], $line['amountMinor']]);
+            foreach (app(FinanceControlService::class)->journalExportBatches($actor, $companyId) as $batch) {
+                foreach ($batch as $row) {
+                    if ($row['lines'] === []) {
+                        fputcsv($out, [$row['id'], $row['createdAt'], $row['entryType'], $row['currency'],
+                            $row['amountMinor'], $row['reversalOf'] ?? '', $row['reason'], '', '', '']);
+                    }
+                    foreach ($row['lines'] as $line) {
+                        fputcsv($out, [$row['id'], $row['createdAt'], $row['entryType'], $row['currency'],
+                            $row['amountMinor'], $row['reversalOf'] ?? '', $row['reason'],
+                            $line['account'], $line['side'], $line['amountMinor']]);
+                    }
                 }
             }
             fclose($out);
@@ -318,10 +320,12 @@ final class FinanceDesk extends Page
         ]);
     }
 
-    /** Company-scoped period financial summary grouped by invoice currency. */
+    /** Company-scoped period financial summary grouped by every active currency. */
     public function financialSummary(): array
     {
-        if ($this->loadedCompanyId === null) {
+        if ($this->loadedCompanyId === null
+            || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $this->reportFrom)
+            || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $this->reportTo)) {
             return [];
         }
         $from = \Carbon\CarbonImmutable::createFromFormat('!Y-m-d', $this->reportFrom, 'UTC');
@@ -331,33 +335,50 @@ final class FinanceDesk extends Page
         }
         $start = $from->startOfDay()->toIso8601String();
         $end = $to->addDay()->startOfDay()->toIso8601String();
-        $invoices = DB::table('venue_invoices')->where('company_id', $this->companyId)
+        $companyId = $this->companyId;
+        $invoices = DB::table('venue_invoices')->where('company_id', $companyId)
             ->where('issued_at', '>=', $start)->where('issued_at', '<', $end)
             ->get(['id', 'currency_code', 'total_minor']);
+        $currencies = collect($invoices->pluck('currency_code'))
+            ->merge(DB::table('venue_invoice_payments')->where('company_id', $companyId)
+                ->where('created_at', '>=', $start)->where('created_at', '<', $end)
+                ->pluck('currency_code'))
+            ->merge(DB::table('venue_invoice_refunds')->where('company_id', $companyId)
+                ->where('created_at', '>=', $start)->where('created_at', '<', $end)
+                ->pluck('currency_code'))
+            ->merge(DB::table('finance_journals')->where('company_id', $companyId)
+                ->where('created_at', '>=', $start)->where('created_at', '<', $end)
+                ->whereIn('entry_type', ['expense', 'cash_expense'])->pluck('currency_code'))
+            ->filter()->unique()->sort()->values();
         $result = [];
-        foreach ($invoices->groupBy('currency_code') as $currency => $rows) {
+        foreach ($currencies as $currency) {
+            $rows = $invoices->where('currency_code', $currency);
             $ids = $rows->pluck('id');
             $invoiced = (int) $rows->sum('total_minor');
             $paid = $ids->isEmpty() ? 0 : (int) DB::table('venue_invoice_payments')
-                ->where('company_id', $this->companyId)->whereIn('invoice_id', $ids)
+                ->where('company_id', $companyId)->whereIn('invoice_id', $ids)
                 ->sum('amount_minor');
             $refunded = $ids->isEmpty() ? 0 : (int) DB::table('venue_invoice_refunds')
-                ->where('company_id', $this->companyId)->whereIn('invoice_id', $ids)
+                ->where('company_id', $companyId)->whereIn('invoice_id', $ids)
                 ->sum('amount_minor');
             $periodPayments = (int) DB::table('venue_invoice_payments')
-                ->where('company_id', $this->companyId)->where('currency_code', $currency)
+                ->where('company_id', $companyId)->where('currency_code', $currency)
                 ->where('created_at', '>=', $start)->where('created_at', '<', $end)
                 ->sum('amount_minor');
             $periodRefunds = (int) DB::table('venue_invoice_refunds')
-                ->where('company_id', $this->companyId)->where('currency_code', $currency)
+                ->where('company_id', $companyId)->where('currency_code', $currency)
+                ->where('created_at', '>=', $start)->where('created_at', '<', $end)
+                ->sum('amount_minor');
+            $periodOnPeriodInvoices = $ids->isEmpty() ? 0 : (int) DB::table('venue_invoice_payments')
+                ->where('company_id', $companyId)->whereIn('invoice_id', $ids)
                 ->where('created_at', '>=', $start)->where('created_at', '<', $end)
                 ->sum('amount_minor');
             $cash = (int) DB::table('venue_invoice_payments')
-                ->where('company_id', $this->companyId)->where('currency_code', $currency)
+                ->where('company_id', $companyId)->where('currency_code', $currency)
                 ->where('created_at', '>=', $start)->where('created_at', '<', $end)
                 ->where('method', 'cash')->sum('amount_minor');
             $expenses = (int) DB::table('finance_journals')
-                ->where('company_id', $this->companyId)->where('currency_code', $currency)
+                ->where('company_id', $companyId)->where('currency_code', $currency)
                 ->where('created_at', '>=', $start)->where('created_at', '<', $end)
                 ->whereIn('entry_type', ['expense', 'cash_expense'])->sum('amount_minor');
             $result[] = [
@@ -366,6 +387,7 @@ final class FinanceDesk extends Page
                 'refundedMinor' => $refunded,
                 'outstandingMinor' => max(0, $invoiced - $paid + $refunded),
                 'periodPaymentsMinor' => $periodPayments,
+                'priorInvoicePaymentsMinor' => max(0, $periodPayments - $periodOnPeriodInvoices),
                 'periodRefundsMinor' => $periodRefunds,
                 'netCollectedMinor' => $periodPayments - $periodRefunds,
                 'cashMinor' => $cash, 'bankMinor' => $periodPayments - $cash,

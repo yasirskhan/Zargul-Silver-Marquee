@@ -155,31 +155,54 @@ final class FinanceControlService
             ->map(fn ($row) => (array) $row)->all();
     }
 
-    /** Company-scoped export of immutable journals with their ledger lines. */
-    public function journalExport(User $actor, string $companyId): array
+    /**
+     * Stream immutable journals and their lines in bounded chronological batches.
+     * No total-size cap is applied; each batch owns at most 500 journals.
+     *
+     * @return \Generator<int,array<int,array<string,mixed>>>
+     */
+    public function journalExportBatches(User $actor, string $companyId, int $batchSize = 500): \Generator
     {
         $this->authorize($actor, $companyId);
-        $journals = DB::table('finance_journals')->where('company_id', $companyId)
-            ->orderBy('created_at')->orderBy('id')
-            ->get(['id', 'entry_type', 'currency_code', 'amount_minor', 'reversal_of',
-                'reason', 'created_at']);
-        $ids = $journals->pluck('id')->all();
-        $lines = $ids === [] ? collect() : DB::table('finance_journal_lines')
+        if ($batchSize < 1 || $batchSize > 1000) {
+            throw new InvalidArgumentException('Invalid ledger batch size.');
+        }
+        $buffer = [];
+        $query = DB::table('finance_journals')->where('company_id', $companyId)
+            ->orderBy('created_at')->orderBy('id');
+        foreach ($query->cursor() as $row) {
+            $buffer[] = $row;
+            if (count($buffer) >= $batchSize) {
+                yield $this->exportBatch($companyId, $buffer);
+                $buffer = [];
+            }
+        }
+        if ($buffer !== []) {
+            yield $this->exportBatch($companyId, $buffer);
+        }
+    }
+
+    /** @param array<int,object> $journals */
+    private function exportBatch(string $companyId, array $journals): array
+    {
+        $ids = array_map(static fn (object $row): string => (string) $row->id, $journals);
+        $lines = DB::table('finance_journal_lines')
             ->where('company_id', $companyId)->whereIn('journal_id', $ids)
-            ->orderBy('journal_id')->orderBy('account_code')
+            ->orderBy('journal_id')->orderBy('account_code')->orderBy('side')
             ->get(['journal_id', 'account_code', 'side', 'amount_minor'])
             ->groupBy('journal_id');
-        return $journals->map(fn ($row) => [
+        return array_map(static fn (object $row): array => [
             'id' => $row->id, 'entryType' => $row->entry_type,
             'currency' => $row->currency_code, 'amountMinor' => (int) $row->amount_minor,
             'reversalOf' => $row->reversal_of, 'reason' => $row->reason,
             'createdAt' => (string) $row->created_at,
-            'lines' => $lines->get($row->id, collect())->map(fn ($line) => [
+            'lines' => $lines->get($row->id, collect())->map(static fn (object $line): array => [
                 'account' => $line->account_code, 'side' => $line->side,
                 'amountMinor' => (int) $line->amount_minor,
             ])->all(),
-        ])->all();
+        ], $journals);
     }
+
     /** Company-scoped, policy-checked UTC cash-count history; no payout actions. */
     public function closeouts(User $actor, string $companyId, int $limit = 30): array
     {
