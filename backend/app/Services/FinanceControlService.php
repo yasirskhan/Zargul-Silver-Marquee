@@ -156,14 +156,11 @@ final class FinanceControlService
     }
 
     /** Company-scoped export of immutable journals with their ledger lines. */
-    public function journalExport(User $actor, string $companyId, int $limit = 10000): array
+    public function journalExport(User $actor, string $companyId): array
     {
         $this->authorize($actor, $companyId);
-        if ($limit < 1 || $limit > 20000) {
-            throw new InvalidArgumentException('Invalid ledger export size.');
-        }
         $journals = DB::table('finance_journals')->where('company_id', $companyId)
-            ->orderBy('created_at')->orderBy('id')->limit($limit)
+            ->orderBy('created_at')->orderBy('id')
             ->get(['id', 'entry_type', 'currency_code', 'amount_minor', 'reversal_of',
                 'reason', 'created_at']);
         $ids = $journals->pluck('id')->all();

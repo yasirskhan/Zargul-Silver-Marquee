@@ -29,14 +29,21 @@
                     <label class="block space-y-1"><span class="text-sm">To (UTC)</span><input type="date" wire:model="reportTo" class="rounded-lg border p-2"></label>
                     <button type="button" wire:click="refreshReport" class="rounded-lg border px-4 py-2 font-semibold">Apply period</button>
                 </div>
-                <div class="vd-metrics" aria-label="Period financial totals">
-                    <div class="vd-metric"><b>{{ number_format($summary['invoicedMinor']/100,2) }}</b><span>Invoiced PKR</span></div>
-                    <div class="vd-metric"><b>{{ number_format($summary['periodPaymentsMinor']/100,2) }}</b><span>Payments received</span></div>
-                    <div class="vd-metric"><b>{{ number_format($summary['periodRefundsMinor']/100,2) }}</b><span>Refunds</span></div>
-                    <div class="vd-metric"><b>{{ number_format($summary['outstandingMinor']/100,2) }}</b><span>Outstanding PKR</span></div>
-                    <div class="vd-metric"><b>{{ number_format($summary['netCollectedMinor']/100,2) }}</b><span>Net collected</span></div>
-                </div>
-                <p class="text-xs">Cash {{ number_format($summary['cashMinor']/100,2) }} · Bank {{ number_format($summary['bankMinor']/100,2) }} · Expenses recorded {{ number_format($summary['expensesMinor']/100,2) }} · {{ $summary['invoiceCount'] }} invoice(s) issued.</p>
+                @forelse ($summary as $bucket)
+                    <div class="vd-panel space-y-2" wire:key="report-{{ $bucket['currency'] }}">
+                        <h3 class="font-semibold">{{ $bucket['currency'] }} financial position</h3>
+                        <div class="vd-metrics" aria-label="Period financial totals">
+                            <div class="vd-metric"><b>{{ number_format($bucket['invoicedMinor']/100,2) }}</b><span>Invoiced {{ $bucket['currency'] }}</span></div>
+                            <div class="vd-metric"><b>{{ number_format($bucket['periodPaymentsMinor']/100,2) }}</b><span>Payments received</span></div>
+                            <div class="vd-metric"><b>{{ number_format($bucket['periodRefundsMinor']/100,2) }}</b><span>Refunds</span></div>
+                            <div class="vd-metric"><b>{{ number_format($bucket['outstandingMinor']/100,2) }}</b><span>Outstanding</span></div>
+                            <div class="vd-metric"><b>{{ number_format($bucket['netCollectedMinor']/100,2) }}</b><span>Net collected</span></div>
+                        </div>
+                        <p class="text-xs">Cash {{ number_format($bucket['cashMinor']/100,2) }} · Bank {{ number_format($bucket['bankMinor']/100,2) }} · Expenses recorded {{ number_format($bucket['expensesMinor']/100,2) }} · {{ $bucket['invoiceCount'] }} invoice(s) issued.</p>
+                    </div>
+                @empty
+                    <p class="text-sm">No invoices were issued in this period.</p>
+                @endforelse
             </section>
             <section aria-label="Create frozen internal rental preview" class="vd-panel space-y-3">
                 <h2 class="text-lg font-semibold">Freeze internal rental-price preview</h2>

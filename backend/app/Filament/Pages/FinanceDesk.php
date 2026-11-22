@@ -318,45 +318,63 @@ final class FinanceDesk extends Page
         ]);
     }
 
-    /** Company-scoped period financial summary from immutable finance sources. */
+    /** Company-scoped period financial summary grouped by invoice currency. */
     public function financialSummary(): array
     {
         if ($this->loadedCompanyId === null) {
             return [];
         }
-        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $this->reportFrom)
-            || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $this->reportTo)) {
+        $from = \Carbon\CarbonImmutable::createFromFormat('!Y-m-d', $this->reportFrom, 'UTC');
+        $to = \Carbon\CarbonImmutable::createFromFormat('!Y-m-d', $this->reportTo, 'UTC');
+        if ($from === false || $to === false || $to->lt($from)) {
             return [];
         }
-        $from = $this->reportFrom.' 00:00:00';
-        $to = $this->reportTo.' 23:59:59';
-        $invoiceIds = DB::table('venue_invoices')->where('company_id', $this->companyId)
-            ->whereBetween('issued_at', [$from, $to])->pluck('id');
-        $invoiced = (int) DB::table('venue_invoices')->where('company_id', $this->companyId)
-            ->whereIn('id', $invoiceIds)->sum('total_minor');
-        $paid = $invoiceIds->isEmpty() ? 0 : (int) DB::table('venue_invoice_payments')
-            ->where('company_id', $this->companyId)->whereIn('invoice_id', $invoiceIds)->sum('amount_minor');
-        $refunded = $invoiceIds->isEmpty() ? 0 : (int) DB::table('venue_invoice_refunds')
-            ->where('company_id', $this->companyId)->whereIn('invoice_id', $invoiceIds)->sum('amount_minor');
-        $periodPayments = (int) DB::table('venue_invoice_payments')->where('company_id', $this->companyId)
-            ->whereBetween('created_at', [$from, $to])->sum('amount_minor');
-        $periodRefunds = (int) DB::table('venue_invoice_refunds')->where('company_id', $this->companyId)
-            ->whereBetween('created_at', [$from, $to])->sum('amount_minor');
-        $cash = (int) DB::table('venue_invoice_payments')->where('company_id', $this->companyId)
-            ->whereBetween('created_at', [$from, $to])->where('method', 'cash')->sum('amount_minor');
-        $bank = $periodPayments - $cash;
-        $expenses = (int) DB::table('finance_journals')->where('company_id', $this->companyId)
-            ->whereBetween('created_at', [$from, $to])
-            ->whereIn('entry_type', ['expense', 'cash_expense'])->sum('amount_minor');
-        return [
-            'invoiceCount' => $invoiceIds->count(), 'invoicedMinor' => $invoiced,
-            'paidMinor' => $paid, 'refundedMinor' => $refunded,
-            'outstandingMinor' => max(0, $invoiced - $paid + $refunded),
-            'periodPaymentsMinor' => $periodPayments, 'periodRefundsMinor' => $periodRefunds,
-            'netCollectedMinor' => $periodPayments - $periodRefunds,
-            'cashMinor' => $cash, 'bankMinor' => $bank, 'expensesMinor' => $expenses,
-        ];
+        $start = $from->startOfDay()->toIso8601String();
+        $end = $to->addDay()->startOfDay()->toIso8601String();
+        $invoices = DB::table('venue_invoices')->where('company_id', $this->companyId)
+            ->where('issued_at', '>=', $start)->where('issued_at', '<', $end)
+            ->get(['id', 'currency_code', 'total_minor']);
+        $result = [];
+        foreach ($invoices->groupBy('currency_code') as $currency => $rows) {
+            $ids = $rows->pluck('id');
+            $invoiced = (int) $rows->sum('total_minor');
+            $paid = $ids->isEmpty() ? 0 : (int) DB::table('venue_invoice_payments')
+                ->where('company_id', $this->companyId)->whereIn('invoice_id', $ids)
+                ->sum('amount_minor');
+            $refunded = $ids->isEmpty() ? 0 : (int) DB::table('venue_invoice_refunds')
+                ->where('company_id', $this->companyId)->whereIn('invoice_id', $ids)
+                ->sum('amount_minor');
+            $periodPayments = (int) DB::table('venue_invoice_payments')
+                ->where('company_id', $this->companyId)->where('currency_code', $currency)
+                ->where('created_at', '>=', $start)->where('created_at', '<', $end)
+                ->sum('amount_minor');
+            $periodRefunds = (int) DB::table('venue_invoice_refunds')
+                ->where('company_id', $this->companyId)->where('currency_code', $currency)
+                ->where('created_at', '>=', $start)->where('created_at', '<', $end)
+                ->sum('amount_minor');
+            $cash = (int) DB::table('venue_invoice_payments')
+                ->where('company_id', $this->companyId)->where('currency_code', $currency)
+                ->where('created_at', '>=', $start)->where('created_at', '<', $end)
+                ->where('method', 'cash')->sum('amount_minor');
+            $expenses = (int) DB::table('finance_journals')
+                ->where('company_id', $this->companyId)->where('currency_code', $currency)
+                ->where('created_at', '>=', $start)->where('created_at', '<', $end)
+                ->whereIn('entry_type', ['expense', 'cash_expense'])->sum('amount_minor');
+            $result[] = [
+                'currency' => $currency, 'invoiceCount' => $ids->count(),
+                'invoicedMinor' => $invoiced, 'paidMinor' => $paid,
+                'refundedMinor' => $refunded,
+                'outstandingMinor' => max(0, $invoiced - $paid + $refunded),
+                'periodPaymentsMinor' => $periodPayments,
+                'periodRefundsMinor' => $periodRefunds,
+                'netCollectedMinor' => $periodPayments - $periodRefunds,
+                'cashMinor' => $cash, 'bankMinor' => $periodPayments - $cash,
+                'expensesMinor' => $expenses,
+            ];
+        }
+        return $result;
     }
+
     public function createPreview(): void
     {
         $actor = $this->authorizeLoaded();
