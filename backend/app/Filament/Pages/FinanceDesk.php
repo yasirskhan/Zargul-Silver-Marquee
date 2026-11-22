@@ -348,7 +348,7 @@ final class FinanceDesk extends Page
                 ->pluck('currency_code'))
             ->merge(DB::table('finance_journals')->where('company_id', $companyId)
                 ->where('created_at', '>=', $start)->where('created_at', '<', $end)
-                ->whereIn('entry_type', ['expense', 'cash_expense'])->pluck('currency_code'))
+                ->whereIn('entry_type', ['expense', 'cash_expense', 'inventory_partner_payment'])->pluck('currency_code'))
             ->filter()->unique()->sort()->values();
         $result = [];
         foreach ($currencies as $currency) {
@@ -380,7 +380,7 @@ final class FinanceDesk extends Page
             $expenses = (int) DB::table('finance_journals')
                 ->where('company_id', $companyId)->where('currency_code', $currency)
                 ->where('created_at', '>=', $start)->where('created_at', '<', $end)
-                ->whereIn('entry_type', ['expense', 'cash_expense'])->sum('amount_minor');
+                ->whereIn('entry_type', ['expense', 'cash_expense', 'inventory_partner_payment'])->sum('amount_minor');
             $result[] = [
                 'currency' => $currency, 'invoiceCount' => $ids->count(),
                 'invoicedMinor' => $invoiced, 'paidMinor' => $paid,

@@ -85,6 +85,17 @@ class FinanceDeskLivewireTest extends TestCase
         $this->assertSame([], $component->instance()->financialSummary());
         $component->set('reportFrom', 'not-a-date')->set('reportTo', '2026-01-01');
         $this->assertSame([], $component->instance()->financialSummary());
+        $component->set('reportFrom', '2026-02-30')->set('reportTo', '2026-03-01');
+        $this->assertSame([], $component->instance()->financialSummary());
+        $component->call('refreshReport')->assertHasErrors('reportFrom');
+        $component->set('reportFrom', '2025-02-29');
+        $component->call('refreshReport')->assertHasErrors('reportFrom');
+        $component->set('reportFrom', '2026-13-01');
+        $component->call('refreshReport')->assertHasErrors('reportFrom');
+        $component->set('reportFrom', '2024-02-29')->set('reportTo', '2024-02-29');
+        $component->call('refreshReport')->assertHasNoErrors();
+        $component->set('reportFrom', '2026-05-02')->set('reportTo', '2026-05-01');
+        $component->call('refreshReport')->assertHasErrors('reportTo');
     }
     public function test_stale_authenticated_owner_cannot_open_finance_after_persisted_account_revocation(): void
     {
