@@ -77,6 +77,15 @@ class FinanceDeskLivewireTest extends TestCase
     }
 
 
+    public function test_empty_or_invalid_report_dates_return_no_summary_without_error(): void
+    {
+        $this->fixture();
+        $component = Livewire::test(FinanceDesk::class);
+        $component->set('reportFrom', '')->set('reportTo', '');
+        $this->assertSame([], $component->instance()->financialSummary());
+        $component->set('reportFrom', 'not-a-date')->set('reportTo', '2026-01-01');
+        $this->assertSame([], $component->instance()->financialSummary());
+    }
     public function test_stale_authenticated_owner_cannot_open_finance_after_persisted_account_revocation(): void
     {
         [$company, , $people] = $this->fixture();
