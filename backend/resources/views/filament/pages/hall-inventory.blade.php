@@ -692,6 +692,7 @@
                         <h3 class="font-semibold">Physical versus recorded book snapshot</h3>
                         <p class="text-xs">Count {{ $varianceStocktakeId }}. The book baseline was captured at count submission, not taken from today's balance.
                             Missing or inconsistent historical baselines cannot produce a trusted variance. This preview neither posts stock nor settles money.</p>
+                        <button type="button" wire:click="downloadStocktakeVarianceCsv" class="rounded-lg border px-3 py-2 text-sm">Export variance CSV</button>
                         <div class="overflow-x-auto">
                             <table class="w-full min-w-[760px] text-left text-sm">
                                 <thead><tr><th class="p-2">Item / ownership</th><th class="p-2">Counted usable</th>

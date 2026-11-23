@@ -1461,6 +1461,41 @@ final class HallInventory extends Page
             ->recent($actor,$this->companyId,$this->hallId);
     }
 
+    public function downloadStocktakeVarianceCsv():\Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $actor=$this->authorizeSelection();
+        abort_unless(config('inventory_controls.stocktakes_enabled') &&
+            config('inventory_controls.position_reports_enabled') &&
+            config('inventory_controls.stocktake_variance_enabled') &&
+            $this->varianceStocktakeId!=='',403);
+        $rows=$this->stocktakeVariance;
+        DB::table('audit_events')->insert([
+            'id'=>(string)Str::uuid(),'company_id'=>$this->companyId,
+            'actor_id'=>$actor->getKey(),
+            'action'=>'hall_inventory.stocktake_variance_csv_exported',
+            'entity_type'=>'hall_inventory_stocktake','entity_id'=>$this->varianceStocktakeId,
+            'before_values'=>json_encode([],JSON_THROW_ON_ERROR),
+            'after_values'=>json_encode(['format'=>'csv','rows'=>count($rows)],JSON_THROW_ON_ERROR),
+            'context'=>json_encode(['scope'=>'selected_hall','financialPosting'=>false],JSON_THROW_ON_ERROR),
+        ]);
+        return response()->streamDownload(function()use($rows):void {
+            $out=fopen('php://output','w');
+            fputcsv($out,['item_id','item','unit','ownership','counted_usable','counted_damaged',
+                'book_usable','book_damaged','usable_variance','damaged_variance','status',
+                'requires_review','adjustment_posted']);
+            foreach($rows as $row){
+                $name=(string)($row['name']??'');
+                if($name!=='' && in_array($name[0],['=','+','-','@'],true))$name="'".$name;
+                fputcsv($out,[$row['itemId']??'',$name,$row['unit']??'',$row['ownership']??'',
+                    $row['countedUsable']??'',$row['countedDamaged']??'',
+                    $row['bookUsable']??'',$row['bookDamaged']??'',
+                    $row['usableVariance']??'',$row['damagedVariance']??'',
+                    $row['status']??'',($row['requiresReview']??false)?'yes':'no',
+                    ($row['adjustmentPosted']??false)?'yes':'no']);
+            }
+            fclose($out);
+        },'stocktake-variance-'.$this->varianceStocktakeId.'.csv',['Content-Type'=>'text/csv']);
+    }
     public function downloadPositionReportCsv():\Symfony\Component\HttpFoundation\StreamedResponse
     {
         $actor=$this->authorizeSelection();

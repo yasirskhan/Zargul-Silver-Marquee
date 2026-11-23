@@ -13,7 +13,7 @@ Status legend: **B** backend/service functional, **F** existing functional form/
 | Invoice panel | reservation detail | yes | yes | partial | tests | mock invoice detail layout |
 | Approvals | `/admin/approval-center` | yes | yes | pagehead | pending | delegation/dialog parity |
 | Approval settings | `/admin/approval-settings` | yes | yes | partial | limits saved | Telegram layout |
-| Inventory | `/admin/hall-inventory` | yes | yes | pagehead | phase12 | mock purchasing/transfer tabs |
+| Inventory | `/admin/hall-inventory` | yes | yes | workflow workspace | phase12 + variance CSV | mock tab parity/browser final |
 | Staff | `/admin/staff-management` | yes | yes | pagehead | pending | role matrix/dialogs |
 | Website CMS | `/admin/website-workspace` | yes | yes | partial | editor e2e | gallery/media parity |
 | Hall programs | `/admin/hall-programs` | yes | yes | partial | pending | mock program cards |
