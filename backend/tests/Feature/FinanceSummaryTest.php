@@ -161,6 +161,25 @@ class FinanceSummaryTest extends TestCase
         ]);
     }
 
+
+    public function test_impossible_february_date_is_rejected_before_march_data_is_summarized(): void
+    {
+        $this->fixture();
+        config()->set('invoice_controls.issuance_enabled', true);
+        config()->set('invoice_controls.tax_rate_bps', 0);
+        $invoice = $this->invoice('PKR', 90000, '2026-03-15 10:00:00+00');
+        $this->pay($invoice, 'PKR', 40000, '2026-03-20 10:00:00+00');
+        $component = Livewire::test(FinanceDesk::class);
+        $component->set('reportFrom', '2026-02-30')->set('reportTo', '2026-03-31');
+        // Real March data exists, so an empty result can only come from rejecting the date.
+        $this->assertSame([], $component->instance()->financialSummary());
+        $component->call('refreshReport')->assertHasErrors('reportFrom');
+        $component->set('reportFrom', '2026-03-01');
+        $summary = collect($component->instance()->financialSummary())->keyBy('currency');
+        $this->assertSame(90000, $summary['PKR']['invoicedMinor']);
+        $this->assertSame(40000, $summary['PKR']['periodPaymentsMinor']);
+    }
+
     public function test_summary_includes_mixed_and_activity_only_currencies_at_utc_boundaries(): void
     {
         $this->fixture();

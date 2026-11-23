@@ -311,12 +311,24 @@ final class FinanceDesk extends Page
             fclose($out);
         }, 'reconciliation-'.$date.'.csv', ['Content-Type' => 'text/csv']);
     }
+    private static function validCalendarDate(string $value): bool
+    {
+        if (! preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $m)) {
+            return false;
+        }
+        return checkdate((int) $m[2], (int) $m[3], (int) $m[1]);
+    }
+
     public function refreshReport(): void
     {
         $this->authorizeLoaded();
         $this->validate([
-            'reportFrom' => ['required', 'date_format:Y-m-d'],
-            'reportTo' => ['required', 'date_format:Y-m-d', 'after_or_equal:reportFrom'],
+            'reportFrom' => ['required', 'string', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (! self::validCalendarDate((string) $value)) $fail('Enter a real calendar date.');
+            }],
+            'reportTo' => ['required', 'string', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (! self::validCalendarDate((string) $value)) $fail('Enter a real calendar date.');
+            }, 'after_or_equal:reportFrom'],
         ]);
     }
 
@@ -324,8 +336,8 @@ final class FinanceDesk extends Page
     public function financialSummary(): array
     {
         if ($this->loadedCompanyId === null
-            || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $this->reportFrom)
-            || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $this->reportTo)) {
+            || ! self::validCalendarDate($this->reportFrom)
+            || ! self::validCalendarDate($this->reportTo)) {
             return [];
         }
         $from = \Carbon\CarbonImmutable::createFromFormat('!Y-m-d', $this->reportFrom, 'UTC');

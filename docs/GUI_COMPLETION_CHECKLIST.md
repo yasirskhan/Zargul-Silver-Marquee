@@ -9,7 +9,7 @@ Status legend: **B** backend/service functional, **F** existing functional form/
 | Booking proposals | `/admin/booking-proposals` | yes | yes | pagehead/table | pending | mock filters/dialogs |
 | Reservations | `/admin/venue-reservations` | yes | yes | table workspace | targeted tests | detail panel parity |
 | Customers | reservation history / quick search | yes | partial | partial | no | no standalone customer directory |
-| Finance review | `/admin/finance-desk` | yes | yes | panels | pending | reports/analytics parity |
+| Finance review | `/admin/finance-desk` | yes | yes | yes | PostgreSQL regressions | mock analytics parity not complete |
 | Invoice panel | reservation detail | yes | yes | partial | tests | mock invoice detail layout |
 | Approvals | `/admin/approval-center` | yes | yes | pagehead | pending | delegation/dialog parity |
 | Approval settings | `/admin/approval-settings` | yes | yes | partial | limits saved | Telegram layout |
