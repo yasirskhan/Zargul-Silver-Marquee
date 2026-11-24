@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\User;
+use App\Services\StaffDirectoryService;
 use App\Services\StaffInvitationService;
 use BackedEnum;
 use Filament\Facades\Filament;
@@ -12,6 +13,7 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 
 final class StaffManagement extends Page
@@ -32,6 +34,13 @@ final class StaffManagement extends Page
     public array $hallIds = [];
     public string $reason = '';
     public array $invitations = [];
+    public string $staffSearch = '';
+    public array $staffRows = [];
+    #[Locked]
+    public ?string $selectedStaffId = null;
+    public string $staffRole = 'manager';
+    public array $staffHallIds = [];
+    public string $staffReason = '';
     public array $halls = [];
     public ?string $message = null;
 
@@ -65,6 +74,7 @@ final class StaffManagement extends Page
         $this->companyId = $this->companyId ?? array_key_first($companies);
         abort_unless($this->companyId !== null && array_key_exists($this->companyId, $companies), 403);
         $this->refreshInvitations();
+        $this->refreshStaff();
         $this->halls = DB::table('halls')->where('company_id', $this->companyId)
             ->where('is_active', true)
             ->orderBy('name')->get(['id', 'name'])->map(fn ($row) => (array) $row)->all();
@@ -75,9 +85,80 @@ final class StaffManagement extends Page
         abort_unless(static::canAccess() && $this->companyId !== null
             && array_key_exists($this->companyId, $this->companies()), 403);
         $this->refreshInvitations();
+        $this->refreshStaff();
         $this->halls = DB::table('halls')->where('company_id', $this->companyId)
             ->where('is_active', true)
             ->orderBy('name')->get(['id', 'name'])->map(fn ($row) => (array) $row)->all();
+    }
+
+
+    public function refreshStaff(): void
+    {
+        $actor = Filament::auth()->user();
+        if (! $actor instanceof User || $this->companyId === null) return;
+        $this->staffRows = app(StaffDirectoryService::class)->staff($actor, $this->companyId, $this->staffSearch);
+    }
+
+    public function updatedStaffSearch(): void
+    {
+        $this->refreshStaff();
+    }
+
+    public function selectStaff(string $membershipId): void
+    {
+        $actor = Filament::auth()->user();
+        abort_unless($actor instanceof User && $this->companyId !== null, 403);
+        $row = collect(app(StaffDirectoryService::class)->staff($actor, $this->companyId))
+            ->firstWhere('id', $membershipId);
+        abort_unless($row !== null, 404);
+        $this->selectedStaffId = $membershipId;
+        $this->staffRole = $row['role'] === 'owner' ? 'owner' : $row['role'];
+        $this->staffHallIds = $row['hallIds'];
+        $this->staffReason = '';
+    }
+
+    public function closeStaff(): void
+    {
+        $this->selectedStaffId = null;
+        $this->staffRole = 'manager';
+        $this->staffHallIds = [];
+        $this->staffReason = '';
+    }
+
+    public function saveStaff(): void
+    {
+        $actor = Filament::auth()->user();
+        abort_unless($actor instanceof User && $this->companyId !== null && $this->selectedStaffId !== null, 403);
+        $this->validate([
+            'staffRole' => ['required', 'in:admin,manager,operations,reception,cashier'],
+            'staffReason' => ['required', 'string', 'min:3', 'max:300'],
+        ]);
+        try {
+            app(StaffDirectoryService::class)->update($actor, $this->companyId, $this->selectedStaffId,
+                $this->staffRole, $this->staffHallIds, $this->staffReason);
+        } catch (\Throwable $e) {
+            $this->addError('staffReason', $e->getMessage());
+            return;
+        }
+        $this->message = 'Staff role and hall assignments updated.';
+        $this->refreshStaff();
+        $this->closeStaff();
+    }
+
+    public function revokeStaff(string $membershipId): void
+    {
+        $actor = Filament::auth()->user();
+        abort_unless($actor instanceof User && $this->companyId !== null, 403);
+        $this->validate(['staffReason' => ['required', 'string', 'min:3', 'max:300']]);
+        try {
+            app(StaffDirectoryService::class)->revoke($actor, $this->companyId, $membershipId, $this->staffReason);
+        } catch (\Throwable $e) {
+            $this->addError('staffReason', $e->getMessage());
+            return;
+        }
+        $this->message = 'Staff membership revoked and hall assignments removed.';
+        $this->refreshStaff();
+        $this->closeStaff();
     }
 
     public function refreshInvitations(): void
@@ -110,6 +191,7 @@ final class StaffManagement extends Page
             $this->email = '';
             $this->reason = '';
             $this->refreshInvitations();
+        $this->refreshStaff();
         $this->halls = DB::table('halls')->where('company_id', $this->companyId)
             ->where('is_active', true)
             ->orderBy('name')->get(['id', 'name'])->map(fn ($row) => (array) $row)->all();
@@ -128,6 +210,7 @@ final class StaffManagement extends Page
         app(StaffInvitationService::class)->revoke($actor, $this->companyId, $id, $this->reason);
         $this->message = 'Invitation revoked and active access deactivated.';
         $this->refreshInvitations();
+        $this->refreshStaff();
         $this->halls = DB::table('halls')->where('company_id', $this->companyId)
             ->where('is_active', true)
             ->orderBy('name')->get(['id', 'name'])->map(fn ($row) => (array) $row)->all();
