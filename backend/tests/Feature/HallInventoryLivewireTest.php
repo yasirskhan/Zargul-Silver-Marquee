@@ -98,6 +98,7 @@ class HallInventoryLivewireTest extends TestCase
     public function test_inventory_catalog_page_hidden_by_default_and_manager_sees_only_assigned_hall(): void
     {
         [$company, $hall, $other] = $this->fixture();
+        config()->set('inventory_controls.catalog_enabled', false);
         $this->assertFalse(HallInventory::canAccess());
         config()->set('inventory_controls.catalog_enabled', true);
         $this->assertTrue(HallInventory::canAccess());
