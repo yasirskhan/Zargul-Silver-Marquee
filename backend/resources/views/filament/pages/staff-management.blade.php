@@ -60,7 +60,7 @@
                         @error('staffReason') <p role="alert" class="text-sm text-red-600">{{ $message }}</p> @enderror
                         <div class="flex flex-wrap gap-2">
                             <button type="button" wire:click="saveStaff" class="rounded-lg bg-emerald-800 px-4 py-2 text-white">Save staff access</button>
-                            <button type="button" wire:click="revokeStaff('{{ $selectedStaff['id'] }}')" class="rounded-lg border border-rose-300 px-4 py-2 text-rose-700">Revoke membership</button>
+                            <button type="button" wire:click="revokeStaff('{{ $selectedStaff['id'] }}')" class="rounded-lg border border-rose-300 px-4 py-2 text-rose-700">Revoke staff membership</button>
                             <button type="button" wire:click="closeStaff" class="rounded-lg border px-4 py-2">Close</button>
                         </div>
                     </div>
@@ -112,7 +112,7 @@
                             <td>{{ ucfirst($invitation['role']) }}</td>
                             <td><span class="vd-status {{ $invitation['status'] === 'accepted' ? 'confirmed' : ($invitation['status'] === 'revoked' ? 'cancelled' : 'hold') }}">{{ ucfirst($invitation['status']) }}</span></td>
                             <td>{{ $invitation['expires_at'] }}</td>
-                            <td>@if ($invitation['status'] !== 'revoked' && $invitation['status'] !== 'accepted')
+                            <td>@if ($invitation['status'] !== 'revoked')
                                 <button type="button" wire:click="revoke('{{ $invitation['id'] }}')" class="underline">Revoke</button>
                             @endif</td>
                         </tr>
