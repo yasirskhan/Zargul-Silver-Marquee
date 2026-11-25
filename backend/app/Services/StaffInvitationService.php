@@ -176,6 +176,10 @@ final class StaffInvitationService
                 throw new ConflictHttpException('Invitation is unavailable.');
             }
             if ($invite->accepted_by !== null) {
+                $membershipIds = DB::table('company_memberships')->where('company_id', $companyId)
+                    ->where('user_id', $invite->accepted_by)->pluck('id');
+                DB::table('hall_assignments')->where('company_id', $companyId)
+                    ->whereIn('membership_id', $membershipIds)->delete();
                 DB::table('company_memberships')->where('company_id', $companyId)
                     ->where('user_id', $invite->accepted_by)->update([
                         'is_active' => false, 'updated_at' => now(),

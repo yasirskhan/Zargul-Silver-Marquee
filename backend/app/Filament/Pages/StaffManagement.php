@@ -39,6 +39,7 @@ final class StaffManagement extends Page
     #[Locked]
     public ?string $selectedStaffId = null;
     public string $staffRole = 'manager';
+    #[Locked]
     public string $staffExpectedRole = '';
     public array $staffHallIds = [];
     public string $staffReason = '';

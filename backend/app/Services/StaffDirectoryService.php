@@ -112,6 +112,14 @@ final class StaffDirectoryService
         }
         DB::transaction(function () use ($actor, $companyId, $membershipId, $reason): void {
             $this->authorizeOwner($actor, $companyId);
+            $locked = DB::table('company_memberships')->where('company_id', $companyId)
+                ->where('id', $membershipId)->lockForUpdate()->first();
+            if (! $locked || ! $locked->is_active) {
+                throw new InvalidArgumentException('Staff membership changed concurrently. Reload and retry.');
+            }
+            if ($locked->role === 'owner' || (int) $locked->user_id === (int) $actor->getKey()) {
+                throw new AuthorizationException('Owner or self membership cannot be revoked.');
+            }
             DB::table('company_memberships')->where('company_id', $companyId)
                 ->where('id', $membershipId)->update(['is_active' => false, 'updated_at' => now()]);
             DB::table('hall_assignments')->where('company_id', $companyId)
