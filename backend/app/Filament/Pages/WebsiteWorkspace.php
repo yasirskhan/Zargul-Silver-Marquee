@@ -66,6 +66,7 @@ final class WebsiteWorkspace extends Page
     public $pendingImage = null;
 
     public string $mediaAltText = '';
+    public string $mediaSearch = '';
 
     public string $mediaReason = '';
 
@@ -585,9 +586,19 @@ final class WebsiteWorkspace extends Page
             ->where('company_id', $page->company_id)
             ->whereIn('status', ['pending', 'approved'])
             ->orderByDesc('created_at')
-            ->limit(50)
             ->get(['id', 'status', 'alt_text', 'mime_type'])
             ->all();
+    }
+
+    /** Filter the authorized media list without changing its tenant scope. */
+    public function filteredMedia(): array
+    {
+        $needle = mb_strtolower(trim($this->mediaSearch));
+        if ($needle === '') return $this->mediaForCurrentCompany();
+        return array_values(array_filter($this->mediaForCurrentCompany(), function ($asset) use ($needle): bool {
+            $haystack = mb_strtolower((string) ($asset->alt_text ?? '').' '.($asset->mime_type ?? '').' '.($asset->id ?? ''));
+            return str_contains($haystack, $needle);
+        }));
     }
 
     public function stageMedia(): void

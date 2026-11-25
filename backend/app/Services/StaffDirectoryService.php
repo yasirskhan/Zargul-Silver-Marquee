@@ -40,7 +40,7 @@ final class StaffDirectoryService
     }
 
     public function update(User $actor, string $companyId, string $membershipId,
-        string $role, array $hallIds, string $reason): void
+        string $role, array $hallIds, string $reason, string $expectedRole = ''): void
     {
         $this->authorizeOwner($actor, $companyId);
         if (! ctype_digit($membershipId) || ! in_array($role, self::ROLES, true)) {
@@ -51,8 +51,12 @@ final class StaffDirectoryService
             throw new InvalidArgumentException('A reason between 3 and 300 characters is required.');
         }
         $target = DB::table('company_memberships')->where('company_id', $companyId)
-            ->where('id', $membershipId)->first();
+            ->where('id', $membershipId)->lockForUpdate()->first();
         if (! $target) throw new InvalidArgumentException('Staff membership not found.');
+        if (! $target->is_active) throw new InvalidArgumentException('Staff membership is no longer active.');
+        if ($expectedRole !== '' && $target->role !== $expectedRole) {
+            throw new InvalidArgumentException('Staff role changed since this page was loaded. Reload and retry.');
+        }
         if ($target->role === 'owner') throw new AuthorizationException('Owner membership cannot be changed here.');
         if ((int) $target->user_id === (int) $actor->getKey()) {
             throw new AuthorizationException('You cannot change your own staff role.');
@@ -62,6 +66,12 @@ final class StaffDirectoryService
             ->whereIn('id', $halls)->pluck('id')->all();
         if (count($valid) !== count($halls)) throw new InvalidArgumentException('Hall assignment is outside this company.');
         DB::transaction(function () use ($actor, $companyId, $membershipId, $target, $role, $valid, $reason): void {
+            $this->authorizeOwner($actor, $companyId);
+            $locked = DB::table('company_memberships')->where('company_id', $companyId)
+                ->where('id', $membershipId)->lockForUpdate()->first();
+            if (! $locked || ! $locked->is_active || $locked->role !== $target->role) {
+                throw new InvalidArgumentException('Staff membership changed concurrently. Reload and retry.');
+            }
             $before = ['role' => $target->role, 'hallIds' => DB::table('hall_assignments')
                 ->where('company_id', $companyId)->where('membership_id', $membershipId)
                 ->pluck('hall_id')->all()];
@@ -94,12 +104,14 @@ final class StaffDirectoryService
             throw new InvalidArgumentException('A reason between 3 and 300 characters is required.');
         }
         $target = DB::table('company_memberships')->where('company_id', $companyId)
-            ->where('id', $membershipId)->first();
+            ->where('id', $membershipId)->lockForUpdate()->first();
         if (! $target) throw new InvalidArgumentException('Staff membership not found.');
+        if (! $target->is_active) throw new InvalidArgumentException('Staff membership is no longer active.');
         if ($target->role === 'owner' || (int) $target->user_id === (int) $actor->getKey()) {
             throw new AuthorizationException('Owner or self membership cannot be revoked.');
         }
         DB::transaction(function () use ($actor, $companyId, $membershipId, $reason): void {
+            $this->authorizeOwner($actor, $companyId);
             DB::table('company_memberships')->where('company_id', $companyId)
                 ->where('id', $membershipId)->update(['is_active' => false, 'updated_at' => now()]);
             DB::table('hall_assignments')->where('company_id', $companyId)
@@ -117,9 +129,11 @@ final class StaffDirectoryService
 
     private function authorizeOwner(User $actor, string $companyId): void
     {
-        $allowed = DB::table('company_memberships')->where('company_id', $companyId)
-            ->where('user_id', $actor->getKey())->where('role', 'owner')
-            ->where('is_active', true)->exists();
-        if (! $allowed) throw new AuthorizationException('Owner access required.');
+        $allowed = (bool) $actor->is_active && $actor->hasVerifiedEmail()
+            && DB::table('companies')->where('id', $companyId)->where('is_active', true)->exists()
+            && DB::table('company_memberships')->where('company_id', $companyId)
+                ->where('user_id', $actor->getKey())->where('role', 'owner')
+                ->where('is_active', true)->exists();
+        if (! $allowed) throw new AuthorizationException('Active verified company owner access required.');
     }
 }

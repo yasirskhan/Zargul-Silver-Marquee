@@ -285,6 +285,7 @@
             <section class="vd-panel space-y-4" aria-label="Website media library">
                 <h2 class="text-lg font-semibold">Media library</h2>
                 <p class="text-sm">Stage genuine venue images privately, then request owner or publisher approval before any publication. Uploading never puts a photo on the public website.</p>
+            <label class="block max-w-md space-y-1"><span class="text-sm">Search media</span><input wire:model.live.debounce.300ms="mediaSearch" maxlength="120" placeholder="Alt text, type or reference" class="w-full rounded-lg border p-2"></label>
                 <div class="grid gap-3 md:grid-cols-2">
                     <label class="block space-y-1">
                         <span class="text-sm font-medium">Venue photograph (JPEG, PNG or WebP; up to 4 MB)</span>
@@ -309,7 +310,7 @@
                     class="rounded-lg border px-3 py-2 font-semibold">Stage image privately</button>
                 <div class="space-y-2">
                     <h3 class="font-semibold">Company image assets</h3>
-                    @forelse ($this->mediaForCurrentCompany() as $asset)
+                    @forelse ($this->filteredMedia() as $asset)
                         @php($assetUrl = $this->mediaPreviewUrl($asset->id))
                         <div wire:key="asset-{{ $asset->id }}" class="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3">
                             <div class="flex min-w-0 items-center gap-3">

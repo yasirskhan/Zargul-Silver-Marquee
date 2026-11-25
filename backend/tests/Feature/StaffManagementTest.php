@@ -48,6 +48,52 @@ class StaffManagementTest extends TestCase
         $service->update($manager,$company->id,(string)$membership->id,'manager',[],'Self escalation attempt');
     }
 
+
+    public function test_cross_company_revoked_owner_self_owner_and_stale_guards(): void
+    {
+        $company=Company::create(['name'=>'Guard Venue','slug'=>'guard-venue']);
+        $other=Company::create(['name'=>'Other Guard Venue','slug'=>'other-guard-venue']);
+        $owner=User::create(['name'=>'Guard Owner','email'=>'guard-owner@example.test','password'=>'test-only']);
+        $manager=User::create(['name'=>'Guard Manager','email'=>'guard-manager@example.test','password'=>'test-only']);
+        foreach([[$owner,'owner'],[$manager,'manager']] as [$user,$role]){
+            $user->markEmailAsVerified();
+            CompanyMembership::create(['company_id'=>$company->id,'user_id'=>$user->id,'role'=>$role]);
+        }
+        $otherOwner=User::create(['name'=>'Other Owner','email'=>'other-guard-owner@example.test','password'=>'test-only']);
+        $otherOwner->markEmailAsVerified();
+        $otherMembership=CompanyMembership::create(['company_id'=>$other->id,'user_id'=>$otherOwner->id,'role'=>'owner']);
+        $managerMembership=CompanyMembership::where('user_id',$manager->id)->first();
+        $ownerMembership=CompanyMembership::where('user_id',$owner->id)->first();
+        $service=app(StaffDirectoryService::class);
+        $this->be($owner);
+        try {
+            $service->update($owner,$company->id,(string)$otherMembership->id,'admin',[],'Cross company attempt');
+            $this->fail('Cross company update was allowed.');
+        } catch (\InvalidArgumentException) {
+            $this->assertSame('manager',DB::table('company_memberships')->where('id',$managerMembership->id)->value('role'));
+        }
+        $service->update($owner,$company->id,(string)$managerMembership->id,'admin',[],'Promote once','manager');
+        try {
+            $service->update($owner,$company->id,(string)$managerMembership->id,'reception',[],'Stale role attempt','manager');
+            $this->fail('Stale role update was allowed.');
+        } catch (\InvalidArgumentException) {
+            $this->assertSame('admin',DB::table('company_memberships')->where('id',$managerMembership->id)->value('role'));
+        }
+        try {
+            $service->revoke($owner,$company->id,(string)$ownerMembership->id,'Owner protection');
+            $this->fail('Owner membership was revoked.');
+        } catch (AuthorizationException) {
+            $this->assertTrue((bool)DB::table('company_memberships')->where('id',$ownerMembership->id)->value('is_active'));
+        }
+        DB::table('company_memberships')->where('id',$ownerMembership->id)->update(['is_active'=>false]);
+        try {
+            $service->staff($owner,$company->id);
+            $this->fail('Revoked owner retained staff access.');
+        } catch (AuthorizationException) {
+            $this->assertTrue(true);
+        }
+    }
+
     public function test_staff_management_screen_lists_members_and_owner_can_open_editor():void
     {
         $company=Company::create(['name'=>'Staff Screen Venue','slug'=>'staff-screen-venue']);

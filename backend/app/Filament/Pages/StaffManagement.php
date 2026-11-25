@@ -39,6 +39,7 @@ final class StaffManagement extends Page
     #[Locked]
     public ?string $selectedStaffId = null;
     public string $staffRole = 'manager';
+    public string $staffExpectedRole = '';
     public array $staffHallIds = [];
     public string $staffReason = '';
     public array $halls = [];
@@ -113,6 +114,7 @@ final class StaffManagement extends Page
         abort_unless($row !== null, 404);
         $this->selectedStaffId = $membershipId;
         $this->staffRole = $row['role'] === 'owner' ? 'owner' : $row['role'];
+        $this->staffExpectedRole = $row['role'];
         $this->staffHallIds = $row['hallIds'];
         $this->staffReason = '';
     }
@@ -135,7 +137,7 @@ final class StaffManagement extends Page
         ]);
         try {
             app(StaffDirectoryService::class)->update($actor, $this->companyId, $this->selectedStaffId,
-                $this->staffRole, $this->staffHallIds, $this->staffReason);
+                $this->staffRole, $this->staffHallIds, $this->staffReason, $this->staffExpectedRole);
         } catch (\Throwable $e) {
             $this->addError('staffReason', $e->getMessage());
             return;
