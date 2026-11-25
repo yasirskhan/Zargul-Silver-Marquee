@@ -77,6 +77,12 @@
         .package-grid,.services-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.package{padding:34px 28px;border:1px solid var(--line);background:#fff}.package.featured{background:var(--forest);color:#fff}.package span{color:var(--gold);font-weight:700}.package h3{margin:18px 0 8px}.package p{color:var(--muted);font-size:.9rem}
         .services-grid>div{padding:30px;background:#fff;text-align:center}.services-grid span{font-size:1.9rem;color:var(--gold)}
         .gallery-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.gallery-grid img{height:280px;width:100%;object-fit:cover}
+.gallery-link{display:block;overflow:hidden;border-radius:8px}
+.lightbox{display:none;position:fixed;inset:0;z-index:100;background:#07150fe8;align-items:center;justify-content:center;padding:24px}
+.lightbox:target{display:flex}.lightbox img{max-width:min(1100px,94vw);max-height:86vh;object-fit:contain;border-radius:8px}
+.lightbox-close{position:absolute;top:16px;right:22px;color:#fff;font-size:2rem;text-decoration:none;line-height:1}
+.lightbox-done{position:absolute;bottom:18px;right:22px;top:auto;font-size:.85rem;border:1px solid #ffffff77;padding:8px 14px;border-radius:6px}
+
         .enquiry{display:grid;grid-template-columns:1fr 1.1fr;gap:40px;background:var(--forest);color:#fff;align-items:center}.enquiry-form{background:#fff;color:var(--forest);padding:30px;box-shadow:0 16px 50px #0002}.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.enquiry-form label{display:flex;flex-direction:column;gap:6px;font-size:.78rem;font-weight:700;margin-bottom:12px}.enquiry-form input,.enquiry-form select,.enquiry-form textarea{background:#fcfbf9;border:1px solid #dddcd5;border-radius:4px;padding:11px;width:100%;font:inherit}.enquiry-form button{width:100%;border:0;padding:13px;background:var(--gold);font-weight:700;border-radius:4px}.enquiry-success,.enquiry-error{padding:10px;border-radius:5px}.enquiry-success{background:#edf7f0;color:#25543a}.enquiry-error{background:#fcebea;color:#a33}
         .contact{text-align:center}.footer{background:#10271f;color:#fff;display:flex;justify-content:space-between;gap:30px;flex-wrap:wrap;padding:38px clamp(22px,7vw,130px)}.footer p,.footer small{color:#c2d7ca;font-size:.84rem}.footer a{display:block;margin:4px 0}.designer-credit{text-align:center;padding:12px}
         @media(max-width:800px){.site-header{height:70px;padding:0 18px}.site-nav{display:none;position:absolute;top:70px;left:12px;right:12px;background:var(--forest);flex-direction:column;align-items:stretch;padding:14px 20px;gap:8px}.menu-toggle{display:block;background:transparent;border:0;color:#fff;font-size:1.7rem;cursor:pointer}.nav-toggle:checked ~ .site-nav{display:flex}.hero{min-height:620px}.section{padding:60px 20px}.hall-grid,.enquiry,.package-grid,.services-grid{grid-template-columns:1fr}.gallery-grid{grid-template-columns:repeat(3,1fr)}.gallery-grid img{height:150px}.form-row{grid-template-columns:1fr}.hero-content{margin:30px 22px 0}}
@@ -174,12 +180,23 @@
         <div class="gallery-grid">
             @forelse ($galleryIds as $id)
                 @if ($mediaBase!==null && isset($snapshot['media'][$id]))
-                    <img src="{{ $mediaBase.$id.'.webp' }}" alt="{{ $snapshot['media'][$id]['alt'] }}" loading="lazy">
+                    <a class="gallery-link" href="#gallery-{{ $id }}" aria-label="Open {{ $snapshot['media'][$id]['alt'] }}">
+                        <img src="{{ $mediaBase.$id.'.webp' }}" alt="{{ $snapshot['media'][$id]['alt'] }}" loading="lazy">
+                    </a>
                 @endif
             @empty
                 <div class="hall-media">Gallery</div><div class="hall-media">Gallery</div><div class="hall-media">Gallery</div>
             @endforelse
         </div>
+        @foreach ($galleryIds as $id)
+            @if ($mediaBase!==null && isset($snapshot['media'][$id]))
+                <div id="gallery-{{ $id }}" class="lightbox" role="dialog" aria-label="{{ $snapshot['media'][$id]['alt'] }}">
+                    <a class="lightbox-close" href="#gallery" aria-label="Close image">×</a>
+                    <img src="{{ $mediaBase.$id.'.webp' }}" alt="{{ $snapshot['media'][$id]['alt'] }}">
+                    <a class="lightbox-close lightbox-done" href="#gallery">Close</a>
+                </div>
+            @endif
+        @endforeach
     </section>
     @if ($canonicalUrl !== null)
         <section class="section enquiry" id="availability">
