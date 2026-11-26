@@ -27,7 +27,7 @@ Status legend: **B** backend/service functional, **F** existing functional form/
 | Support | `/admin/support-inbox` | yes | yes | partial | pending | threaded inbox layout |
 | Event operations | `/admin/event-operations` | yes | yes | partial | pending | mock checklist layout |
 | Setup wizard | `/admin/venue-setup` | yes | yes | two-column shell | wizard spec | field-group parity |
-| Installer start | `/install` | yes | yes | partial | tests | approved installer shell |
+| Installer start | `/install` | yes | yes | readiness + owner form | feature tests | full mock field polish |
 | Public homepage | published host | yes | CMS | hero image | pending | section-level mock parity |
 | Public booking | `/book` | yes | yes | approved shell | desktop/mobile | later-step visual parity |
 | Central dashboard | `/staff/home` | yes | existing | sidebar shell | central tests | inner page layouts |

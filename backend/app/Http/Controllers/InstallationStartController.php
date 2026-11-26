@@ -15,7 +15,12 @@ final class InstallationStartController
         if ($this->installed()) {
             return redirect('/admin/login');
         }
-        return response()->view('site.install.start', ['installed' => false]);
+        $checks = $this->readiness();
+        return response()->view('site.install.start', [
+            'installed' => false,
+            'checks' => $checks,
+            'ready' => collect($checks)->every(fn (array $check): bool => $check['ok']),
+        ]);
     }
 
     public function store(Request $request, OwnerBootstrapService $owners)
@@ -24,6 +29,8 @@ final class InstallationStartController
         if ($this->installed()) {
             return redirect('/admin/login');
         }
+        $checks = $this->readiness();
+        abort_unless(collect($checks)->every(fn (array $check): bool => $check['ok']), 503, 'Server readiness checks have not passed.');
         $data = $request->validate([
             'operator_token' => ['required', 'string', 'max:256'],
             'company_name' => ['required', 'string', 'min:2', 'max:120'],
@@ -42,6 +49,31 @@ final class InstallationStartController
             return back()->withErrors(['installation' => $exception->getMessage()])->withInput();
         }
         return redirect()->route('installation.owner.show', ['token' => $issued['token']]);
+    }
+
+    /** @return array<int,array{label:string,ok:bool,detail:string}> */
+    private function readiness(): array
+    {
+        $dbOk = false;
+        $dbDetail = 'Connection failed';
+        try {
+            DB::select('select 1');
+            $dbOk = true;
+            $dbDetail = 'PostgreSQL connection succeeded';
+        } catch (\Throwable $e) {
+            $dbDetail = 'Database connection failed';
+        }
+        $storage = storage_path('framework');
+        $extensions = ['pdo_pgsql', 'mbstring', 'openssl', 'fileinfo', 'gd'];
+        $missing = array_values(array_filter($extensions, fn (string $ext): bool => ! extension_loaded($ext)));
+        return [
+            ['label' => 'PHP 8.3 or newer', 'ok' => version_compare(PHP_VERSION, '8.3.0', '>='), 'detail' => PHP_VERSION],
+            ['label' => 'Required PHP extensions', 'ok' => $missing === [], 'detail' => $missing === [] ? 'pdo_pgsql, mbstring, openssl, fileinfo, gd' : 'Missing: '.implode(', ', $missing)],
+            ['label' => 'PostgreSQL connection', 'ok' => $dbOk, 'detail' => $dbDetail],
+            ['label' => 'Writable storage', 'ok' => is_dir($storage) && is_writable($storage), 'detail' => $storage],
+            ['label' => 'Application key', 'ok' => filled(config('app.key')), 'detail' => filled(config('app.key')) ? 'Configured' : 'APP_KEY missing'],
+            ['label' => 'Installation token', 'ok' => (string) config('installation.operator_token') !== '', 'detail' => (string) config('installation.operator_token') !== '' ? 'Configured' : 'OPERATOR TOKEN missing'],
+        ];
     }
 
     private function guard(): void
