@@ -1,5 +1,6 @@
 <x-filament-panels::page>
     <div class="space-y-6">
+        <x-venuedesk.header eyebrow="VenueDesk · Settings" title="Payment settings" />
         <section class="vd-panel">
             <div class="vd-panel-head"><h2>Payment settings</h2><p>Owner-controlled manual payment instructions. Provider API activation and live settlement remain disabled.</p></div>
             <label class="block space-y-1"><span class="text-sm font-medium">Operating company</span>
@@ -33,6 +34,35 @@
                 </div>
             @endforeach
             <button type="button" class="rounded-lg border px-3 py-2" wire:click="addBank">Add bank account</button>
+        </section>
+
+        <section class="vd-panel" aria-label="Payment instructions preview">
+            <div class="vd-panel-head"><h2>Staff-facing preview</h2><p>This is the guidance staff will see for manual deposits. No provider is charged.</p></div>
+            <div class="grid gap-4 md:grid-cols-2">
+                <div>
+                    <h3 class="font-semibold">Accepted methods</h3>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        @forelse($methods as $method)
+                            <span class="vd-status confirmed">{{ str_replace('_',' ', ucfirst($method)) }}</span>
+                        @empty
+                            <p class="text-sm">No manual method enabled.</p>
+                        @endforelse
+                    </div>
+                    <p class="mt-3 text-sm">{{ $instructions !== '' ? $instructions : 'No bank or wallet instructions entered.' }}</p>
+                </div>
+                <div>
+                    <h3 class="font-semibold">Venue accounts</h3>
+                    @forelse($banks as $bank)
+                        @if(trim((string)($bank['bankName'] ?? '')) !== '')
+                            <p class="text-sm">{{ $bank['bankName'] }} · {{ $bank['branch'] }} · {{ $bank['accountMasked'] }}</p>
+                        @endif
+                    @empty
+                        <p class="text-sm">No bank accounts configured.</p>
+                    @endforelse
+                    <p class="mt-3 text-sm">{{ $qrInstructions !== '' ? $qrInstructions : 'No QR / Raast instructions entered.' }}</p>
+                    <p class="mt-2 text-xs">Default deposit: {{ $depositPercent }}%</p>
+                </div>
+            </div>
         </section>
 
         <section class="vd-panel">

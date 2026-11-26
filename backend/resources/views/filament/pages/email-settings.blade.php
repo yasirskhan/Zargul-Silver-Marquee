@@ -1,5 +1,6 @@
 <x-filament-panels::page>
 <div class="space-y-6">
+<x-venuedesk.header eyebrow="VenueDesk · Settings" title="Email & SMTP" />
 <section class="vd-panel"><div class="vd-panel-head"><h2>Email / SMTP settings</h2><p>Owner-managed invoice delivery. Password is stored encrypted and never shown again.</p></div>
 <label class="block space-y-1"><span>Operating company</span><select wire:model.live="companyId" class="w-full rounded-lg border p-2 text-gray-900">@foreach($this->companyOptions() as $id=>$name)<option value="{{ $id }}">{{ $name }}</option>@endforeach</select></label>
 <p class="mt-2 text-xs text-gray-500">Revision {{ $revision }} · password {{ $hasPassword ? 'stored' : 'not set' }}</p></section>
