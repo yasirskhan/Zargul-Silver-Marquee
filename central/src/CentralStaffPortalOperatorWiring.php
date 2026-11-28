@@ -3,6 +3,9 @@ declare(strict_types=1);
 
 namespace Hafzatech\Central;
 
+require_once __DIR__.'/CentralStaffLicenseExpiryDirectory.php';
+require_once __DIR__.'/CentralStaffLicenseExpiryRenderer.php';
+
 use Closure;
 use PDO;
 
