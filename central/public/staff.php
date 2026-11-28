@@ -73,7 +73,7 @@ CSS;
         .'<div class="sub">CENTRAL CONTROL CENTER</div>'
         .'<a href="/staff/home">Dashboard</a><a href="/staff/plans">Plans &amp; pricing</a>'
         .'<a href="/staff/staff">Staff &amp; access</a><a href="/staff/team">Role requests</a>'
-        .'<a href="/staff/audit">Security &amp; audit</a></aside>'
+        .'<a href="/staff/audit">Security &amp; audit</a><a href="/staff/licenses/expiring">License expiry</a></aside>'
         .'<div class="central-work"><header class="central-top"><a class="brand" href="/staff/home">✦ HAFZATECH<b>CENTRAL CONTROL CENTER</b></a>'
         .'<span style="font-size:.7rem;letter-spacing:.16em;color:#caa56b">VENDOR ONLY</span></header>'
         .'<main class="central-wrap">'.$inner.'</main>'
@@ -116,7 +116,7 @@ if ($method === 'GET' && $path === '/staff') {
     exit;
 }
 $readPath = $method === 'GET' && in_array($path,
-    ['/staff/home','/staff/plans','/staff/team','/staff/audit','/staff/staff'],true)
+    ['/staff/home','/staff/plans','/staff/team','/staff/audit','/staff/staff','/staff/licenses/expiring'],true)
     || ($method === 'GET' && str_starts_with((string) $path, '/staff/customers/'));
 if (($method !== 'POST' && ! $readPath) || ! is_string($path) || ! str_starts_with($path, '/staff/')) {
     centralStaffReply(405, '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Method denied</title></head><body><main><h1>Method not allowed</h1></main></body></html>');

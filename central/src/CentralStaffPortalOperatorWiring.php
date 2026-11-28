@@ -101,7 +101,8 @@ final class CentralStaffPortalOperatorWiring
             new CentralStaffPaidLicensePreparation($db,$sessions,$auth,
                 new PaidLicensePreparation($db,new PaidInvoiceEligibility($db),$access)),
             $csrf,$sessions,
-            new CentralStaffLicenseDirectory($db,$sessions,$auth));
+            new CentralStaffLicenseDirectory($db,$sessions,$auth),
+            new CentralStaffLicenseExpiryDirectory($db,$sessions,$auth));
         return new CentralStaffPortalOperatorApp(
             new CentralStaffPortalOperatorKernel(
                 $router,new CentralStaffPortalPrivateResponse(true),true),

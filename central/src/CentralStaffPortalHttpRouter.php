@@ -46,7 +46,8 @@ final class CentralStaffPortalHttpRouter
         private readonly ?CentralStaffPaidLicensePreparation $licensePreparation = null,
         private readonly ?CentralStaffCsrfTokenService $csrfTokens = null,
         private readonly ?CentralStaffSessionService $sessions = null,
-        private readonly ?CentralStaffLicenseDirectory $licenseDirectory = null
+        private readonly ?CentralStaffLicenseDirectory $licenseDirectory = null,
+        private readonly ?CentralStaffLicenseExpiryDirectory $licenseExpiry = null
     ) {}
 
     /**
@@ -692,6 +693,10 @@ final class CentralStaffPortalHttpRouter
             $rows=$this->staffDirectory->listStaff($bearer,0,25);
             $title='Staff directory';$active='team';
             $content=CentralStaffAccountDirectory::html($rows);
+        } elseif($path==='/staff/licenses/expiring') {
+            if($this->licenseExpiry===null) throw new RegistrationError('staff_portal_denied');
+            $title='License expiry watch';$active='plans';
+            $content=CentralStaffLicenseExpiryRenderer::html($this->licenseExpiry->rows($bearer));
         } elseif($path==='/staff/customers/directory') {
             if($this->customerDirectory===null) throw new RegistrationError('staff_portal_denied');
             $rows=$this->customerDirectory->search($bearer,'',20);

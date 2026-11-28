@@ -24,6 +24,7 @@ final class CentralStaffPortalReadPage
             .$nav('plans','/staff/plans','Subscriptions and plans')
             .$nav('team','/staff/team','Staff and permissions')
             .$nav('audit','/staff/audit','Security and audit')
+            .$nav('plans','/staff/licenses/expiring','License expiry')
             .'</nav><form method="post" action="/staff/session/logout">'
             .'<input type="hidden" name="staff_csrf" value="'.$proof.'">'
             .'<button type="submit">Sign out</button></form></aside>'
