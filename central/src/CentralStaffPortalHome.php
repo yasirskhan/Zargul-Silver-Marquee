@@ -36,6 +36,8 @@ final class CentralStaffPortalHome
                 .'<div class="metric-card"><strong>'.$count($this->db,'SELECT count(*) FROM vendor_customers').'</strong><span>Customers</span></div>'
                 .'<div class="metric-card"><strong>'.$count($this->db,"SELECT count(*) FROM registered_installations WHERE status='active'").'</strong><span>Active installations</span></div>'
                 .'<div class="metric-card"><strong>'.$count($this->db,'SELECT count(*) FROM central_licenses').'</strong><span>Licenses</span></div>'
+                .'<div class="metric-card"><strong>'.$count($this->db,"SELECT count(*) FROM central_paid_license_revisions WHERE state='signed' AND expires_at > now() AND expires_at <= now() + interval '30 days'").'</strong><span>Expiring in 30 days</span></div>'
+                .'<div class="metric-card"><strong>'.$count($this->db,"SELECT count(*) FROM central_paid_license_revisions WHERE state='signed' AND expires_at <= now()").'</strong><span>Expired signed licenses</span></div>'
                 .'<div class="metric-card"><strong>'.$count($this->db,"SELECT count(*) FROM central_vendor_invoices WHERE status='issued'").'</strong><span>Issued invoices</span></div>'
                 .'<div class="metric-card"><strong>'.$count($this->db,"SELECT count(*) FROM vendor_support_tickets WHERE status NOT IN ('resolved','closed')").'</strong><span>Open support tickets</span></div>'
                 .'<div class="metric-card"><strong>'.$count($this->db,"SELECT count(*) FROM central_staff_users WHERE status='active'").'</strong><span>Active staff</span></div>'
