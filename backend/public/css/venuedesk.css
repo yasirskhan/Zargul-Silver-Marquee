@@ -177,3 +177,7 @@ body{background:var(--vd-cream)}
 .fi-page .fi-main input:not([type=checkbox]):not([type=radio]),.fi-page .fi-main select,.fi-page .fi-main textarea{border:1px solid #cfd8cd!important;border-radius:7px!important;background:#fff!important;min-height:40px;padding:9px 10px!important;color:#172b24!important}
 .fi-page .fi-main section.rounded-xl,.fi-page .fi-main section.rounded-lg{box-shadow:0 3px 15px #173b2910;border-color:#e3e4db!important;background:#fff}
 .fi-page .fi-main button.rounded-lg,.fi-page .fi-main a.rounded-lg{font-weight:650}
+
+/* The approved page header replaces Filament's duplicate page title. */
+.fi-page:has(.vd-pagehead) .fi-header,
+.fi-page:has(.vd-hero) .fi-header{display:none}
